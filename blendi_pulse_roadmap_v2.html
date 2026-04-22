@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLENDi Pulse — Master Roadmap v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pulse: #9a4893;
+    --pulse-dim: rgba(154,72,147,0.10);
+    --pulse-border: rgba(154,72,147,0.30);
+    --bg: #080c10;
+    --surface: #0e1318;
+    --surface2: #141b22;
+    --surface3: #1a242e;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8edf2;
+    --muted: #7a8a98;
+    --muted2: #4a5a68;
+    --green: #22c55e; --green-dim: rgba(34,197,94,0.12); --green-border: rgba(34,197,94,0.28);
+    --blue: #3b82f6; --blue-dim: rgba(59,130,246,0.10); --blue-border: rgba(59,130,246,0.28);
+    --amber: #f59e0b; --amber-dim: rgba(245,158,11,0.10); --amber-border: rgba(245,158,11,0.28);
+    --red: #ef4444; --red-dim: rgba(239,68,68,0.10); --red-border: rgba(239,68,68,0.28);
+    --teal: #14b8a6; --teal-dim: rgba(20,184,166,0.10); --teal-border: rgba(20,184,166,0.28);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar { width: 240px; flex-shrink: 0; background: var(--surface); border-right: 0.5px solid var(--border); position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 0 0 40px; scrollbar-width: none; display: flex; flex-direction: column; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar-brand { padding: 24px 20px 20px; border-bottom: 0.5px solid var(--border); }
+  .sidebar-logo { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: var(--text); display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pulse); animation: lp 2s ease-in-out infinite; }
+  @keyframes lp { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)} }
+  .sidebar-sub { font-size: 11px; color: var(--muted); }
+  .sidebar-version { display: inline-block; margin-top: 6px; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); font-family: 'Syne', sans-serif; }
+  .nav-scroll { flex: 1; overflow-y: auto; padding: 8px 0 16px; scrollbar-width: none; }
+  .nav-scroll::-webkit-scrollbar { display: none; }
+  .nav-section { padding: 0 20px; margin-bottom: 4px; }
+  .nav-label { font-size: 10px; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; margin-top: 14px; }
+  .nav-link { display: block; padding: 5px 8px; border-radius: 6px; font-size: 12px; color: var(--muted); text-decoration: none; transition: background .15s, color .15s; margin-bottom: 1px; }
+  .nav-link:hover { background: var(--surface2); color: var(--text); }
+  .nav-link.active { background: var(--pulse-dim); color: var(--pulse); }
+
+  /* Lang toggle */
+  .lang-toggle { padding: 16px 20px; border-top: 0.5px solid var(--border); margin-top: auto; }
+  .lang-label { font-size: 10px; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+  .lang-btns { display: flex; gap: 6px; }
+  .lang-btn { flex: 1; padding: 6px 0; border-radius: 6px; border: 0.5px solid var(--border2); background: transparent; color: var(--muted); font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s; letter-spacing: 0.05em; }
+  .lang-btn:hover { background: var(--surface2); color: var(--text); }
+  .lang-btn.active { background: var(--pulse-dim); color: var(--pulse); border-color: var(--pulse-border); }
+
+  /* Main */
+  .main { flex: 1; padding: 48px 52px 80px; max-width: 860px; }
+  h1 { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--text); line-height: 1.15; margin-bottom: 8px; }
+  h2 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); margin-top: 48px; margin-bottom: 16px; padding-top: 20px; border-top: 0.5px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  h2.first { margin-top: 32px; border-top: none; }
+  h3 { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--text); margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.07em; }
+  p { color: var(--muted); margin-bottom: 12px; font-size: 13px; line-height: 1.7; }
+  strong { color: var(--text); font-weight: 500; }
+  code { font-family: 'DM Mono', monospace; font-size: 11px; background: var(--surface2); border: 0.5px solid var(--border2); border-radius: 4px; padding: 1px 5px; color: var(--pulse); }
+  hr { border: none; border-top: 0.5px solid var(--border); margin: 32px 0; }
+
+  /* Hero */
+  .hero { margin-bottom: 40px; padding-bottom: 32px; border-bottom: 0.5px solid var(--border); }
+  .hero-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--pulse-dim); border: 0.5px solid var(--pulse-border); border-radius: 999px; padding: 4px 12px; font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; color: var(--pulse); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 16px; }
+  .hero-meta { display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .hero-stat-label { font-size: 10px; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+  .hero-stat-val { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--text); }
+
+  /* Changelog */
+  .changelog { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; }
+  .changelog-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+  .cl-row { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; border-bottom: 0.5px solid var(--border); font-size: 12px; }
+  .cl-row:last-child { border-bottom: none; }
+  .cl-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px; font-family: 'Syne', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; margin-top: 1px; }
+  .cl-added { background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); }
+  .cl-removed { background: var(--red-dim); color: var(--red); border: 0.5px solid var(--red-border); }
+  .cl-changed { background: var(--amber-dim); color: var(--amber); border: 0.5px solid var(--amber-border); }
+  .cl-moved { background: var(--blue-dim); color: var(--blue); border: 0.5px solid var(--blue-border); }
+  .cl-text { color: var(--muted); line-height: 1.5; }
+  .cl-text strong { color: var(--text); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 10px; }
+  .card-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+
+  /* Info boxes */
+  .info-box { border-radius: 10px; padding: 13px 16px; margin-bottom: 12px; display: flex; gap: 10px; align-items: flex-start; }
+  .info-box.warning { background: var(--amber-dim); border: 0.5px solid var(--amber-border); }
+  .info-box.info { background: var(--blue-dim); border: 0.5px solid var(--blue-border); }
+  .info-box.success { background: var(--green-dim); border: 0.5px solid var(--green-border); }
+  .info-box.teal { background: var(--teal-dim); border: 0.5px solid var(--teal-border); }
+  .info-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .info-text { font-size: 12px; line-height: 1.6; }
+  .info-box.warning .info-text { color: var(--amber); }
+  .info-box.info .info-text { color: var(--blue); }
+  .info-box.success .info-text { color: var(--green); }
+  .info-box.teal .info-text { color: var(--teal); }
+
+  /* Screen map */
+  .screen-map { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .screen-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 12px; }
+  .screen-card.highlight { border-color: var(--pulse-border); }
+  .screen-tab { font-size: 10px; font-weight: 700; color: var(--pulse); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 5px; font-family: 'Syne', sans-serif; }
+  .screen-tab.teal { color: var(--teal); }
+  .screen-name { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .screen-items { display: flex; flex-direction: column; gap: 2px; }
+  .screen-item { font-size: 11px; color: var(--muted); display: flex; gap: 5px; }
+  .screen-item::before { content: '—'; color: var(--muted2); flex-shrink: 0; }
+  .screen-new { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px; background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); vertical-align: middle; margin-left: 3px; font-family: 'Syne', sans-serif; }
+
+  /* Stack grid */
+  .stack-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stack-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px; }
+  .stack-layer { font-size: 10px; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+  .stack-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--border); }
+  .stack-item:last-child { border-bottom: none; }
+  .stack-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+  .dp { background: var(--pulse); } .dg { background: var(--green); } .db { background: var(--blue); } .da { background: var(--amber); } .dt { background: var(--teal); }
+  .stack-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .stack-why { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* API table */
+  .api-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .api-table th { font-size: 10px; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.07em; text-align: left; padding: 8px 12px; background: var(--surface); border-bottom: 0.5px solid var(--border); }
+  .api-table td { font-size: 12px; color: var(--muted); padding: 10px 12px; border-bottom: 0.5px solid var(--border); vertical-align: top; }
+  .api-table tr:last-child td { border-bottom: none; }
+  .api-table tr:hover td { background: var(--surface2); }
+  .api-name { font-weight: 500; color: var(--text); margin-bottom: 2px; font-family: 'DM Mono', monospace; font-size: 11px; }
+  .api-desc { font-size: 11px; color: var(--muted); }
+  .cost-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; font-family: 'DM Mono', monospace; }
+  .cf { background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); }
+  .cv { background: var(--blue-dim); color: var(--blue); border: 0.5px solid var(--blue-border); }
+
+  /* Phases */
+  .phase { border: 0.5px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
+  .phase-header { padding: 14px 20px; background: var(--surface); display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; border-bottom: 0.5px solid var(--border); }
+  .phase-header:hover { background: var(--surface2); }
+  .phase-num { width: 32px; height: 32px; border-radius: 8px; background: var(--pulse-dim); border: 0.5px solid var(--pulse-border); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; color: var(--pulse); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .phase-meta { flex: 1; }
+  .phase-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .phase-timeline { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .phase-badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; font-family: 'Syne', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; }
+  .bf { background: var(--amber-dim); color: var(--amber); border: 0.5px solid var(--amber-border); }
+  .bm { background: var(--pulse-dim); color: var(--pulse); border: 0.5px solid var(--pulse-border); }
+  .bh { background: var(--blue-dim); color: var(--blue); border: 0.5px solid var(--blue-border); }
+  .bo { background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); }
+  .bl { background: var(--red-dim); color: var(--red); border: 0.5px solid var(--red-border); }
+  .bg2 { background: rgba(139,92,246,0.12); color: #a78bfa; border: 0.5px solid rgba(139,92,246,0.3); }
+  .phase-toggle { font-size: 11px; color: var(--muted); }
+  .phase-body { background: var(--surface); padding: 16px 20px; display: none; }
+  .phase-body.open { display: block; }
+
+  /* Tasks */
+  .task-list { display: flex; flex-direction: column; gap: 8px; }
+  .task { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--surface2); border-radius: 8px; border: 0.5px solid var(--border); }
+  .task-icon { width: 22px; height: 22px; border-radius: 6px; background: var(--surface3); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .task-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .task-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .task-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--surface3); color: var(--muted); border: 0.5px solid var(--border2); font-family: 'DM Mono', monospace; }
+  .tag.crit { background: var(--red-dim); color: var(--red); border-color: var(--red-border); }
+  .tag.new { background: var(--green-dim); color: var(--green); border-color: var(--green-border); }
+  .tag.moved { background: var(--blue-dim); color: var(--blue); border-color: var(--blue-border); }
+
+  /* Hosting */
+  .hosting-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+  .hosting-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px; }
+  .hosting-service { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; font-family: 'DM Mono', monospace; }
+  .hosting-role { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .hosting-cost { font-size: 12px; color: var(--amber); font-weight: 500; }
+
+  /* Questions */
+  .questions { display: flex; flex-direction: column; gap: 8px; }
+  .question { display: flex; align-items: flex-start; gap: 12px; background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 13px 15px; }
+  .q-num { width: 24px; height: 24px; border-radius: 6px; background: var(--amber-dim); border: 0.5px solid var(--amber-border); font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; color: var(--amber); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .q-answered { background: var(--green-dim); border: 0.5px solid var(--green-border); }
+  .q-answered .q-num { background: var(--green-dim); border-color: var(--green-border); color: var(--green); }
+  .q-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .q-why { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .q-answer { font-size: 11px; color: var(--green); margin-top: 4px; font-weight: 500; }
+  .q-category { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-top: 5px; display: inline-block; font-family: 'Syne', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo"><div class="logo-dot"></div>BLENDi Pulse</div>
+      <div class="sidebar-sub">Master Technical Roadmap</div>
+      <div class="sidebar-version" data-i18n="version">v2 — Updated</div>
+    </div>
+    <div class="nav-scroll">
+      <div class="nav-section">
+        <div class="nav-label" data-i18n="nav_overview">Overview</div>
+        <a class="nav-link" href="#overview" data-i18n="nav_summary">Executive summary</a>
+        <a class="nav-link" href="#changelog" data-i18n="nav_changelog">What changed in v2</a>
+        <a class="nav-link" href="#architecture" data-i18n="nav_arch">App architecture</a>
+        <a class="nav-link" href="#screens" data-i18n="nav_screens">Screen map</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label" data-i18n="nav_tech">Tech stack</div>
+        <a class="nav-link" href="#stack" data-i18n="nav_stack">Languages & frameworks</a>
+        <a class="nav-link" href="#apis" data-i18n="nav_apis">Required APIs</a>
+        <a class="nav-link" href="#ai" data-i18n="nav_ai">AI integrations</a>
+        <a class="nav-link" href="#hosting" data-i18n="nav_hosting">Hosting</a>
+        <a class="nav-link" href="#mobile" data-i18n="nav_mobile">iOS & Android</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label" data-i18n="nav_phases">Dev phases</div>
+        <a class="nav-link" href="#phase0" data-i18n="nav_ph0">Phase 0 — Foundation</a>
+        <a class="nav-link" href="#phase1" data-i18n="nav_ph1">Phase 1 — MVP Core</a>
+        <a class="nav-link" href="#phase2" data-i18n="nav_ph2">Phase 2 — Habit</a>
+        <a class="nav-link" href="#phase3" data-i18n="nav_ph3">Phase 3 — Moat</a>
+        <a class="nav-link" href="#phase4" data-i18n="nav_ph4">Phase 4 — Launch</a>
+        <a class="nav-link" href="#phase5" data-i18n="nav_ph5">Phase 5 — Growth</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label" data-i18n="nav_open">Open decisions</div>
+        <a class="nav-link" href="#questions" data-i18n="nav_questions">Critical questions</a>
+      </div>
+    </div>
+    <div class="lang-toggle">
+      <div class="lang-label" data-i18n="lang_label">Language</div>
+      <div class="lang-btns">
+        <button class="lang-btn active" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" onclick="setLang('pt')">PT-BR</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- HERO -->
+    <div class="hero" id="overview">
+      <div class="hero-pill">⚡ <span data-i18n="hero_pill">BLENDi Pulse — Internal Document</span></div>
+      <h1>BLENDi Pulse<br><span data-i18n="hero_title">Master Technical Roadmap v2</span></h1>
+      <p data-i18n="hero_desc">Complete reference document for app development. This is version 2, updated with executive feedback from Jon, Gemini's technical recommendations, and confirmed product decisions. Follow this document precisely — all major changes from v1 are logged in the changelog below.</p>
+      <div class="hero-meta">
+        <div><span class="hero-stat-label" data-i18n="stat_date">Date</span><span class="hero-stat-val">April 2026</span></div>
+        <div><span class="hero-stat-label" data-i18n="stat_phases">Phases</span><span class="hero-stat-val">6</span></div>
+        <div><span class="hero-stat-label" data-i18n="stat_duration">Estimated duration</span><span class="hero-stat-val">~24 weeks</span></div>
+        <div><span class="hero-stat-label" data-i18n="stat_platforms">Platforms</span><span class="hero-stat-val">iOS + Android + Web</span></div>
+      </div>
+    </div>
+
+    <!-- CHANGELOG -->
+    <h2 class="first" id="changelog">📝 <span data-i18n="h_changelog">What changed from v1 → v2</span></h2>
+    <p data-i18n="changelog_desc">Every decision below was confirmed by Jon directly or approved through the Gemini–Claude strategy session. No changes were made without executive input.</p>
+    <div class="changelog">
+      <div class="changelog-title" data-i18n="changelog_title">Version 2 — Change log</div>
+      <div class="cl-row"><span class="cl-badge cl-removed" data-i18n="badge_removed">Removed</span><span class="cl-text"><strong data-i18n="cl1_name">Pulse Level (habit bar)</strong> — <span data-i18n="cl1_why">Removed by Gabriel. Required manual blend registration — if user forgets, streak breaks unfairly. Replaced by Goal Rings (positive progress, not anxiety).</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-removed" data-i18n="badge_removed">Removed</span><span class="cl-text"><strong data-i18n="cl2_name">Community Pulses feed</strong> — <span data-i18n="cl2_why">App is a performance tool, not a social network. Replaced by Share Cards only (UGC for external platforms). Tab renamed from "Pulses" to "Track".</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-removed" data-i18n="badge_removed">Removed</span><span class="cl-text"><strong data-i18n="cl3_name">Hardware Health Estimation</strong> — <span data-i18n="cl3_why">No direct sensors on the hardware. Any motor health estimate would be inaccurate and could cause bad UX. Cleaning reminder by time (every 7 days) stays — by usage count is removed.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-added" data-i18n="badge_added">Added</span><span class="cl-text"><strong data-i18n="cl4_name">Nutrition Goal Tracking — macro rings</strong> — <span data-i18n="cl4_why">Jon's direct request. User sets daily protein/calorie targets in onboarding. Home screen shows Goal Rings filling as blends are logged. Replaces Pulse Level as the main daily engagement driver.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-added" data-i18n="badge_added">Added</span><span class="cl-text"><strong data-i18n="cl5_name">Hydration & Supplement Stack tracking</strong> — <span data-i18n="cl5_why">Jon's direct request. 1-tap water log + "My Stack" daily checklist (creatine ✓, collagen ✓). Zero AI cost. High daily-open value for Gym & Protein and Active Moms segments.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-moved" data-i18n="badge_moved">Moved</span><span class="cl-text"><strong data-i18n="cl6_name">Offline Mode → Phase 1</strong> — <span data-i18n="cl6_why">Jon's direct request. Was not in the original roadmap at all. Cache favorites + last 20 recipes locally. Critical for kitchen use and travel. Jon said "this is Phase 1, not Phase 5."</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-added" data-i18n="badge_added">Added</span><span class="cl-text"><strong data-i18n="cl7_name">i18n from Day 0</strong> — <span data-i18n="cl7_why">Gemini's technical recommendation (confirmed). No hardcoded strings anywhere. Use i18next + JSON language files. Adding Portuguese or Spanish later must be a config change, not a code refactor.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-changed" data-i18n="badge_changed">Changed</span><span class="cl-text"><strong data-i18n="cl8_name">Tab "Pulses" → "Track"</strong> — <span data-i18n="cl8_why">Navigation stays at 5 tabs. The Track tab hosts: Goal Rings detail, Hydration Log, Supplement Stack, blend history. App pivots from recipe tool to daily wellness tracker.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-changed" data-i18n="badge_changed">Changed</span><span class="cl-text"><strong data-i18n="cl9_name">Pantry Scanner — scope reduced for Phase 2</strong> — <span data-i18n="cl9_why">Focus on common household ingredients first (fruits, oats, vegetables). Supplement Detector (protein tubs, creatine) moves to Phase 5. Smart Substitutes Engine is the main value prop.</span></span></div>
+      <div class="cl-row"><span class="cl-badge cl-added" data-i18n="badge_added">Added</span><span class="cl-text"><strong data-i18n="cl10_name">Skeleton screens as implementation standard</strong> — <span data-i18n="cl10_why">Every screen with an AI call (Pulse AI, Pantry Scanner) must show skeleton placeholders while loading. App must feel as fast as the 120W hardware — no spinners, no blank screens.</span></span></div>
+    </div>
+
+    <!-- ARCHITECTURE -->
+    <h2 id="architecture">🏗 <span data-i18n="h_arch">App architecture</span></h2>
+    <p data-i18n="arch_desc">Three independent layers communicating via API. This separation allows the mobile app to evolve independently from the backend — and vice versa. The i18n layer now runs across all three.</p>
+    <div class="card"><div class="card-title" data-i18n="arch1_title">Layer 1 — Mobile frontend (what the user sees)</div><p style="margin:0;font-size:12px;" data-i18n="arch1_desc">React Native + Expo. Consumes backend API over HTTPS. All UI/UX lives here. HealthKit / Health Connect integration at this layer. i18next handles language switching client-side. Offline cache via React Query + MMKV storage.</p></div>
+    <div class="card"><div class="card-title" data-i18n="arch2_title">Layer 2 — Backend API (the brain)</div><p style="margin:0;font-size:12px;" data-i18n="arch2_desc">Node.js + Express. Authentication, database, business logic, AI API calls, payment processing, email delivery, cron jobs (daily push, weekly report). Never exposed directly to the end user.</p></div>
+    <div class="card"><div class="card-title" data-i18n="arch3_title">Layer 3 — Database + Storage (memory)</div><p style="margin:0;font-size:12px;" data-i18n="arch3_desc">MongoDB Atlas for structured data (users, recipes, blend logs, macro goals, hydration, supplement stack). Cloudflare R2 for files (Pantry Scanner photos, generated share cards). Upstash Redis for AI response caching and rate limiting.</p></div>
+    <div class="info-box warning"><span class="info-icon">⚠</span><span class="info-text" data-i18n="arch_warn">The current prototype is plain HTML with localStorage. It will NOT be the base of the mobile app. It serves as a UI reference. Development starts from scratch in React Native. The prototype can be deployed to Vercel as a stakeholder demo.</span></div>
+
+    <!-- SCREENS -->
+    <h2 id="screens">📱 <span data-i18n="h_screens">Screen map — v2</span></h2>
+    <p data-i18n="screens_desc">5-tab navigation. "Pulses" tab renamed to "Track" — now the daily wellness tracking hub. Community feed removed. Share Cards remain as an action inside the Track tab.</p>
+    <div class="screen-map">
+      <div class="screen-card">
+        <div class="screen-tab" data-i18n="tab1">Tab 1</div>
+        <div class="screen-name">🏠 Home</div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="s1_1">Dynamic greeting (time of day)</span></div>
+          <div class="screen-item"><span data-i18n="s1_2">Goal Rings (protein + calories)</span> <span class="screen-new">NEW</span></div>
+          <div class="screen-item"><span data-i18n="s1_3">Today's biometric recipe</span></div>
+          <div class="screen-item"><span data-i18n="s1_4">Streak counter</span></div>
+          <div class="screen-item"><span data-i18n="s1_5">Quick Protocols (4 cards)</span></div>
+          <div class="screen-item"><span data-i18n="s1_6">Trial / Pro badge</span></div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-tab" data-i18n="tab2">Tab 2</div>
+        <div class="screen-name">🔍 <span data-i18n="tab2_name">Recipes</span></div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="s2_1">Pulse AI chat</span></div>
+          <div class="screen-item"><span data-i18n="s2_2">Goal / model filter</span></div>
+          <div class="screen-item"><span data-i18n="s2_3">Pantry Scanner entry</span></div>
+          <div class="screen-item"><span data-i18n="s2_4">Favorites</span></div>
+          <div class="screen-item"><span data-i18n="s2_5">Shopping list</span></div>
+          <div class="screen-item"><span data-i18n="s2_6">Skeleton screens on all AI loads</span> <span class="screen-new">NEW</span></div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-tab" data-i18n="tab3">Tab 3 — CTA</div>
+        <div class="screen-name">⚡ Blend</div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="s3_1">30s timer (simple)</span></div>
+          <div class="screen-item"><span data-i18n="s3_2">Active recipe step-by-step</span></div>
+          <div class="screen-item"><span data-i18n="s3_3">Pantry Scanner (camera)</span></div>
+          <div class="screen-item"><span data-i18n="s3_4">Cleaning reminder (7-day)</span></div>
+          <div class="screen-item"><span data-i18n="s3_5">Seamless Refill prompt</span></div>
+        </div>
+      </div>
+      <div class="screen-card highlight">
+        <div class="screen-tab teal" data-i18n="tab4">Tab 4 — NEW</div>
+        <div class="screen-name">📊 Track</div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="s4_1">Goal Rings detail view</span> <span class="screen-new">NEW</span></div>
+          <div class="screen-item"><span data-i18n="s4_2">1-tap Hydration Log</span> <span class="screen-new">NEW</span></div>
+          <div class="screen-item"><span data-i18n="s4_3">My Stack (supplement checklist)</span> <span class="screen-new">NEW</span></div>
+          <div class="screen-item"><span data-i18n="s4_4">Blend history + macro totals</span></div>
+          <div class="screen-item"><span data-i18n="s4_5">Share Card generator</span></div>
+          <div class="screen-item"><span data-i18n="s4_6">Weekly Nutrition Report</span></div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-tab" data-i18n="tab5">Tab 5</div>
+        <div class="screen-name">👤 Me</div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="s5_1">Profile + selected model</span></div>
+          <div class="screen-item"><span data-i18n="s5_2">Macro goals settings</span></div>
+          <div class="screen-item"><span data-i18n="s5_3">Earned badges</span></div>
+          <div class="screen-item"><span data-i18n="s5_4">Biometric Sync status</span></div>
+          <div class="screen-item"><span data-i18n="s5_5">Free vs Pro / manage plan</span></div>
+          <div class="screen-item"><span data-i18n="s5_6">Language preference</span></div>
+        </div>
+      </div>
+      <div class="screen-card" style="border-color:var(--pulse-border);">
+        <div class="screen-tab" data-i18n="tabM">Modals</div>
+        <div class="screen-name" data-i18n="tabM_name">+ Extra flows</div>
+        <div class="screen-items">
+          <div class="screen-item"><span data-i18n="sm1">Onboarding (model + goal + macro targets)</span></div>
+          <div class="screen-item"><span data-i18n="sm2">Pantry Scanner flow</span></div>
+          <div class="screen-item"><span data-i18n="sm3">Pulse Pro paywall</span></div>
+          <div class="screen-item"><span data-i18n="sm4">Golden Ticket activation</span></div>
+          <div class="screen-item"><span data-i18n="sm5">Biometric permission request</span></div>
+          <div class="screen-item"><span data-i18n="sm6">Offline mode indicator</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STACK -->
+    <h2 id="stack">🛠 <span data-i18n="h_stack">Languages & frameworks</span></h2>
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-layer" data-i18n="layer_mobile">Mobile app</div>
+        <div class="stack-item"><div class="stack-dot dp"></div><div><div class="stack-name">React Native + Expo SDK 52</div><div class="stack-why" data-i18n="rn_why">One codebase for iOS + Android. EAS Build delivers IPA and APK without a local Mac.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dp"></div><div><div class="stack-name">TypeScript</div><div class="stack-why" data-i18n="ts_why">Type safety end-to-end. Shared types between frontend and backend.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dp"></div><div><div class="stack-name">React Navigation 7</div><div class="stack-why" data-i18n="rn7_why">Bottom tabs + stack navigator. Industry standard.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dp"></div><div><div class="stack-name">Zustand</div><div class="stack-why" data-i18n="zus_why">Lightweight global state. Goal rings, hydration counter, supplement stack all live here.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dt"></div><div><div class="stack-name">i18next + react-i18next</div><div class="stack-why" data-i18n="i18n_why">NEW — i18n from Day 0. JSON language files. No hardcoded strings anywhere in the codebase.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dt"></div><div><div class="stack-name">React Query + MMKV</div><div class="stack-why" data-i18n="mmkv_why">NEW — Offline mode. React Query manages cache. MMKV (fast native storage) stores last 20 recipes and favorites locally.</div></div></div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-layer" data-i18n="layer_backend">Backend API</div>
+        <div class="stack-item"><div class="stack-dot dg"></div><div><div class="stack-name">Node.js + Express 5</div><div class="stack-why" data-i18n="node_why">Fast to prototype endpoints. Async-first — ideal for chained AI API calls.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dg"></div><div><div class="stack-name">TypeScript</div><div class="stack-why" data-i18n="tsbe_why">Full-stack consistency. Shared type definitions minimize integration bugs.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dg"></div><div><div class="stack-name">JWT + Refresh Tokens</div><div class="stack-why" data-i18n="jwt_why">Stateless auth. Access token (15min) + refresh token (30 days) in secure storage.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dg"></div><div><div class="stack-name">Zod</div><div class="stack-why" data-i18n="zod_why">Runtime schema validation on all API inputs before they reach the database.</div></div></div>
+        <div class="stack-item"><div class="stack-dot dg"></div><div><div class="stack-name">node-cron</div><div class="stack-why" data-i18n="cron_why">Daily push notifications, weekly report emails, trial expiry downgrade.</div></div></div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-layer" data-i18n="layer_db">Database</div>
+        <div class="stack-item"><div class="stack-dot db"></div><div><div class="stack-name">MongoDB Atlas</div><div class="stack-why" data-i18n="mongo_why">Free tier (M0) for MVP. Flexible schema handles evolving data models (new fields for macro goals, hydration, supplement stack).</div></div></div>
+        <div class="stack-item"><div class="stack-dot db"></div><div><div class="stack-name">Mongoose</div><div class="stack-why" data-i18n="mongoose_why">ODM. Models: User, Recipe, BlendLog, MacroGoal, HydrationLog, SupplementStack.</div></div></div>
+        <div class="stack-item"><div class="stack-dot db"></div><div><div class="stack-name">Redis (Upstash)</div><div class="stack-why" data-i18n="redis_why">AI response cache + Pantry Scanner rate limiting (3/month free tier). Serverless — near-zero cost at MVP.</div></div></div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-layer" data-i18n="layer_storage">Storage & media</div>
+        <div class="stack-item"><div class="stack-dot da"></div><div><div class="stack-name">Cloudflare R2</div><div class="stack-why" data-i18n="r2_why">S3-compatible, zero egress cost. Pantry Scanner photos, share card PNGs, recipe images. Global CDN included.</div></div></div>
+        <div class="stack-item"><div class="stack-dot da"></div><div><div class="stack-name">Sharp (Node.js)</div><div class="stack-why" data-i18n="sharp_why">Server-side image resize + compression + share card PNG generation.</div></div></div>
+      </div>
+    </div>
+
+    <div class="info-box teal">
+      <span class="info-icon">🌍</span>
+      <span class="info-text" data-i18n="i18n_note"><strong>i18n architecture note:</strong> All user-facing strings must reference a key in the language JSON file — never written inline. Structure: <code>/locales/en.json</code> and <code>/locales/pt-BR.json</code>. Language preference saved in user profile (backend) and local storage (offline). Adding a new language in the future = create a new JSON file, zero code changes.</span>
+    </div>
+
+    <!-- APIS -->
+    <h2 id="apis">🔌 <span data-i18n="h_apis">Required APIs & integrations</span></h2>
+    <table class="api-table">
+      <thead><tr><th data-i18n="th_api">API / Service</th><th data-i18n="th_purpose">Purpose</th><th data-i18n="th_phase">Phase</th><th data-i18n="th_cost">Cost</th></tr></thead>
+      <tbody>
+        <tr><td><div class="api-name">OpenAI GPT-4o</div></td><td class="api-desc" data-i18n="api1">Pulse AI chat — recipe generation with macros. Smart Substitutes Engine. Biometric context injection.</td><td>1</td><td><span class="cost-badge cv">~$0.01/req</span></td></tr>
+        <tr><td><div class="api-name">OpenAI Vision (GPT-4o)</div></td><td class="api-desc" data-i18n="api2">Pantry Scanner — analyzes fridge/pantry photo to identify common household ingredients.</td><td>2</td><td><span class="cost-badge cv">~$0.02/scan</span></td></tr>
+        <tr><td><div class="api-name">RevenueCat</div></td><td class="api-desc" data-i18n="api3">Subscription management (Pulse Pro $4.99/mo, $49/yr). Integrates with App Store and Play Store automatically.</td><td>3</td><td><span class="cost-badge cf">Free &lt;$2.5k MRR</span></td></tr>
+        <tr><td><div class="api-name">Apple HealthKit</div></td><td class="api-desc" data-i18n="api4">Biometric Sync — sleep, HRV, active calories from iPhone / Apple Watch.</td><td>3</td><td><span class="cost-badge cf">Free</span></td></tr>
+        <tr><td><div class="api-name">Google Health Connect</div></td><td class="api-desc" data-i18n="api5">Biometric Sync — Android equivalent. Integrates with Google Fit, Garmin, Fitbit.</td><td>3</td><td><span class="cost-badge cf">Free</span></td></tr>
+        <tr><td><div class="api-name">Resend</div></td><td class="api-desc" data-i18n="api6">Transactional emails + 5-email post-purchase automation. Bilingual templates (EN / PT-BR).</td><td>1</td><td><span class="cost-badge cf">3k emails/mo free</span></td></tr>
+        <tr><td><div class="api-name">Expo Push Notifications</div></td><td class="api-desc" data-i18n="api7">Daily Pulse, streak reminders, trial expiry alerts. Bilingual payloads.</td><td>2</td><td><span class="cost-badge cf">Free</span></td></tr>
+        <tr><td><div class="api-name">QR Code (npm qrcode)</div></td><td class="api-desc" data-i18n="api8">Golden Ticket — batch QR generation per production lot for 30-day trial activation.</td><td>4</td><td><span class="cost-badge cf">Free</span></td></tr>
+        <tr><td><div class="api-name">Shopify API</div></td><td class="api-desc" data-i18n="api9">Seamless Refill — 1-tap restock of Mocktail Mixes and parts. Requires confirmation from Jon.</td><td>3</td><td><span class="cost-badge cf">Free (public API)</span></td></tr>
+        <tr><td><div class="api-name">Expo Camera</div></td><td class="api-desc" data-i18n="api10">Pantry Scanner — camera access for fridge/pantry photos.</td><td>2</td><td><span class="cost-badge cf">Free</span></td></tr>
+        <tr><td><div class="api-name">Sentry</div></td><td class="api-desc" data-i18n="api11">Error tracking — iOS, Android, and backend. Critical for catching production crashes.</td><td>4</td><td><span class="cost-badge cf">Free &lt;5k errors/mo</span></td></tr>
+      </tbody>
+    </table>
+
+    <!-- AI -->
+    <h2 id="ai">🧠 <span data-i18n="h_ai">AI integrations</span></h2>
+    <div class="card"><div class="card-title" data-i18n="ai1_title">GPT-4o — Pulse AI + Smart Substitutes + Biometric context</div><p style="margin:0;font-size:12px;" data-i18n="ai1_desc">Input: user's BLENDi model, goal, blend history, available ingredients, and biometric data category (if synced). Output: structured JSON with recipe title, ingredients, macros (protein/carbs/fat/kcal), blend time, instructions. System prompt always forces JSON output format.</p></div>
+    <div class="card"><div class="card-title" data-i18n="ai2_title">GPT-4o Vision — Pantry Scanner (Phase 2 scope)</div><p style="margin:0;font-size:12px;" data-i18n="ai2_desc">Input: base64 photo. Output: JSON list of detected common ingredients (fruits, vegetables, oats, dairy). Second call generates 3 recipes with Smart Substitutes for missing items. Supplement Detector (protein tubs, creatine) intentionally excluded — Phase 5 only.</p></div>
+    <div class="card"><div class="card-title" data-i18n="ai3_title">Biometric logic — no separate model needed</div><p style="margin:0;font-size:12px;" data-i18n="ai3_desc">Backend reads sleep hours + HRV + calories from HealthKit/Health Connect. Maps to simple categories (recovery needed / high energy / dehydration risk). These categories are injected as context into GPT-4o. No dedicated ML model — GPT-4o handles interpretation.</p></div>
+    <div class="info-box info"><span class="info-icon">💡</span><span class="info-text" data-i18n="ai_cost">Estimated AI cost at MVP (100 active users, 5 Pulse AI requests/week, 10 Pantry scans/month): ~$15–40/month. Redis cache prevents duplicate API calls. Scales linearly with users.</span></div>
+
+    <!-- HOSTING -->
+    <h2 id="hosting">☁️ <span data-i18n="h_hosting">Hosting & infrastructure</span></h2>
+    <div class="hosting-grid">
+      <div class="hosting-card"><div class="hosting-service">Railway</div><div class="hosting-role" data-i18n="h1_role">Node.js backend API. Auto-deploy via GitHub. No server configuration. Auto-scales.</div><div class="hosting-cost">~$5–20/month</div></div>
+      <div class="hosting-card"><div class="hosting-service">MongoDB Atlas</div><div class="hosting-role" data-i18n="h2_role">Primary database. Free M0 tier sufficient for MVP (~10k active users).</div><div class="hosting-cost" data-i18n="h2_cost">Free at MVP scale</div></div>
+      <div class="hosting-card"><div class="hosting-service">Cloudflare R2</div><div class="hosting-role" data-i18n="h3_role">Image storage. Zero egress cost. Global CDN included.</div><div class="hosting-cost">$0.015/GB</div></div>
+      <div class="hosting-card"><div class="hosting-service">Upstash Redis</div><div class="hosting-role" data-i18n="h4_role">AI cache + rate limiting. Serverless, pay-per-request.</div><div class="hosting-cost" data-i18n="h4_cost">Free up to 10k req/day</div></div>
+      <div class="hosting-card"><div class="hosting-service">Expo EAS</div><div class="hosting-role" data-i18n="h5_role">Mobile build & distribution. IPA + APK/AAB in the cloud. No local Mac or Android Studio needed.</div><div class="hosting-cost" data-i18n="h5_cost">Free up to 30 builds/month</div></div>
+      <div class="hosting-card"><div class="hosting-service">Vercel</div><div class="hosting-role" data-i18n="h6_role">HTML prototype deploy as stakeholder demo webapp. Not the main app.</div><div class="hosting-cost" data-i18n="h6_cost">Free</div></div>
+    </div>
+    <div class="info-box success"><span class="info-icon">✓</span><span class="info-text" data-i18n="hosting_total">Total infrastructure cost at MVP: ~$25–60/month for first 500 users. RevenueCat only charges after $2,500/month in recurring revenue.</span></div>
+
+    <!-- MOBILE -->
+    <h2 id="mobile">📲 <span data-i18n="h_mobile">iOS & Android</span></h2>
+    <div class="card"><div class="card-title" data-i18n="ios_title">App Store (iOS) requirements</div>
+      <div class="task-list" style="margin-top:8px;">
+        <div class="task"><div class="task-icon">💳</div><div><div class="task-name" data-i18n="ios1_name">Apple Developer Account — $99/year</div><div class="task-desc" data-i18n="ios1_desc">Must be under BLENDi company name. App appears in store with this identity.</div></div></div>
+        <div class="task"><div class="task-icon">📋</div><div><div class="task-name" data-i18n="ios2_name">App Store Connect review</div><div class="task-desc" data-i18n="ios2_desc">1–3 business days standard. HealthKit + camera + payments apps need 7-day buffer. Justification text for health data access must be prepared in advance.</div></div></div>
+        <div class="task"><div class="task-icon">🔐</div><div><div class="task-name" data-i18n="ios3_name">Certificates & Provisioning</div><div class="task-desc" data-i18n="ios3_desc">Expo EAS manages automatically. No manual configuration needed.</div></div></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-title" data-i18n="android_title">Google Play (Android) requirements</div>
+      <div class="task-list" style="margin-top:8px;">
+        <div class="task"><div class="task-icon">💳</div><div><div class="task-name" data-i18n="and1_name">Google Play Console — $25 one-time</div><div class="task-desc" data-i18n="and1_desc">2–5 days first review, then near-instant for updates.</div></div></div>
+        <div class="task"><div class="task-icon">📦</div><div><div class="task-name" data-i18n="and2_name">AAB (Android App Bundle)</div><div class="task-desc" data-i18n="and2_desc">Expo EAS generates automatically. Upload to Play Console. Data safety section required for health apps.</div></div></div>
+      </div>
+    </div>
+
+    <!-- PHASES -->
+    <h2 id="phase0">📋 <span data-i18n="h_phases">Development phases</span></h2>
+
+    <div class="phase" id="ph0">
+      <div class="phase-header" onclick="tp('ph0')">
+        <div class="phase-num">0</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph0_name">Foundation & Setup</div><div class="phase-timeline" data-i18n="ph0_time">Weeks 1–2 · ~10 days</div></div>
+        <div class="phase-badge bf" data-i18n="badge_foundation">Foundation</div>
+        <div class="phase-toggle" id="tg-ph0">▲</div>
+      </div>
+      <div class="phase-body open" id="bd-ph0">
+        <p style="margin-bottom:12px;" data-i18n="ph0_desc">Structure first. A bad setup here creates technical debt in every subsequent phase. Two new additions in v2: i18n from Day 0 and Vercel prototype deploy.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">📁</div><div><div class="task-name" data-i18n="t0_1">Monorepo structure</div><div class="task-desc" data-i18n="t0_1d"><code>/apps/mobile</code> (Expo) + <code>/apps/api</code> (Node.js) + <code>/packages/shared</code> (types). pnpm workspaces. GitHub Actions CI/CD.</div><div class="task-tags"><span class="tag">pnpm</span><span class="tag">TypeScript</span><span class="tag">GitHub</span></div></div></div>
+          <div class="task"><div class="task-icon">🌍</div><div><div class="task-name" data-i18n="t0_2">i18n setup — i18next + JSON files <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;background:rgba(20,184,166,0.12);color:#14b8a6;border:0.5px solid rgba(20,184,166,0.28);font-family:Syne,sans-serif;">NEW</span></div><div class="task-desc" data-i18n="t0_2d">Configure i18next in the mobile app. Create <code>/locales/en.json</code> and <code>/locales/pt-BR.json</code>. Zero hardcoded user-facing strings from this point forward. Language saved to user profile + MMKV local.</div><div class="task-tags"><span class="tag new">i18n</span><span class="tag crit">No hardcoded strings</span></div></div></div>
+          <div class="task"><div class="task-icon">📱</div><div><div class="task-name" data-i18n="t0_3">Expo project init</div><div class="task-desc" data-i18n="t0_3d">Expo SDK 52, React Native 0.76, TypeScript. Install: React Navigation 7, Zustand, Axios, React Query, MMKV, i18next. ESLint + Prettier.</div><div class="task-tags"><span class="tag">Expo</span><span class="tag">RN 0.76</span></div></div></div>
+          <div class="task"><div class="task-icon">🎨</div><div><div class="task-name" data-i18n="t0_4">Design system / tokens</div><div class="task-desc" data-i18n="t0_4d">Colors <code>#9a4893</code> + <code>#2b1429</code>. Typography: Syne + DM Sans via Expo Google Fonts. Spacing, radius, components (Button, Card, Badge, SkeletonLoader). Skeleton screens component built here and reused everywhere.</div><div class="task-tags"><span class="tag crit">Critical</span><span class="tag new">Skeleton component</span></div></div></div>
+          <div class="task"><div class="task-icon">🖥</div><div><div class="task-name" data-i18n="t0_5">Backend setup — Railway + MongoDB</div><div class="task-desc" data-i18n="t0_5d">Railway project, MongoDB Atlas connection, environment variables. Health check <code>GET /ping</code>. CI/CD via GitHub Actions.</div><div class="task-tags"><span class="tag">Railway</span><span class="tag">MongoDB</span></div></div></div>
+          <div class="task"><div class="task-icon">🔐</div><div><div class="task-name" data-i18n="t0_6">Auth — register, login, JWT</div><div class="task-desc" data-i18n="t0_6d">Email + password. JWT (15min) + refresh token (30 days). <code>POST /auth/register</code>, <code>POST /auth/login</code>, <code>POST /auth/refresh</code>. Argon2 password hashing.</div><div class="task-tags"><span class="tag">JWT</span><span class="tag">Argon2</span><span class="tag crit">Critical</span></div></div></div>
+          <div class="task"><div class="task-icon">📧</div><div><div class="task-name" data-i18n="t0_7">Resend — email templates (bilingual)</div><div class="task-desc" data-i18n="t0_7d">Domain configuration. Welcome and verification templates in EN and PT-BR. Language determined by user's preference set in onboarding.</div><div class="task-tags"><span class="tag">Resend</span><span class="tag new">Bilingual</span></div></div></div>
+          <div class="task"><div class="task-icon">🧪</div><div><div class="task-name" data-i18n="t0_8">HTML prototype → Vercel deploy</div><div class="task-desc" data-i18n="t0_8d">Fix 3 identified bugs (moms protocol routing, blendTime display, currentView race condition). Deploy to <code>demo.blendiblender.com</code>. Stakeholder demo only — not the app.</div><div class="task-tags"><span class="tag">Vercel</span><span class="tag new">Bug fixes</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase" id="ph1">
+      <div class="phase-header" onclick="tp('ph1')">
+        <div class="phase-num">1</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph1_name">MVP Core — the central loop</div><div class="phase-timeline" data-i18n="ph1_time">Weeks 3–8 · ~30 days</div></div>
+        <div class="phase-badge bm" data-i18n="badge_mvp">MVP</div>
+        <div class="phase-toggle" id="tg-ph1">▲</div>
+      </div>
+      <div class="phase-body open" id="bd-ph1">
+        <p style="margin-bottom:12px;" data-i18n="ph1_desc">Phase 1 is now heavier than v1 — Offline Mode, Nutrition Goal Tracking, Hydration, and Supplement Stack all moved here from later phases. These are Jon's direct requests and establish the app as a daily tracker from day one.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">🚀</div><div><div class="task-name" data-i18n="t1_1">Splash + Onboarding (expanded)</div><div class="task-desc" data-i18n="t1_1d">4-screen onboarding: (1) language selection + name/email, (2) BLENDi model (Lite / Pro+ / Steel), (3) goal (Muscle / Wellness / Energy / Recovery), (4) daily macro targets (protein in grams + calorie goal). These targets drive the Goal Rings on Home.</div><div class="task-tags"><span class="tag crit">Foundation of everything</span><span class="tag new">Macro targets</span></div></div></div>
+          <div class="task"><div class="task-icon">🏠</div><div><div class="task-name" data-i18n="t1_2">Home Screen — Goal Rings</div><div class="task-desc" data-i18n="t1_2d">Dynamic greeting by time of day. Goal Rings: animated circular progress for protein and calories, filling as blends are logged during the day. Resets at midnight. Streak counter. 4 Quick Protocol cards. Today's recipe recommendation (static, biometric in Phase 3). Trial / Pro badge.</div><div class="task-tags"><span class="tag new">Goal Rings replaces Pulse Level</span></div></div></div>
+          <div class="task"><div class="task-icon">🤖</div><div><div class="task-name" data-i18n="t1_3">Pulse AI — chat with GPT-4o</div><div class="task-desc" data-i18n="t1_3d">Chat screen with skeleton screen while loading. GPT-4o receives: model, goal, macro targets. Returns: JSON recipe with full macros. Frontend renders recipe card. Redis cache for repeated queries. 3 requests/day on free tier.</div><div class="task-tags"><span class="tag">GPT-4o</span><span class="tag">Redis</span><span class="tag new">Skeleton screen</span></div></div></div>
+          <div class="task"><div class="task-icon">⏱</div><div><div class="task-name" data-i18n="t1_4">Blend Timer (fixed)</div><div class="task-desc" data-i18n="t1_4d">Simple 30s timer. Default by model: Pro+: 30s, Steel: 25s, Lite: 35s — manually overrideable. Haptic feedback on completion. Logging a blend after timer completion automatically adds macros to Goal Rings.</div><div class="task-tags"><span class="tag">Simple</span></div></div></div>
+          <div class="task"><div class="task-icon">💧</div><div><div class="task-name" data-i18n="t1_5">Hydration Log — 1-tap <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;background:var(--green-dim);color:var(--green);border:0.5px solid var(--green-border);font-family:Syne,sans-serif;">NEW</span></div><div class="task-desc" data-i18n="t1_5d">Prominent button on the Track tab. Tap = log 250ml of water. Daily total displayed. User can set a daily target (e.g. 2.5L). No AI involved — pure UI state in Zustand + daily log in MongoDB. Under 5 seconds to use.</div><div class="task-tags"><span class="tag new">Zero AI cost</span><span class="tag">1-tap</span></div></div></div>
+          <div class="task"><div class="task-icon">💊</div><div><div class="task-name" data-i18n="t1_6">My Stack — supplement checklist <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;background:var(--green-dim);color:var(--green);border:0.5px solid var(--green-border);font-family:Syne,sans-serif;">NEW</span></div><div class="task-desc" data-i18n="t1_6d">User defines their supplement list in settings (creatine, collagen, omega-3, BCAA, etc.). Track tab shows daily checklist. Tap each to mark taken. Resets at midnight. No AI, no reminders for now — pure check-in UX.</div><div class="task-tags"><span class="tag new">Zero AI cost</span><span class="tag">Daily habit</span></div></div></div>
+          <div class="task"><div class="task-icon">📶</div><div><div class="task-name" data-i18n="t1_7">Offline Mode <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;background:var(--blue-dim);color:var(--blue);border:0.5px solid var(--blue-border);font-family:Syne,sans-serif;">MOVED FROM PHASE 5</span></div><div class="task-desc" data-i18n="t1_7d">React Query caches last 20 recipes and all favorites in MMKV (fast native storage). When offline: Recipes tab shows cached content with an "offline" indicator banner. Pulse AI chat and Pantry Scanner show a "no connection" state gracefully — no crash, no blank screen. Hydration and Supplement Stack work fully offline.</div><div class="task-tags"><span class="tag moved">Jon's direct request</span><span class="tag">MMKV</span></div></div></div>
+          <div class="task"><div class="task-icon">❤️</div><div><div class="task-name" data-i18n="t1_8">Favorites + Blend Log</div><div class="task-desc" data-i18n="t1_8d">Save recipes to MongoDB (not localStorage). BlendLog: date, recipe, macros consumed, rating (1–5 stars). Logged macros feed Goal Rings in real time. This data later powers Seamless Refill and Weekly Report.</div><div class="task-tags"><span class="tag">MongoDB</span></div></div></div>
+          <div class="task"><div class="task-icon">👤</div><div><div class="task-name" data-i18n="t1_9">Profile / Me screen</div><div class="task-desc" data-i18n="t1_9d">Selected model, goal, macro targets, current streak, total blends, badges. Language preference selector. Free vs Pro badge. Upgrade to Pro button (waitlist for now).</div><div class="task-tags"><span class="tag new">Language preference</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase" id="ph2">
+      <div class="phase-header" onclick="tp('ph2')">
+        <div class="phase-num">2</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph2_name">Habit Formation — daily loop</div><div class="phase-timeline" data-i18n="ph2_time">Weeks 9–13 · ~25 days</div></div>
+        <div class="phase-badge bh" data-i18n="badge_habit">Habit</div>
+        <div class="phase-toggle" id="tg-ph2">▲</div>
+      </div>
+      <div class="phase-body open" id="bd-ph2">
+        <p style="margin-bottom:12px;" data-i18n="ph2_desc">Turn the app into a daily ritual. By this phase the user already has Goal Rings, hydration, and supplement tracking from Phase 1. Now we add the Pantry Scanner and push notification infrastructure.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">📸</div><div><div class="task-name" data-i18n="t2_1">Pantry AI Scanner — common ingredients</div><div class="task-desc" data-i18n="t2_1d">Camera → base64 → GPT-4o Vision identifies common household ingredients (fruits, vegetables, oats, dairy, eggs, nuts). Second call generates 3 recipes with Smart Substitutes for missing items. Supplement Detector (protein tubs, creatine) intentionally excluded — Phase 5. Limit: 3 scans/month free tier. Skeleton screen while processing.</div><div class="task-tags"><span class="tag">GPT-4o Vision</span><span class="tag new">Skeleton screen</span><span class="tag crit">Killer feature #1</span></div></div></div>
+          <div class="task"><div class="task-icon">🔔</div><div><div class="task-name" data-i18n="t2_2">Push Notifications — Daily Pulse</div><div class="task-desc" data-i18n="t2_2d">Expo Push. Daily cron job (user-configurable time). Bilingual payload. Sends: "Your Pulse today: [Recipe] — [Xg protein], 5 min." Streak alerts: "Day 6 — don't break it!" Goal Ring nudge at 6pm if user hasn't hit daily target.</div><div class="task-tags"><span class="tag">Expo Push</span><span class="tag new">Bilingual</span></div></div></div>
+          <div class="task"><div class="task-icon">🔥</div><div><div class="task-name" data-i18n="t2_3">Streaks & Badges</div><div class="task-desc" data-i18n="t2_3d">Streak increments when a blend is logged per day. Resets if 48h pass without a blend or hydration log. Badges: 7 days, 30 days, 50 blends, hit protein goal 10 days in a row, 5 Pantry scans. Unlock animation in profile.</div><div class="task-tags"><span class="tag">Gamification</span></div></div></div>
+          <div class="task"><div class="task-icon">🛒</div><div><div class="task-name" data-i18n="t2_4">Shopping List Generator</div><div class="task-desc" data-i18n="t2_4d">Select 3–5 recipes → backend consolidates ingredients → list grouped by section. Export to WhatsApp/Notes via native Share API. Bilingual output.</div><div class="task-tags"><span class="tag">Share API</span><span class="tag new">Bilingual output</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase" id="ph3">
+      <div class="phase-header" onclick="tp('ph3')">
+        <div class="phase-num">3</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph3_name">Platform Moat — lock-in & monetization</div><div class="phase-timeline" data-i18n="ph3_time">Weeks 14–19 · ~30 days</div></div>
+        <div class="phase-badge bo" data-i18n="badge_moat">Moat</div>
+        <div class="phase-toggle" id="tg-ph3">▲</div>
+      </div>
+      <div class="phase-body open" id="bd-ph3">
+        <p style="margin-bottom:12px;" data-i18n="ph3_desc">Biometric Sync, paywall, Seamless Refill, and Share Cards. The paywall must be live before store submission in Phase 4. Community feed is removed — Share Cards carry the social/UGC role.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">💳</div><div><div class="task-name" data-i18n="t3_1">RevenueCat — Pulse Pro paywall</div><div class="task-desc" data-i18n="t3_1d">Integrate RevenueCat SDK. Products: <code>pulse_pro_monthly</code> ($4.99), <code>pulse_pro_yearly</code> ($49). Paywall triggers: 4th Pantry scan, Biometric Sync entry, Weekly Report. Upgrade screen with Free vs Pro comparison. Bilingual paywall copy.</div><div class="task-tags"><span class="tag crit">Revenue</span><span class="tag new">Bilingual</span></div></div></div>
+          <div class="task"><div class="task-icon">🏃</div><div><div class="task-name" data-i18n="t3_2">Biometric Sync — Phase 1</div><div class="task-desc" data-i18n="t3_2d">iOS: HealthKit via <code>expo-health</code>. Android: Health Connect plugin. Reads: sleep hours + score, HRV, active calories from previous day. Backend categorizes and injects into GPT-4o prompt: "User slept 5.5h, low HRV → recovery recipe with magnesium." Pro only.</div><div class="task-tags"><span class="tag crit">Killer feature #2</span><span class="tag">Pro only</span></div></div></div>
+          <div class="task"><div class="task-icon">📊</div><div><div class="task-name" data-i18n="t3_3">Weekly Nutrition Report</div><div class="task-desc" data-i18n="t3_3d">Every Monday: push + bilingual email. Total blends, average protein vs goal, hydration average, supplements consistency, streak, badges. Backend calculates from BlendLog + HydrationLog. Pro only.</div><div class="task-tags"><span class="tag">Resend</span><span class="tag">Pro only</span></div></div></div>
+          <div class="task"><div class="task-icon">🔁</div><div><div class="task-name" data-i18n="t3_4">Seamless Refill</div><div class="task-desc" data-i18n="t3_4d">Backend analyzes BlendLog for ingredient cadence. 8+ blends with Mocktail Mix → restock suggestion with direct Shopify link. Future: pre-filled cart via Shopify API.</div><div class="task-tags"><span class="tag">Shopify</span><span class="tag">LTV</span></div></div></div>
+          <div class="task"><div class="task-icon">📲</div><div><div class="task-name" data-i18n="t3_5">Recipe Share Cards</div><div class="task-desc" data-i18n="t3_5d">Server-side PNG generation (sharp + canvas): recipe, macros, BLENDi brand colors, username, QR code to app download. Native Share API to Instagram/WhatsApp/TikTok. Replaces Community Pulses feed as UGC driver. Pro only for premium card designs.</div><div class="task-tags"><span class="tag">Sharp</span><span class="tag">UGC</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase" id="ph4">
+      <div class="phase-header" onclick="tp('ph4')">
+        <div class="phase-num">4</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph4_name">Store Launch & Golden Ticket</div><div class="phase-timeline" data-i18n="ph4_time">Weeks 20–23 · ~20 days</div></div>
+        <div class="phase-badge bl" data-i18n="badge_launch">Launch</div>
+        <div class="phase-toggle" id="tg-ph4">▲</div>
+      </div>
+      <div class="phase-body open" id="bd-ph4">
+        <p style="margin-bottom:12px;" data-i18n="ph4_desc">Store submission and Golden Ticket activation. Allow 7-day Apple review buffer. Email sequence must be bilingual before launch.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">🎫</div><div><div class="task-name" data-i18n="t4_1">Golden Ticket — QR activation system</div><div class="task-desc" data-i18n="t4_1d"><code>POST /activate/:code</code> validates QR (linked to production lot), activates 30 days Pulse Pro, marks code as used. Batch QR generation for print. Auto-downgrade on day 30 via cron job. QR scan detects user language from device and pre-fills onboarding language.</div><div class="task-tags"><span class="tag crit">Hardware bridge</span></div></div></div>
+          <div class="task"><div class="task-icon">📧</div><div><div class="task-name" data-i18n="t4_2">Email sequence — 5 bilingual emails</div><div class="task-desc" data-i18n="t4_2d">Day 0 (Welcome), Day 2 (Hardware Mastery), Day 5 (Pantry Scanner), Day 10 (Biometric Sync), Day 25 (Don't lose your Pulse — 20% off). All templates in EN + PT-BR. Triggered by Golden Ticket activation.</div><div class="task-tags"><span class="tag new">Bilingual</span><span class="tag">Resend</span></div></div></div>
+          <div class="task"><div class="task-icon">🍎</div><div><div class="task-name" data-i18n="t4_3">App Store submission (iOS)</div><div class="task-desc" data-i18n="t4_3d">EAS Build → IPA → App Store Connect. Screenshots at 6.7" and 5.5". HealthKit + camera justification text. Privacy policy URL. 7-day review buffer.</div><div class="task-tags"><span class="tag crit">Apple Developer $99/year</span></div></div></div>
+          <div class="task"><div class="task-icon">🤖</div><div><div class="task-name" data-i18n="t4_4">Play Store submission (Android)</div><div class="task-desc" data-i18n="t4_4d">EAS Build → AAB → Play Console. Data safety section required. 2–5 days first review.</div><div class="task-tags"><span class="tag">Google Play $25</span></div></div></div>
+          <div class="task"><div class="task-icon">🐛</div><div><div class="task-name" data-i18n="t4_5">Sentry — production error tracking</div><div class="task-desc" data-i18n="t4_5d">Install on mobile + backend. Critical error alerts by email. Essential before any real users are on production.</div><div class="task-tags"><span class="tag">Sentry</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase" id="ph5">
+      <div class="phase-header" onclick="tp('ph5')">
+        <div class="phase-num">5</div>
+        <div class="phase-meta"><div class="phase-name" data-i18n="ph5_name">Growth & premium tier</div><div class="phase-timeline" data-i18n="ph5_time">Weeks 24+ · ongoing</div></div>
+        <div class="phase-badge bg2" data-i18n="badge_growth">Growth</div>
+        <div class="phase-toggle" id="tg-ph5">▼</div>
+      </div>
+      <div class="phase-body" id="bd-ph5">
+        <p style="margin-bottom:12px;" data-i18n="ph5_desc">Post-launch features driven by real usage data and user feedback. Supplement Detector returns here after validating that the Gym & Protein segment is large enough to justify the scope.</p>
+        <div class="task-list">
+          <div class="task"><div class="task-icon">💊</div><div><div class="task-name" data-i18n="t5_1">Supplement Detector in Pantry Scanner</div><div class="task-desc" data-i18n="t5_1d">Now enabled for Phase 5. GPT-4o Vision prompt expanded to identify protein tubs, creatine, collagen, BCAA. Integrates with My Stack checklist automatically.</div><div class="task-tags"><span class="tag new">From Phase 2 scope reduction</span></div></div></div>
+          <div class="task"><div class="task-icon">🍹</div><div><div class="task-name" data-i18n="t5_2">Cocktail & Mocktail Studio</div><div class="task-desc" data-i18n="t5_2d">Dedicated mode for Beach & Cocktails. Occasion packs (Pool Day, Game Night, Brunch). Mocktail Mixes product links. Biggest upsell surface for that SKU.</div><div class="task-tags"><span class="tag">Shopify</span></div></div></div>
+          <div class="task"><div class="task-icon">👨‍👩‍👧</div><div><div class="task-name" data-i18n="t5_3">Family & Kids Mode</div><div class="task-desc" data-i18n="t5_3d">Fun recipe names, allergen filters, portion scaler. Active Moms segment — completely ignored by all competitors at this depth.</div><div class="task-tags"><span class="tag">Active Moms</span></div></div></div>
+          <div class="task"><div class="task-icon">⌚</div><div><div class="task-name" data-i18n="t5_4">Biometric Sync Phase 2 — Oura, Garmin, Whoop</div><div class="task-desc" data-i18n="t5_4d">Expand beyond Apple/Google. Oura Ring readiness score → adapted blend. Positions BLENDi Pulse as the "Oura Ring of nutrition."</div><div class="task-tags"><span class="tag">Oura API</span><span class="tag">Garmin API</span><span class="tag">Pro only</span></div></div></div>
+          <div class="task"><div class="task-icon">🏆</div><div><div class="task-name" data-i18n="t5_5">Monthly challenges</div><div class="task-desc" data-i18n="t5_5d">"30-Day Protein Challenge", city leaderboard, ambassador program. Social flywheel without building a full social network.</div><div class="task-tags"><span class="tag">Community</span></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUESTIONS -->
+    <h2 id="questions">❓ <span data-i18n="h_questions">Critical questions — status update</span></h2>
+    <p data-i18n="questions_desc">Questions from v1 updated with answers where decisions were confirmed. Open questions remain — these block specific phases.</p>
+    <div class="questions">
+      <div class="question q-answered"><div class="q-num">✓</div><div><div class="q-text" data-i18n="q1_text">Does the Pulse Level stay or get removed?</div><div class="q-answer" data-i18n="q1_ans">→ Removed by Gabriel. Replaced by Goal Rings (positive macro progress, not anxiety-based streak bar).</div></div></div>
+      <div class="question q-answered"><div class="q-num">✓</div><div><div class="q-text" data-i18n="q2_text">Should the Community Pulses feed be built?</div><div class="q-answer" data-i18n="q2_ans">→ No. Removed. App is a performance tool, not a social network. Share Cards replace the UGC function.</div></div></div>
+      <div class="question q-answered"><div class="q-num">✓</div><div><div class="q-text" data-i18n="q3_text">5-tab navigation: keep "Pulses" or replace it?</div><div class="q-answer" data-i18n="q3_ans">→ Keep 5 tabs. Rename "Pulses" to "Track". Hosts: Goal Rings detail, Hydration Log, My Stack, history, Share Cards.</div></div></div>
+      <div class="question q-answered"><div class="q-num">✓</div><div><div class="q-text" data-i18n="q4_text">i18n from Day 0 or added later?</div><div class="q-answer" data-i18n="q4_ans">→ Day 0. Confirmed by Gemini + Gabriel. Zero hardcoded strings. i18next + JSON files from the first commit.</div></div></div>
+      <div class="question q-answered"><div class="q-num">✓</div><div><div class="q-text" data-i18n="q5_text">Is the Supplement Detector in Pantry Scanner a Phase 2 priority?</div><div class="q-answer" data-i18n="q5_ans">→ No. Phase 5. Focus Phase 2 on common ingredients + Smart Substitutes Engine first.</div></div></div>
+      <div class="question"><div class="q-num">6</div><div><div class="q-text" data-i18n="q6_text">Does Jon have an active Apple Developer Account under the BLENDi company name?</div><div class="q-why" data-i18n="q6_why">App in the App Store appears with the developer's name. Personal account = less professional than "BLENDi Inc." Migrating apps between accounts is complex — must be decided before any iOS build.</div><span class="q-category" style="background:var(--red-dim);color:var(--red);border:0.5px solid var(--red-border);" data-i18n="q6_cat">Blocks Phase 4</span></div></div>
+      <div class="question"><div class="q-num">7</div><div><div class="q-text" data-i18n="q7_text">Does BLENDi use Shopify? Does Jon have access to Shopify API credentials?</div><div class="q-why" data-i18n="q7_why">Seamless Refill architecture depends on this. Different platform = different implementation entirely.</div><span class="q-category" style="background:var(--amber-dim);color:var(--amber);border:0.5px solid var(--amber-border);" data-i18n="q7_cat">Affects Phase 3</span></div></div>
+      <div class="question"><div class="q-num">8</div><div><div class="q-text" data-i18n="q8_text">What is the monthly BLENDi unit sales volume?</div><div class="q-why" data-i18n="q8_why">Defines infrastructure scale, AI API cost projections, and ARR forecasts. 100 vs 1,000 units/month = completely different decisions.</div><span class="q-category" style="background:var(--amber-dim);color:var(--amber);border:0.5px solid var(--amber-border);" data-i18n="q8_cat">Affects infrastructure</span></div></div>
+      <div class="question"><div class="q-num">9</div><div><div class="q-text" data-i18n="q9_text">Do the Golden Ticket QR codes need to be unique per unit, or per production lot?</div><div class="q-why" data-i18n="q9_why">Per unit = more secure but requires integrating QR generation with the packaging process at scale. Per lot = simpler but shareable. Decision changes Phase 4 backend complexity significantly.</div><span class="q-category" style="background:var(--red-dim);color:var(--red);border:0.5px solid var(--red-border);" data-i18n="q9_cat">Blocks Phase 4</span></div></div>
+      <div class="question"><div class="q-num">10</div><div><div class="q-text" data-i18n="q10_text">Does Jon want analytics (DAU, MAU, Free→Pro funnel)?</div><div class="q-why" data-i18n="q10_why">Must be instrumented from Phase 1. Adding later = losing all historical data. Mixpanel free tier is the standard for consumer apps at this stage.</div><span class="q-category" style="background:var(--blue-dim);color:var(--blue);border:0.5px solid var(--blue-border);" data-i18n="q10_cat">Affects Phase 0</span></div></div>
+      <div class="question"><div class="q-num">11</div><div><div class="q-text" data-i18n="q11_text">Is there a target launch date? Any seasonal moment to hit?</div><div class="q-why" data-i18n="q11_why">January is the best window for wellness apps (New Year resolutions). Without a date, the ~24-week roadmap runs as-is. With a date, scope may need to be cut.</div><span class="q-category" style="background:var(--amber-dim);color:var(--amber);border:0.5px solid var(--amber-border);" data-i18n="q11_cat">Affects total scope</span></div></div>
+    </div>
+
+    <hr>
+    <p style="text-align:center;font-size:12px;color:var(--muted2);" data-i18n="footer">BLENDi Pulse — Master Technical Roadmap v2 · April 2026</p>
+
+  </main>
+</div>
+
+<script>
+const T = {
+  en: {
+    version:"v2 — Updated",nav_overview:"Overview",nav_summary:"Executive summary",nav_changelog:"What changed in v2",nav_arch:"App architecture",nav_screens:"Screen map",nav_tech:"Tech stack",nav_stack:"Languages & frameworks",nav_apis:"Required APIs",nav_ai:"AI integrations",nav_hosting:"Hosting",nav_mobile:"iOS & Android",nav_phases:"Dev phases",nav_ph0:"Phase 0 — Foundation",nav_ph1:"Phase 1 — MVP Core",nav_ph2:"Phase 2 — Habit",nav_ph3:"Phase 3 — Moat",nav_ph4:"Phase 4 — Launch",nav_ph5:"Phase 5 — Growth",nav_open:"Open decisions",nav_questions:"Critical questions",lang_label:"Language",
+    hero_pill:"BLENDi Pulse — Internal Document",hero_title:"Master Technical Roadmap v2",hero_desc:"Complete reference document for app development. This is version 2, updated with executive feedback from Jon, Gemini's technical recommendations, and confirmed product decisions. Follow this document precisely — all major changes from v1 are logged in the changelog below.",stat_date:"Date",stat_phases:"Phases",stat_duration:"Estimated duration",stat_platforms:"Platforms",
+    h_changelog:"What changed from v1 → v2",changelog_desc:"Every decision below was confirmed by Jon directly or approved through the Gemini–Claude strategy session. No changes were made without executive input.",changelog_title:"Version 2 — Change log",badge_removed:"Removed",badge_added:"Added",badge_changed:"Changed",badge_moved:"Moved",
+    cl1_name:"Pulse Level (habit bar)",cl1_why:"Removed by Gabriel. Required manual blend registration — if user forgets, streak breaks unfairly. Replaced by Goal Rings (positive progress, not anxiety).",
+    cl2_name:"Community Pulses feed",cl2_why:"App is a performance tool, not a social network. Replaced by Share Cards only (UGC for external platforms). Tab renamed from \"Pulses\" to \"Track\".",
+    cl3_name:"Hardware Health Estimation",cl3_why:"No direct sensors on hardware. Any motor health estimate would be inaccurate and cause bad UX. Time-based cleaning reminder (every 7 days) stays.",
+    cl4_name:"Nutrition Goal Tracking — macro rings",cl4_why:"Jon's direct request. User sets daily protein/calorie targets in onboarding. Home screen shows Goal Rings filling as blends are logged. Replaces Pulse Level as main daily engagement driver.",
+    cl5_name:"Hydration & Supplement Stack tracking",cl5_why:"Jon's direct request. 1-tap water log + \"My Stack\" daily checklist (creatine ✓, collagen ✓). Zero AI cost. High daily-open value.",
+    cl6_name:"Offline Mode → Phase 1",cl6_why:"Jon's direct request. Was not in original roadmap. Cache favorites + last 20 recipes locally. Critical for kitchen and travel use. Jon said \"this is Phase 1, not Phase 5.\"",
+    cl7_name:"i18n from Day 0",cl7_why:"Technical requirement. No hardcoded strings. i18next + JSON language files. Adding Portuguese or Spanish later must be a config change, not a code refactor.",
+    cl8_name:"Tab \"Pulses\" → \"Track\"",cl8_why:"Navigation stays at 5 tabs. Track tab hosts: Goal Rings detail, Hydration Log, Supplement Stack, blend history. App pivots from recipe tool to daily wellness tracker.",
+    cl9_name:"Pantry Scanner — scope reduced for Phase 2",cl9_why:"Focus on common household ingredients first (fruits, oats, vegetables). Supplement Detector moves to Phase 5. Smart Substitutes Engine is the main value prop.",
+    cl10_name:"Skeleton screens as implementation standard",cl10_why:"Every screen with an AI call must show skeleton placeholders while loading. App must feel as fast as the 120W hardware.",
+    h_arch:"App architecture",arch_desc:"Three independent layers communicating via API. This separation allows the mobile app to evolve independently from the backend. The i18n layer runs across all three.",arch1_title:"Layer 1 — Mobile frontend (what the user sees)",arch1_desc:"React Native + Expo. Consumes backend API over HTTPS. All UI/UX lives here. HealthKit / Health Connect at this layer. i18next handles language switching client-side. Offline cache via React Query + MMKV.",arch2_title:"Layer 2 — Backend API (the brain)",arch2_desc:"Node.js + Express. Authentication, database, business logic, AI API calls, payment processing, email delivery, cron jobs (daily push, weekly report). Never exposed to end user.",arch3_title:"Layer 3 — Database + Storage (memory)",arch3_desc:"MongoDB Atlas for structured data (users, recipes, blend logs, macro goals, hydration, supplement stack). Cloudflare R2 for files. Upstash Redis for caching and rate limiting.",arch_warn:"The current prototype is plain HTML with localStorage. It will NOT be the base of the mobile app. It serves as a UI reference. Development starts from scratch in React Native. Prototype can be deployed to Vercel as a stakeholder demo.",
+    h_screens:"Screen map — v2",screens_desc:"5-tab navigation. \"Pulses\" renamed to \"Track\" — now the daily wellness tracking hub. Community feed removed. Share Cards remain as an action inside the Track tab.",tab1:"Tab 1",tab2:"Tab 2",tab2_name:"Recipes",tab3:"Tab 3 — CTA",tab4:"Tab 4 — NEW",tab5:"Tab 5",tabM:"Modals",tabM_name:"+ Extra flows",s1_1:"Dynamic greeting (time of day)",s1_2:"Goal Rings (protein + calories)",s1_3:"Today's biometric recipe",s1_4:"Streak counter",s1_5:"Quick Protocols (4 cards)",s1_6:"Trial / Pro badge",s2_1:"Pulse AI chat",s2_2:"Goal / model filter",s2_3:"Pantry Scanner entry",s2_4:"Favorites",s2_5:"Shopping list",s2_6:"Skeleton screens on all AI loads",s3_1:"30s timer (simple)",s3_2:"Active recipe step-by-step",s3_3:"Pantry Scanner (camera)",s3_4:"Cleaning reminder (7-day)",s3_5:"Seamless Refill prompt",s4_1:"Goal Rings detail view",s4_2:"1-tap Hydration Log",s4_3:"My Stack (supplement checklist)",s4_4:"Blend history + macro totals",s4_5:"Share Card generator",s4_6:"Weekly Nutrition Report",s5_1:"Profile + selected model",s5_2:"Macro goals settings",s5_3:"Earned badges",s5_4:"Biometric Sync status",s5_5:"Free vs Pro / manage plan",s5_6:"Language preference",sm1:"Onboarding (model + goal + macro targets)",sm2:"Pantry Scanner flow",sm3:"Pulse Pro paywall",sm4:"Golden Ticket activation",sm5:"Biometric permission request",sm6:"Offline mode indicator",
+    h_stack:"Languages & frameworks",layer_mobile:"Mobile app",rn_why:"One codebase for iOS + Android. EAS Build delivers IPA and APK without a local Mac.",ts_why:"Type safety end-to-end. Shared types between frontend and backend.",rn7_why:"Bottom tabs + stack navigator. Industry standard.",zus_why:"Lightweight global state. Goal rings, hydration counter, supplement stack all live here.",i18n_why:"NEW — i18n from Day 0. JSON language files. No hardcoded strings anywhere.",mmkv_why:"NEW — Offline mode. React Query cache + MMKV stores last 20 recipes and favorites locally.",layer_backend:"Backend API",node_why:"Fast to prototype endpoints. Async-first — ideal for chained AI API calls.",tsbe_why:"Full-stack consistency. Shared type definitions minimize integration bugs.",jwt_why:"Stateless auth. Access token (15min) + refresh token (30 days) in secure storage.",zod_why:"Runtime schema validation on all API inputs before reaching the database.",cron_why:"Daily push notifications, weekly report emails, trial expiry downgrade.",layer_db:"Database",mongo_why:"Free tier (M0) for MVP. Flexible schema handles evolving data (macro goals, hydration, supplement stack).",mongoose_why:"ODM. Models: User, Recipe, BlendLog, MacroGoal, HydrationLog, SupplementStack.",redis_why:"AI response cache + Pantry Scanner rate limiting (3/month free). Serverless — near-zero cost at MVP.",layer_storage:"Storage & media",r2_why:"S3-compatible, zero egress cost. Pantry Scanner photos, share card PNGs, recipe images. CDN included.",sharp_why:"Server-side image resize + compression + share card PNG generation.",
+    i18n_note:"i18n architecture note: All user-facing strings must reference a key in the language JSON file. Structure: /locales/en.json and /locales/pt-BR.json. Language preference saved in user profile + local storage. Adding a new language = create a new JSON file, zero code changes.",
+    h_apis:"Required APIs & integrations",th_api:"API / Service",th_purpose:"Purpose",th_phase:"Phase",th_cost:"Cost",api1:"Pulse AI chat — recipe generation with macros. Smart Substitutes Engine. Biometric context injection.",api2:"Pantry Scanner — analyzes fridge/pantry photo to identify common household ingredients.",api3:"Subscription management (Pulse Pro $4.99/mo, $49/yr). Integrates with App Store and Play Store automatically.",api4:"Biometric Sync — sleep, HRV, active calories from iPhone / Apple Watch.",api5:"Biometric Sync — Android equivalent. Integrates with Google Fit, Garmin, Fitbit.",api6:"Transactional emails + 5-email post-purchase automation. Bilingual templates (EN / PT-BR).",api7:"Daily Pulse, streak reminders, trial expiry alerts. Bilingual payloads.",api8:"Golden Ticket — batch QR generation per production lot for 30-day trial activation.",api9:"Seamless Refill — 1-tap restock of Mocktail Mixes and parts. Requires confirmation from Jon.",api10:"Pantry Scanner — camera access for fridge/pantry photos.",api11:"Error tracking — iOS, Android, and backend. Critical for catching production crashes.",
+    h_ai:"AI integrations",ai1_title:"GPT-4o — Pulse AI + Smart Substitutes + Biometric context",ai1_desc:"Input: user's BLENDi model, goal, blend history, available ingredients, and biometric category (if synced). Output: JSON recipe with full macros. System prompt always forces JSON output.",ai2_title:"GPT-4o Vision — Pantry Scanner (Phase 2 scope)",ai2_desc:"Input: base64 photo. Output: JSON list of detected common ingredients. Second call generates 3 recipes with Smart Substitutes. Supplement Detector excluded from Phase 2 — Phase 5 only.",ai3_title:"Biometric logic — no separate model needed",ai3_desc:"Backend reads sleep + HRV + calories from HealthKit/Health Connect. Maps to categories and injects into GPT-4o prompt. No dedicated ML model needed.",ai_cost:"Estimated AI cost at MVP (100 active users, 5 Pulse AI requests/week, 10 Pantry scans/month): ~$15–40/month. Redis cache prevents duplicate calls. Scales linearly with users.",
+    h_hosting:"Hosting & infrastructure",h1_role:"Node.js backend API. Auto-deploy via GitHub. No server config. Auto-scales.",h2_role:"Primary database. Free M0 tier sufficient for MVP (~10k active users).",h2_cost:"Free at MVP scale",h3_role:"Image storage. Zero egress cost. Global CDN included.",h4_role:"AI cache + rate limiting. Serverless, pay-per-request.",h4_cost:"Free up to 10k req/day",h5_role:"Mobile build & distribution. IPA + APK/AAB in the cloud. No local Mac or Android Studio needed.",h5_cost:"Free up to 30 builds/month",h6_role:"HTML prototype deploy as stakeholder demo webapp. Not the main app.",h6_cost:"Free",hosting_total:"Total infrastructure cost at MVP: ~$25–60/month for first 500 users. RevenueCat only charges after $2,500/month in recurring revenue.",
+    h_mobile:"iOS & Android",ios_title:"App Store (iOS) requirements",ios1_name:"Apple Developer Account — $99/year",ios1_desc:"Must be under BLENDi company name. App appears in store with this identity.",ios2_name:"App Store Connect review",ios2_desc:"1–3 business days standard. HealthKit + camera + payments apps need 7-day buffer. Justification text for health data must be prepared in advance.",ios3_name:"Certificates & Provisioning",ios3_desc:"Expo EAS manages automatically. No manual configuration needed.",android_title:"Google Play (Android) requirements",and1_name:"Google Play Console — $25 one-time",and1_desc:"2–5 days first review, then near-instant for updates.",and2_name:"AAB (Android App Bundle)",and2_desc:"Expo EAS generates automatically. Upload to Play Console. Data safety section required for health apps.",
+    h_phases:"Development phases",ph0_name:"Foundation & Setup",ph0_time:"Weeks 1–2 · ~10 days",badge_foundation:"Foundation",ph0_desc:"Structure first. A bad setup here creates technical debt in every subsequent phase. Two new additions in v2: i18n from Day 0 and Vercel prototype deploy.",t0_1:"Monorepo structure",t0_1d:"/apps/mobile (Expo) + /apps/api (Node.js) + /packages/shared (types). pnpm workspaces. GitHub Actions CI/CD.",t0_2:"i18n setup — i18next + JSON files",t0_2d:"Configure i18next in the mobile app. Create /locales/en.json and /locales/pt-BR.json. Zero hardcoded user-facing strings from this point forward. Language saved to user profile + MMKV local.",t0_3:"Expo project init",t0_3d:"Expo SDK 52, React Native 0.76, TypeScript. Install: React Navigation 7, Zustand, Axios, React Query, MMKV, i18next. ESLint + Prettier.",t0_4:"Design system / tokens",t0_4d:"Colors #9a4893 + #2b1429. Typography: Syne + DM Sans via Expo Google Fonts. Spacing, radius, reusable components (Button, Card, Badge, SkeletonLoader). Skeleton screens component built here and reused everywhere.",t0_5:"Backend setup — Railway + MongoDB",t0_5d:"Railway project, MongoDB Atlas, environment variables. Health check GET /ping. CI/CD via GitHub Actions.",t0_6:"Auth — register, login, JWT",t0_6d:"Email + password. JWT (15min) + refresh token (30 days). POST /auth/register, /auth/login, /auth/refresh. Argon2 password hashing.",t0_7:"Resend — email templates (bilingual)",t0_7d:"Domain config. Welcome and verification templates in EN and PT-BR. Language determined by user preference set in onboarding.",t0_8:"HTML prototype → Vercel deploy",t0_8d:"Fix 3 identified bugs. Deploy to demo.blendiblender.com. Stakeholder demo only.",
+    ph1_name:"MVP Core — the central loop",ph1_time:"Weeks 3–8 · ~30 days",badge_mvp:"MVP",ph1_desc:"Phase 1 is now heavier than v1 — Offline Mode, Goal Tracking, Hydration, and Supplement Stack all moved here. These establish the app as a daily tracker from day one.",t1_1:"Splash + Onboarding (expanded)",t1_1d:"4-screen onboarding: (1) language + name/email, (2) BLENDi model, (3) goal, (4) daily macro targets (protein grams + calorie goal). Targets drive the Goal Rings on Home.",t1_2:"Home Screen — Goal Rings",t1_2d:"Dynamic greeting. Goal Rings: animated circular progress for protein and calories, filling as blends are logged. Resets at midnight. Streak counter. 4 Quick Protocol cards. Today's recipe. Trial / Pro badge.",t1_3:"Pulse AI — chat with GPT-4o",t1_3d:"Chat screen with skeleton screen while loading. GPT-4o receives model, goal, macro targets. Returns JSON recipe with full macros. Redis cache for repeated queries. 3 requests/day free tier.",t1_4:"Blend Timer (fixed)",t1_4d:"Simple 30s timer. Default by model: Pro+: 30s, Steel: 25s, Lite: 35s — manually overrideable. Haptic feedback. Logging a blend adds macros to Goal Rings.",t1_5:"Hydration Log — 1-tap",t1_5d:"Prominent button on Track tab. Tap = log 250ml. Daily total displayed. User sets target (e.g. 2.5L). Pure UI state in Zustand + daily log in MongoDB. Under 5 seconds to use.",t1_6:"My Stack — supplement checklist",t1_6d:"User defines supplement list in settings (creatine, collagen, omega-3, BCAA, etc.). Track tab shows daily checklist. Tap each to mark taken. Resets at midnight.",t1_7:"Offline Mode",t1_7d:"React Query caches last 20 recipes + all favorites in MMKV. When offline: Recipes tab shows cached content with offline indicator. Pulse AI and Pantry Scanner show graceful no-connection state. Hydration and Stack work fully offline.",t1_8:"Favorites + Blend Log",t1_8d:"Save recipes to MongoDB. BlendLog: date, recipe, macros consumed, rating. Logged macros feed Goal Rings in real time.",t1_9:"Profile / Me screen",t1_9d:"Selected model, goal, macro targets, streak, total blends, badges. Language preference selector. Free vs Pro badge. Upgrade button.",
+    ph2_name:"Habit Formation — daily loop",ph2_time:"Weeks 9–13 · ~25 days",badge_habit:"Habit",ph2_desc:"Turn the app into a daily ritual. Users already have Goal Rings, hydration, and supplement tracking from Phase 1. Now add Pantry Scanner and push notifications.",t2_1:"Pantry AI Scanner — common ingredients",t2_1d:"Camera → base64 → GPT-4o Vision identifies common household ingredients. Second call generates 3 recipes with Smart Substitutes. Supplement Detector excluded (Phase 5). Limit: 3 scans/month free. Skeleton screen while processing.",t2_2:"Push Notifications — Daily Pulse",t2_2d:"Daily cron job (user-configurable time). Bilingual payload. Recipe recommendation + streak alerts + Goal Ring nudge at 6pm if target not hit.",t2_3:"Streaks & Badges",t2_3d:"Streak increments when blend logged per day. Resets if 48h pass. Badges: 7 days, 30 days, 50 blends, protein goal 10 days in a row, 5 Pantry scans. Unlock animation.",t2_4:"Shopping List Generator",t2_4d:"Select 3–5 recipes → consolidated ingredient list by section. Export to WhatsApp/Notes via Share API. Bilingual output.",
+    ph3_name:"Platform Moat — lock-in & monetization",ph3_time:"Weeks 14–19 · ~30 days",badge_moat:"Moat",ph3_desc:"Biometric Sync, paywall, Seamless Refill, Share Cards. Paywall must be live before store submission. Community feed is removed — Share Cards carry the UGC role.",t3_1:"RevenueCat — Pulse Pro paywall",t3_1d:"Products: pulse_pro_monthly ($4.99), pulse_pro_yearly ($49). Paywall triggers: 4th Pantry scan, Biometric Sync, Weekly Report. Upgrade screen with bilingual Free vs Pro comparison.",t3_2:"Biometric Sync — Phase 1",t3_2d:"iOS: HealthKit via expo-health. Android: Health Connect plugin. Reads sleep, HRV, active calories. Backend categorizes and injects into GPT-4o prompt. Pro only.",t3_3:"Weekly Nutrition Report",t3_3d:"Every Monday: push + bilingual email. Total blends, protein vs goal, hydration average, supplement consistency, streak, badges. Pro only.",t3_4:"Seamless Refill",t3_4d:"Backend detects ingredient cadence from BlendLog. 8+ blends with Mocktail Mix → restock suggestion with Shopify link.",t3_5:"Recipe Share Cards",t3_5d:"Server-side PNG (sharp + canvas): recipe, macros, brand colors, username, QR code. Share to Instagram/WhatsApp/TikTok. Replaces Community Pulses as UGC driver.",
+    ph4_name:"Store Launch & Golden Ticket",ph4_time:"Weeks 20–23 · ~20 days",badge_launch:"Launch",ph4_desc:"Store submission and Golden Ticket activation. Allow 7-day Apple review buffer. Email sequence must be bilingual before launch.",t4_1:"Golden Ticket — QR activation",t4_1d:"POST /activate/:code validates QR, activates 30 days Pulse Pro, marks as used. Batch generation for print. Auto-downgrade day 30 via cron job. QR scan detects device language.",t4_2:"Email sequence — 5 bilingual emails",t4_2d:"Day 0 (Welcome), Day 2 (Hardware Mastery), Day 5 (Pantry Scanner), Day 10 (Biometric Sync), Day 25 (Don't lose your Pulse — 20% off). EN + PT-BR. Triggered by Golden Ticket.",t4_3:"App Store submission (iOS)",t4_3d:"EAS Build → IPA → App Store Connect. Screenshots, HealthKit justification, privacy policy. 7-day review buffer.",t4_4:"Play Store submission (Android)",t4_4d:"EAS Build → AAB → Play Console. Data safety section required. 2–5 days first review.",t4_5:"Sentry — production error tracking",t4_5d:"Install on mobile + backend. Critical error alerts by email. Essential before real users on production.",
+    ph5_name:"Growth & premium tier",ph5_time:"Weeks 24+ · ongoing",badge_growth:"Growth",ph5_desc:"Post-launch features driven by real usage data. Supplement Detector returns here after validating Gym & Protein segment size.",t5_1:"Supplement Detector in Pantry Scanner",t5_1d:"GPT-4o Vision prompt expanded to identify protein tubs, creatine, collagen, BCAA. Integrates with My Stack checklist automatically.",t5_2:"Cocktail & Mocktail Studio",t5_2d:"Dedicated mode for Beach & Cocktails. Occasion packs (Pool Day, Game Night, Brunch). Mocktail Mixes product links.",t5_3:"Family & Kids Mode",t5_3d:"Fun recipe names, allergen filters, portion scaler. Active Moms — completely ignored by all competitors.",t5_4:"Biometric Sync Phase 2 — Oura, Garmin, Whoop",t5_4d:"Expand to premium wearables. Oura Ring readiness score → adapted blend. Positions BLENDi Pulse as the \"Oura Ring of nutrition.\"",t5_5:"Monthly challenges",t5_5d:"\"30-Day Protein Challenge\", city leaderboard, ambassador program. Social flywheel without a full social network.",
+    h_questions:"Critical questions — status update",questions_desc:"Questions from v1 updated with answers where confirmed. Open questions remain — these block specific phases.",q1_text:"Does the Pulse Level stay or get removed?",q1_ans:"→ Removed by Gabriel. Replaced by Goal Rings (positive macro progress, not anxiety-based streak bar).",q2_text:"Should the Community Pulses feed be built?",q2_ans:"→ No. Removed. App is a performance tool, not a social network. Share Cards replace UGC.",q3_text:"5-tab navigation: keep \"Pulses\" or replace it?",q3_ans:"→ Keep 5 tabs. Rename to \"Track\". Hosts: Goal Rings detail, Hydration Log, My Stack, history, Share Cards.",q4_text:"i18n from Day 0 or added later?",q4_ans:"→ Day 0. Confirmed. Zero hardcoded strings. i18next + JSON files from first commit.",q5_text:"Is Supplement Detector in Pantry Scanner a Phase 2 priority?",q5_ans:"→ No. Phase 5. Focus Phase 2 on common ingredients + Smart Substitutes Engine.",q6_text:"Does Jon have an Apple Developer Account under the BLENDi company name?",q6_why:"App in App Store appears with developer's name. Personal = less professional. Migrating accounts later is complex.",q6_cat:"Blocks Phase 4",q7_text:"Does BLENDi use Shopify? Shopify API credentials available?",q7_why:"Seamless Refill architecture depends on this. Different platform = different implementation.",q7_cat:"Affects Phase 3",q8_text:"What is the monthly BLENDi unit sales volume?",q8_why:"Defines infrastructure scale, AI cost projections, and ARR forecasts.",q8_cat:"Affects infrastructure",q9_text:"Do Golden Ticket QR codes need to be unique per unit, or per production lot?",q9_why:"Per unit = more secure but complex packaging integration. Per lot = simpler but shareable. Significantly changes Phase 4 backend.",q9_cat:"Blocks Phase 4",q10_text:"Does Jon want analytics (DAU, MAU, Free→Pro funnel)?",q10_why:"Must be instrumented from Phase 1. Adding later = losing all historical data.",q10_cat:"Affects Phase 0",q11_text:"Is there a target launch date? Any seasonal moment to hit?",q11_why:"January is best for wellness apps. Without a date, ~24-week roadmap runs as-is.",q11_cat:"Affects total scope",
+    footer:"BLENDi Pulse — Master Technical Roadmap v2 · April 2026"
+  },
+  pt: {
+    version:"v2 — Atualizado",nav_overview:"Visão geral",nav_summary:"Resumo executivo",nav_changelog:"O que mudou na v2",nav_arch:"Arquitetura do app",nav_screens:"Mapa de telas",nav_tech:"Stack técnico",nav_stack:"Linguagens & frameworks",nav_apis:"APIs necessárias",nav_ai:"Integrações de IA",nav_hosting:"Hospedagem",nav_mobile:"iOS & Android",nav_phases:"Fases de dev",nav_ph0:"Fase 0 — Fundação",nav_ph1:"Fase 1 — MVP Core",nav_ph2:"Fase 2 — Hábito",nav_ph3:"Fase 3 — Moat",nav_ph4:"Fase 4 — Lançamento",nav_ph5:"Fase 5 — Crescimento",nav_open:"Decisões abertas",nav_questions:"Perguntas críticas",lang_label:"Idioma",
+    hero_pill:"BLENDi Pulse — Documento Interno",hero_title:"Roadmap Técnico Master v2",hero_desc:"Documento de referência completo para o desenvolvimento do app. Esta é a versão 2, atualizada com feedback executivo do Jon, recomendações técnicas do Gemini e decisões de produto confirmadas. Siga este documento à risca — todas as mudanças em relação à v1 estão registradas no changelog abaixo.",stat_date:"Data",stat_phases:"Fases",stat_duration:"Duração estimada",stat_platforms:"Plataformas",
+    h_changelog:"O que mudou da v1 → v2",changelog_desc:"Cada decisão abaixo foi confirmada diretamente pelo Jon ou aprovada na sessão estratégica Gemini–Claude. Nenhuma mudança foi feita sem input executivo.",changelog_title:"Versão 2 — Log de mudanças",badge_removed:"Removido",badge_added:"Adicionado",badge_changed:"Alterado",badge_moved:"Movido",
+    cl1_name:"Pulse Level (barra de hábito)",cl1_why:"Removido pelo Gabriel. Exigia registro manual de blend — se o usuário esquece, a streak quebra injustamente. Substituído pelos Goal Rings (progresso positivo, sem ansiedade).",
+    cl2_name:"Feed Community Pulses",cl2_why:"O app é uma ferramenta de performance, não uma rede social. Substituído por Share Cards (UGC para plataformas externas). Aba renomeada de \"Pulses\" para \"Track\".",
+    cl3_name:"Hardware Health Estimation",cl3_why:"Sem sensores diretos no hardware, qualquer estimativa de saúde do motor seria imprecisa e causaria má experiência. Lembrete de limpeza por tempo (a cada 7 dias) permanece.",
+    cl4_name:"Nutrition Goal Tracking — anéis de metas",cl4_why:"Pedido direto do Jon. Usuário define metas diárias de proteína/calorias no onboarding. Home mostra Goal Rings preenchendo conforme blends são logados. Substitui o Pulse Level como motor principal de engajamento diário.",
+    cl5_name:"Rastreamento de Hidratação & Suplementos",cl5_why:"Pedido direto do Jon. Log de água 1-tap + checklist diário \"Meu Stack\" (creatina ✓, colágeno ✓). Custo zero de IA. Alto valor de abertura diária.",
+    cl6_name:"Modo Offline → Fase 1",cl6_why:"Pedido direto do Jon. Não estava no roadmap original. Cache de favoritos + últimas 20 receitas localmente. Crítico para uso na cozinha e em viagens. Jon disse \"isso é Fase 1, não Fase 5.\"",
+    cl7_name:"i18n desde o Dia 0",cl7_why:"Requisito técnico confirmado. Sem textos hardcoded. i18next + arquivos JSON de idioma. Adicionar português ou espanhol depois deve ser uma mudança de config, não de código.",
+    cl8_name:"Aba \"Pulses\" → \"Track\"",cl8_why:"Navegação mantém 5 abas. A aba Track abriga: detalhes dos Goal Rings, Log de Hidratação, Meu Stack, histórico de blends. App pivota de ferramenta de receitas para rastreador diário de bem-estar.",
+    cl9_name:"Pantry Scanner — escopo reduzido para Fase 2",cl9_why:"Foco em ingredientes domésticos comuns primeiro (frutas, aveia, vegetais). Supplement Detector vai para Fase 5. Smart Substitutes Engine é o principal valor entregue.",
+    cl10_name:"Skeleton screens como padrão de implementação",cl10_why:"Toda tela com chamada de IA deve mostrar esqueletos de carregamento. O app deve parecer tão rápido quanto o hardware de 120W.",
+    h_arch:"Arquitetura do app",arch_desc:"Três camadas independentes que se comunicam via API. Essa separação permite que o app mobile evolua independentemente do backend. A camada de i18n atravessa todas as três.",arch1_title:"Camada 1 — Frontend mobile (o que o usuário vê)",arch1_desc:"React Native + Expo. Consome a API backend via HTTPS. Toda UI/UX vive aqui. HealthKit / Health Connect nesta camada. i18next gerencia troca de idioma no lado cliente. Cache offline via React Query + MMKV.",arch2_title:"Camada 2 — Backend API (o cérebro)",arch2_desc:"Node.js + Express. Autenticação, banco de dados, lógica de negócio, chamadas de IA, processamento de pagamento, envio de emails, cron jobs (push diário, relatório semanal). Nunca exposto ao usuário final.",arch3_title:"Camada 3 — Banco de dados + Storage (memória)",arch3_desc:"MongoDB Atlas para dados estruturados (usuários, receitas, logs de blend, metas de macros, hidratação, stack de suplementos). Cloudflare R2 para arquivos. Upstash Redis para cache e rate limiting.",arch_warn:"O protótipo atual é HTML puro com localStorage. NÃO será a base do app mobile. Serve como referência de UI. O desenvolvimento começa do zero em React Native. O protótipo pode ser hospedado no Vercel como demo para stakeholders.",
+    h_screens:"Mapa de telas — v2",screens_desc:"Navegação com 5 abas. \"Pulses\" renomeada para \"Track\" — agora o hub central de rastreamento diário. Feed da comunidade removido. Share Cards permanecem como ação dentro da aba Track.",tab1:"Aba 1",tab2:"Aba 2",tab2_name:"Receitas",tab3:"Aba 3 — CTA",tab4:"Aba 4 — NOVA",tab5:"Aba 5",tabM:"Modais",tabM_name:"+ Fluxos extras",s1_1:"Saudação dinâmica (hora do dia)",s1_2:"Goal Rings (proteína + calorias)",s1_3:"Receita do dia (biométrica)",s1_4:"Contador de streak",s1_5:"Quick Protocols (4 cards)",s1_6:"Badge trial / Pro",s2_1:"Chat Pulse AI",s2_2:"Filtro por goal / modelo",s2_3:"Entrada do Pantry Scanner",s2_4:"Favoritos",s2_5:"Lista de compras",s2_6:"Skeleton screens em todos os loads de IA",s3_1:"Timer 30s (simples)",s3_2:"Receita ativa passo a passo",s3_3:"Pantry Scanner (câmera)",s3_4:"Lembrete de limpeza (7 dias)",s3_5:"Prompt de Seamless Refill",s4_1:"Visão detalhada dos Goal Rings",s4_2:"Log de hidratação 1-tap",s4_3:"Meu Stack (checklist de suplementos)",s4_4:"Histórico de blends + totais de macros",s4_5:"Gerador de Share Cards",s4_6:"Relatório Nutricional Semanal",s5_1:"Perfil + modelo selecionado",s5_2:"Configurações de metas de macros",s5_3:"Badges conquistados",s5_4:"Status do Biometric Sync",s5_5:"Free vs Pro / gerenciar plano",s5_6:"Preferência de idioma",sm1:"Onboarding (modelo + goal + metas de macros)",sm2:"Fluxo do Pantry Scanner",sm3:"Paywall Pulse Pro",sm4:"Ativação do Golden Ticket",sm5:"Solicitação de permissão biométrica",sm6:"Indicador de modo offline",
+    h_stack:"Linguagens & frameworks",layer_mobile:"App mobile",rn_why:"Um codebase para iOS + Android. EAS Build entrega IPA e APK sem precisar de Mac local.",ts_why:"Segurança de tipos de ponta a ponta. Tipos compartilhados entre frontend e backend.",rn7_why:"Bottom tabs + stack navigator. Padrão do ecossistema.",zus_why:"State global leve. Goal rings, contador de hidratação, stack de suplementos vivem aqui.",i18n_why:"NOVO — i18n desde o Dia 0. Arquivos JSON de idioma. Sem strings hardcoded em lugar nenhum.",mmkv_why:"NOVO — Modo Offline. Cache do React Query + MMKV armazena últimas 20 receitas e favoritos localmente.",layer_backend:"Backend API",node_why:"Rápido para prototipar endpoints. Async-first — ideal para chamadas de IA encadeadas.",tsbe_why:"Consistência full-stack. Definições de tipos compartilhadas minimizam bugs de integração.",jwt_why:"Auth stateless. Access token (15min) + refresh token (30 dias) em secure storage.",zod_why:"Validação de schema em runtime em todos os inputs da API antes de chegar ao banco.",cron_why:"Push notifications diários, emails de relatório semanal, downgrade de trial.",layer_db:"Banco de dados",mongo_why:"Free tier (M0) para MVP. Schema flexível — lida com dados em evolução (metas de macro, hidratação, stack de suplementos).",mongoose_why:"ODM. Modelos: User, Recipe, BlendLog, MacroGoal, HydrationLog, SupplementStack.",redis_why:"Cache de respostas de IA + rate limiting do Pantry Scanner (3/mês free). Serverless — custo quase zero no MVP.",layer_storage:"Storage & mídia",r2_why:"Compatível com S3, custo zero de egress. Fotos do Pantry Scanner, PNGs de share cards, imagens de receitas. CDN global incluso.",sharp_why:"Resize e compressão de imagens server-side + geração de PNGs dos share cards.",
+    i18n_note:"Nota de arquitetura i18n: Todas as strings visíveis ao usuário devem referenciar uma chave no arquivo JSON de idioma. Estrutura: /locales/en.json e /locales/pt-BR.json. Preferência de idioma salva no perfil do usuário + localStorage. Adicionar um novo idioma = criar um novo arquivo JSON, zero mudanças de código.",
+    h_apis:"APIs & integrações necessárias",th_api:"API / Serviço",th_purpose:"Para que serve",th_phase:"Fase",th_cost:"Custo",api1:"Chat Pulse AI — geração de receitas com macros. Smart Substitutes Engine. Injeção de contexto biométrico.",api2:"Pantry Scanner — analisa foto da geladeira/despensa para identificar ingredientes comuns.",api3:"Gerenciamento de subscriptions (Pulse Pro $4.99/mês, $49/ano). Integra com App Store e Play Store automaticamente.",api4:"Biometric Sync — sono, HRV, calorias ativas do iPhone / Apple Watch.",api5:"Biometric Sync — equivalente Android. Integra com Google Fit, Garmin, Fitbit.",api6:"Emails transacionais + sequência de 5 emails pós-compra. Templates bilíngues (EN / PT-BR).",api7:"Daily Pulse, lembretes de streak, alertas de expiração de trial. Payloads bilíngues.",api8:"Golden Ticket — geração em lote de QR codes por lote de produção para ativar 30 dias de trial.",api9:"Seamless Refill — restock 1-tap de Mocktail Mixes e peças. Requer confirmação do Jon.",api10:"Pantry Scanner — acesso à câmera para fotos da despensa/geladeira.",api11:"Error tracking — iOS, Android e backend. Crítico para detectar crashes em produção.",
+    h_ai:"Integrações de IA",ai1_title:"GPT-4o — Pulse AI + Smart Substitutes + contexto biométrico",ai1_desc:"Input: modelo BLENDi do usuário, goal, histórico de blends, ingredientes disponíveis e categoria biométrica (se sincronizado). Output: receita JSON com macros completos. System prompt sempre força output JSON.",ai2_title:"GPT-4o Vision — Pantry Scanner (escopo Fase 2)",ai2_desc:"Input: foto em base64. Output: lista JSON de ingredientes domésticos comuns detectados. Segunda chamada gera 3 receitas com Smart Substitutes. Supplement Detector excluído da Fase 2 — somente Fase 5.",ai3_title:"Lógica biométrica — sem modelo separado",ai3_desc:"Backend lê sono + HRV + calorias do HealthKit/Health Connect. Mapeia para categorias e injeta no prompt do GPT-4o. Sem modelo de ML dedicado.",ai_cost:"Custo estimado de IA no MVP (100 usuários ativos, 5 requests Pulse AI/semana, 10 scans Pantry/mês): ~$15–40/mês. Cache Redis evita chamadas duplicadas. Escala linearmente com usuários.",
+    h_hosting:"Hospedagem & infraestrutura",h1_role:"Backend API Node.js. Deploy automático via GitHub. Sem configuração de servidor. Auto-escala.",h2_role:"Banco de dados principal. Free tier M0 suficiente para MVP (~10k usuários ativos).",h2_cost:"Grátis no MVP",h3_role:"Storage de imagens. Custo zero de egress. CDN global incluso.",h4_role:"Cache de IA + rate limiting. Serverless, paga por request.",h4_cost:"Grátis até 10k req/dia",h5_role:"Build e distribuição mobile. IPA + APK/AAB na nuvem. Sem Mac ou Android Studio local.",h5_cost:"Grátis até 30 builds/mês",h6_role:"Deploy do protótipo HTML como webapp de demo para stakeholders. Não é o app principal.",h6_cost:"Grátis",hosting_total:"Custo total de infraestrutura no MVP: ~$25–60/mês para os primeiros 500 usuários. RevenueCat só começa a cobrar após $2.500/mês de receita recorrente.",
+    h_mobile:"iOS & Android",ios_title:"Requisitos para App Store (iOS)",ios1_name:"Apple Developer Account — $99/ano",ios1_desc:"Deve estar em nome da empresa BLENDi. O app aparece na loja com essa identidade.",ios2_name:"Review do App Store Connect",ios2_desc:"1–3 dias úteis padrão. Apps com HealthKit + câmera + pagamentos precisam de 7 dias de buffer. Texto de justificativa para dados de saúde deve ser preparado antes.",ios3_name:"Certificados & Provisioning",ios3_desc:"Expo EAS gerencia automaticamente. Sem configuração manual.",android_title:"Requisitos para Google Play (Android)",and1_name:"Google Play Console — $25 taxa única",and1_desc:"2–5 dias na primeira review, depois quase instantâneo para atualizações.",and2_name:"AAB (Android App Bundle)",and2_desc:"Expo EAS gera automaticamente. Upload no Play Console. Seção de segurança de dados obrigatória para apps de saúde.",
+    h_phases:"Fases de desenvolvimento",ph0_name:"Fundação & Setup",ph0_time:"Semanas 1–2 · ~10 dias",badge_foundation:"Fundação",ph0_desc:"Estrutura primeiro. Um setup ruim aqui cria dívida técnica em todas as fases seguintes. Duas adições novas na v2: i18n desde o Dia 0 e deploy do protótipo no Vercel.",t0_1:"Estrutura do monorepo",t0_1d:"/apps/mobile (Expo) + /apps/api (Node.js) + /packages/shared (tipos). pnpm workspaces. CI/CD via GitHub Actions.",t0_2:"Setup de i18n — i18next + arquivos JSON",t0_2d:"Configurar i18next no app mobile. Criar /locales/en.json e /locales/pt-BR.json. Zero strings hardcoded deste ponto em diante. Idioma salvo no perfil do usuário + MMKV local.",t0_3:"Init do projeto Expo",t0_3d:"Expo SDK 52, React Native 0.76, TypeScript. Instalar: React Navigation 7, Zustand, Axios, React Query, MMKV, i18next. ESLint + Prettier.",t0_4:"Design system / tokens",t0_4d:"Cores #9a4893 + #2b1429. Tipografia: Syne + DM Sans via Expo Google Fonts. Espaçamentos, radius, componentes reutilizáveis (Button, Card, Badge, SkeletonLoader). Componente de skeleton screen criado aqui e reutilizado em todo o app.",t0_5:"Setup do backend — Railway + MongoDB",t0_5d:"Projeto Railway, MongoDB Atlas, variáveis de ambiente. Health check GET /ping. CI/CD via GitHub Actions.",t0_6:"Auth — registro, login, JWT",t0_6d:"Email + senha. JWT (15min) + refresh token (30 dias). POST /auth/register, /auth/login, /auth/refresh. Argon2 para hash de senha.",t0_7:"Resend — templates de email (bilíngues)",t0_7d:"Configuração de domínio. Templates de boas-vindas e verificação em EN e PT-BR. Idioma determinado pela preferência definida no onboarding.",t0_8:"Protótipo HTML → deploy no Vercel",t0_8d:"Corrigir 3 bugs identificados. Deploy em demo.blendiblender.com. Somente para demonstração a stakeholders.",
+    ph1_name:"MVP Core — o loop central",ph1_time:"Semanas 3–8 · ~30 dias",badge_mvp:"MVP",ph1_desc:"A Fase 1 está mais pesada que na v1 — Modo Offline, Goal Tracking, Hidratação e Stack de Suplementos foram todos movidos para cá. Esses elementos estabelecem o app como um rastreador diário desde o primeiro dia.",t1_1:"Splash + Onboarding (expandido)",t1_1d:"Onboarding de 4 telas: (1) idioma + nome/email, (2) modelo BLENDi, (3) goal, (4) metas diárias de macros (proteína em gramas + meta calórica). As metas alimentam os Goal Rings na Home.",t1_2:"Home Screen — Goal Rings",t1_2d:"Saudação dinâmica por hora. Goal Rings: progresso circular animado para proteína e calorias, preenchendo conforme blends são logados. Reseta à meia-noite. Contador de streak. 4 cards Quick Protocol. Receita do dia. Badge trial / Pro.",t1_3:"Pulse AI — chat com GPT-4o",t1_3d:"Tela de chat com skeleton screen durante o carregamento. GPT-4o recebe modelo, goal, metas de macros. Retorna receita JSON com macros completos. Cache Redis para queries repetidas. 3 requests/dia no free tier.",t1_4:"Blend Timer (fixo)",t1_4d:"Timer simples de 30s. Default por modelo: Pro+: 30s, Steel: 25s, Lite: 35s — sobrescrevível manualmente. Haptic feedback. Logar um blend adiciona macros aos Goal Rings.",t1_5:"Log de Hidratação — 1-tap",t1_5d:"Botão proeminente na aba Track. Tap = log de 250ml. Total diário exibido. Usuário define meta (ex: 2,5L). Estado puro em Zustand + log diário no MongoDB. Menos de 5 segundos para usar.",t1_6:"Meu Stack — checklist de suplementos",t1_6d:"Usuário define lista de suplementos nas configurações (creatina, colágeno, ômega-3, BCAA, etc.). Aba Track mostra checklist diário. Tap para marcar como tomado. Reseta à meia-noite.",t1_7:"Modo Offline",t1_7d:"React Query faz cache das últimas 20 receitas + todos os favoritos no MMKV. Quando offline: aba Receitas mostra conteúdo em cache com banner indicador. Pulse AI e Pantry Scanner mostram estado de sem-conexão de forma graciosa. Hidratação e Stack funcionam 100% offline.",t1_8:"Favoritos + Blend Log",t1_8d:"Salvar receitas no MongoDB. BlendLog: data, receita, macros consumidos, avaliação. Macros logados alimentam os Goal Rings em tempo real.",t1_9:"Tela de Perfil / Me",t1_9d:"Modelo selecionado, goal, metas de macros, streak atual, total de blends, badges. Seletor de preferência de idioma. Badge Free vs Pro. Botão de upgrade.",
+    ph2_name:"Formação de Hábito — loop diário",ph2_time:"Semanas 9–13 · ~25 dias",badge_habit:"Hábito",ph2_desc:"Transformar o app em um ritual diário. Os usuários já têm Goal Rings, hidratação e rastreamento de suplementos da Fase 1. Agora adicionamos o Pantry Scanner e push notifications.",t2_1:"Pantry AI Scanner — ingredientes comuns",t2_1d:"Câmera → base64 → GPT-4o Vision identifica ingredientes domésticos comuns (frutas, vegetais, aveia, laticínios, ovos, nozes). Segunda chamada gera 3 receitas com Smart Substitutes. Supplement Detector excluído (Fase 5). Limite: 3 scans/mês no free tier. Skeleton screen durante o processamento.",t2_2:"Push Notifications — Daily Pulse",t2_2d:"Cron job diário (horário configurável pelo usuário). Payload bilíngue. Recomendação de receita + alertas de streak + nudge de Goal Ring às 18h se meta não foi atingida.",t2_3:"Streaks & Badges",t2_3d:"Streak incrementa quando um blend é logado por dia. Reseta se 48h passam. Badges: 7 dias, 30 dias, 50 blends, meta de proteína por 10 dias seguidos, 5 scans do Pantry. Animação de unlock.",t2_4:"Gerador de Lista de Compras",t2_4d:"Selecionar 3–5 receitas → lista consolidada de ingredientes por seção. Exportar para WhatsApp/Notas via Share API. Output bilíngue.",
+    ph3_name:"Platform Moat — lock-in & monetização",ph3_time:"Semanas 14–19 · ~30 dias",badge_moat:"Moat",ph3_desc:"Biometric Sync, paywall, Seamless Refill, Share Cards. O paywall deve estar ativo antes da submissão nas lojas. Feed da comunidade removido — Share Cards assumem o papel de UGC.",t3_1:"RevenueCat — paywall Pulse Pro",t3_1d:"Produtos: pulse_pro_monthly ($4,99), pulse_pro_yearly ($49). Paywall aparece no 4º scan do Pantry, Biometric Sync e Relatório Semanal. Tela de upgrade com comparativo Free vs Pro bilíngue.",t3_2:"Biometric Sync — Fase 1",t3_2d:"iOS: HealthKit via expo-health. Android: plugin Health Connect. Lê sono, HRV, calorias ativas. Backend categoriza e injeta no prompt do GPT-4o. Somente Pro.",t3_3:"Relatório Nutricional Semanal",t3_3d:"Toda segunda-feira: push + email bilíngue. Total de blends, proteína vs meta, média de hidratação, consistência de suplementos, streak, badges. Somente Pro.",t3_4:"Seamless Refill",t3_4d:"Backend detecta cadência de ingredientes pelo BlendLog. 8+ blends com Mocktail Mix → sugestão de restock com link Shopify.",t3_5:"Recipe Share Cards",t3_5d:"PNG gerado server-side (sharp + canvas): receita, macros, cores da marca, nome do usuário, QR code. Share para Instagram/WhatsApp/TikTok. Substitui o feed da comunidade como motor de UGC.",
+    ph4_name:"Lançamento nas Lojas & Golden Ticket",ph4_time:"Semanas 20–23 · ~20 dias",badge_launch:"Lançamento",ph4_desc:"Submissão nas lojas e ativação do Golden Ticket. Reservar 7 dias de buffer para review da Apple. Sequência de emails deve estar bilíngue antes do lançamento.",t4_1:"Golden Ticket — sistema de ativação QR",t4_1d:"POST /activate/:code valida QR (vinculado ao lote de produção), ativa 30 dias de Pulse Pro, marca como usado. Geração em lote para impressão. Downgrade automático no dia 30 via cron job. Scan do QR detecta idioma do dispositivo.",t4_2:"Sequência de emails — 5 emails bilíngues",t4_2d:"Dia 0 (Boas-vindas), Dia 2 (Hardware Mastery), Dia 5 (Pantry Scanner), Dia 10 (Biometric Sync), Dia 25 (Don't lose your Pulse — 20% off). EN + PT-BR. Disparados pela ativação do Golden Ticket.",t4_3:"Submissão na App Store (iOS)",t4_3d:"EAS Build → IPA → App Store Connect. Screenshots, justificativa de HealthKit, política de privacidade. 7 dias de buffer para review.",t4_4:"Submissão no Play Store (Android)",t4_4d:"EAS Build → AAB → Play Console. Seção de segurança de dados obrigatória. 2–5 dias na primeira review.",t4_5:"Sentry — error tracking em produção",t4_5d:"Instalar no app mobile e no backend. Alertas de erro crítico por email. Essencial antes de ter usuários reais em produção.",
+    ph5_name:"Crescimento & premium tier",ph5_time:"Semanas 24+ · contínuo",badge_growth:"Crescimento",ph5_desc:"Features pós-lançamento guiadas por dados reais de uso. Supplement Detector retorna aqui após validar o tamanho do segmento Gym & Protein.",t5_1:"Supplement Detector no Pantry Scanner",t5_1d:"Prompt do GPT-4o Vision expandido para identificar potes de proteína, creatina, colágeno, BCAA. Integra automaticamente com o checklist do Meu Stack.",t5_2:"Cocktail & Mocktail Studio",t5_2d:"Modo dedicado para Beach & Cocktails. Packs de receitas por ocasião (Dia de Piscina, Game Night, Brunch). Links para os Mocktail Mixes.",t5_3:"Modo Família & Kids",t5_3d:"Nomes divertidos de receitas, filtros de alergênicos, escalador de porções. Active Moms — completamente ignorado por todos os concorrentes.",t5_4:"Biometric Sync Fase 2 — Oura, Garmin, Whoop",t5_4d:"Expandir para wearables premium. Score de prontidão do Oura Ring → blend adaptado. Posiciona BLENDi Pulse como o \"Oura Ring da nutrição.\"",t5_5:"Desafios mensais",t5_5d:"\"Desafio de 30 Dias de Proteína\", ranking por cidade, programa de embaixadores. Flywheel social sem precisar de uma rede social completa.",
+    h_questions:"Perguntas críticas — atualização de status",questions_desc:"Perguntas da v1 atualizadas com respostas onde as decisões foram confirmadas. Perguntas abertas permanecem — algumas bloqueiam fases específicas.",q1_text:"O Pulse Level fica ou é removido?",q1_ans:"→ Removido pelo Gabriel. Substituído pelos Goal Rings (progresso positivo de macros, não barra de ansiedade por streak).",q2_text:"O feed Community Pulses deve ser construído?",q2_ans:"→ Não. Removido. O app é uma ferramenta de performance, não uma rede social. Share Cards substituem o UGC.",q3_text:"Navegação com 5 abas: manter \"Pulses\" ou substituir?",q3_ans:"→ Manter 5 abas. Renomear para \"Track\". Abriga: detalhes dos Goal Rings, Log de Hidratação, Meu Stack, histórico, Share Cards.",q4_text:"i18n desde o Dia 0 ou adicionado depois?",q4_ans:"→ Dia 0. Confirmado. Zero strings hardcoded. i18next + arquivos JSON desde o primeiro commit.",q5_text:"O Supplement Detector no Pantry Scanner é prioridade da Fase 2?",q5_ans:"→ Não. Fase 5. Foco da Fase 2 em ingredientes comuns + Smart Substitutes Engine.",q6_text:"Jon tem Apple Developer Account em nome da empresa BLENDi?",q6_why:"O app na App Store aparece com o nome do desenvolvedor. Conta pessoal = menos profissional. Migrar contas depois é complexo.",q6_cat:"Bloqueia Fase 4",q7_text:"A BLENDi usa Shopify? Jon tem acesso às credenciais da API Shopify?",q7_why:"A arquitetura do Seamless Refill depende disso. Plataforma diferente = implementação diferente.",q7_cat:"Afeta Fase 3",q8_text:"Qual é o volume mensal de vendas de unidades BLENDi?",q8_why:"Define escala de infraestrutura, projeções de custo de IA e ARR.",q8_cat:"Afeta infraestrutura",q9_text:"Os QR codes do Golden Ticket precisam ser únicos por unidade ou por lote de produção?",q9_why:"Por unidade = mais seguro mas integração complexa com embalagem. Por lote = mais simples mas compartilhável. Muda significativamente o backend da Fase 4.",q9_cat:"Bloqueia Fase 4",q10_text:"Jon quer analytics (DAU, MAU, funil Free→Pro)?",q10_why:"Deve ser instrumentado desde a Fase 1. Adicionar depois = perder todos os dados históricos.",q10_cat:"Afeta Fase 0",q11_text:"Existe uma data alvo de lançamento? Algum momento sazonal para atingir?",q11_why:"Janeiro é o melhor período para apps de wellness (resoluções de Ano Novo). Sem data, o roadmap de ~24 semanas roda como está.",q11_cat:"Afeta escopo total",
+    footer:"BLENDi Pulse — Roadmap Técnico Master v2 · Abril 2026"
+  }
+};
+
+let lang = 'en';
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent === l.toUpperCase()));
+  document.documentElement.lang = l === 'pt' ? 'pt-BR' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (T[l][k] !== undefined) el.innerHTML = T[l][k];
+  });
+}
+
+function tp(id) {
+  const body = document.getElementById('bd-' + id);
+  const toggle = document.getElementById('tg-' + id);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  toggle.textContent = isOpen ? '▼' : '▲';
+}
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', function() {
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const id = e.target.id;
+      document.querySelectorAll('.nav-link').forEach(l => {
+        l.classList.toggle('active', l.getAttribute('href') === '#' + id);
+      });
+    }
+  });
+}, { threshold: 0.2 });
+
+document.querySelectorAll('h2[id]').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
