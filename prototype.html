@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BLENDi Pulse — Updated</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            purple: '#9a4893',
+                            plum: '#2b1429',
+                            light: '#f4e9f3'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'San Francisco', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.4s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ─── App Shell ─────────────────────────────────────── */
+        #app-container {
+            width: 100%;
+            max-width: 480px;
+            height: 100vh;
+            max-height: 900px;
+            background: linear-gradient(135deg, #2b1429 0%, #1a0c19 100%);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ─── Fixed Header ───────────────────────────────────── */
+        #app-header { flex-shrink: 0; z-index: 20; }
+
+        /* ─── Scrollable Areas ───────────────────────────────── */
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+        .scroll-area::-webkit-scrollbar { display: none; }
+        .scroll-area { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* ─── Fixed Bottom Nav ───────────────────────────────── */
+        #app-nav { flex-shrink: 0; z-index: 30; }
+
+        /* ─── Glassmorphism ──────────────────────────────────── */
+        .glass {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .glass-card:active { transform: scale(0.98); background: rgba(255,255,255,0.1); }
+
+        /* ─── Typing Indicator ───────────────────────────────── */
+        .typing-dot { animation: typingBounce 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40%           { transform: scale(1); opacity: 1; }
+        }
+
+        /* ─── Splash ─────────────────────────────────────────── */
+        #splash-screen {
+            transition: opacity 0.6s cubic-bezier(0.4,0,0.2,1), transform 0.6s cubic-bezier(0.4,0,0.2,1);
+        }
+        .splash-hidden { opacity: 0; pointer-events: none; transform: scale(1.05); }
+
+        /* ─── Nutri-Badges ───────────────────────────────────── */
+        .nutri-badge {
+            display: inline-block;
+            font-size: 9px; font-weight: 700;
+            letter-spacing: 0.05em; text-transform: uppercase;
+            padding: 2px 7px; border-radius: 999px;
+            background: linear-gradient(135deg,#9a4893,#7a3875);
+            color:#fff; white-space:nowrap;
+            box-shadow: 0 1px 4px rgba(154,72,147,0.4);
+        }
+        .nutri-badge.green  { background: linear-gradient(135deg,#10b981,#059669); }
+        .nutri-badge.blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); }
+        .nutri-badge.orange { background: linear-gradient(135deg,#f97316,#ea580c); }
+
+        /* ─── Heart Button ───────────────────────────────────── */
+        .heart-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(154,72,147,0.1);
+            border: 1px solid rgba(154,72,147,0.25);
+            cursor: pointer; transition: transform 0.2s, background 0.2s;
+        }
+        .heart-btn:active { transform: scale(0.82); }
+        .heart-btn.liked  { background: rgba(220,38,38,0.15); border-color: rgba(220,38,38,0.4); }
+        .heart-btn svg    { width:14px; height:14px; stroke:#9a4893; transition: stroke 0.2s, fill 0.2s; }
+        .heart-btn.liked svg { stroke:#ef4444; fill:#ef4444; }
+
+        /* ─── Blend Timer ────────────────────────────────────── */
+        @keyframes motorPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(154,72,147,0.0); }
+            50%     { box-shadow: 0 0 0 14px rgba(154,72,147,0.35); }
+        }
+        .motor-pulsing { animation: motorPulse 0.8s ease-in-out infinite; }
+
+        .blend-timer-btn {
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            width:100%; margin-top:10px; padding:10px; border-radius:12px;
+            background: linear-gradient(135deg,#2b1429,#9a4893);
+            color:#fff; font-size:12px; font-weight:600;
+            cursor:pointer; border:none; transition: opacity 0.2s;
+        }
+        .blend-timer-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+        .timer-ring-wrap {
+            display:flex; flex-direction:column; align-items:center;
+            margin-top:10px; gap:4px;
+        }
+        .timer-icon-wrap {
+            width:48px; height:48px; border-radius:50%;
+            background:rgba(154,72,147,0.1);
+            display:flex; align-items:center; justify-content:center;
+            transition: box-shadow 0.3s;
+        }
+        .timer-icon-wrap svg { width:24px; height:24px; stroke:#9a4893; }
+        .timer-count { font-size:22px; font-weight:700; color:#2b1429; letter-spacing:-1px; }
+        .timer-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:#9a4893; }
+        .ready-msg {
+            font-size:13px; font-weight:700; color:#059669;
+            display:flex; align-items:center; gap:4px; margin-top:4px;
+        }
+
+        /* ─── Favorites empty state ──────────────────────────── */
+        .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:64px 0; gap:12px; opacity:0.5; }
+    </style>
+</head>
+<body>
+
+<div id="app-container" class="text-white">
+
+    <!-- ░░ Splash ░░ -->
+    <div id="splash-screen" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-brand-plum">
+        <div class="relative flex flex-col items-center animate-slide-up">
+            <div class="w-20 h-20 bg-gradient-to-tr from-brand-purple to-brand-light rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(154,72,147,0.5)] mb-4 animate-pulse-slow">
+                <i data-lucide="zap" class="text-brand-plum w-10 h-10"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-white">BLENDi <span class="font-light text-brand-purple">Pulse</span></h1>
+            <p class="text-xs text-white/50 tracking-widest mt-2 uppercase">Performance Coach</p>
+        </div>
+    </div>
+
+    <!-- ░░ Fixed Header ░░ -->
+    <header id="app-header" class="pt-12 pb-4 px-6 flex justify-between items-center bg-brand-plum/80 backdrop-blur-md border-b border-white/5">
+        <div>
+            <p class="text-xs text-white/60 font-medium tracking-wide uppercase mb-1">Good Afternoon</p>
+            <h2 class="text-xl font-semibold tracking-tight">Hello, Jon</h2>
+        </div>
+        <div class="relative cursor-pointer">
+            <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                <i data-lucide="user" class="w-5 h-5 text-white/80"></i>
+            </div>
+            <span class="absolute top-0 right-0 w-3 h-3 bg-brand-purple border-2 border-brand-plum rounded-full"></span>
+        </div>
+    </header>
+
+    <!-- ░░ View: Home ░░ -->
+    <main id="view-home" class="scroll-area px-6 py-6 pb-4 z-10">
+        <div class="mb-8">
+            <div class="bg-gradient-to-r from-brand-purple/20 to-transparent p-5 rounded-2xl border border-brand-purple/30 relative overflow-hidden">
+                <div class="absolute right-0 top-0 opacity-20 transform translate-x-4 -translate-y-4">
+                    <i data-lucide="cpu" class="w-32 h-32 text-brand-purple"></i>
+                </div>
+                <h3 class="text-lg font-semibold mb-1">Pulse AI is Ready</h3>
+                <p class="text-sm text-white/70 font-light max-w-[80%]">Your personalized nutrition and performance coach is online.</p>
+            </div>
+        </div>
+
+        <h3 class="text-sm font-medium text-white/60 uppercase tracking-widest mb-4">Quick Protocols</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="glass glass-card rounded-2xl p-4 cursor-pointer transition-all" onclick="triggerAI('gym')">
+                <div class="w-10 h-10 rounded-full bg-brand-purple/20 flex items-center justify-center mb-3">
+                    <i data-lucide="dumbbell" class="w-5 h-5 text-brand-purple"></i>
+                </div>
+                <h4 class="font-semibold text-sm mb-1">Gym &amp; Protein</h4>
+                <p class="text-[10px] text-white/50 leading-tight">High-Torque recovery shakes.</p>
+            </div>
+            <div class="glass glass-card rounded-2xl p-4 cursor-pointer transition-all" onclick="triggerAI('moms')">
+                <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center mb-3">
+                    <i data-lucide="heart" class="w-5 h-5 text-blue-400"></i>
+                </div>
+                <h4 class="font-semibold text-sm mb-1">Active Moms</h4>
+                <p class="text-[10px] text-white/50 leading-tight">Nutritious blends for the family.</p>
+            </div>
+            <div class="glass glass-card rounded-2xl p-4 cursor-pointer transition-all" onclick="triggerAI('beach')">
+                <div class="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center mb-3">
+                    <i data-lucide="sun" class="w-5 h-5 text-orange-400"></i>
+                </div>
+                <h4 class="font-semibold text-sm mb-1">Beach &amp; Cocktails</h4>
+                <p class="text-[10px] text-white/50 leading-tight">Perfectly crushed ice, anywhere.</p>
+            </div>
+            <div class="glass glass-card rounded-2xl p-4 cursor-pointer transition-all" onclick="triggerAI('travel')">
+                <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+                    <i data-lucide="plane" class="w-5 h-5 text-emerald-400"></i>
+                </div>
+                <h4 class="font-semibold text-sm mb-1">Travel Hacks</h4>
+                <p class="text-[10px] text-white/50 leading-tight">Performance on the go.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- ░░ View: Chat ░░ -->
+    <main id="view-chat" class="hidden z-10 relative" style="flex:1;overflow:hidden;display:none;flex-direction:column;">
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48ZmlsdGVyIGlkPSJmIiB4PSIwIiB5PSIwIiB3aWR0aD0iMjAwJSIgaGVpZ2h0PSIyMDAlIj48ZmVHYXVzc2lhbkJsdXIgcmVzdWx0PSJibHVyT3V0IiBpbj0iU291cmNlR3JhcGhpYyIgc3RkRGV2aWF0aW9uPSI1MCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMyYjE0MjkiLz48Y2lyY2xlIGN4PSI1MCUiIGN5PSI1MCUiIHI9IjM1JSIgZmlsbD0iIzlhNDg5MyIgZmlsdGVyPSJ1cmwoI2YpIiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=')] bg-cover bg-center opacity-40 mix-blend-screen pointer-events-none"></div>
+
+        <div id="chat-history" class="scroll-area px-5 py-6 flex flex-col gap-5 z-10" style="padding-bottom:88px;">
+            <div class="flex flex-col gap-1 items-start w-full animate-fade-in">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-6 h-6 rounded-full bg-brand-purple flex items-center justify-center">
+                        <i data-lucide="zap" class="w-3 h-3 text-white"></i>
+                    </div>
+                    <span class="text-[10px] text-white/60 font-medium uppercase tracking-wider">Pulse AI</span>
+                </div>
+                <div class="glass rounded-2xl rounded-tl-sm py-3 px-4 text-sm font-light text-white/90 max-w-[85%] leading-relaxed shadow-lg">
+                    System calibrated. I am Pulse AI, your performance coach. How can we optimize your nutrition today?
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div id="typing-indicator" class="hidden absolute z-20 flex items-center gap-2" style="bottom:72px;left:20px;">
+            <div class="glass rounded-full py-2 px-4 flex items-center gap-1 shadow-lg">
+                <div class="w-1.5 h-1.5 bg-brand-purple rounded-full typing-dot"></div>
+                <div class="w-1.5 h-1.5 bg-brand-purple rounded-full typing-dot"></div>
+                <div class="w-1.5 h-1.5 bg-brand-purple rounded-full typing-dot"></div>
+                <span class="text-[10px] text-white/60 ml-2 font-light">Pulse AI is calculating...</span>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="absolute left-0 right-0 px-4 z-20" style="bottom:10px;">
+            <form id="chat-form" class="glass rounded-full p-1 pl-4 flex items-center shadow-2xl bg-[#2b1429]/80">
+                <input type="text" id="chat-input" placeholder="Ask for a recipe or protocol…"
+                    class="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-white/40 font-light" autocomplete="off">
+                <button type="submit" class="w-10 h-10 rounded-full bg-gradient-to-br from-brand-purple to-[#7a3875] flex items-center justify-center text-white shadow-lg transition-transform active:scale-95">
+                    <i data-lucide="arrow-up" class="w-5 h-5"></i>
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- ░░ View: Favorites ░░ -->
+    <main id="view-favorites" class="hidden scroll-area px-5 py-6 pb-4 z-10">
+        <h3 class="text-sm font-medium text-white/60 uppercase tracking-widest mb-5">Saved Recipes</h3>
+        <div id="favorites-list" class="flex flex-col gap-4"></div>
+    </main>
+
+    <!-- ░░ Fixed Bottom Nav ░░ -->
+    <nav id="app-nav" class="h-20 bg-brand-plum/90 backdrop-blur-xl border-t border-white/10 px-6 flex justify-around items-center pb-4">
+        <button onclick="switchView('home')" id="nav-home" class="flex flex-col items-center gap-1 text-brand-purple transition-colors">
+            <i data-lucide="layout-grid" class="w-6 h-6"></i>
+            <span class="text-[10px] font-medium tracking-wide">Home</span>
+        </button>
+        <button onclick="switchView('chat')" id="nav-chat" class="flex flex-col items-center gap-1 text-white/40 transition-colors hover:text-white/70">
+            <i data-lucide="message-square" class="w-6 h-6"></i>
+            <span class="text-[10px] font-medium tracking-wide">Pulse AI</span>
+        </button>
+        <button onclick="switchView('favorites')" id="nav-favorites" class="relative flex flex-col items-center gap-1 text-white/40 transition-colors hover:text-white/70">
+            <i data-lucide="heart" class="w-6 h-6"></i>
+            <span class="text-[10px] font-medium tracking-wide">Favorites</span>
+            <span id="fav-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">0</span>
+        </button>
+    </nav>
+
+</div>
+
+    <script>
+// ═══════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════
+lucide.createIcons();
+
+// ═══════════════════════════════════════════════════════
+//  DOM
+// ═══════════════════════════════════════════════════════
+const splashScreen    = document.getElementById('splash-screen');
+const viewHome        = document.getElementById('view-home');
+const viewChat        = document.getElementById('view-chat');
+const viewFavorites   = document.getElementById('view-favorites');
+const favoritesList   = document.getElementById('favorites-list');
+const favBadge        = document.getElementById('fav-badge');
+const navHome         = document.getElementById('nav-home');
+const navChat         = document.getElementById('nav-chat');
+const navFavorites    = document.getElementById('nav-favorites');
+const chatHistory     = document.getElementById('chat-history');
+const typingIndicator = document.getElementById('typing-indicator');
+const chatForm        = document.getElementById('chat-form');
+const chatInput       = document.getElementById('chat-input');
+
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let currentView  = 'home';
+let isProcessing = false;
+
+// ═══════════════════════════════════════════════════════
+//  Protocol Database
+// ═══════════════════════════════════════════════════════
+const aiProtocols = {
+    gym: {
+        userText:    'I need a post-workout recovery shake.',
+        introText:   'Calculating optimal recovery protocol… Deploying Vortex technology to ensure a perfect, clump-free whey isolate emulsion.',
+        recipeTitle: 'High-Protein Recovery Shake',
+        badges:      [{ label:'High Protein', cls:'' }, { label:'Gluten-Free', cls:'green' }],
+        ingredients: ['1.5 scoops Whey Isolate', '10oz Almond Milk', '½ Frozen Banana', '1 tbsp Peanut Butter'],
+        blendTime:   '30s · Silky Texture'
+    },
+    moms: {
+        userText:    'Give me a quick, nutritious blend for the kids.',
+        introText:   'Analyzing nutritional density… Utilizing the 120W High-Torque motor to completely pulverize hidden greens into a smooth, undetectable texture.',
+        recipeTitle: 'Healthy Fruit Puree',
+        badges:      [{ label:'Kid-Friendly', cls:'blue' }, { label:'Nutrient-Dense', cls:'green' }],
+        ingredients: ['1 handful Spinach (pulverized)', '½ cup Frozen Berries', '4oz Greek Yogurt', '6oz Apple Juice'],
+        blendTime:   '45s · Complete Emulsion'
+    },
+    beach: {
+        userText:    "What's a good crushed-ice drink for the beach?",
+        introText:   'Processing hydration metrics… Engaging full ice-crushing mode for a flawless, high-torque frozen cocktail blend.',
+        recipeTitle: 'Frozen Margarita',
+        badges:      [{ label:'Ice-Cold', cls:'blue' }, { label:'Party Ready', cls:'orange' }],
+        ingredients: ['1 cup Cubed Ice', '2oz Silver Tequila', '1oz Triple Sec', '2oz Fresh Lime Juice', 'Salt rim'],
+        blendTime:   '40s · Snow-Like Ice'
+    },
+    slushie: {
+        userText:    'Make me a summer slushie!',
+        introText:   'Activating full ice-crush power… BLENDi Pulse turns solid ice into silky snow in seconds.',
+        recipeTitle: 'Summer Slushie',
+        badges:      [{ label:'Ice-Cold', cls:'blue' }, { label:'Refreshing', cls:'green' }],
+        ingredients: ['1.5 cups Crushed Ice', '4oz Mango Juice', '2oz Passion Fruit Syrup', 'Fresh Mint'],
+        blendTime:   '35s · Ultra-Smooth'
+    },
+    kids: {
+        userText:    'Something healthy for the kids, please.',
+        introText:   'Deploying stealth-nutrition mode… Hidden Veggie Smoothie engineered for tiny taste-buds.',
+        recipeTitle: 'Hidden Veggie Smoothie',
+        badges:      [{ label:'Kid-Friendly', cls:'blue' }, { label:'Low Sugar', cls:'green' }],
+        ingredients: ['½ cup Steamed Sweet Potato', '1 Frozen Banana', '½ cup Oat Milk', '1 tbsp Honey', 'Cinnamon pinch'],
+        blendTime:   '40s · Creamy Smooth'
+    },
+    travel: {
+        userText:    "I'm travelling. Need a quick performance boost.",
+        introText:   'Optimizing on-the-go performance… Activating clump-free emulsion for your portable travel nutrition stack.',
+        recipeTitle: 'Jetlag Buster Protocol',
+        badges:      [{ label:'Quick Prep', cls:'orange' }, { label:'Energy Boost', cls:'' }],
+        ingredients: ['1 scoop Greens Powder', '1 scoop Collagen Peptides', '12oz Cold Water', '1 packet Electrolytes'],
+        blendTime:   '20s · Rapid Integration'
+    },
+    generic: {
+        introText:   'Analyzing request… Leveraging our 120W High-Torque motor and Vortex technology to synthesize the perfect macro-balanced profile.',
+        recipeTitle: 'Custom Performance Protocol',
+        badges:      [{ label:'Balanced', cls:'green' }],
+        ingredients: ['Customized Macro Base', 'Targeted Micronutrients', 'Optimized Liquid Ratio'],
+        blendTime:   '35s · Ideal Consistency'
+    }
+};
+
+// ═══════════════════════════════════════════════════════
+//  Keyword Detection
+// ═══════════════════════════════════════════════════════
+function detectProtocol(text) {
+    const t = text.toLowerCase();
+    if (/protein|gym|workout|whey/.test(t))              return aiProtocols.gym;
+    if (/kids?|mom|mum|family|children|veggie/.test(t))  return aiProtocols.kids;
+    if (/cocktail|margarita/.test(t))                    return aiProtocols.beach;
+    if (/slushie|slush|summer/.test(t))                  return aiProtocols.slushie;
+    if (/beach|\bice\b/.test(t))                         return aiProtocols.beach;
+    if (/travel|jetlag|jet.lag|airport/.test(t))         return aiProtocols.travel;
+    return aiProtocols.generic;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Splash
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+    setTimeout(() => splashScreen.classList.add('splash-hidden'), 2000);
+    updateFavBadge();
+});
+
+// ═══════════════════════════════════════════════════════
+//  View Navigation
+// ═══════════════════════════════════════════════════════
+const viewMap = { home: viewHome, chat: viewChat, favorites: viewFavorites };
+const navMap  = { home: navHome,  chat: navChat,  favorites: navFavorites  };
+
+function switchView(view) {
+    if (currentView === view) return;
+    currentView = view;
+
+    // Toggle visibility
+    Object.entries(viewMap).forEach(([k, el]) => {
+        if (k === 'chat') {
+            // chat needs display:flex (column), not just block
+            if (k === view) {
+                el.style.display = 'flex';
+                el.classList.remove('hidden');
+            } else {
+                el.style.display = 'none';
+                el.classList.add('hidden');
+            }
+        } else {
+            el.classList.toggle('hidden', k !== view);
+        }
+    });
+
+    // Toggle nav colours
+    Object.entries(navMap).forEach(([k, btn]) => {
+        btn.classList.toggle('text-brand-purple', k === view);
+        btn.classList.toggle('text-white/40', k !== view);
+    });
+
+    if (view === 'chat')      chatHistory.scrollTop = chatHistory.scrollHeight;
+    if (view === 'favorites') renderFavorites();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Quick Action Cards
+// ═══════════════════════════════════════════════════════
+window.triggerAI = function(category) {
+    if (isProcessing) return;
+    switchView('chat');
+    const protocol = aiProtocols[category] || aiProtocols.generic;
+    addUserMessage(protocol.userText);
+    showTypingThen(() => addAIMessage(protocol));
+};
+
+// ═══════════════════════════════════════════════════════
+//  Chat Form
+// ═══════════════════════════════════════════════════════
+chatForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text || isProcessing) return;
+    addUserMessage(text);
+    chatInput.value = '';
+    showTypingThen(() => addAIMessage(detectProtocol(text)));
+});
+
+function showTypingThen(cb) {
+    isProcessing = true;
+    typingIndicator.classList.remove('hidden');
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    setTimeout(() => {
+        typingIndicator.classList.add('hidden');
+        cb();
+        isProcessing = false;
+    }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════
+//  Message Builders
+// ═══════════════════════════════════════════════════════
+function addUserMessage(text) {
+    chatHistory.insertAdjacentHTML('beforeend', `
+        <div class="flex w-full justify-end animate-slide-up mb-2">
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl rounded-tr-sm py-3 px-4 text-sm font-light text-white max-w-[80%] shadow-md">
+                ${esc(text)}
+            </div>
+        </div>`);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function addAIMessage(protocol) {
+    const id       = 'r' + Date.now();
+    const saved    = getFavorites();
+    const isLiked  = saved.some(f => f.title === protocol.recipeTitle);
+
+    const badgesHTML = (protocol.badges || []).map(b =>
+        `<span class="nutri-badge ${b.cls||''}">${esc(b.label)}</span>`).join('');
+
+    const ingredientsHTML = protocol.ingredients.map(ing =>
+        `<li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-brand-purple flex-shrink-0 inline-block"></span>${esc(ing)}</li>`
+    ).join('');
+
+    // Encode recipe data for onclick attribute (avoid breaking HTML)
+    const rd = {
+        title: protocol.recipeTitle,
+        ingredients: protocol.ingredients,
+        blendTime: protocol.blendTime,
+        badges: protocol.badges
+    };
+
+    chatHistory.insertAdjacentHTML('beforeend', `
+        <div class="flex flex-col gap-1 items-start w-full animate-slide-up mb-4">
+            <div class="flex items-center gap-2 mb-1">
+                <div class="w-6 h-6 rounded-full bg-brand-purple flex items-center justify-center">
+                    <i data-lucide="zap" class="w-3 h-3 text-white"></i>
+                </div>
+                <span class="text-[10px] text-white/60 font-medium uppercase tracking-wider">Pulse AI</span>
+            </div>
+
+            <div class="glass rounded-2xl rounded-tl-sm py-3 px-4 text-sm font-light text-white/90 max-w-[85%] leading-relaxed shadow-lg mb-2">
+                ${esc(protocol.introText)}
+            </div>
+
+            <!-- Recipe Card -->
+            <div class="bg-white text-brand-plum rounded-2xl p-5 shadow-xl w-full max-w-[92%] relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-brand-purple/5 rounded-bl-full pointer-events-none"></div>
+
+                <!-- Nutri-Badges (top-right) -->
+                <div class="absolute top-3 right-3 flex flex-col gap-1 items-end z-10">${badgesHTML}</div>
+
+                <!-- Heart Button (top-left) -->
+                <button class="heart-btn ${isLiked?'liked':''} absolute top-3 left-3 z-10"
+                        id="heart-${id}"
+                        data-recipe-id="${id}"
+                        onclick="toggleFavorite('${id}', this)">
+                    <i data-lucide="heart"></i>
+                </button>
+
+                <h4 class="font-bold text-lg mb-1 tracking-tight pt-1 pl-9 pr-14">${esc(protocol.recipeTitle)}</h4>
+                <p class="text-[10px] font-semibold text-brand-purple uppercase tracking-widest mb-4 pb-2 border-b border-brand-plum/10 pl-9">Blend Protocol</p>
+
+                <ul class="text-sm font-medium space-y-2 mb-5 text-brand-plum/80">${ingredientsHTML}</ul>
+
+                <!-- Blend Timer -->
+                <div id="timer-wrap-${id}">
+                    <button class="blend-timer-btn" onclick="startBlendTimer('${id}', this)">
+                        <i data-lucide="play-circle" style="width:15px;height:15px;flex-shrink:0;"></i>
+                        Start 30s Blend
+                    </button>
+                </div>
+            </div>
+        </div>`);
+
+    // Store recipe data on heart button for later retrieval
+    const heartBtn = document.getElementById('heart-' + id);
+    if (heartBtn) heartBtn._recipeData = rd;
+
+    lucide.createIcons();
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Blend Timer
+// ═══════════════════════════════════════════════════════
+window.startBlendTimer = function(id, btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" style="width:15px;height:15px;"></i> Blending…`;
+    lucide.createIcons();
+
+    const wrap = document.getElementById('timer-wrap-' + id);
+    wrap.insertAdjacentHTML('beforeend', `
+        <div class="timer-ring-wrap" id="tui-${id}">
+            <div class="timer-icon-wrap motor-pulsing" id="tico-${id}">
+                <i data-lucide="zap"></i>
+            </div>
+            <div class="timer-count" id="tct-${id}">30</div>
+            <div class="timer-label">seconds remaining</div>
+        </div>`);
+    lucide.createIcons();
+
+    const iconWrap = document.getElementById('tico-' + id);
+    const countEl  = document.getElementById('tct-' + id);
+    let secs = 30;
+
+    const interval = setInterval(() => {
+        secs--;
+        countEl.textContent = secs;
+        if (secs <= 0) {
+            clearInterval(interval);
+            iconWrap.classList.remove('motor-pulsing');
+            document.getElementById('tui-' + id).insertAdjacentHTML('beforeend', `
+                <div class="ready-msg">
+                    <i data-lucide="check-circle" style="width:16px;height:16px;stroke:#059669;"></i>
+                    Ready!
+                </div>`);
+            btn.innerHTML = `<i data-lucide="check" style="width:15px;height:15px;"></i> Done!`;
+            lucide.createIcons();
+        }
+    }, 1000);
+};
+
+// ═══════════════════════════════════════════════════════
+//  Favorites — LocalStorage
+// ═══════════════════════════════════════════════════════
+const FAV_KEY = 'blendi_favorites_v1';
+
+function getFavorites() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY)) || []; }
+    catch { return []; }
+}
+function saveFavorites(list) {
+    localStorage.setItem(FAV_KEY, JSON.stringify(list));
+    updateFavBadge();
+}
+function updateFavBadge() {
+    const n = getFavorites().length;
+    favBadge.textContent = n;
+    favBadge.classList.toggle('hidden', n === 0);
+}
+
+window.toggleFavorite = function(id, btn) {
+    const rd = btn._recipeData;
+    if (!rd) return;
+    let list = getFavorites();
+    const idx = list.findIndex(f => f.title === rd.title);
+    if (idx === -1) {
+        list.push({ id, ...rd, savedAt: Date.now() });
+        btn.classList.add('liked');
+    } else {
+        list.splice(idx, 1);
+        btn.classList.remove('liked');
+    }
+    saveFavorites(list);
+    lucide.createIcons();
+};
+
+function renderFavorites() {
+    const list = getFavorites();
+    if (list.length === 0) {
+        favoritesList.innerHTML = `
+            <div class="empty-state text-center">
+                <i data-lucide="heart" class="w-12 h-12 text-white/30"></i>
+                <p class="text-white/50 text-sm font-light mt-3">No saved recipes yet.<br>Tap ♥ on any recipe card.</p>
+            </div>`;
+        lucide.createIcons();
+        return;
+    }
+    favoritesList.innerHTML = list.map(f => {
+        const badgesHTML = (f.badges||[]).map(b =>
+            `<span class="nutri-badge ${b.cls||''}">${esc(b.label)}</span>`).join('');
+        const ingHTML = (f.ingredients||[]).map(i =>
+            `<li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-brand-purple flex-shrink-0 inline-block"></span>${esc(i)}</li>`
+        ).join('');
+        return `
+        <div class="bg-white text-brand-plum rounded-2xl p-5 shadow-xl relative overflow-hidden fav-card">
+            <div class="absolute top-0 right-0 w-20 h-20 bg-brand-purple/5 rounded-bl-full pointer-events-none"></div>
+            <div class="absolute top-3 right-3 flex flex-col gap-1 items-end z-10">${badgesHTML}</div>
+            <button class="heart-btn liked absolute top-3 left-3 z-10" onclick="removeFavorite('${esc(f.title)}', this.closest('.fav-card'))">
+                <i data-lucide="heart"></i>
+            </button>
+            <h4 class="font-bold text-base mb-1 tracking-tight pt-1 pl-9 pr-14">${esc(f.title)}</h4>
+            <p class="text-[10px] font-semibold text-brand-purple uppercase tracking-widest mb-3 pb-2 border-b border-brand-plum/10 pl-9">Saved Recipe</p>
+            <ul class="text-sm font-medium space-y-1.5 text-brand-plum/80 mb-4">${ingHTML}</ul>
+        </div>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+window.removeFavorite = function(title, cardEl) {
+    let list = getFavorites().filter(f => f.title !== title);
+    saveFavorites(list);
+    if (cardEl) {
+        cardEl.style.transition = 'opacity 0.3s, transform 0.3s';
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'scale(0.95)';
+        setTimeout(() => renderFavorites(), 320);
+    }
+};
+
+// ═══════════════════════════════════════════════════════
+//  Utility
+// ═══════════════════════════════════════════════════════
+function esc(str) {
+    return String(str||'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+    </script>
+</body>
+</html>
