@@ -4,6 +4,11 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
+// ─── i18n — DEVE ser o primeiro import do app ─────────────────────────────────
+// Inicialização síncrona: garante que os textos estejam prontos antes do
+// primeiro render, sem flicker de chaves ou textos em idioma errado.
+import './src/locales/i18n';
+
 // Fontes da marca — carregadas antes de qualquer render
 import {
   Syne_400Regular,
@@ -13,7 +18,6 @@ import {
   Syne_800ExtraBold,
 } from '@expo-google-fonts/syne';
 import {
-  DMSans_300Light,
   DMSans_400Regular,
   DMSans_500Medium,
   DMSans_700Bold,
@@ -27,7 +31,8 @@ import {
 import { colors } from '@blendi/shared';
 
 // Mantém a splash screen visível enquanto as fontes carregam
-SplashScreen.preventAutoHideAsync();
+// preventAutoHideAsync é fire-and-forget intencional — sem await no módulo
+void SplashScreen.preventAutoHideAsync();
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
@@ -36,7 +41,6 @@ export default function App() {
     Syne_600SemiBold,
     Syne_700Bold,
     Syne_800ExtraBold,
-    DMSans_300Light,
     DMSans_400Regular,
     DMSans_500Medium,
     DMSans_700Bold,
@@ -45,9 +49,9 @@ export default function App() {
     DMMono_500Medium,
   });
 
-  const onLayoutRootView = useCallback(async () => {
+  const onLayoutRootView = useCallback(() => {
     if (fontsLoaded || fontError) {
-      await SplashScreen.hideAsync();
+      void SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 

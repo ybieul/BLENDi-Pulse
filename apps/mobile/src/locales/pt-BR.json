@@ -1,0 +1,302 @@
+{
+  "common": {
+    "actions": {
+      "confirm": "Confirmar",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "back": "Voltar",
+      "continue": "Continuar",
+      "edit": "Editar",
+      "remove": "Remover",
+      "done": "Concluído",
+      "retry": "Tentar novamente",
+      "close": "Fechar"
+    },
+    "states": {
+      "loading": "Carregando…",
+      "offline": "Sem conexão",
+      "error": "Algo deu errado. Tente novamente.",
+      "empty": "Nada aqui ainda."
+    },
+    "units": {
+      "grams": "g",
+      "grams_long": "gramas",
+      "milliliters": "ml",
+      "milliliters_long": "mililitros",
+      "kilocalories": "kcal",
+      "kilocalories_long": "quilocalorias"
+    },
+    "macros": {
+      "protein": "Proteína",
+      "carbs": "Carboidratos",
+      "fat": "Gordura",
+      "calories": "Calorias"
+    }
+  },
+
+  "onboarding": {
+    "welcome": {
+      "title": "Conheça seu\nblender pessoal.",
+      "subtitle": "O BLENDi Pulse transforma seu hardware em um sistema inteligente de nutrição.",
+      "cta": "Começar"
+    },
+    "profile": {
+      "title": "Fale um pouco\nsobre você.",
+      "subtitle": "Vamos personalizar suas receitas e metas.",
+      "name_label": "Seu nome",
+      "name_placeholder": "ex.: Alex",
+      "email_label": "E-mail",
+      "email_placeholder": "alex@exemplo.com",
+      "name_required": "O nome é obrigatório.",
+      "name_min": "O nome deve ter pelo menos 2 caracteres.",
+      "email_required": "O e-mail é obrigatório.",
+      "email_invalid": "Insira um e-mail válido."
+    },
+    "model": {
+      "title": "Qual BLENDi\nvocê tem?",
+      "subtitle": "Vamos otimizar as receitas para a potência do seu motor.",
+      "lite": {
+        "name": "BLENDi Lite",
+        "description": "500W — ideal para smoothies e blends leves"
+      },
+      "pro_plus": {
+        "name": "BLENDi Pro+",
+        "description": "900W — frutas congeladas e sementes sem esforço"
+      },
+      "steel": {
+        "name": "BLENDi Steel",
+        "description": "1400W — potência total para qualquer ingrediente"
+      }
+    },
+    "goal": {
+      "title": "Qual é o seu\nprincipal objetivo?",
+      "subtitle": "Seu objetivo define suas receitas diárias e metas de macros.",
+      "muscle": {
+        "name": "Músculo",
+        "description": "Blends ricos em proteína para força e recuperação"
+      },
+      "wellness": {
+        "name": "Bem-estar",
+        "description": "Nutrição equilibrada para se sentir energizado todos os dias"
+      },
+      "energy": {
+        "name": "Energia",
+        "description": "Blends focados em performance para estilos de vida ativos"
+      },
+      "recovery": {
+        "name": "Recuperação",
+        "description": "Ingredientes anti-inflamatórios para o corpo se recuperar"
+      }
+    },
+    "targets": {
+      "title": "Defina suas\nmetas diárias.",
+      "subtitle": "Estes são seus macros de referência. Você pode ajustá-los a qualquer momento.",
+      "protein_label": "Meta diária de proteína",
+      "protein_placeholder": "ex.: 120",
+      "calories_label": "Meta diária de calorias",
+      "calories_placeholder": "ex.: 2000",
+      "protein_hint": "g / dia",
+      "calories_hint": "kcal / dia",
+      "protein_required": "A meta de proteína é obrigatória.",
+      "protein_invalid": "Insira um valor entre 20 e 400 g.",
+      "calories_required": "A meta de calorias é obrigatória.",
+      "calories_invalid": "Insira um valor entre 500 e 6000 kcal."
+    }
+  },
+
+  "home": {
+    "greeting": {
+      "morning": "Bom dia, {{name}}.",
+      "afternoon": "Boa tarde, {{name}}.",
+      "evening": "Boa noite, {{name}}."
+    },
+    "rings": {
+      "protein_label": "Proteína",
+      "calories_label": "Calorias",
+      "progress": "{{current}} de {{goal}} {{unit}}",
+      "complete": "Meta atingida! 🎉"
+    },
+    "streak": {
+      "label_one": "{{count}} dia seguido",
+      "label_other": "{{count}} dias seguidos",
+      "none": "Comece sua sequência hoje"
+    },
+    "recipe_of_day": {
+      "label": "Receita do dia",
+      "cta": "Blendar agora"
+    },
+    "protocols": {
+      "title": "Protocolos Rápidos",
+      "gym_protein": {
+        "name": "Academia & Proteína",
+        "description": "Shakes pré e pós-treino"
+      },
+      "active_moms": {
+        "name": "Mães Ativas",
+        "description": "Blends equilibrados para dias corridos"
+      },
+      "beach_cocktails": {
+        "name": "Praia & Drinks",
+        "description": "Mocktails refrescantes e blends de frutas"
+      },
+      "travel": {
+        "name": "Viagem",
+        "description": "Nutrição rápida e prática onde você estiver"
+      }
+    }
+  },
+
+  "blend": {
+    "timer": {
+      "ready": "Pronto para blendar",
+      "blending": "Blendando…",
+      "finished": "Blend concluído!"
+    },
+    "models": {
+      "lite": "Lite · 500W",
+      "pro_plus": "Pro+ · 900W",
+      "steel": "Steel · 1400W"
+    },
+    "feedback": {
+      "start": "Iniciando blend",
+      "complete": "Blend concluído",
+      "logged": "Salvo no seu histórico"
+    },
+    "clean_reminder": {
+      "title": "Limpe seu BLENDi",
+      "message": "Adicione água e uma gota de detergente, depois bata por 10 segundos.",
+      "cta": "Iniciar ciclo de limpeza"
+    }
+  },
+
+  "recipes": {
+    "ai": {
+      "placeholder": "Peça uma receita ao Pulse AI…",
+      "loading_one": "Criando sua receita…",
+      "loading_two": "Verificando seus macros…",
+      "loading_three": "Quase pronto…",
+      "error_offline": "Você está offline. Mostrando receitas salvas.",
+      "error_generic": "Não foi possível conectar ao Pulse AI. Tente novamente."
+    },
+    "filters": {
+      "all_goals": "Todos os objetivos",
+      "all_models": "Todos os modelos",
+      "goal_label": "Objetivo",
+      "model_label": "Modelo"
+    },
+    "favorites": {
+      "title": "Favoritos",
+      "empty_title": "Nenhum favorito ainda",
+      "empty_message": "Toque no coração de qualquer receita para salvá-la aqui."
+    },
+    "substitutes": {
+      "label": "Substituições Inteligentes",
+      "loading": "Buscando substituições…"
+    }
+  },
+
+  "track": {
+    "hydration": {
+      "title": "Hidratação",
+      "add_button": "+ 250 ml",
+      "daily_total": "{{amount}} ml hoje",
+      "goal_reached": "Meta de hidratação atingida! 💧",
+      "reset_hint": "Reinicia à meia-noite"
+    },
+    "supplements": {
+      "title": "Meu Stack",
+      "add_button": "Adicionar suplemento",
+      "item_checked": "Tomado",
+      "item_unchecked": "Não tomado",
+      "empty_title": "Seu stack está vazio",
+      "empty_message": "Adicione seus suplementos diários para acompanhá-los aqui."
+    },
+    "history": {
+      "title": "Histórico de Blends",
+      "empty_title": "Nenhum blend ainda",
+      "empty_message": "Seus blends aparecerão aqui após a primeira sessão.",
+      "item_label": "{{name}} · {{calories}} kcal"
+    },
+    "share_card": {
+      "title": "Share Card",
+      "generate_cta": "Gerar meu card",
+      "loading": "Criando seu card…"
+    }
+  },
+
+  "profile": {
+    "title": "Perfil",
+    "fields": {
+      "name": "Nome",
+      "email": "E-mail",
+      "model": "Meu BLENDi",
+      "goal": "Objetivo",
+      "protein_target": "Meta de proteína",
+      "calories_target": "Meta de calorias"
+    },
+    "badges": {
+      "title": "Conquistas",
+      "first_blend": {
+        "name": "Primeiro Blend",
+        "description": "Conclua sua primeira sessão de blend"
+      },
+      "streak_7": {
+        "name": "Guerreiro da Semana",
+        "description": "Sequência de 7 dias"
+      },
+      "streak_30": {
+        "name": "Campeão do Mês",
+        "description": "Sequência de 30 dias"
+      },
+      "protein_goal": {
+        "name": "Mestre da Proteína",
+        "description": "Atinja sua meta de proteína por 5 dias seguidos"
+      }
+    },
+    "subscription": {
+      "free_label": "Plano gratuito",
+      "pro_label": "Pulse Pro",
+      "upgrade_cta": "Assinar Pro · R$ 29,90/mês",
+      "pro_badge": "PRO"
+    },
+    "language": {
+      "label": "Idioma",
+      "en": "English",
+      "pt_BR": "Português (Brasil)"
+    }
+  },
+
+  "errors": {
+    "validation": {
+      "required": "Este campo é obrigatório.",
+      "email_invalid": "Insira um endereço de e-mail válido.",
+      "too_short": "Deve ter pelo menos {{min}} caracteres.",
+      "too_long": "Deve ter no máximo {{max}} caracteres.",
+      "number_range": "Insira um valor entre {{min}} e {{max}}."
+    },
+    "auth": {
+      "invalid_credentials": "E-mail ou senha incorretos.",
+      "email_taken": "Este e-mail já está em uso.",
+      "session_expired": "Sua sessão expirou. Faça login novamente.",
+      "unauthorized": "Você não tem acesso a este recurso."
+    },
+    "network": {
+      "offline": "Você está offline. Verifique sua conexão.",
+      "timeout": "A solicitação expirou. Tente novamente.",
+      "server": "Erro no servidor. Estamos resolvendo — tente novamente em breve."
+    }
+  },
+
+  "notifications": {
+    "daily_pulse": {
+      "title": "Seu Pulse diário está pronto 🥤",
+      "body": "Experimente {{recipe}} hoje — {{protein}}g de proteína em um blend."
+    },
+    "streak": {
+      "reminder_title": "Não quebre sua sequência!",
+      "reminder_body": "Você ainda não blendou hoje. Mantenha sua sequência de {{count}} dias.",
+      "lost_title": "Sequência reiniciada 😔",
+      "lost_body": "Sua sequência acabou. Comece de novo hoje!"
+    }
+  }
+}

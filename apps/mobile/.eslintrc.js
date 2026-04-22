@@ -74,5 +74,6 @@ module.exports = {
     '.expo/',
     'babel.config.js',
     '*.config.js',
+    '**/*.d.ts', // arquivos de declaração de tipo não precisam ser lintados
   ],
 };
