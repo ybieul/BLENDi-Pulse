@@ -5,10 +5,12 @@
     "moduleResolution": "Node",
     "outDir": "dist",
     "rootDir": "src",
+    "noEmit": false,
+    "types": ["node"],
     "paths": {
       "@blendi/shared": ["../../packages/shared/src/index.ts"]
     }
   },
-  "include": ["src"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,0 +1,59 @@
+# .github/workflows/deploy-api.yml
+# Deploy automático da API no Railway via push na branch main.
+# Só executa quando há mudanças em apps/api/** ou packages/shared/**.
+
+name: Deploy API → Railway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'tsconfig.json'
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # 1. Checkout do código
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Setup pnpm (antes do Node, para usar cache correto)
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # 3. Setup Node.js 20 com cache do pnpm
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      # 4. Instalar dependências do monorepo inteiro
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 5. Type-check — garante que o código compila sem erros
+      - name: TypeScript build (apps/api)
+        run: pnpm --filter @blendi/api build
+
+      # 6. Notificar Railway para iniciar o deploy
+      # RAILWAY_TOKEN deve estar configurado em:
+      # GitHub → Settings → Secrets and variables → Actions → New repository secret
+      - name: Deploy to Railway
+        if: success()
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          railway up --service blendi-pulse-api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
