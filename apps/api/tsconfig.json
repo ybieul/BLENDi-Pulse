@@ -6,11 +6,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
-    "types": ["node"],
-    "paths": {
-      "@blendi/shared": ["../../packages/shared/src/index.ts"]
-    }
+    "types": ["node"]
   },
   "include": ["src/**/*"],
+  "references": [{ "path": "../../packages/shared" }],
   "exclude": ["node_modules", "dist"]
 }

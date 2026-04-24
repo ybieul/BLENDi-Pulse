@@ -1,13 +1,16 @@
-import { useCallback } from 'react';
+// ─── i18n — DEVE ser o primeiro import do app ─────────────────────────────────
+// Inicialização síncrona: garante que os textos estejam prontos antes do
+// primeiro render, sem flicker de chaves ou textos em idioma errado.
+import './src/locales/i18n';
+
+import { useCallback, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
-// ─── i18n — DEVE ser o primeiro import do app ─────────────────────────────────
-// Inicialização síncrona: garante que os textos estejam prontos antes do
-// primeiro render, sem flicker de chaves ou textos em idioma errado.
-import './src/locales/i18n';
+// Auth — interceptors Axios e restauração de sessão
+import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
 
 // Fontes da marca — carregadas antes de qualquer render
 import {
@@ -35,6 +38,8 @@ import { colors } from '@blendi/shared';
 void SplashScreen.preventAutoHideAsync();
 
 export default function App() {
+  const restoreSession = useAuthStore((s) => s.restoreSession);
+
   const [fontsLoaded, fontError] = useFonts({
     Syne_400Regular,
     Syne_500Medium,
@@ -48,6 +53,19 @@ export default function App() {
     DMMono_400Regular,
     DMMono_500Medium,
   });
+
+  // ── Boot: interceptors + restauração de sessão ───────────────────────────
+  // setupAxiosInterceptors é idempotente (guard interno) — seguro chamar aqui.
+  // onSessionExpired: navegar para login será implementado na Fase de Navegação.
+  useEffect(() => {
+    setupAxiosInterceptors(() => {
+      // TODO (Navigation): navigate to login screen
+      // navigation.reset({ routes: [{ name: 'Login' }] })
+    });
+
+    void restoreSession();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onLayoutRootView = useCallback(() => {
     if (fontsLoaded || fontError) {

@@ -15,6 +15,7 @@ import cors from 'cors';
 import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import { pingRouter } from './routes/ping';
+import { authRouter } from './routes/auth';
 
 const app = express();
 
@@ -40,14 +41,14 @@ app.use(requestLogger);
 // ─── Rotas ────────────────────────────────────────────────────────────────────
 
 app.use('/', pingRouter);
+app.use('/auth', authRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
-// app.use('/api/v1/auth', authRouter);
 // app.use('/api/v1/recipes', recipesRouter);
 
 // ─── 404 — rota não encontrada ────────────────────────────────────────────────
 
 app.use((_req, res) => {
-  res.status(404).json({ success: false, message: 'Rota não encontrada' });
+  res.status(404).json({ success: false, message: 'errors.not_found' });
 });
 
 // ─── Handler global de erros (DEVE ser o último middleware) ───────────────────

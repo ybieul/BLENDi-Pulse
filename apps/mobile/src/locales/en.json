@@ -272,7 +272,10 @@
       "email_invalid": "Enter a valid email address.",
       "too_short": "Must be at least {{min}} characters.",
       "too_long": "Must be at most {{max}} characters.",
-      "number_range": "Enter a value between {{min}} and {{max}}."
+      "number_range": "Enter a value between {{min}} and {{max}}.",
+      "password_complexity": "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
+      "integer": "Must be a whole number.",
+      "invalid_option": "Invalid option selected."
     },
     "auth": {
       "invalid_credentials": "Incorrect email or password.",
@@ -284,7 +287,8 @@
       "offline": "You're offline. Check your connection.",
       "timeout": "Request timed out. Please try again.",
       "server": "Server error. We're on it — try again shortly."
-    }
+    },
+    "not_found": "The requested resource was not found."
   },
 
   "notifications": {

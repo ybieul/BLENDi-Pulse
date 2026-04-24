@@ -272,7 +272,10 @@
       "email_invalid": "Insira um endereço de e-mail válido.",
       "too_short": "Deve ter pelo menos {{min}} caracteres.",
       "too_long": "Deve ter no máximo {{max}} caracteres.",
-      "number_range": "Insira um valor entre {{min}} e {{max}}."
+      "number_range": "Insira um valor entre {{min}} e {{max}}.",
+      "password_complexity": "A senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número.",
+      "integer": "Deve ser um número inteiro.",
+      "invalid_option": "Opção inválida selecionada."
     },
     "auth": {
       "invalid_credentials": "E-mail ou senha incorretos.",
@@ -284,7 +287,8 @@
       "offline": "Você está offline. Verifique sua conexão.",
       "timeout": "A solicitação expirou. Tente novamente.",
       "server": "Erro no servidor. Estamos resolvendo — tente novamente em breve."
-    }
+    },
+    "not_found": "O recurso solicitado não foi encontrado."
   },
 
   "notifications": {

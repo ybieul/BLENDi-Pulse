@@ -21,7 +21,7 @@ export function errorHandler(
 
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'Erro interno do servidor',
+    message: err.message || 'errors.network.server',
     // Stack trace apenas em desenvolvimento — nunca exponha em produção
     ...(isDev && { stack: err.stack }),
   });
