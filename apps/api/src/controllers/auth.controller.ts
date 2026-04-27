@@ -10,7 +10,12 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { registerSchema, loginSchema, refreshTokenSchema } from '@blendi/shared';
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+  updateTimezoneSchema,
+} from '@blendi/shared';
 import { UserModel } from '../models/User';
 import {
   generateAccessToken,
@@ -65,6 +70,7 @@ export async function register(
       blendiModel,
       goal,
       preferredLanguage,
+      timezone,
       dailyProteinTarget,
       dailyCalorieTarget,
     } = parsed.data;
@@ -87,6 +93,7 @@ export async function register(
       blendiModel,
       goal,
       locale: preferredLanguage,
+      timezone,
       dailyProteinTarget,
       dailyCalorieTarget,
     });
@@ -109,6 +116,7 @@ export async function register(
           blendiModel: user.blendiModel,
           goal: user.goal,
           locale: user.locale,
+          timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           createdAt: user.createdAt,
@@ -186,6 +194,7 @@ export async function login(
           blendiModel: user.blendiModel,
           goal: user.goal,
           locale: user.locale,
+          timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           createdAt: user.createdAt,
@@ -260,6 +269,66 @@ export async function refresh(
       data: {
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Update Timezone ──────────────────────────────────────────────────────────
+
+/**
+ * PATCH /auth/timezone
+ * Atualiza o timezone IANA do usuário autenticado.
+ *
+ * Chamado pelo app mobile automaticamente quando detecta divergência entre
+ * o timezone salvo no servidor e o timezone atual do dispositivo.
+ * Requer autenticação (middleware authenticate).
+ */
+export async function updateTimezone(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    // 1. Validar body
+    const parsed = updateTimezoneSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        success: false,
+        message: 'errors.validation.required',
+        errors: formatZodErrors(parsed.error),
+      });
+      return;
+    }
+
+    const { timezone } = parsed.data;
+
+    // 2. req.user é garantido pelo middleware authenticate
+    const userId = req.user!.sub;
+
+    // 3. Atualizar timezone — sem transformações, salvo exatamente como recebido
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      { timezone },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'errors.not_found',
+      });
+      return;
+    }
+
+    // 4. Retornar 200 com os dados públicos atualizados
+    res.status(200).json({
+      success: true,
+      data: {
+        id: String(user._id),
+        timezone: user.timezone,
       },
     });
   } catch (err) {

@@ -20,6 +20,8 @@ export interface AuthUser {
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
+  /** Timezone IANA do usuário (ex: 'America/Sao_Paulo'). Sincronizado com o dispositivo. */
+  timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   createdAt: string;
@@ -49,9 +51,17 @@ export interface RefreshResponse {
 /**
  * Registra um novo usuário.
  * POST /auth/register → 201 { user, accessToken, refreshToken }
+ *
+ * O timezone é capturado automaticamente via Intl e injetado no body,
+ * garantindo que o servidor armazene o fuso correto desde o primeiro registro —
+ * independente do que o formulário de cadastro tenha passado no input.
  */
 export async function register(input: RegisterInput): Promise<AuthResponse['data']> {
-  const response = await api.post<AuthResponse>('/auth/register', input);
+  const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const response = await api.post<AuthResponse>('/auth/register', {
+    ...input,
+    timezone: deviceTimezone,
+  });
   return response.data.data;
 }
 

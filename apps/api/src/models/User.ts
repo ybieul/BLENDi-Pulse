@@ -16,6 +16,14 @@ export interface IUser {
   blendiModel: BlendiModel;
   goal: UserGoal;
   locale: UserLocale;
+  /**
+   * Timezone IANA do dispositivo do usuário.
+   * Exemplos: 'America/Sao_Paulo', 'Europe/London', 'Asia/Tokyo'.
+   * Capturado automaticamente via expo-localization durante o onboarding —
+   * nunca digitado manualmente. Atualizado via PATCH /auth/timezone sempre
+   * que o app detectar divergência com o timezone do dispositivo.
+   */
+  timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   isActive: boolean;
@@ -76,6 +84,15 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: String,
       enum: ['en', 'pt-BR'] satisfies UserLocale[],
       default: 'en',
+    },
+    // Timezone IANA — ver comentário na interface IUser acima.
+    // Padrão: 'America/New_York' (UTC-5/-4) — escolhido por ser o timezone
+    // com maior base de usuários EN esperada no lançamento. Sempre sobrescrito
+    // pelo valor real do dispositivo durante o onboarding.
+    timezone: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      default: 'America/New_York',
     },
     dailyProteinTarget: {
       type: Number,

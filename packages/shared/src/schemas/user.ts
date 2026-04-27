@@ -51,6 +51,29 @@ export const macroTargetSchema = z.object({
     .optional(),
 });
 
-// ─── Tipo inferido ────────────────────────────────────────────────────────────
+// ─── Schema: timezone do usuário ─────────────────────────────────────────────
+// Fonte de verdade para validação do campo timezone em qualquer contexto de
+// domínio do usuário (perfil, preferências, sincronização de dispositivo).
+//
+// Aceita qualquer string IANA não-vazia (ex: 'America/Sao_Paulo', 'UTC',
+// 'Europe/London'). A validação de existência do timezone no banco de dados
+// IANA é responsabilidade da camada de negócio — o schema garante apenas que
+// o campo foi fornecido como string.
+//
+// Consumidores:
+//   • Backend  → PATCH /auth/timezone (updateTimezoneSchema reutiliza este)
+//   • Mobile   → serviço de sincronização de timezone ao detectar mudança de fuso
+
+export const timezoneSchema = z.object({
+  timezone: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.required',
+    })
+    .min(1, 'errors.validation.required'),
+});
+
+// ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
 export type MacroTargetInput = z.infer<typeof macroTargetSchema>;
+export type TimezoneInput = z.infer<typeof timezoneSchema>;

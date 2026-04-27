@@ -3,14 +3,18 @@
 // primeiro render, sem flicker de chaves ou textos em idioma errado.
 import './src/locales/i18n';
 
-import { useCallback, useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { AppState, View, ActivityIndicator, StyleSheet } from 'react-native';
+import type { AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 // Auth — interceptors Axios e restauração de sessão
 import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
+
+// Timezone — sincronização silenciosa ao voltar ao foreground
+import { syncTimezoneIfNeeded } from './src/services/timezone.service';
 
 // Fontes da marca — carregadas antes de qualquer render
 import {
@@ -40,6 +44,10 @@ void SplashScreen.preventAutoHideAsync();
 export default function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
 
+  // Rastreia o AppState anterior para filtrar apenas transições para 'active'
+  // vindas de background/inactive — evita disparar na montagem inicial.
+  const appStatePrevious = useRef<AppStateStatus>(AppState.currentState);
+
   const [fontsLoaded, fontError] = useFonts({
     Syne_400Regular,
     Syne_500Medium,
@@ -54,7 +62,7 @@ export default function App() {
     DMMono_500Medium,
   });
 
-  // ── Boot: interceptors + restauração de sessão ───────────────────────────
+  // ── Boot: interceptors + restauração de sessão + timezone inicial ───────────
   // setupAxiosInterceptors é idempotente (guard interno) — seguro chamar aqui.
   // onSessionExpired: navegar para login será implementado na Fase de Navegação.
   useEffect(() => {
@@ -63,8 +71,47 @@ export default function App() {
       // navigation.reset({ routes: [{ name: 'Login' }] })
     });
 
-    void restoreSession();
+    // Restaura a sessão e, em seguida, tenta sincronizar o timezone.
+    // syncTimezoneIfNeeded retorna cedo se não houver sessão ativa ou se
+    // user === null (enquanto GET /me não existir, user fica null após restore).
+    // A chamada é feita aqui para garantir que quando GET /me for implementado
+    // a sincronização já aconteça no boot sem nenhuma alteração neste arquivo.
+    const boot = async () => {
+      await restoreSession();
+      void syncTimezoneIfNeeded();
+    };
+
+    void boot();
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── AppState: sincronização de timezone ao voltar ao foreground ──────────────
+  // Cobre o caso de uso principal: usuário viaja entre países, o SO ajusta o
+  // timezone automaticamente — na próxima abertura do app o fuso é atualizado
+  // sem precisar de logout/login.
+  //
+  // appStatePrevious rastreia o estado anterior para filtrar apenas as transições
+  // background/inactive → active, evitando disparar na montagem inicial.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      const wasInBackground =
+        appStatePrevious.current === 'background' || appStatePrevious.current === 'inactive';
+      const isNowActive = nextState === 'active';
+
+      if (wasInBackground && isNowActive) {
+        // Sincronização silenciosa — nenhum indicador visual para o usuário.
+        // Erros são absorvidos: falha de rede ao voltar ao foreground não deve
+        // afetar a experiência do usuário. O fuso será sincronizado na próxima
+        // oportunidade.
+        void syncTimezoneIfNeeded().catch(() => undefined);
+      }
+
+      appStatePrevious.current = nextState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const onLayoutRootView = useCallback(() => {

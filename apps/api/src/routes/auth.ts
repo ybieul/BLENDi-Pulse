@@ -1,7 +1,8 @@
 // apps/api/src/routes/auth.ts
 
 import { Router, type IRouter } from 'express';
-import { register, login, refresh } from '../controllers/auth.controller';
+import { register, login, refresh, updateTimezone } from '../controllers/auth.controller';
+import { authenticate } from '../middlewares/authenticate';
 
 export const authRouter: IRouter = Router();
 
@@ -22,3 +23,10 @@ authRouter.post('/login', login);
  * Refresh Token Rotation — retorna novo par de tokens. Body: { refreshToken }
  */
 authRouter.post('/refresh', refresh);
+
+/**
+ * PATCH /auth/timezone  🔒 autenticado
+ * Atualiza o timezone IANA do usuário. Body: { timezone: string }
+ * Chamado automaticamente pelo app quando detecta divergência de timezone.
+ */
+authRouter.patch('/timezone', authenticate, updateTimezone);

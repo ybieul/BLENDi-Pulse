@@ -71,6 +71,13 @@ export const registerSchema = z.object({
     .int('errors.validation.integer')
     .min(500, 'errors.validation.number_range')
     .max(10_000, 'errors.validation.number_range'),
+
+  // Timezone IANA do dispositivo (ex: 'America/Sao_Paulo', 'Europe/London').
+  // Capturado automaticamente pelo app durante o onboarding via expo-localization —
+  // nunca digitado manualmente pelo usuário.
+  timezone: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
 });
 
 // ─── Schema: login ────────────────────────────────────────────────────────────
@@ -88,6 +95,17 @@ export const loginSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+// ─── Schema: atualização de timezone ─────────────────────────────────────────
+// Usado pelo endpoint PATCH /auth/timezone.
+// O app mobile chama este endpoint quando detecta divergência entre o timezone
+// salvo no servidor e o timezone atual do dispositivo.
+
+export const updateTimezoneSchema = z.object({
+  timezone: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
+});
+
 // ─── Schema: refresh token ────────────────────────────────────────────────────
 
 export const refreshTokenSchema = z.object({
@@ -101,3 +119,4 @@ export const refreshTokenSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+export type UpdateTimezoneInput = z.infer<typeof updateTimezoneSchema>;

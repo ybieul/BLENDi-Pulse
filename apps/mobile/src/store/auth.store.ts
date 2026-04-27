@@ -74,10 +74,21 @@ interface AuthActions {
    * Tenta restaurar a sessão a partir do refresh token persistido.
    * Deve ser chamada no boot do app (App.tsx) antes de exibir qualquer tela.
    * Não lança exceção — se falhar, o usuário permanece deslogado.
+   *
+   * ⚠️  TODO (Fase N): quando GET /me for implementado, chamar aqui para
+   * carregar o perfil completo (incluindo timezone) após refresh bem-sucedido.
+   * Atualmente user permanece null após restoreSession — o perfil completo
+   * só fica disponível após login/register explícito.
    */
   restoreSession: () => Promise<void>;
   /** @internal Usado pelo interceptor do Axios. Não chamar diretamente em componentes. */
   _setAccessToken: (token: string | null) => void;
+  /**
+   * Atualiza o campo timezone no perfil do usuário no store após uma
+   * sincronização bem-sucedida com o backend (PATCH /auth/timezone).
+   * Chamada por timezone.service.ts — não chamar diretamente em componentes.
+   */
+  updateTimezone: (timezone: string) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -200,6 +211,18 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       accessToken: token,
       isAuthenticated: token !== null,
     });
+  },
+
+  // ── updateTimezone ────────────────────────────────────────────────────────
+
+  updateTimezone: (timezone) => {
+    const { user } = get();
+    // Só atualiza se houver um perfil de usuário carregado em memória.
+    // Se user for null (sessão restaurada sem GET /me), a atualização local
+    // é ignorada — o backend já foi sincronizado via PATCH /auth/timezone e
+    // o valor correto será carregado quando o perfil completo for buscado.
+    if (user === null) return;
+    set({ user: { ...user, timezone } });
   },
 }));
 
