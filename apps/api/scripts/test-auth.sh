@@ -49,6 +49,7 @@ REGISTER=$(curl -sf -X POST "$BASE_URL/auth/register" \
     \"blendiModel\": \"ProPlus\",
     \"goal\": \"Muscle\",
     \"preferredLanguage\": \"en\",
+    \"timezone\": \"America/Sao_Paulo\",
     \"dailyProteinTarget\": 150,
     \"dailyCalorieTarget\": 2500
   }") || fail "POST /auth/register falhou"
@@ -72,6 +73,7 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/auth/register
     \"blendiModel\": \"ProPlus\",
     \"goal\": \"Muscle\",
     \"preferredLanguage\": \"en\",
+    \"timezone\": \"America/Sao_Paulo\",
     \"dailyProteinTarget\": 150,
     \"dailyCalorieTarget\": 2500
   }")
@@ -136,6 +138,33 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/auth/refresh"
   -d '{"refreshToken": "token.invalido.qualquer"}')
 [[ "$STATUS" == "401" ]] || fail "Esperado 401, recebido $STATUS"
 pass "Refresh inválido retornou 401"
+
+# ── 9. PATCH /auth/timezone ───────────────────────────────────────────────────
+section "9. PATCH /auth/timezone (atualização de timezone)"
+info "Trocando para Asia/Tokyo com o access token do login"
+PATCH_RESP=$(curl -sf -X PATCH "$BASE_URL/auth/timezone" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $NEW_ACCESS" \
+  -d '{"timezone": "Asia/Tokyo"}') || fail "PATCH /auth/timezone falhou"
+
+echo "$PATCH_RESP" | jq .
+SAVED_TZ=$(echo "$PATCH_RESP" | jq -r '.data.timezone')
+[[ "$SAVED_TZ" == "Asia/Tokyo" ]] || fail "Timezone na resposta não é Asia/Tokyo (recebido: $SAVED_TZ)"
+pass "PATCH /auth/timezone → timezone salvo como Asia/Tokyo"
+
+# ── 10. PATCH /auth/timezone sem token → 401 ──────────────────────────────────
+section "10. PATCH /auth/timezone sem token → 401"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE_URL/auth/timezone" \
+  -H "Content-Type: application/json" \
+  -d '{"timezone": "America/Sao_Paulo"}')
+[[ "$STATUS" == "401" ]] || fail "Esperado 401, recebido $STATUS"
+pass "PATCH /auth/timezone sem token retornou 401"
+
+# ── 11. Verificar campo timezone no register ───────────────────────────────────
+section "11. Campo timezone presente na resposta do register"
+REG_TZ=$(echo "$REGISTER" | jq -r '.data.user.timezone')
+[[ "$REG_TZ" == "America/Sao_Paulo" ]] || fail "timezone no register não é America/Sao_Paulo (recebido: $REG_TZ)"
+pass "Register retornou user.timezone = America/Sao_Paulo"
 
 # ── Resultado ─────────────────────────────────────────────────────────────────
 echo -e "\n${GREEN}════════════════════════════════════════${RESET}"
