@@ -281,7 +281,11 @@
       "invalid_credentials": "Incorrect email or password.",
       "email_taken": "This email is already in use.",
       "session_expired": "Your session expired. Please sign in again.",
-      "unauthorized": "You don't have access to this feature."
+      "unauthorized": "You don't have access to this feature.",
+      "google_auth_failed": "Google sign-in failed. Please try again.",
+      "google_cancelled": "Google sign-in was cancelled.",
+      "invalid_state": "Authentication request expired. Please try again.",
+      "email_not_verified": "Your Google account email is not verified."
     },
     "network": {
       "offline": "You're offline. Check your connection.",

@@ -11,7 +11,17 @@ export type UserLocale = 'en' | 'pt-BR';
 
 export interface IUser {
   email: string;
-  password: string;
+  /**
+   * Hash Argon2id da senha. Ausente em contas criadas exclusivamente via OAuth.
+   * Nunca retornado por padrão (select: false no schema).
+   */
+  password?: string;
+  /**
+   * ID único do usuário no Google (campo `sub` do ID token).
+   * Ausente em contas criadas via email/senha.
+   * Nunca retornado por padrão — usado apenas internamente para lookup.
+   */
+  googleId?: string;
   name: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
@@ -59,10 +69,22 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       lowercase: true,
       trim: true,
     },
-    // select: false — a senha NUNCA é retornada por padrão nas queries
+    // select: false — a senha NUNCA é retornada por padrão nas queries.
+    // Opcional: usuários que se cadastram via Google OAuth não têm senha local.
     password: {
       type: String,
-      required: [true, 'errors.validation.required'],
+      required: false,
+      select: false,
+    },
+    // ID do usuário no Google (campo `sub` do ID token).
+    // sparse: true → permite múltiplos documentos com googleId ausente (undefined/null)
+    //                  enquanto mantém uniqueness para valores presentes.
+    // select: false → não exposto em queries padrão (lookup interno apenas).
+    googleId: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
       select: false,
     },
     name: {
@@ -119,8 +141,8 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
 // ─── Middleware: hash da senha antes de salvar ────────────────────────────────
 
 userSchema.pre('save', async function (next) {
-  // Só faz hash se a senha foi modificada (criação ou troca de senha)
-  if (!this.isModified('password')) return next();
+  // Só faz hash se a senha foi modificada E existe (OAuth users não têm senha)
+  if (!this.isModified('password') || !this.password) return next();
   this.password = await argon2.hash(this.password, ARGON2_OPTIONS);
   next();
 });
@@ -130,6 +152,8 @@ userSchema.pre('save', async function (next) {
 userSchema.method(
   'comparePassword',
   async function (candidatePassword: string): Promise<boolean> {
+    // Conta OAuth sem senha local — never matches any password
+    if (!this.password) return false;
     return argon2.verify(this.password, candidatePassword);
   }
 );
