@@ -1,0 +1,10 @@
+{
+  "password_reset": {
+    "subject": "Redefina sua senha no BLENDi Pulse",
+    "greeting": "Olá, {name}!",
+    "body": "Recebemos uma solicitação para redefinir a senha da sua conta BLENDi Pulse. Use o código de verificação abaixo para continuar. Não compartilhe este código com ninguém.",
+    "code_label": "Seu código de verificação",
+    "expires": "Este código expira em 15 minutos.",
+    "ignore": "Se você não solicitou a redefinição de senha, pode ignorar este e-mail com segurança. Sua conta permanece protegida."
+  }
+}

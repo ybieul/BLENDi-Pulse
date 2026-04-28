@@ -42,6 +42,13 @@ export interface IUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   isActive: boolean;
+  /**
+   * Timestamp da última troca de senha via fluxo de reset.
+   * Usado para invalidar resetTokens já utilizados:
+   * se passwordChangedAt > token.iat, o token foi emitido antes da última
+   * troca e portanto não pode ser reutilizado.
+   */
+  passwordChangedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -143,6 +150,10 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: Boolean,
       default: true,
     },
+    passwordChangedAt: {
+      type: Date,
+      required: false,
+    },
   },
   {
     timestamps: true,
@@ -155,6 +166,8 @@ userSchema.pre('save', async function (next) {
   // Só faz hash se a senha foi modificada E existe (OAuth users não têm senha)
   if (!this.isModified('password') || !this.password) return next();
   this.password = await argon2.hash(this.password, ARGON2_OPTIONS);
+  // Registrar o momento da troca para invalidar resetTokens anteriores
+  this.passwordChangedAt = new Date();
   next();
 });
 

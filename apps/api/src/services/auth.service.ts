@@ -10,6 +10,7 @@
 import jwt, { type JsonWebTokenError, type TokenExpiredError } from 'jsonwebtoken';
 import argon2 from 'argon2';
 import { authConfig } from '../config/auth';
+import { env } from '../config/env';
 
 // ─── Tipos dos payloads JWT ───────────────────────────────────────────────────
 
@@ -23,6 +24,15 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sub: string;
+  iat: number;
+  exp: number;
+}
+
+export interface ResetTokenPayload {
+  /** Email do usuário */
+  sub: string;
+  /** Identifica o propósito do token — deve ser 'password_reset' */
+  purpose: string;
   iat: number;
   exp: number;
 }
@@ -84,6 +94,29 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
 
 export function isTokenExpiredError(err: unknown): err is TokenExpiredError {
   return (err as JsonWebTokenError)?.name === 'TokenExpiredError';
+}
+
+// ─── JWT: token de reset de senha ─────────────────────────────────────────────
+
+/**
+ * Gera um token JWT de curta duração para autorizar a redefinição de senha.
+ * Payload: sub (email), purpose: 'password_reset'.
+ * Expiração: 10 minutos — janela mínima para não frustrar o usuário.
+ * Secret dedicado (JWT_RESET_SECRET) para isolamento de segurança.
+ */
+export function generateResetToken(email: string): string {
+  return jwt.sign({ sub: email, purpose: 'password_reset' }, env.JWT_RESET_SECRET, {
+    expiresIn: '10m',
+  });
+}
+
+/**
+ * Verifica e decodifica um token de reset.
+ * @throws {TokenExpiredError} se o token estiver expirado
+ * @throws {JsonWebTokenError} se o token for inválido
+ */
+export function verifyResetToken(token: string): ResetTokenPayload {
+  return jwt.verify(token, env.JWT_RESET_SECRET) as ResetTokenPayload;
 }
 
 // ─── Senha: hash e verificação ────────────────────────────────────────────────

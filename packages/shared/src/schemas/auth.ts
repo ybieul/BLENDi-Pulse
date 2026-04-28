@@ -126,6 +126,52 @@ export const googleCallbackSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+// ─── Schema: solicitação de OTP (forgot password) ────────────────────────────
+// Recebe apenas o email. O backend gera o OTP, persiste o hash no banco
+// e envia por email. Usa as mesmas regras de validação do loginSchema.
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required')
+    .email('errors.validation.email_invalid')
+    .toLowerCase(),
+});
+
+// ─── Schema: verificação de OTP ───────────────────────────────────────────────
+// Valida o par email + código OTP submetido pelo usuário.
+// O OTP é exatamente 6 dígitos numéricos — sem letras ou caracteres especiais.
+
+const OTP_REGEX = /^\d{6}$/;
+
+export const verifyOtpSchema = z.object({
+  email: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required')
+    .email('errors.validation.email_invalid')
+    .toLowerCase(),
+
+  otp: z
+    .string({ required_error: 'errors.validation.required' })
+    .regex(OTP_REGEX, 'errors.validation.invalid_option'),
+});
+
+// ─── Schema: redefinição de senha ─────────────────────────────────────────────
+// Recebe o resetToken (JWT emitido pelo backend após verificação do OTP)
+// e a nova senha, que segue as mesmas regras de complexidade do registerSchema.
+
+export const resetPasswordSchema = z.object({
+  resetToken: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
+
+  newPassword: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(8, 'errors.validation.too_short')
+    .max(PASSWORD_MAX, 'errors.validation.too_long')
+    .regex(PASSWORD_REGEX, 'errors.validation.password_complexity'),
+});
+
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -133,3 +179,6 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type UpdateTimezoneInput = z.infer<typeof updateTimezoneSchema>;
 export type GoogleCallbackInput = z.infer<typeof googleCallbackSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

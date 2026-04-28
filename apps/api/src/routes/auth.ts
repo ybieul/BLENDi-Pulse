@@ -11,6 +11,11 @@ import {
   getGoogleUrl,
   handleGoogleCallback,
 } from '../controllers/google.controller';
+import {
+  forgotPassword,
+  verifyOtp,
+  resetPassword,
+} from '../controllers/password.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const authRouter: IRouter = Router();
@@ -55,3 +60,28 @@ authRouter.get('/google/url', getGoogleUrl);
  * Query params: code (obrigatório), state (CSRF), error (se o usuário cancelou)
  */
 authRouter.get('/google/callback', handleGoogleCallback);
+
+// ─── Redefinição de senha via OTP ─────────────────────────────────────────────
+
+/**
+ * POST /auth/forgot-password
+ * Inicia o fluxo de redefinição de senha: gera OTP e envia por e-mail.
+ * Responde sempre com 200 (email enumeration prevention).
+ * Body: { email }
+ */
+authRouter.post('/forgot-password', forgotPassword);
+
+/**
+ * POST /auth/verify-otp
+ * Valida o OTP recebido por e-mail. Se válido, retorna um resetToken JWT (10 min).
+ * Body: { email, otp }
+ */
+authRouter.post('/verify-otp', verifyOtp);
+
+/**
+ * PATCH /auth/reset-password
+ * Redefine a senha usando o resetToken obtido em /verify-otp.
+ * Não requer JWT de sessão — o resetToken é a própria forma de autorização.
+ * Body: { resetToken, newPassword }
+ */
+authRouter.patch('/reset-password', resetPassword);
