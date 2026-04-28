@@ -22,6 +22,11 @@ export interface IUser {
    * Nunca retornado por padrão — usado apenas internamente para lookup.
    */
   googleId?: string;
+  /**
+   * URL da foto de perfil vinda do Google.
+   * Ausente em contas criadas via email/senha (sem foto padrão).
+   */
+  profilePhoto?: string;
   name: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
@@ -86,6 +91,12 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       unique: true,
       sparse: true,
       select: false,
+    },
+    // URL da foto de perfil vinda do Google.
+    // Opcional — usuários de email/senha não têm este campo.
+    profilePhoto: {
+      type: String,
+      required: false,
     },
     name: {
       type: String,

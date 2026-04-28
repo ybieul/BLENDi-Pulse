@@ -114,9 +114,22 @@ export const refreshTokenSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+// ─── Schema: Google OAuth callback ───────────────────────────────────────────
+// Valida a query string recebida no endpoint GET /auth/google/callback.
+// O campo `code` é o código de autorização emitido pelo Google — obrigatório
+// e não vazio. Os campos `state` e `error` são tratados diretamente no
+// controller antes desta validação.
+
+export const googleCallbackSchema = z.object({
+  code: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
+});
+
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type UpdateTimezoneInput = z.infer<typeof updateTimezoneSchema>;
+export type GoogleCallbackInput = z.infer<typeof googleCallbackSchema>;

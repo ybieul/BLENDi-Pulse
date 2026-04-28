@@ -10,7 +10,6 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import jwt from 'jsonwebtoken';
 import {
   registerSchema,
   loginSchema,
@@ -24,13 +23,7 @@ import {
   verifyRefreshToken,
   isTokenExpiredError,
 } from '../services/auth.service';
-import {
-  buildGoogleAuthUrl,
-  getGoogleProfile,
-  normalizeGoogleLocale,
-} from '../services/google.service';
 import { EmailService } from '../services/email.service';
-import { env } from '../config/env';
 
 // Instância única compartilhada pelos handlers — troca de implementação sem mudar controllers
 const emailService = new EmailService();
@@ -336,183 +329,6 @@ export async function updateTimezone(
       data: {
         id: String(user._id),
         timezone: user.timezone,
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ─── Google OAuth: geração da URL ─────────────────────────────────────────────
-
-/**
- * GET /auth/google
- * Retorna a URL de autorização do Google para o app mobile abrir no browser.
- *
- * O `state` é um JWT de curta duração (10 min) assinado com JWT_ACCESS_SECRET.
- * É embutido na URL e devolvido pelo Google no callback para verificação CSRF.
- *
- * Resposta: { success: true, data: { url: string } }
- */
-export async function googleAuthUrl(
-  _req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    // Gera state JWT: payload mínimo, expiração curta, assina com secret existente
-    const state = jwt.sign({ csrf: true }, env.JWT_ACCESS_SECRET, {
-      expiresIn: '10m',
-    });
-
-    const url = buildGoogleAuthUrl(state);
-
-    res.status(200).json({ success: true, data: { url } });
-  } catch (err) {
-    next(err);
-  }
-}
-
-// ─── Google OAuth: callback ───────────────────────────────────────────────────
-
-/**
- * GET /auth/google/callback
- * Recebe o código de autorização do Google, verifica o state CSRF,
- * troca o código pelo perfil do usuário e faz login ou registro automático.
- *
- * Três casos possíveis:
- *   1. googleId já existe no banco → login direto
- *   2. Email existe sem googleId  → vincula o googleId à conta existente → login
- *   3. Usuário novo               → cria conta com defaults de onboarding → registro
- *
- * Defaults de onboarding para contas OAuth:
- *   - blendiModel: 'Lite' (upgrade disponível nas configurações)
- *   - goal: 'Wellness'
- *   - dailyProteinTarget: 150g | dailyCalorieTarget: 2000 kcal
- *   O usuário completa/ajusta esses valores no onboarding após o primeiro login.
- *
- * Resposta: { success: true, data: { user, accessToken, refreshToken, isNewUser } }
- *
- * ⚠️  Parte 3 (mobile): este endpoint retornará um deep link redirect
- *     (blendipulse://auth/callback) em vez de JSON quando o app mobile
- *     integrar o expo-auth-session.
- */
-export async function googleCallback(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  try {
-    const { code, state, error } = req.query as Record<string, string | undefined>;
-
-    // 1. Verificar se o Google retornou erro (ex: usuário cancelou)
-    if (error) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.google_cancelled',
-      });
-      return;
-    }
-
-    // 2. Validar presença dos parâmetros obrigatórios
-    if (!code || !state) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-      });
-      return;
-    }
-
-    // 3. Verificar state CSRF — rejeita tokens expirados ou adulterados
-    try {
-      jwt.verify(state, env.JWT_ACCESS_SECRET);
-    } catch {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_state',
-      });
-      return;
-    }
-
-    // 4. Trocar código pelo perfil verificado do Google
-    let profile;
-    try {
-      profile = await getGoogleProfile(code);
-    } catch {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.google_auth_failed',
-      });
-      return;
-    }
-
-    // 5. Rejeitar contas com email não verificado pelo Google
-    if (!profile.email_verified) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.email_not_verified',
-      });
-      return;
-    }
-
-    const locale = normalizeGoogleLocale(profile.locale);
-    const deviceTimezone = 'America/New_York'; // Atualizado via PATCH /auth/timezone pelo mobile
-
-    // 6. Tentar encontrar usuário por googleId (caso já tenha feito OAuth antes)
-    let user = await UserModel.findOne({ googleId: profile.sub });
-    let isNewUser = false;
-
-    if (!user) {
-      // 7. Tentar encontrar por email (conta existente por email/senha)
-      user = await UserModel.findOne({ email: profile.email });
-
-      if (user) {
-        // Caso 2: vincular googleId à conta existente
-        user.googleId = profile.sub;
-        await user.save();
-      } else {
-        // Caso 3: criar nova conta com defaults de onboarding
-        user = await UserModel.create({
-          email: profile.email,
-          name: profile.name,
-          googleId: profile.sub,
-          locale,
-          timezone: deviceTimezone,
-          // Defaults de onboarding — ajustados pelo usuário na tela de perfil
-          blendiModel: 'Lite',
-          goal: 'Wellness',
-          dailyProteinTarget: 150,
-          dailyCalorieTarget: 2000,
-        });
-
-        isNewUser = true;
-        void emailService.sendWelcomeEmail(user.name, user.email);
-      }
-    }
-
-    // 8. Gerar par de tokens BLENDi (mesma estrutura do login por email)
-    const accessToken = generateAccessToken(user.id as string, user.email);
-    const refreshToken = generateRefreshToken(user.id as string);
-
-    res.status(isNewUser ? 201 : 200).json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          blendiModel: user.blendiModel,
-          goal: user.goal,
-          locale: user.locale,
-          timezone: user.timezone,
-          dailyProteinTarget: user.dailyProteinTarget,
-          dailyCalorieTarget: user.dailyCalorieTarget,
-          createdAt: user.createdAt,
-        },
-        accessToken,
-        refreshToken,
-        /** true se o usuário foi criado agora — o mobile usa para direcionar ao onboarding */
-        isNewUser,
       },
     });
   } catch (err) {
