@@ -85,3 +85,17 @@ export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
   const response = await api.post<RefreshResponse>('/auth/refresh', { refreshToken });
   return response.data.data;
 }
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+/**
+ * Obtém a URL de autorização do Google via backend.
+ * GET /auth/google/url → 200 { url: string }
+ *
+ * A URL inclui o state JWT (CSRF) gerado pelo backend.
+ * O app abre essa URL no browser via expo-web-browser.
+ */
+export async function getGoogleAuthUrl(): Promise<string> {
+  const response = await api.get<{ success: true; data: { url: string } }>('/auth/google/url');
+  return response.data.data.url;
+}

@@ -1,3 +1,7 @@
+// Polyfill para new URL() no engine Hermes (React Native).
+// DEVE ser a primeira linha do entry point — antes de qualquer outro import.
+import 'react-native-url-polyfill/auto';
+
 import { registerRootComponent } from 'expo';
 
 import App from './App';

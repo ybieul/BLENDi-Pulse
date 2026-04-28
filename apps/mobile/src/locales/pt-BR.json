@@ -266,6 +266,10 @@
     }
   },
 
+  "auth": {
+    "google_sign_in": "Continuar com Google"
+  },
+
   "errors": {
     "validation": {
       "required": "Este campo é obrigatório.",

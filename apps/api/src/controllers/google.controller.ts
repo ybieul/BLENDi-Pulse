@@ -90,9 +90,10 @@ export async function getGoogleUrl(
  *     Primeiro acesso via Google → cria nova conta com valores padrão de onboarding.
  *     O app mobile pedirá os dados complementares (modelo, meta, targets) após o login.
  *
- * Resposta: { success: true, data: { user, accessToken, refreshToken, isNewUser } }
- *   - Status 201 se nova conta criada, 200 para login ou vinculação.
- *   - isNewUser: true direciona o app mobile para o fluxo de onboarding.
+ * Resposta: redirect para blendipulse://auth/callback?accessToken=...&refreshToken=...&isNewUser=...&user=<base64url>
+ *   - O browser detecta o esquema blendipulse:// e fecha automaticamente.
+ *   - openAuthSessionAsync captura a URL e a entrega ao hook useGoogleAuth.
+ *   - Erros redirecionam com ?error=<chave_i18n> para que o app exiba a mensagem correta.
  */
 export async function handleGoogleCallback(
   req: Request,
@@ -104,10 +105,7 @@ export async function handleGoogleCallback(
 
     // ── Passo 1: verificar se o usuário cancelou a autorização no Google ───────
     if (error) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.google_cancelled',
-      });
+      res.redirect('blendipulse://auth/callback?error=errors.auth.google_cancelled');
       return;
     }
 
@@ -115,20 +113,14 @@ export async function handleGoogleCallback(
     // O state deve existir e ser um JWT válido e não expirado.
     // Protege contra ataques onde um agente externo forja o callback.
     if (!state) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_state',
-      });
+      res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
       return;
     }
 
     try {
       jwt.verify(state, env.JWT_ACCESS_SECRET);
     } catch {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_state',
-      });
+      res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
       return;
     }
 
@@ -136,10 +128,7 @@ export async function handleGoogleCallback(
     // googleCallbackSchema valida que `code` é uma string não vazia.
     const parsed = googleCallbackSchema.safeParse({ code });
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-      });
+      res.redirect('blendipulse://auth/callback?error=errors.validation.required');
       return;
     }
 
@@ -152,10 +141,7 @@ export async function handleGoogleCallback(
       userInfo = await getUserInfoFromToken(idToken);
     } catch {
       // Código inválido, expirado, já utilizado ou falha na verificação do token
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.google_auth_failed',
-      });
+      res.redirect('blendipulse://auth/callback?error=errors.auth.google_auth_failed');
       return;
     }
 
@@ -197,32 +183,38 @@ export async function handleGoogleCallback(
       }
     }
 
-    // ── Passo 6: gerar par de tokens BLENDi ───────────────────────────────────
+    // ── Passo 6: gerar par de tokens e redirecionar para o deep link do app ────
+    // O browser detecta o esquema blendipulse:// e fecha automaticamente.
+    // openAuthSessionAsync retorna { type: 'success', url } com a URL completa.
     const accessToken = generateAccessToken(user.id as string, user.email);
     const refreshToken = generateRefreshToken(user.id as string);
 
-    res.status(isNewUser ? 201 : 200).json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          profilePhoto: user.profilePhoto,
-          blendiModel: user.blendiModel,
-          goal: user.goal,
-          locale: user.locale,
-          timezone: user.timezone,
-          dailyProteinTarget: user.dailyProteinTarget,
-          dailyCalorieTarget: user.dailyCalorieTarget,
-          createdAt: user.createdAt,
-        },
-        accessToken,
-        refreshToken,
-        /** true se conta criada agora — o mobile usa para direcionar ao onboarding */
-        isNewUser,
-      },
+    // O objeto user é serializado como JSON → base64url para transporte via query string.
+    // Não contém dados sensíveis além do que já está no access token.
+    const userPayload = Buffer.from(
+      JSON.stringify({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        profilePhoto: user.profilePhoto,
+        blendiModel: user.blendiModel,
+        goal: user.goal,
+        locale: user.locale,
+        timezone: user.timezone,
+        dailyProteinTarget: user.dailyProteinTarget,
+        dailyCalorieTarget: user.dailyCalorieTarget,
+        createdAt: user.createdAt,
+      })
+    ).toString('base64');
+
+    const params = new URLSearchParams({
+      accessToken,
+      refreshToken,
+      isNewUser: String(isNewUser),
+      user: userPayload,
     });
+
+    res.redirect(`blendipulse://auth/callback?${params.toString()}`);
   } catch (err) {
     next(err);
   }

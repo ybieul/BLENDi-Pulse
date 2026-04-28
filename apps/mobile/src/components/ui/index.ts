@@ -9,3 +9,6 @@ export {
 } from './SkeletonLoader';
 
 export type { SkeletonLoaderProps, SkeletonVariant } from './SkeletonLoader';
+
+export { GoogleSignInButton } from './GoogleSignInButton';
+export type { GoogleSignInButtonProps } from './GoogleSignInButton';

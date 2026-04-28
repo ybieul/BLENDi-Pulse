@@ -84,6 +84,13 @@ interface AuthActions {
   /** @internal Usado pelo interceptor do Axios. Não chamar diretamente em componentes. */
   _setAccessToken: (token: string | null) => void;
   /**
+   * @internal Persiste uma sessão completa recebida da API.
+   * Salva o refresh token no Secure Store e atualiza user + accessToken no estado.
+   * Usado pelo useGoogleAuth após OAuth bem-sucedido.
+   * Não chamar diretamente em componentes.
+   */
+  _setSession: (data: import('../services/auth.service').AuthResponse['data']) => Promise<void>;
+  /**
    * Atualiza o campo timezone no perfil do usuário no store após uma
    * sincronização bem-sucedida com o backend (PATCH /auth/timezone).
    * Chamada por timezone.service.ts — não chamar diretamente em componentes.
@@ -210,6 +217,21 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     set({
       accessToken: token,
       isAuthenticated: token !== null,
+    });
+  },
+
+  // ── _setSession ───────────────────────────────────────────────────────────
+
+  _setSession: async (data) => {
+    await SecureStore.setItemAsync(
+      REFRESH_TOKEN_KEY,
+      data.refreshToken,
+      SECURE_STORE_OPTIONS
+    );
+    set({
+      user: data.user,
+      accessToken: data.accessToken,
+      isAuthenticated: true,
     });
   },
 
