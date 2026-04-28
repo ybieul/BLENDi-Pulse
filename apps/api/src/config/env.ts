@@ -37,6 +37,25 @@ const envSchema = z.object({
 
   // CORS
   ALLOWED_ORIGINS: z.string().default('http://localhost:8081'),
+
+  // Google OAuth 2.0
+  // Obtenha em: console.cloud.google.com → Credenciais → OAuth 2.0 Client IDs
+  GOOGLE_CLIENT_ID: z
+    .string()
+    .min(1, 'GOOGLE_CLIENT_ID é obrigatória — configure em console.cloud.google.com'),
+  GOOGLE_CLIENT_SECRET: z
+    .string()
+    .min(1, 'GOOGLE_CLIENT_SECRET é obrigatória — configure em console.cloud.google.com'),
+  // URI de redirecionamento cadastrado no Google Cloud Console.
+  // Dev:  http://localhost:3000/auth/google/callback
+  // Prod: https://api.blendipulse.com/auth/google/callback
+  GOOGLE_REDIRECT_URI: z
+    .string()
+    .min(1, 'GOOGLE_REDIRECT_URI é obrigatória')
+    .refine(
+      uri => uri.startsWith('http://') || uri.startsWith('https://'),
+      'GOOGLE_REDIRECT_URI deve ser uma URL válida'
+    ),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo
