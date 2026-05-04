@@ -4,7 +4,8 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "moduleResolution": "Bundler",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "ignoreDeprecations": "5.0",
     "outDir": "dist",
     "rootDir": "src"
