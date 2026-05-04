@@ -49,6 +49,7 @@ jobs:
       # 6. Notificar Railway para iniciar o deploy
       # RAILWAY_TOKEN deve estar configurado em:
       # GitHub → Settings → Secrets and variables → Actions → New repository secret
+      # Perfect
       - name: Deploy to Railway
         if: success()
         run: |
