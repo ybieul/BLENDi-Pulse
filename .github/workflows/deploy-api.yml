@@ -42,9 +42,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 5. Type-check — garante que o código compila sem erros
+      # 5. Compila shared primeiro (dependência), depois a api
       - name: TypeScript build (apps/api)
-        run: pnpm --filter @blendi/api build
+        run: pnpm --filter @blendi/api... build
 
       # 6. Notificar Railway para iniciar o deploy
       # RAILWAY_TOKEN deve estar configurado em:
