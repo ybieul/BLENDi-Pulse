@@ -27,10 +27,9 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. Setup pnpm (antes do Node, para usar cache correto)
+      # A versão é lida automaticamente de package.json > packageManager
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       # 3. Setup Node.js 20 com cache do pnpm
       - name: Setup Node.js 20
