@@ -12,7 +12,7 @@
 
 import { useState, useCallback } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { getGoogleAuthUrl } from '../services/auth.service';
+import { getGoogleAuthUrl, type AuthUser } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
 
 // Necessário para fechar o browser corretamente no Android após o redirect
@@ -25,6 +25,8 @@ export interface UseGoogleAuthReturn {
   signInWithGoogle: () => Promise<void>;
   /** true enquanto o fluxo estiver em andamento. */
   isLoading: boolean;
+  /** true quando o login Google acabou de criar uma nova conta. */
+  isNewUser: boolean;
   /** Chave i18n do erro, ou null se não houver erro. */
   error: string | null;
   /** Limpa o erro atual. */
@@ -35,12 +37,14 @@ export interface UseGoogleAuthReturn {
 
 export function useGoogleAuth(): UseGoogleAuthReturn {
   const [isLoading, setIsLoading] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const _setSession = useAuthStore((s) => s._setSession);
 
   const signInWithGoogle = useCallback(async () => {
     setIsLoading(true);
+    setIsNewUser(false);
     setError(null);
 
     try {
@@ -113,9 +117,9 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       // ── Passo 5: decodificar payload do usuário ───────────────────────────
       // atob() está disponível no Hermes desde RN 0.64.
       // O backend serializa o user como JSON → base64 via Buffer.from().toString('base64').
-      let user;
+      let user: AuthUser;
       try {
-        user = JSON.parse(atob(userBase64));
+        user = JSON.parse(atob(userBase64)) as AuthUser;
       } catch (err) {
         console.error('[useGoogleAuth] Falha ao decodificar payload do usuário:', err);
         setError('errors.auth.google_auth_failed');
@@ -123,9 +127,8 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       }
 
       // ── Passo 6: salvar sessão no store (SecureStore + Zustand) ───────────
-      await _setSession({ user, accessToken, refreshToken });
-      // isNewUser fica disponível aqui para uso futuro no onboarding
-      void isNewUser;
+      await _setSession({ user, accessToken, refreshToken, isNewUser });
+      setIsNewUser(isNewUser);
     } catch (err) {
       // Captura erros não tratados nos passos anteriores
       console.error('[useGoogleAuth] Erro inesperado no fluxo Google Login:', err);
@@ -137,5 +140,5 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { signInWithGoogle, isLoading, error, clearError };
+  return { signInWithGoogle, isLoading, isNewUser, error, clearError };
 }

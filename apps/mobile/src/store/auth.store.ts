@@ -35,7 +35,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { api } from '../config/api';
 import * as AuthService from '../services/auth.service';
-import type { AuthUser } from '../services/auth.service';
+import type { AuthResponse, AuthUser } from '../services/auth.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -50,6 +50,10 @@ const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
 
+type AuthSessionData = AuthResponse['data'] & {
+  isNewUser?: boolean;
+};
+
 // ─── Tipos do store ───────────────────────────────────────────────────────────
 
 interface AuthState {
@@ -59,8 +63,15 @@ interface AuthState {
   accessToken: string | null;
   /** Derivado: true se accessToken não for null. */
   isAuthenticated: boolean;
+  /** true quando a sessão atual foi criada por um primeiro login via Google. */
+  isNewUser: boolean;
   /** true durante operações assíncronas de auth (login, register, restoreSession). */
   isLoading: boolean;
+  /**
+   * true enquanto o boot ainda está restaurando a sessão persistida.
+   * Começa como true para evitar flicker do fluxo público antes do refresh.
+   */
+  isRestoringSession: boolean;
 }
 
 interface AuthActions {
@@ -85,11 +96,11 @@ interface AuthActions {
   _setAccessToken: (token: string | null) => void;
   /**
    * @internal Persiste uma sessão completa recebida da API.
-   * Salva o refresh token no Secure Store e atualiza user + accessToken no estado.
+    * Salva o refresh token no Secure Store e atualiza user + accessToken no estado.
    * Usado pelo useGoogleAuth após OAuth bem-sucedido.
    * Não chamar diretamente em componentes.
    */
-  _setSession: (data: import('../services/auth.service').AuthResponse['data']) => Promise<void>;
+    _setSession: (data: AuthSessionData) => Promise<void>;
   /**
    * Atualiza o campo timezone no perfil do usuário no store após uma
    * sincronização bem-sucedida com o backend (PATCH /auth/timezone).
@@ -105,7 +116,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   user: null,
   accessToken: null,
   isAuthenticated: false,
+  isNewUser: false,
   isLoading: false,
+  isRestoringSession: true,
 
   // ── register ─────────────────────────────────────────────────────────────
 
@@ -124,6 +137,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         user: data.user,
         accessToken: data.accessToken,
         isAuthenticated: true,
+        isNewUser: false,
       });
     } finally {
       set({ isLoading: false });
@@ -147,6 +161,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         user: data.user,
         accessToken: data.accessToken,
         isAuthenticated: true,
+        isNewUser: false,
       });
     } finally {
       set({ isLoading: false });
@@ -167,13 +182,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       user: null,
       accessToken: null,
       isAuthenticated: false,
+      isNewUser: false,
     });
   },
 
   // ── restoreSession ────────────────────────────────────────────────────────
 
   restoreSession: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, isRestoringSession: true });
     try {
       const storedRefreshToken = await SecureStore.getItemAsync(
         REFRESH_TOKEN_KEY,
@@ -202,12 +218,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       set({
         accessToken: tokens.accessToken,
         isAuthenticated: true,
+        isNewUser: false,
       });
     } catch {
       // Refresh token inválido/expirado — limpa sessão silenciosamente
       await get().logout();
     } finally {
-      set({ isLoading: false });
+      set({ isLoading: false, isRestoringSession: false });
     }
   },
 
@@ -232,6 +249,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       user: data.user,
       accessToken: data.accessToken,
       isAuthenticated: true,
+      isNewUser: data.isNewUser ?? false,
     });
   },
 

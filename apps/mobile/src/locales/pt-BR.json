@@ -1,5 +1,6 @@
 {
   "common": {
+    "or": "ou",
     "actions": {
       "confirm": "Confirmar",
       "cancel": "Cancelar",
@@ -32,6 +33,14 @@
       "fat": "Gordura",
       "calories": "Calorias"
     }
+  },
+
+  "navigation": {
+    "home": "Início",
+    "recipes": "Receitas",
+    "blend": "Blend",
+    "track": "Acompanhar",
+    "me": "Perfil"
   },
 
   "onboarding": {
@@ -267,6 +276,50 @@
   },
 
   "auth": {
+    "brandWordmark": "BLENDi",
+    "loginTitle": "Bem-vindo de volta.",
+    "loginSubtitle": "Entre para manter seus blends, metas e sequência sincronizados.",
+    "loginCta": "Entrar",
+    "registerHere": "Criar conta",
+    "registerTitle": "Crie sua conta.",
+    "registerSubtitle": "Comece com seus dados agora. Vamos concluir sua configuração na próxima etapa.",
+    "registerCta": "Continuar",
+    "termsNotice": "Ao continuar, você concorda com nossos",
+    "forgotPasswordTitle": "Redefina sua senha.",
+    "forgotPasswordDescription": "Digite o e-mail vinculado à sua conta. Vamos enviar um código de verificação para continuar.",
+    "forgotPasswordCta": "Enviar código",
+    "forgotPasswordSuccess": "Enviamos um código de verificação para o seu e-mail.",
+    "verifyOtpTitle": "Confira seu e-mail.",
+    "verifyOtpDescription": "Digite o código de 6 dígitos que enviamos para",
+    "verifyOtpCta": "Digite os 6 dígitos",
+    "resetPasswordTitle": "Crie uma nova senha.",
+    "resetPasswordDescription": "Escolha uma senha segura para proteger sua conta.",
+    "resetPasswordCta": "Salvar nova senha",
+    "newPasswordLabel": "Nova senha",
+    "passwordsMismatch": "As senhas não coincidem.",
+    "passwordResetSuccess": "Senha atualizada com sucesso.",
+    "resendCodeIn": "Reenviar código em {{seconds}}s",
+    "resendCode": "Reenviar código",
+    "emailLabel": "E-mail",
+    "fullNameLabel": "Nome completo",
+    "passwordLabel": "Senha",
+    "confirmPasswordLabel": "Confirmar senha",
+    "forgotPassword": "Esqueceu a senha?",
+    "showPassword": "Mostrar senha",
+    "hidePassword": "Ocultar senha",
+    "noAccount": "Ainda não tem uma conta?",
+    "createAccount": "Criar conta",
+    "alreadyHaveAccount": "Já tem uma conta?",
+    "signIn": "Entrar",
+    "passwordsDoNotMatch": "As senhas não coincidem.",
+    "passwordStrengthWeak": "Senha fraca",
+    "passwordStrengthFair": "Senha razoável",
+    "passwordStrengthGood": "Senha boa",
+    "passwordStrengthStrong": "Senha forte",
+    "termsPrefix": "Ao continuar, você concorda com nossos",
+    "termsOfService": "Termos de Serviço",
+    "termsConnector": "e",
+    "privacyPolicy": "Política de Privacidade",
     "google_sign_in": "Continuar com Google"
   },
 
@@ -296,7 +349,19 @@
       "timeout": "A solicitação expirou. Tente novamente.",
       "server": "Erro no servidor. Estamos resolvendo — tente novamente em breve."
     },
-    "not_found": "O recurso solicitado não foi encontrado."
+    "not_found": "O recurso solicitado não foi encontrado.",
+    "validation_invalid_input": "Revise os campos destacados e tente novamente.",
+    "auth_email_already_exists": "Este e-mail já está em uso.",
+    "auth_invalid_credentials": "E-mail ou senha incorretos.",
+    "auth_otp_expired": "Este código expirou. Solicite um novo.",
+    "auth_otp_max_attempts": "Muitas tentativas. Solicite um novo código.",
+    "auth_otp_invalid": "O código informado é inválido.",
+    "auth_reset_token_invalid": "Este link de redefinição de senha é inválido.",
+    "auth_reset_token_expired": "Este link de redefinição de senha expirou.",
+    "auth_session_expired": "Sua sessão expirou. Faça login novamente.",
+    "auth_unauthorized": "Você não tem acesso a este recurso.",
+    "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
+    "resource_not_found": "O recurso solicitado não foi encontrado."
   },
 
   "notifications": {

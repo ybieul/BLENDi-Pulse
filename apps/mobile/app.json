@@ -5,6 +5,7 @@
     "scheme": "blendipulse",
     "version": "1.0.0",
     "orientation": "portrait",
+    "newArchEnabled": true,
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#2b1429",

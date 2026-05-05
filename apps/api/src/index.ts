@@ -16,6 +16,7 @@ import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import { pingRouter } from './routes/ping';
 import { authRouter } from './routes/auth';
+import { sendErrorResponse } from './utils/error.utils';
 
 const app = express();
 
@@ -48,7 +49,11 @@ app.use('/auth', authRouter);
 // ─── 404 — rota não encontrada ────────────────────────────────────────────────
 
 app.use((_req, res) => {
-  res.status(404).json({ success: false, message: 'errors.not_found' });
+  sendErrorResponse(res, {
+    statusCode: 404,
+    code: 'resource/not-found',
+    message: 'Route not found.',
+  });
 });
 
 // ─── Handler global de erros (DEVE ser o último middleware) ───────────────────

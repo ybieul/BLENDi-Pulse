@@ -41,6 +41,12 @@ const OTP_TTL_MS = 15 * 60 * 1000;
 /** Número máximo de tentativas de verificação antes de bloquear o OTP. */
 const MAX_ATTEMPTS = 5;
 
+export type OtpValidationFailureReason = 'expired' | 'invalid' | 'max_attempts';
+
+export type OtpValidationResult =
+  | { ok: true }
+  | { ok: false; reason: OtpValidationFailureReason };
+
 /**
  * Parâmetros Argon2id — OWASP 2025.
  * Idênticos aos usados para senhas, garantindo consistência na postura de
@@ -147,29 +153,33 @@ export async function createOtpRecord(email: string): Promise<string> {
  *   6. Verifica o código com Argon2
  *   7. Se correto, marca como usado e retorna true
  *
- * Retorna false sem revelar o motivo específico da falha (expirado, usado,
- * tentativas excedidas ou código incorreto) — evita information leakage.
+ * Retorna um resultado discriminado, permitindo que o controller exponha apenas
+ * os códigos necessários para o cliente mobile sem perder a proteção do fluxo.
+ * Registros inexistentes ou já usados continuam mapeados para `invalid`.
  *
  * @param email - Email do usuário
  * @param otp   - Código OTP digitado pelo usuário (6 dígitos)
- * @returns true se o OTP é válido e foi marcado como usado, false caso contrário
+ * @returns Resultado da validação com motivo padronizado em caso de falha
  */
-export async function validateOtpRecord(email: string, otp: string): Promise<boolean> {
+export async function validateOtpRecord(
+  email: string,
+  otp: string
+): Promise<OtpValidationResult> {
   const normalizedEmail = email.toLowerCase();
 
   const record = await OtpModel.findOne({ email: normalizedEmail });
 
   // Registro não encontrado (expirou e foi removido pelo TTL, ou nunca existiu)
-  if (!record) return false;
+  if (!record) return { ok: false, reason: 'invalid' };
 
   // Verificação explícita de expiração — belt-and-suspenders contra atraso do TTL
-  if (record.expiresAt < new Date()) return false;
+  if (record.expiresAt < new Date()) return { ok: false, reason: 'expired' };
 
   // OTP já foi utilizado com sucesso anteriormente
-  if (record.used) return false;
+  if (record.used) return { ok: false, reason: 'invalid' };
 
   // Tentativas esgotadas — rejeitar sem incrementar (já no limite)
-  if (record.attempts >= MAX_ATTEMPTS) return false;
+  if (record.attempts >= MAX_ATTEMPTS) return { ok: false, reason: 'max_attempts' };
 
   // Incrementar tentativas ANTES de verificar o código.
   // Garante que tentativas paralelas não contornem o limite.
@@ -181,8 +191,12 @@ export async function validateOtpRecord(email: string, otp: string): Promise<boo
   if (isValid) {
     record.used = true;
     await record.save();
-    return true;
+    return { ok: true };
   }
 
-  return false;
+  if (record.attempts >= MAX_ATTEMPTS) {
+    return { ok: false, reason: 'max_attempts' };
+  }
+
+  return { ok: false, reason: 'invalid' };
 }

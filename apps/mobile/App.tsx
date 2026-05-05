@@ -3,15 +3,30 @@
 // primeiro render, sem flicker de chaves ou textos em idioma errado.
 import './src/locales/i18n';
 
-import { useCallback, useEffect, useRef } from 'react';
-import { AppState, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { enableScreens } from 'react-native-screens';
+
+// Ativa telas nativas do React Navigation para reduzir custo de memória e
+// melhorar transições em dispositivos físicos.
+enableScreens();
+
+import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Auth — interceptors Axios e restauração de sessão
 import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
+
+// Query cache — client persistido em MMKV
+import { persistOptions, queryClient } from './src/config/queryClient';
+
+// Navigation — root switch entre auth e app
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 // Timezone — sincronização silenciosa ao voltar ao foreground
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
@@ -41,8 +56,23 @@ import { colors } from '@blendi/shared';
 // preventAutoHideAsync é fire-and-forget intencional — sem await no módulo
 void SplashScreen.preventAutoHideAsync();
 
+const navigationTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.brand.pulse,
+    background: colors.background.primary,
+    card: colors.background.primary,
+    text: colors.text.primary,
+    border: colors.background.secondary,
+    notification: colors.brand.pulse,
+  },
+};
+
 export default function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isRestoringSession = useAuthStore((s) => s.isRestoringSession);
 
   // Rastreia o AppState anterior para filtrar apenas transições para 'active'
   // vindas de background/inactive — evita disparar na montagem inicial.
@@ -62,28 +92,33 @@ export default function App() {
     DMMono_500Medium,
   });
 
-  // ── Boot: interceptors + restauração de sessão + timezone inicial ───────────
+  // ── Boot: interceptors + restauração imediata de sessão ─────────────────────
   // setupAxiosInterceptors é idempotente (guard interno) — seguro chamar aqui.
-  // onSessionExpired: navegar para login será implementado na Fase de Navegação.
   useEffect(() => {
     setupAxiosInterceptors(() => {
-      // TODO (Navigation): navigate to login screen
-      // navigation.reset({ routes: [{ name: 'Login' }] })
+      // RootNavigator reage ao logout pelo store e troca automaticamente
+      // para o fluxo público sem navegação imperativa aqui.
     });
 
-    // Restaura a sessão e, em seguida, tenta sincronizar o timezone.
-    // syncTimezoneIfNeeded retorna cedo se não houver sessão ativa ou se
-    // user === null (enquanto GET /me não existir, user fica null após restore).
-    // A chamada é feita aqui para garantir que quando GET /me for implementado
-    // a sincronização já aconteça no boot sem nenhuma alteração neste arquivo.
-    const boot = async () => {
-      await restoreSession();
-      void syncTimezoneIfNeeded();
-    };
+    // Dispara imediatamente após a montagem, sem delay intermediário.
+    void restoreSession();
+  }, [restoreSession]);
 
-    void boot();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── Splash nativa: só some depois que as fontes estiverem resolvidas ───────
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // ── Timezone inicial após o término do restore da sessão ───────────────────
+  useEffect(() => {
+    if (isRestoringSession || !isAuthenticated) {
+      return;
+    }
+
+    void syncTimezoneIfNeeded().catch(() => undefined);
+  }, [isAuthenticated, isRestoringSession]);
 
   // ── AppState: sincronização de timezone ao voltar ao foreground ──────────────
   // Cobre o caso de uso principal: usuário viaja entre países, o SO ajusta o
@@ -114,37 +149,18 @@ export default function App() {
     };
   }, []);
 
-  const onLayoutRootView = useCallback(() => {
-    if (fontsLoaded || fontError) {
-      void SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
   if (!fontsLoaded && !fontError) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.brand.pulse} />
-      </View>
-    );
+    return null;
   }
 
   return (
-    <View style={styles.container} onLayout={onLayoutRootView}>
-      {/* Navegação e providers serão injetados aqui nos próximos checkpoints */}
-      <StatusBar style="light" backgroundColor={colors.brand.plum} />
-    </View>
+    <SafeAreaProvider>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <NavigationContainer theme={navigationTheme}>
+          <StatusBar style="light" backgroundColor={colors.background.primary} />
+          <RootNavigator />
+        </NavigationContainer>
+      </PersistQueryClientProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.brand.plum,
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.brand.plum,
-  },
-});

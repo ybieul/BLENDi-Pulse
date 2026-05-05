@@ -2,16 +2,22 @@
 // Inicialização síncrona do i18next — deve ser importado no topo do App.tsx,
 // antes de qualquer componente ser renderizado, para evitar flickers de texto.
 
+import '@formatjs/intl-pluralrules/polyfill-force.js';
+import '@formatjs/intl-pluralrules/locale-data/en.js';
+import '@formatjs/intl-pluralrules/locale-data/pt.js';
+
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
-import { MMKV } from 'react-native-mmkv';
 
 import en from './en.json';
 import ptBR from './pt-BR.json';
+import { createAppStorage } from '../config/storage';
 
-// ─── MMKV storage (mesma instância usada pelo app inteiro) ────────────────────
-export const storage = new MMKV({ id: 'blendi-pulse' });
+// ─── Storage síncrono do app ───────────────────────────────────────────────────
+// Em builds nativos usa MMKV. No Expo Go, cai para memória para evitar crash
+// no boot quando TurboModules/MMKV não estiverem disponíveis.
+export const storage = createAppStorage('blendi-pulse');
 
 const LANGUAGE_KEY = 'user_language';
 

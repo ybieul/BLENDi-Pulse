@@ -4,10 +4,11 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { env } from '../config/env';
-
-export interface ApiError extends Error {
-  statusCode?: number;
-}
+import {
+  DEFAULT_ERROR_CODE,
+  DEFAULT_ERROR_MESSAGE,
+  type ApiError,
+} from '../utils/error.utils';
 
 export function errorHandler(
   err: ApiError,
@@ -18,10 +19,13 @@ export function errorHandler(
 ): void {
   const statusCode = err.statusCode ?? 500;
   const isDev = env.NODE_ENV === 'development';
+  const code = err.code ?? DEFAULT_ERROR_CODE;
+  const message = err.message || DEFAULT_ERROR_MESSAGE;
 
   res.status(statusCode).json({
     success: false,
-    message: err.message || 'errors.network.server',
+    code,
+    message,
     // Stack trace apenas em desenvolvimento — nunca exponha em produção
     ...(isDev && { stack: err.stack }),
   });

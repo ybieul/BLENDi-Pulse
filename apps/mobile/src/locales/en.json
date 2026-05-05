@@ -1,5 +1,6 @@
 {
   "common": {
+    "or": "or",
     "actions": {
       "confirm": "Confirm",
       "cancel": "Cancel",
@@ -32,6 +33,14 @@
       "fat": "Fat",
       "calories": "Calories"
     }
+  },
+
+  "navigation": {
+    "home": "Home",
+    "recipes": "Recipes",
+    "blend": "Blend",
+    "track": "Track",
+    "me": "Me"
   },
 
   "onboarding": {
@@ -267,6 +276,50 @@
   },
 
   "auth": {
+    "brandWordmark": "BLENDi",
+    "loginTitle": "Welcome back.",
+    "loginSubtitle": "Sign in to keep your blends, goals, and streaks in sync.",
+    "loginCta": "Log in",
+    "registerHere": "Create one",
+    "registerTitle": "Create your account.",
+    "registerSubtitle": "Start with your details now. We'll finish your setup in the next step.",
+    "registerCta": "Continue",
+    "termsNotice": "By continuing, you agree to our",
+    "forgotPasswordTitle": "Reset your password.",
+    "forgotPasswordDescription": "Enter the email linked to your account. We'll send a verification code to continue.",
+    "forgotPasswordCta": "Send code",
+    "forgotPasswordSuccess": "We sent a verification code to your email.",
+    "verifyOtpTitle": "Check your email.",
+    "verifyOtpDescription": "Enter the 6-digit code we sent to",
+    "verifyOtpCta": "Enter all 6 digits",
+    "resetPasswordTitle": "Create a new password.",
+    "resetPasswordDescription": "Choose a secure password to protect your account.",
+    "resetPasswordCta": "Save new password",
+    "newPasswordLabel": "New password",
+    "passwordsMismatch": "Passwords do not match.",
+    "passwordResetSuccess": "Password updated successfully.",
+    "resendCodeIn": "Resend code in {{seconds}}s",
+    "resendCode": "Resend code",
+    "emailLabel": "Email",
+    "fullNameLabel": "Full name",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "forgotPassword": "Forgot password?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "noAccount": "Don't have an account?",
+    "createAccount": "Create one",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "passwordsDoNotMatch": "Passwords do not match.",
+    "passwordStrengthWeak": "Weak password",
+    "passwordStrengthFair": "Fair password",
+    "passwordStrengthGood": "Good password",
+    "passwordStrengthStrong": "Strong password",
+    "termsPrefix": "By continuing, you agree to our",
+    "termsOfService": "Terms of Service",
+    "termsConnector": "and",
+    "privacyPolicy": "Privacy Policy",
     "google_sign_in": "Continue with Google"
   },
 
@@ -296,7 +349,19 @@
       "timeout": "Request timed out. Please try again.",
       "server": "Server error. We're on it — try again shortly."
     },
-    "not_found": "The requested resource was not found."
+    "not_found": "The requested resource was not found.",
+    "validation_invalid_input": "Please review the highlighted fields.",
+    "auth_email_already_exists": "This email is already in use.",
+    "auth_invalid_credentials": "Incorrect email or password.",
+    "auth_otp_expired": "This code has expired. Request a new one.",
+    "auth_otp_max_attempts": "Too many attempts. Request a new code.",
+    "auth_otp_invalid": "The code you entered is invalid.",
+    "auth_reset_token_invalid": "This password reset link is invalid.",
+    "auth_reset_token_expired": "This password reset link has expired.",
+    "auth_session_expired": "Your session expired. Please sign in again.",
+    "auth_unauthorized": "You don't have access to this feature.",
+    "network_internal_server_error": "Server error. We're on it — try again shortly.",
+    "resource_not_found": "The requested resource was not found."
   },
 
   "notifications": {

@@ -12,14 +12,28 @@
 
 import React from 'react';
 import {
+  Animated,
   TouchableOpacity,
-  View,
   Text,
   ActivityIndicator,
   StyleSheet,
+  Easing,
+  type GestureResponderEvent,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
+import {
+  borderRadius,
+  colors,
+  fonts,
+  fontWeights,
+} from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+
+const BUTTON_HEIGHT = 56;
+const PRESS_SCALE = 0.97;
+const LOADING_FADE_DURATION = 150;
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
@@ -34,54 +48,86 @@ export interface GoogleSignInButtonProps {
 
 export function GoogleSignInButton({ onPress, isLoading }: GoogleSignInButtonProps) {
   const { t } = useAppTranslation();
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const contentOpacity = React.useRef(new Animated.Value(isLoading ? 0 : 1)).current;
+  const loaderOpacity = React.useRef(new Animated.Value(isLoading ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: isLoading ? 0 : 1,
+        duration: LOADING_FADE_DURATION,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(loaderOpacity, {
+        toValue: isLoading ? 1 : 0,
+        duration: LOADING_FADE_DURATION,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [contentOpacity, isLoading, loaderOpacity]);
+
+  const animateScale = (toValue: number) => {
+    Animated.spring(scale, {
+      toValue,
+      stiffness: 420,
+      damping: 28,
+      mass: 0.45,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressIn = (_event: GestureResponderEvent) => {
+    animateScale(PRESS_SCALE);
+  };
+
+  const handlePressOut = (_event: GestureResponderEvent) => {
+    animateScale(1);
+  };
 
   return (
-    <TouchableOpacity
+    <AnimatedTouchableOpacity
       style={styles.button}
       onPress={onPress}
       disabled={isLoading}
-      activeOpacity={0.85}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
       accessibilityRole="button"
       accessibilityLabel={t('auth.google_sign_in')}
       accessibilityState={{ busy: isLoading, disabled: isLoading }}
     >
-      <View style={styles.content}>
-        {isLoading ? (
-          // Indicador centralizado — mesma altura do conteúdo normal
-          <ActivityIndicator size="small" color="#5F6368" />
-        ) : (
-          <>
-            {/* Ícone Google — cor azul da marca (#4285F4) */}
-            <AntDesign name="google" size={20} color="#4285F4" />
-            <Text style={styles.label}>{t('auth.google_sign_in')}</Text>
-          </>
-        )}
-      </View>
-    </TouchableOpacity>
+      <Animated.View style={[styles.pressLayer, { transform: [{ scale }] }]}> 
+        <Animated.View style={[styles.content, { opacity: contentOpacity }]}> 
+          <AntDesign name="google" size={18} color="#4285F4" />
+          <Text style={styles.label}>{t('auth.google_sign_in')}</Text>
+        </Animated.View>
+
+        <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}> 
+          <ActivityIndicator size="small" color={colors.text.primary} />
+        </Animated.View>
+      </Animated.View>
+    </AnimatedTouchableOpacity>
   );
 }
 
 // ─── Estilos ───────────────────────────────────────────────────────────────────
-// Segue as diretrizes visuais do Google para botões de Sign In:
-// fundo branco, borda cinza (#DADCE0), texto escuro (#3C4043), raio 8dp.
-// https://developers.google.com/identity/branding-guidelines
-
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#FFFFFF',
+    width: '100%',
+    height: BUTTON_HEIGHT,
+    borderRadius: borderRadius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: '#DADCE0',
-    borderRadius: 8,
-    height: 48,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    overflow: 'hidden',
+  },
+  pressLayer: {
+    flex: 1,
     alignItems: 'center',
-    // Leve sombra para destacar do fundo em telas claras
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 1,
+    justifyContent: 'center',
   },
   content: {
     flexDirection: 'row',
@@ -89,9 +135,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   label: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
     fontSize: 16,
-    fontWeight: '500',
-    color: '#3C4043',
-    letterSpacing: 0.25,
+    fontWeight: fontWeights.medium,
+  },
+  loader: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

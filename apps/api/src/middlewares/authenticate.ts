@@ -10,15 +10,17 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, isTokenExpiredError } from '../services/auth.service';
+import { sendErrorResponse } from '../utils/error.utils';
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   // 1. Extrair token do header Authorization: Bearer <token>
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      success: false,
-      message: 'errors.auth.unauthorized',
+    sendErrorResponse(res, {
+      statusCode: 401,
+      code: 'auth/unauthorized',
+      message: 'Unauthorized.',
     });
     return;
   }
@@ -33,17 +35,19 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   } catch (err) {
     // Token expirado → orientar o cliente a usar o refresh token
     if (isTokenExpiredError(err)) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.session_expired',
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: 'auth/session-expired',
+        message: 'Session expired.',
       });
       return;
     }
 
     // Token inválido/adulterado
-    res.status(401).json({
-      success: false,
-      message: 'errors.auth.unauthorized',
+    sendErrorResponse(res, {
+      statusCode: 401,
+      code: 'auth/unauthorized',
+      message: 'Unauthorized.',
     });
   }
 }

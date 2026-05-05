@@ -3,10 +3,7 @@
 // Cada handler segue o mesmo contrato de resposta:
 //
 //   Sucesso → { success: true, data: { ... } }
-//   Erro    → { success: false, message: '<chave i18n>', errors?: [...] }
-//
-// As mensagens são SEMPRE chaves de i18n — nunca texto traduzido.
-// O cliente (mobile/web) resolve a chave para o idioma do usuário via t(key).
+//   Erro    → { success: false, code: 'dominio/erro', message: 'English message', errors?: [...] }
 
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
@@ -24,6 +21,11 @@ import {
   isTokenExpiredError,
 } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
+import {
+  sendErrorResponse,
+  VALIDATION_ERROR_CODE,
+  VALIDATION_ERROR_MESSAGE,
+} from '../utils/error.utils';
 
 // Instância única compartilhada pelos handlers — troca de implementação sem mudar controllers
 const emailService = new EmailService();
@@ -38,6 +40,15 @@ function formatZodErrors(err: ZodError) {
     ...(issue.code === 'too_small' && { minimum: (issue as { minimum?: number }).minimum }),
     ...(issue.code === 'too_big' && { maximum: (issue as { maximum?: number }).maximum }),
   }));
+}
+
+function sendValidationError(res: Response, err: ZodError): void {
+  sendErrorResponse(res, {
+    statusCode: 400,
+    code: VALIDATION_ERROR_CODE,
+    message: VALIDATION_ERROR_MESSAGE,
+    errors: formatZodErrors(err),
+  });
 }
 
 // ─── Register ─────────────────────────────────────────────────────────────────
@@ -55,11 +66,7 @@ export async function register(
     // 1. Validar body com Zod
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -78,9 +85,10 @@ export async function register(
     // 2. Verificar se o email já está cadastrado
     const existing = await UserModel.findOne({ email }).lean();
     if (existing) {
-      res.status(409).json({
-        success: false,
-        message: 'errors.auth.email_taken',
+      sendErrorResponse(res, {
+        statusCode: 409,
+        code: 'auth/email-already-exists',
+        message: 'Email already exists.',
       });
       return;
     }
@@ -147,11 +155,7 @@ export async function login(
     // 1. Validar body
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -162,9 +166,10 @@ export async function login(
 
     // 3. Usuário não encontrado → resposta genérica (não revela que o email não existe)
     if (!user) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.invalid_credentials',
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: 'auth/invalid-credentials',
+        message: 'Invalid email or password.',
       });
       return;
     }
@@ -172,9 +177,10 @@ export async function login(
     // 4. Verificar senha com Argon2
     const passwordMatch = await user.comparePassword(password);
     if (!passwordMatch) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.invalid_credentials',
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: 'auth/invalid-credentials',
+        message: 'Invalid email or password.',
       });
       return;
     }
@@ -226,11 +232,7 @@ export async function refresh(
     // 1. Validar body
     const parsed = refreshTokenSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -241,20 +243,21 @@ export async function refresh(
     try {
       payload = verifyRefreshToken(refreshToken);
     } catch (err) {
-      const message = isTokenExpiredError(err)
-        ? 'errors.auth.session_expired'
-        : 'errors.auth.unauthorized';
-
-      res.status(401).json({ success: false, message });
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: isTokenExpiredError(err) ? 'auth/session-expired' : 'auth/unauthorized',
+        message: isTokenExpiredError(err) ? 'Session expired.' : 'Unauthorized.',
+      });
       return;
     }
 
     // 3. Confirmar que o usuário ainda existe e está ativo
     const user = await UserModel.findById(payload.sub).lean();
     if (!user || !user.isActive) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.unauthorized',
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: 'auth/unauthorized',
+        message: 'Unauthorized.',
       });
       return;
     }
@@ -295,11 +298,7 @@ export async function updateTimezone(
     // 1. Validar body
     const parsed = updateTimezoneSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -316,9 +315,10 @@ export async function updateTimezone(
     ).lean();
 
     if (!user) {
-      res.status(404).json({
-        success: false,
-        message: 'errors.not_found',
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
       });
       return;
     }

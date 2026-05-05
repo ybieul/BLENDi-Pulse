@@ -7,7 +7,13 @@
 // Tipagem de entrada: schemas compartilhados de @blendi/shared.
 // Tipagem de saída: interfaces locais alinhadas ao contrato da API.
 
-import type { RegisterInput, LoginInput } from '@blendi/shared';
+import type {
+  ForgotPasswordInput,
+  RegisterInput,
+  LoginInput,
+  ResetPasswordInput,
+  VerifyOtpInput,
+} from '@blendi/shared';
 import { api } from '../config/api';
 
 // ─── Tipos de resposta da API ─────────────────────────────────────────────────
@@ -17,6 +23,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  profilePhoto?: string;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
@@ -44,6 +51,27 @@ export interface AuthResponse {
 export interface RefreshResponse {
   success: true;
   data: AuthTokens;
+}
+
+export interface ForgotPasswordResponse {
+  success: true;
+  data: {
+    message: string;
+  };
+}
+
+export interface VerifyOtpResponse {
+  success: true;
+  data: {
+    resetToken: string;
+  };
+}
+
+export interface ResetPasswordResponse {
+  success: true;
+  data: {
+    message: string;
+  };
 }
 
 // ─── Funções do serviço ───────────────────────────────────────────────────────
@@ -84,6 +112,33 @@ export async function login(input: LoginInput): Promise<AuthResponse['data']> {
 export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
   const response = await api.post<RefreshResponse>('/auth/refresh', { refreshToken });
   return response.data.data;
+}
+
+/**
+ * Inicia o fluxo de recuperação de senha.
+ * POST /auth/password/forgot → 200 { message }
+ *
+ * O backend sempre retorna sucesso para evitar enumeração de emails.
+ */
+export async function forgotPassword(input: ForgotPasswordInput): Promise<void> {
+  await api.post<ForgotPasswordResponse>('/auth/password/forgot', input);
+}
+
+/**
+ * Valida o OTP de 6 dígitos e retorna o resetToken para a próxima etapa.
+ * POST /auth/password/verify-otp → 200 { resetToken }
+ */
+export async function verifyOtp(input: VerifyOtpInput): Promise<string> {
+  const response = await api.post<VerifyOtpResponse>('/auth/password/verify-otp', input);
+  return response.data.data.resetToken;
+}
+
+/**
+ * Redefine a senha usando o resetToken emitido após a verificação do OTP.
+ * POST /auth/password/reset → 200 { message }
+ */
+export async function resetPassword(input: ResetPasswordInput): Promise<void> {
+  await api.post<ResetPasswordResponse>('/auth/password/reset', input);
 }
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────

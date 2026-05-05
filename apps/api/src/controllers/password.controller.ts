@@ -8,7 +8,7 @@
 //
 // Cada handler segue o contrato:
 //   Sucesso → { success: true, data: { ... } }
-//   Erro    → { success: false, message: '<chave i18n>' }
+//   Erro    → { success: false, code: 'dominio/erro', message: 'English message' }
 
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
@@ -25,6 +25,11 @@ import {
   verifyResetToken,
   isTokenExpiredError,
 } from '../services/auth.service';
+import {
+  sendErrorResponse,
+  VALIDATION_ERROR_CODE,
+  VALIDATION_ERROR_MESSAGE,
+} from '../utils/error.utils';
 
 const emailService = new EmailService();
 
@@ -37,6 +42,15 @@ function formatZodErrors(err: ZodError) {
     ...(issue.code === 'too_small' && { minimum: (issue as { minimum?: number }).minimum }),
     ...(issue.code === 'too_big' && { maximum: (issue as { maximum?: number }).maximum }),
   }));
+}
+
+function sendValidationError(res: Response, err: ZodError): void {
+  sendErrorResponse(res, {
+    statusCode: 400,
+    code: VALIDATION_ERROR_CODE,
+    message: VALIDATION_ERROR_MESSAGE,
+    errors: formatZodErrors(err),
+  });
 }
 
 // ─── Forgot Password ──────────────────────────────────────────────────────────
@@ -59,11 +73,7 @@ export async function forgotPassword(
   try {
     const parsed = forgotPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -109,21 +119,32 @@ export async function verifyOtp(
   try {
     const parsed = verifyOtpSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
     const { email, otp } = parsed.data;
 
-    const isValid = await validateOtpRecord(email, otp);
-    if (!isValid) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_or_expired_code',
+    const validation = await validateOtpRecord(email, otp);
+    if (!validation.ok) {
+      const code =
+        validation.reason === 'expired'
+          ? 'auth/otp-expired'
+          : validation.reason === 'max_attempts'
+            ? 'auth/otp-max-attempts'
+            : 'auth/otp-invalid';
+
+      const message =
+        validation.reason === 'expired'
+          ? 'OTP code expired.'
+          : validation.reason === 'max_attempts'
+            ? 'Maximum OTP attempts exceeded.'
+            : 'Invalid OTP code.';
+
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code,
+        message,
       });
       return;
     }
@@ -162,11 +183,7 @@ export async function resetPassword(
   try {
     const parsed = resetPasswordSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        success: false,
-        message: 'errors.validation.required',
-        errors: formatZodErrors(parsed.error),
-      });
+      sendValidationError(res, parsed.error);
       return;
     }
 
@@ -176,18 +193,23 @@ export async function resetPassword(
     try {
       payload = verifyResetToken(resetToken);
     } catch (err) {
-      const message = isTokenExpiredError(err)
-        ? 'errors.auth.reset_token_expired'
-        : 'errors.auth.invalid_or_expired_code';
-
-      res.status(400).json({ success: false, message });
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: isTokenExpiredError(err)
+          ? 'auth/reset-token-expired'
+          : 'auth/reset-token-invalid',
+        message: isTokenExpiredError(err)
+          ? 'Reset token expired.'
+          : 'Invalid reset token.',
+      });
       return;
     }
 
     if (payload.purpose !== 'password_reset') {
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_or_expired_code',
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'auth/reset-token-invalid',
+        message: 'Invalid reset token.',
       });
       return;
     }
@@ -196,9 +218,10 @@ export async function resetPassword(
     const user = await UserModel.findOne({ email: payload.sub }).select('+password +passwordChangedAt');
     if (!user) {
       // Não vazar se o e-mail existe — resposta genérica
-      res.status(400).json({
-        success: false,
-        message: 'errors.auth.invalid_or_expired_code',
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'auth/reset-token-invalid',
+        message: 'Invalid reset token.',
       });
       return;
     }
@@ -207,9 +230,10 @@ export async function resetPassword(
     // Se a senha já foi trocada após a emissão deste token, rejeitá-lo.
     // payload.iat está em segundos; passwordChangedAt.getTime() em ms.
     if (user.passwordChangedAt && user.passwordChangedAt.getTime() >= payload.iat * 1000) {
-      res.status(401).json({
-        success: false,
-        message: 'errors.auth.reset_token_already_used',
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'auth/reset-token-invalid',
+        message: 'Invalid reset token.',
       });
       return;
     }

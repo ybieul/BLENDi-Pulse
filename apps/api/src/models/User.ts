@@ -41,6 +41,16 @@ export interface IUser {
   timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
+  /**
+   * Quantos scans do Pantry Scanner já foram consumidos no mês corrente.
+   * Usado pelo rate limiting atômico do free tier e do Pro.
+   */
+  scanCount: number;
+  /**
+   * Data de referência para reset do contador mensal de scans.
+   * A lógica de reset por timezone será implementada no CP1.5.
+   */
+  scanResetDate: Date;
   isActive: boolean;
   /**
    * Timestamp da última troca de senha via fluxo de reset.
@@ -145,6 +155,15 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: [true, 'errors.validation.required'],
       min: [500, 'errors.validation.number_range'],
       max: [10000, 'errors.validation.number_range'],
+    },
+    scanCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    scanResetDate: {
+      type: Date,
+      default: Date.now,
     },
     isActive: {
       type: Boolean,
