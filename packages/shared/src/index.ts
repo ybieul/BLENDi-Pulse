@@ -8,3 +8,4 @@ export * from './tokens';
 // Schemas Zod + tipos inferidos (backend e mobile)
 export * from './schemas/auth';
 export * from './schemas/user';
+export type { CalculateMacrosInput, UpdateUserInput } from './schemas/user';

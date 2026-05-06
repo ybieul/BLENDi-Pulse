@@ -34,6 +34,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { api } from '../config/api';
+import { createAppStorage } from '../config/storage';
 import * as AuthService from '../services/auth.service';
 import type { AuthResponse, AuthUser } from '../services/auth.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
@@ -41,6 +42,8 @@ import type { RegisterInput, LoginInput } from '@blendi/shared';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const REFRESH_TOKEN_KEY = 'blendi_refresh_token';
+const ONBOARDING_COMPLETED_KEY = 'onboarding_completed';
+const authStorage = createAppStorage('blendi-pulse');
 
 /** Opções de segurança máxima disponíveis no Expo Secure Store. */
 const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
@@ -53,6 +56,46 @@ const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
 type AuthSessionData = AuthResponse['data'] & {
   isNewUser?: boolean;
 };
+
+function hasPendingOnboarding(): boolean {
+  return authStorage.getString(ONBOARDING_COMPLETED_KEY) === 'false';
+}
+
+function persistOnboardingCompletion(isCompleted: boolean): void {
+  authStorage.set(ONBOARDING_COMPLETED_KEY, isCompleted);
+}
+
+async function setRefreshToken(token: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(
+      REFRESH_TOKEN_KEY,
+      token,
+      SECURE_STORE_OPTIONS
+    );
+    return;
+  } catch {
+    authStorage.set(REFRESH_TOKEN_KEY, token);
+  }
+}
+
+async function getRefreshToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(
+      REFRESH_TOKEN_KEY,
+      SECURE_STORE_OPTIONS
+    );
+  } catch {
+    return authStorage.getString(REFRESH_TOKEN_KEY) ?? null;
+  }
+}
+
+async function deleteRefreshToken(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, SECURE_STORE_OPTIONS);
+  } catch {
+    authStorage.delete(REFRESH_TOKEN_KEY);
+  }
+}
 
 // ─── Tipos do store ───────────────────────────────────────────────────────────
 
@@ -107,6 +150,8 @@ interface AuthActions {
    * Chamada por timezone.service.ts — não chamar diretamente em componentes.
    */
   updateTimezone: (timezone: string) => void;
+  /** Marca o onboarding como concluído e libera o acesso ao app principal. */
+  completeOnboarding: () => Promise<void>;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -127,18 +172,15 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       const data = await AuthService.register(input);
 
-      await SecureStore.setItemAsync(
-        REFRESH_TOKEN_KEY,
-        data.refreshToken,
-        SECURE_STORE_OPTIONS
-      );
+      await setRefreshToken(data.refreshToken);
 
       set({
         user: data.user,
         accessToken: data.accessToken,
         isAuthenticated: true,
-        isNewUser: false,
+        isNewUser: true,
       });
+      persistOnboardingCompletion(false);
     } finally {
       set({ isLoading: false });
     }
@@ -151,17 +193,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       const data = await AuthService.login(input);
 
-      await SecureStore.setItemAsync(
-        REFRESH_TOKEN_KEY,
-        data.refreshToken,
-        SECURE_STORE_OPTIONS
-      );
+      await setRefreshToken(data.refreshToken);
 
       set({
         user: data.user,
         accessToken: data.accessToken,
         isAuthenticated: true,
-        isNewUser: false,
+        isNewUser: hasPendingOnboarding(),
       });
     } finally {
       set({ isLoading: false });
@@ -172,11 +210,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   logout: async () => {
     // Remove do Secure Store (melhor esforço — não bloqueia o logout se falhar)
-    try {
-      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, SECURE_STORE_OPTIONS);
-    } catch {
-      // Ignorado — o estado local será limpo de qualquer forma
-    }
+    await deleteRefreshToken();
 
     set({
       user: null,
@@ -191,10 +225,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   restoreSession: async () => {
     set({ isLoading: true, isRestoringSession: true });
     try {
-      const storedRefreshToken = await SecureStore.getItemAsync(
-        REFRESH_TOKEN_KEY,
-        SECURE_STORE_OPTIONS
-      );
+      const storedRefreshToken = await getRefreshToken();
 
       if (!storedRefreshToken) {
         // Nenhuma sessão prévia — usuário precisa fazer login
@@ -205,11 +236,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       const tokens = await AuthService.refreshTokens(storedRefreshToken);
 
       // Persiste o novo refresh token (rotação)
-      await SecureStore.setItemAsync(
-        REFRESH_TOKEN_KEY,
-        tokens.refreshToken,
-        SECURE_STORE_OPTIONS
-      );
+      await setRefreshToken(tokens.refreshToken);
 
       // Atualiza access token em memória
       // Nota: restoreSession não retorna dados do usuário — o perfil completo
@@ -218,7 +245,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       set({
         accessToken: tokens.accessToken,
         isAuthenticated: true,
-        isNewUser: false,
+        isNewUser: hasPendingOnboarding(),
       });
     } catch {
       // Refresh token inválido/expirado — limpa sessão silenciosamente
@@ -240,16 +267,19 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   // ── _setSession ───────────────────────────────────────────────────────────
 
   _setSession: async (data) => {
-    await SecureStore.setItemAsync(
-      REFRESH_TOKEN_KEY,
-      data.refreshToken,
-      SECURE_STORE_OPTIONS
-    );
+    const shouldShowOnboarding = data.isNewUser === true || hasPendingOnboarding();
+
+    await setRefreshToken(data.refreshToken);
+
+    if (data.isNewUser === true) {
+      persistOnboardingCompletion(false);
+    }
+
     set({
       user: data.user,
       accessToken: data.accessToken,
       isAuthenticated: true,
-      isNewUser: data.isNewUser ?? false,
+      isNewUser: shouldShowOnboarding,
     });
   },
 
@@ -263,6 +293,13 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // o valor correto será carregado quando o perfil completo for buscado.
     if (user === null) return;
     set({ user: { ...user, timezone } });
+  },
+
+  // ── completeOnboarding ───────────────────────────────────────────────────
+
+  completeOnboarding: async () => {
+    persistOnboardingCompletion(true);
+    set({ isNewUser: false });
   },
 }));
 
@@ -312,10 +349,7 @@ export function setupAxiosInterceptors(
 
       try {
         // Lê o refresh token do Secure Store
-        const storedRefreshToken = await SecureStore.getItemAsync(
-          REFRESH_TOKEN_KEY,
-          SECURE_STORE_OPTIONS
-        );
+        const storedRefreshToken = await getRefreshToken();
 
         if (!storedRefreshToken) {
           throw new Error('No refresh token available');
@@ -325,11 +359,7 @@ export function setupAxiosInterceptors(
         const tokens = await AuthService.refreshTokens(storedRefreshToken);
 
         // Persiste novo refresh token (rotação)
-        await SecureStore.setItemAsync(
-          REFRESH_TOKEN_KEY,
-          tokens.refreshToken,
-          SECURE_STORE_OPTIONS
-        );
+        await setRefreshToken(tokens.refreshToken);
 
         // Atualiza access token no store
         useAuthStore.getState()._setAccessToken(tokens.accessToken);

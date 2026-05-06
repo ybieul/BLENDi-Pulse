@@ -5,9 +5,11 @@ import { colors, fontSizes, fonts, spacing } from '@blendi/shared';
 import { useAuthStore } from '../store/auth.store';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
+import { OnboardingNavigator } from './OnboardingNavigator';
 
 type RootStackParamList = {
   AuthFlow: undefined;
+  OnboardingFlow: undefined;
   AppFlow: undefined;
 };
 
@@ -24,6 +26,7 @@ function NavigationSplashScreen() {
 
 export function RootNavigator() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isNewUser = useAuthStore((state) => state.isNewUser);
   const isRestoringSession = useAuthStore((state) => state.isRestoringSession);
 
   if (isRestoringSession) {
@@ -38,7 +41,9 @@ export function RootNavigator() {
         contentStyle: styles.navigatorContent,
       }}
     >
-      {isAuthenticated ? (
+      {isAuthenticated ? isNewUser ? (
+        <RootStack.Screen name="OnboardingFlow" component={OnboardingNavigator} />
+      ) : (
         <RootStack.Screen name="AppFlow" component={AppNavigator} />
       ) : (
         <RootStack.Screen name="AuthFlow" component={AuthNavigator} />

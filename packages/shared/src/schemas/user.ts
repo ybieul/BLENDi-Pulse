@@ -9,6 +9,93 @@
 
 import { z } from 'zod';
 
+const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
+
+// ─── Schema: atualização parcial do perfil do usuário ───────────────────────
+
+export const updateUserSchema = z
+  .object({
+    blendiModel: z.enum(['Lite', 'ProPlus', 'Steel'], {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
+    goal: z.enum(userGoalValues, {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
+    dailyProteinTarget: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(10, 'errors.validation.number_range')
+      .max(400, 'errors.validation.number_range'),
+
+    dailyCalorieTarget: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(500, 'errors.validation.number_range')
+      .max(10_000, 'errors.validation.number_range'),
+
+    weight: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .min(20, 'errors.validation.number_range')
+      .max(300, 'errors.validation.number_range'),
+
+    height: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(100, 'errors.validation.number_range')
+      .max(250, 'errors.validation.number_range'),
+
+    preferredLanguage: z.enum(['en', 'pt-BR'], {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+  })
+  .partial();
+
+// ─── Schema: cálculo de macros e metas calóricas ────────────────────────────
+
+export const calculateMacrosSchema = z.object({
+  weight: z
+    .number({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.number_range',
+    })
+    .positive('errors.validation.number_range'),
+
+  height: z
+    .number({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.number_range',
+    })
+    .int('errors.validation.integer')
+    .positive('errors.validation.number_range'),
+
+  activityLevel: z.enum(['sedentary', 'lightlyActive', 'moderatelyActive', 'veryActive'], {
+    required_error: 'errors.validation.required',
+    message: 'errors.validation.invalid_option',
+  }),
+
+  goal: z.enum(userGoalValues, {
+    required_error: 'errors.validation.required',
+    message: 'errors.validation.invalid_option',
+  }),
+});
+
 // ─── Schema: metas de macronutrientes ────────────────────────────────────────
 
 export const macroTargetSchema = z.object({
@@ -77,3 +164,5 @@ export const timezoneSchema = z.object({
 
 export type MacroTargetInput = z.infer<typeof macroTargetSchema>;
 export type TimezoneInput = z.infer<typeof timezoneSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type CalculateMacrosInput = z.infer<typeof calculateMacrosSchema>;

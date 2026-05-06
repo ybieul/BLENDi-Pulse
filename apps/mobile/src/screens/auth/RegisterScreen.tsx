@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import {
   Animated,
   Easing,
@@ -22,6 +23,8 @@ import {
   AuthScreenLayout,
 } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useAuthStore } from '../../store/auth.store';
+import { getApiErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 const PASSWORD_MIN_LENGTH = 8;
@@ -47,6 +50,10 @@ type FieldTouched = Record<FieldName, boolean>;
 
 interface PasswordStrengthMeterProps {
   password: string;
+}
+
+interface ApiErrorResponse {
+  code?: string;
 }
 
 function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
@@ -134,7 +141,9 @@ function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
 }
 
 export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
-  const { t } = useAppTranslation();
+  const { t, locale } = useAppTranslation();
+  const register = useAuthStore((state) => state.register);
+  const isLoading = useAuthStore((state) => state.isLoading);
 
   const emailInputRef = useRef<RNTextInput | null>(null);
   const passwordInputRef = useRef<RNTextInput | null>(null);
@@ -150,6 +159,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     password: null,
     confirmPassword: null,
   });
+  const [formError, setFormError] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<FieldTouched>({
     name: false,
     email: false,
@@ -249,6 +259,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const handleNameChange = (nextValue: string) => {
     setName(nextValue);
+    setFormError(null);
 
     if (touchedFields.name) {
       updateFieldError('name', { name: nextValue });
@@ -257,6 +268,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const handleEmailChange = (nextValue: string) => {
     setEmail(nextValue);
+    setFormError(null);
 
     if (touchedFields.email) {
       updateFieldError('email', { email: nextValue });
@@ -265,6 +277,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const handlePasswordChange = (nextValue: string) => {
     setPassword(nextValue);
+    setFormError(null);
 
     if (touchedFields.password) {
       updateFieldError('password', { password: nextValue });
@@ -280,13 +293,16 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const handleConfirmPasswordChange = (nextValue: string) => {
     setConfirmPassword(nextValue);
+    setFormError(null);
 
     if (touchedFields.confirmPassword) {
       updateFieldError('confirmPassword', { confirmPassword: nextValue });
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    setFormError(null);
+
     const nextTouchedFields: FieldTouched = {
       name: true,
       email: true,
@@ -309,7 +325,35 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
       return;
     }
 
-    // O avanço para a etapa 2 será conectado no CP1.3 quando o fluxo de onboarding existir.
+    try {
+      await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        blendiModel: 'Lite',
+        goal: 'Wellness',
+        preferredLanguage: locale,
+        dailyProteinTarget: 120,
+        dailyCalorieTarget: 2000,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      });
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const responseData = error.response?.data as ApiErrorResponse | undefined;
+        const translationKey = getApiErrorTranslationKey(responseData?.code);
+        const translatedMessage = translateKey(translationKey);
+
+        if (responseData?.code === 'auth/email-already-exists') {
+          setFieldErrors((current) => ({ ...current, email: translatedMessage }));
+          return;
+        }
+
+        setFormError(translatedMessage);
+        return;
+      }
+
+      setFormError(translateKey('errors.network_internal_server_error'));
+    }
   };
 
   const handleOpenExternalUrl = async (url: string) => {
@@ -407,7 +451,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
           textContentType="newPassword"
           autoComplete="new-password"
           returnKeyType="done"
-          onSubmitEditing={() => handleSubmit()}
+          onSubmitEditing={() => { void handleSubmit(); }}
         />
       </View>
     </View>
@@ -415,7 +459,11 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const bottomContent = (
     <View>
-      <AuthButton onPress={handleSubmit}>{t('auth.registerCta')}</AuthButton>
+      {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+
+      <AuthButton loading={isLoading} onPress={() => { void handleSubmit(); }}>
+        {t('auth.registerCta')}
+      </AuthButton>
 
       <Text style={styles.bottomText}>
         {t('auth.alreadyHaveAccount')}{' '}
@@ -502,6 +550,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 14,
     fontWeight: fontWeights.regular,
+    textAlign: 'center',
+  },
+  formError: {
+    marginBottom: spacing.lg,
+    color: colors.feedback.error,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: fontWeights.medium,
     textAlign: 'center',
   },
   bottomLink: {

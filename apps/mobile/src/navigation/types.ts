@@ -24,6 +24,13 @@ export type AppTabParamList = {
   Me: undefined;
 };
 
+export type OnboardingStackParamList = {
+  OnboardingModel: undefined;
+  OnboardingGoal: undefined;
+  OnboardingBody: undefined;
+  OnboardingMacros: undefined;
+};
+
 export type AuthNavigationProp<RouteName extends keyof AuthStackParamList> =
   NativeStackNavigationProp<AuthStackParamList, RouteName>;
 
@@ -45,3 +52,14 @@ export type AppTabRouteProp<RouteName extends keyof AppTabParamList> = RouteProp
 
 export type AppTabScreenProps<RouteName extends keyof AppTabParamList> =
   BottomTabScreenProps<AppTabParamList, RouteName>;
+
+export type OnboardingNavigationProp<RouteName extends keyof OnboardingStackParamList> =
+  NativeStackNavigationProp<OnboardingStackParamList, RouteName>;
+
+export type OnboardingRouteProp<RouteName extends keyof OnboardingStackParamList> = RouteProp<
+  OnboardingStackParamList,
+  RouteName
+>;
+
+export type OnboardingScreenProps<RouteName extends keyof OnboardingStackParamList> =
+  NativeStackScreenProps<OnboardingStackParamList, RouteName>;

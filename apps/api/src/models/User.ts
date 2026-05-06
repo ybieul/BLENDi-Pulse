@@ -41,6 +41,10 @@ export interface IUser {
   timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
+  /** Peso corporal em quilogramas. Opcional até o onboarding coletar o valor. */
+  weight?: number;
+  /** Altura em centímetros. Opcional até o onboarding coletar o valor. */
+  height?: number;
   /**
    * Quantos scans do Pantry Scanner já foram consumidos no mês corrente.
    * Usado pelo rate limiting atômico do free tier e do Pro.
@@ -155,6 +159,18 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: [true, 'errors.validation.required'],
       min: [500, 'errors.validation.number_range'],
       max: [10000, 'errors.validation.number_range'],
+    },
+    weight: {
+      type: Number,
+      required: false,
+      min: [20, 'errors.validation.number_range'],
+      max: [300, 'errors.validation.number_range'],
+    },
+    height: {
+      type: Number,
+      required: false,
+      min: [100, 'errors.validation.number_range'],
+      max: [250, 'errors.validation.number_range'],
     },
     scanCount: {
       type: Number,
