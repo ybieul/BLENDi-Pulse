@@ -22,16 +22,14 @@ import {
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import {
-  borderRadius,
   colors,
-  fonts,
-  fontWeights,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 
-const BUTTON_HEIGHT = 56;
+const BUTTON_HEIGHT = 52;
 const PRESS_SCALE = 0.97;
 const LOADING_FADE_DURATION = 150;
+const GOOGLE_BUTTON_BORDER = 'rgba(255,255,255,0.15)';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -118,10 +116,9 @@ const styles = StyleSheet.create({
   button: {
     width: '100%',
     height: BUTTON_HEIGHT,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: GOOGLE_BUTTON_BORDER,
     overflow: 'hidden',
   },
   pressLayer: {
@@ -136,9 +133,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.text.primary,
-    fontFamily: fonts.body,
+    fontFamily: 'DMSans_400Regular',
     fontSize: 16,
-    fontWeight: fontWeights.medium,
   },
   loader: {
     ...StyleSheet.absoluteFillObject,

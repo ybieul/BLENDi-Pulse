@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -6,12 +6,12 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  type LayoutChangeEvent,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@blendi/shared';
+import { AuroraBackground } from './AuroraBackground';
 
 const FOOTER_HORIZONTAL_PADDING = spacing['3xl'];
 const FOOTER_VERTICAL_PADDING = spacing['5xl'];
@@ -19,7 +19,6 @@ const TOP_HORIZONTAL_PADDING = spacing['3xl'];
 const TOP_PADDING = spacing['4xl'];
 const BACK_BUTTON_SIZE = 36;
 const BACK_BUTTON_TOP_OFFSET = spacing.md;
-const TOP_CONTENT_GAP = spacing['3xl'];
 
 export interface AuthScreenLayoutProps {
   topContent: ReactNode;
@@ -34,11 +33,6 @@ export function AuthScreenLayout({
 }: AuthScreenLayoutProps) {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
-  const [bottomContentHeight, setBottomContentHeight] = useState(0);
-
-  const handleBottomLayout = (event: LayoutChangeEvent) => {
-    setBottomContentHeight(event.nativeEvent.layout.height);
-  };
 
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
@@ -52,6 +46,9 @@ export function AuthScreenLayout({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.screen}>
+        {/* Aurora animado — primeiro filho, cobre toda a tela */}
+        <AuroraBackground />
+
         {showBackButton ? (
           <Pressable
             onPress={handleGoBack}
@@ -70,25 +67,20 @@ export function AuthScreenLayout({
             styles.scrollContent,
             {
               paddingTop: insets.top + TOP_PADDING + (showBackButton ? BACK_BUTTON_SIZE + spacing.xl : 0),
-              paddingBottom: bottomContentHeight + spacing['4xl'],
             },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
-          {topContent}
-        </ScrollView>
+          <View style={styles.topContentWrapper}>
+            {topContent}
+          </View>
 
-        <View
-          onLayout={handleBottomLayout}
-          style={[
-            styles.bottomContainer,
-            { paddingBottom: insets.bottom + FOOTER_VERTICAL_PADDING },
-          ]}
-        >
-          {bottomContent}
-        </View>
+          <View style={[styles.bottomWrapper, { paddingBottom: insets.bottom + FOOTER_VERTICAL_PADDING }]}>
+            {bottomContent}
+          </View>
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
@@ -107,8 +99,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    justifyContent: 'space-between',
+  },
+  topContentWrapper: {
     paddingHorizontal: TOP_HORIZONTAL_PADDING,
-    gap: TOP_CONTENT_GAP,
+  },
+  bottomWrapper: {
+    paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
+    paddingTop: FOOTER_VERTICAL_PADDING,
   },
   backButton: {
     position: 'absolute',
@@ -118,14 +116,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
-  },
-  bottomContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
-    paddingTop: FOOTER_VERTICAL_PADDING,
-    backgroundColor: colors.background.primary,
   },
 });

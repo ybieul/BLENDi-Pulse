@@ -28,6 +28,9 @@ interface ApiErrorResponse {
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 
+const DIVIDER_LINE_COLOR = 'rgba(255,255,255,0.08)';
+const DIVIDER_TEXT_COLOR = 'rgba(255,255,255,0.4)';
+
 export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const { t } = useAppTranslation();
   const login = useAuthStore((state) => state.login);
@@ -246,7 +249,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.display,
     fontSize: 20,
     fontWeight: fontWeights.bold,
-    letterSpacing: 0.6,
+    letterSpacing: 4,
+    textTransform: 'uppercase',
   },
   headingBlock: {
     marginBottom: spacing['4xl'],
@@ -258,6 +262,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: fontWeights.bold,
     textAlign: 'center',
+    letterSpacing: -0.8,
   },
   subtitle: {
     color: colors.text.secondary,
@@ -266,6 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.regular,
     lineHeight: 20,
     textAlign: 'center',
+    opacity: 0.6,
   },
   formBlock: {
     gap: spacing.lg,
@@ -275,7 +281,7 @@ const styles = StyleSheet.create({
   },
   passwordToggle: {
     position: 'absolute',
-    top: 22,
+    top: 18,
     right: spacing.xl,
     width: 20,
     height: 20,
@@ -296,20 +302,18 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xl,
   },
   dividerLine: {
     flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.text.primary,
-    opacity: 0.1,
+    height: 1,
+    backgroundColor: DIVIDER_LINE_COLOR,
   },
   dividerText: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
+    color: DIVIDER_TEXT_COLOR,
+    fontFamily: 'DMSans_400Regular',
     fontSize: 12,
-    fontWeight: fontWeights.regular,
-    textTransform: 'lowercase',
+    backgroundColor: colors.background.primary,
+    paddingHorizontal: 12,
   },
   formErrorText: {
     color: colors.feedback.error,

@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: fontWeights.bold,
     textAlign: 'center',
+    letterSpacing: -0.8,
   },
   subtitle: {
     color: colors.text.secondary,
@@ -151,6 +152,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.regular,
     lineHeight: 20,
     textAlign: 'center',
+    opacity: 0.6,
   },
   formBlock: {
     marginTop: spacing['4xl'],

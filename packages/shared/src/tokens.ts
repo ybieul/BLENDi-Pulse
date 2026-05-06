@@ -127,7 +127,7 @@ export const spacing = {
 export const borderRadius = {
   sm: 6,      // Tags, badges, chips
   md: 12,     // Botões, inputs, selects
-  lg: 20,     // Cards, painéis, bottom sheets
+  lg: 14,     // Cards, painéis, bottom sheets — alinhado com auth components
   full: 9999, // Pills, avatares, Goal Rings
 } as const;
 

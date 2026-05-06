@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import {
-  borderRadius,
   colors,
   fonts,
   fontSizes,
@@ -18,7 +17,9 @@ import {
   spacing,
 } from '@blendi/shared';
 
-const FIELD_HEIGHT = 64;
+const FIELD_HEIGHT = 56;
+const FIELD_BG_COLOR = 'rgba(255,255,255,0.07)';
+const FIELD_HIGHLIGHT_COLOR = 'rgba(255,255,255,0.04)';
 const LABEL_IDLE_TRANSLATE_Y = 12;
 const LABEL_FLOAT_FONT_SIZE = 11;
 const LABEL_IDLE_FONT_SIZE = 15;
@@ -93,7 +94,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
       toValue: isFocused ? 1 : 0,
       duration: BORDER_ANIMATION_DURATION,
       easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [borderProgress, isFocused]);
 
@@ -164,13 +165,20 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
     outputRange: [-ERROR_TRANSLATE_Y, 0],
   });
 
+  const animatedBorderColor = borderProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255,255,255,0.10)', 'rgba(154,72,147,0.65)'],
+  });
+
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.field, !editable && styles.fieldDisabled]}>
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.focusBorder, { opacity: borderProgress }]}
-        />
+      <Animated.View
+        style={[styles.fieldOuter, !editable && styles.fieldDisabled, { borderColor: animatedBorderColor }]}
+      >
+        {/* Camada de fundo — simula superfície de vidro */}
+        <View style={styles.fieldBg} />
+        {/* Highlight superior — simula luz vinda de cima */}
+        <View style={styles.fieldHighlight} />
 
         {leftIcon ? <View style={styles.leftIcon}>{leftIcon}</View> : null}
 
@@ -197,7 +205,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
           defaultValue={defaultValue}
           editable={editable}
           placeholder={undefined}
-          placeholderTextColor={colors.text.tertiary}
+          placeholderTextColor="rgba(255,255,255,0.35)"
           selectionColor={colors.brand.pulse}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -221,7 +229,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
         >
           <AntDesign name="checkcircle" size={18} color={colors.feedback.success} />
         </Animated.View>
-      </View>
+      </Animated.View>
 
       {visibleError ? (
         <Animated.View
@@ -244,29 +252,33 @@ const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
   },
-  field: {
+  fieldOuter: {
     position: 'relative',
     height: FIELD_HEIGHT,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    justifyContent: 'center',
+    borderRadius: 14,
     overflow: 'hidden',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   fieldDisabled: {
     opacity: 0.7,
   },
-  focusBorder: {
+  fieldBg: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.brand.pulse,
+    backgroundColor: FIELD_BG_COLOR,
+  },
+  fieldHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: FIELD_HEIGHT / 2,
+    backgroundColor: FIELD_HIGHLIGHT_COLOR,
   },
   leftIcon: {
     position: 'absolute',
     left: HORIZONTAL_PADDING,
-    top: 22,
+    top: 18,
     width: ICON_SLOT_SIZE,
     height: ICON_SLOT_SIZE,
     alignItems: 'center',
@@ -285,9 +297,8 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     color: colors.text.primary,
-    fontFamily: fonts.body,
+    fontFamily: 'DMSans_400Regular',
     fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
   },
   inputWithoutLabel: {
     textAlignVertical: 'center',
@@ -295,7 +306,7 @@ const styles = StyleSheet.create({
   checkIcon: {
     position: 'absolute',
     right: HORIZONTAL_PADDING,
-    top: 23,
+    top: 19,
     width: 18,
     height: 18,
     alignItems: 'center',

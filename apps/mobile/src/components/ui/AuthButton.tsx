@@ -6,20 +6,19 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  View,
   type GestureResponderEvent,
   type TouchableOpacityProps,
 } from 'react-native';
 import {
-  borderRadius,
   colors,
-  fonts,
-  fontWeights,
 } from '@blendi/shared';
 
 const BUTTON_HEIGHT = 56;
 const BUTTON_FONT_SIZE = 16;
 const PRESS_SCALE = 0.97;
 const LOADING_FADE_DURATION = 150;
+const SHINE_OVERLAY_COLOR = 'rgba(255,255,255,0.08)';
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -112,11 +111,14 @@ export function AuthButton({
         { transform: [{ scale }] },
       ]}
     >
-      <Animated.View style={[styles.content, { opacity: contentOpacity }]}> 
+      {/* Brilho sutil no topo — ilusão de luz vinda de cima */}
+      <View pointerEvents="none" style={styles.topShine} />
+
+      <Animated.View style={[styles.content, { opacity: contentOpacity }]}>
         {renderContent(children)}
       </Animated.View>
 
-      <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}> 
+      <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}>
         <ActivityIndicator size="small" color={colors.text.primary} />
       </Animated.View>
     </AnimatedTouchableOpacity>
@@ -127,11 +129,12 @@ const styles = StyleSheet.create({
   button: {
     position: 'relative',
     height: BUTTON_HEIGHT,
-    borderRadius: borderRadius.lg,
+    borderRadius: 14,
     backgroundColor: colors.brand.pulse,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
+    overflow: 'hidden',
   },
   fullWidth: {
     width: '100%',
@@ -139,15 +142,25 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.92,
   },
+  topShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: BUTTON_HEIGHT / 2,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    backgroundColor: SHINE_OVERLAY_COLOR,
+  },
   content: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
     color: colors.text.primary,
-    fontFamily: fonts.body,
+    fontFamily: 'DMSans_500Medium',
     fontSize: BUTTON_FONT_SIZE,
-    fontWeight: fontWeights.medium,
+    letterSpacing: 0.5,
   },
   loader: {
     ...StyleSheet.absoluteFillObject,
