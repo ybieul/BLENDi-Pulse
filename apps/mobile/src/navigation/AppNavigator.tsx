@@ -3,6 +3,8 @@ import { Pressable, Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
+import { HomeScreen } from '../screens/HomeScreen';
+
 import {
   borderRadius,
   colors,
@@ -48,10 +50,6 @@ function AppPlaceholderScreen({
       {children}
     </View>
   );
-}
-
-function HomeScreen() {
-  return <AppPlaceholderScreen title="Home" />;
 }
 
 function RecipesScreen() {

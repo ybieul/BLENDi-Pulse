@@ -144,11 +144,35 @@
     "macrosSubtitle": "These are your daily targets. You can adjust them in settings anytime.",
     "proteinPlaceholder": "Daily protein (g)",
     "caloriesPlaceholder": "Daily calories (kcal)",
+    "carbTarget": "Daily carbs (g)",
     "macroRecommendation": "For {{goal}}, we recommend {{proteinMin}}\u2013{{proteinMax}}g protein and {{caloriesMin}}\u2013{{caloriesMax}} kcal",
     "finishSetup": "Finish setup"
   },
 
   "home": {
+    "greeting_morning": "Good morning, {{name}}.",
+    "greeting_afternoon": "Good afternoon, {{name}}.",
+    "greeting_evening": "Good evening, {{name}}.",
+    "logWater": "Log Water",
+    "lastBlend": "Last Blend",
+    "startBlend": "Start Blend",
+    "waterAdded": "+{{amount}} ml",
+    "dayStreak": "day streak",
+    "days": "days",
+    "todaysBlend": "Today's Blend",
+    "quickStart": "Quick Start",
+    "proteinRing": "Protein",
+    "carbsRing": "Carbs",
+    "caloriesRing": "Calories",
+    "hydrationBar": "{{current}} ml / {{target}} ml",
+    "freePlan": "Free",
+    "proPlan": "Pro",
+    "goalMuscleRecipe": "Power Protein Blend",
+    "goalWellnessRecipe": "Green Balance Smoothie",
+    "goalEnergyRecipe": "Fast Fuel Mango Oats",
+    "goalRecoveryRecipe": "Golden Recovery Smoothie",
+    "recipeMacros": "{{protein}}g protein • {{carbs}}g carbs • {{calories}} kcal",
+    "blendTime": "{{minutes}} min blend time",
     "greeting": {
       "morning": "Good morning, {{name}}.",
       "afternoon": "Good afternoon, {{name}}.",
@@ -187,6 +211,12 @@
         "name": "Travel",
         "description": "Quick, portable nutrition on the go"
       }
+    },
+    "protocolPrompts": {
+      "gym_protein": "Create a BLENDi Pulse gym protein protocol with one pre-workout option and one post-workout option focused on strength and recovery.",
+      "active_moms": "Create a BLENDi Pulse protocol for active moms with fast, balanced blends for energy, satiety, and busy mornings.",
+      "beach_cocktails": "Create a BLENDi Pulse beach cocktail protocol with tropical mocktail-style blends focused on hydration and fresh flavors.",
+      "travel": "Create a BLENDi Pulse travel protocol with portable blends that are quick to prepare and easy to repeat on the go."
     }
   },
 

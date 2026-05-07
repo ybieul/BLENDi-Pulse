@@ -144,11 +144,35 @@
     "macrosSubtitle": "Estas são suas metas diárias. Você pode ajustá-las nas configurações.",
     "proteinPlaceholder": "Proteína diária (g)",
     "caloriesPlaceholder": "Calorias diárias (kcal)",
+    "carbTarget": "Carboidratos diários (g)",
     "macroRecommendation": "Para {{goal}}, recomendamos {{proteinMin}}\u2013{{proteinMax}}g de proteína e {{caloriesMin}}\u2013{{caloriesMax}} kcal",
     "finishSetup": "Finalizar configuração"
   },
 
   "home": {
+    "greeting_morning": "Bom dia, {{name}}.",
+    "greeting_afternoon": "Boa tarde, {{name}}.",
+    "greeting_evening": "Boa noite, {{name}}.",
+    "logWater": "Registrar água",
+    "lastBlend": "Último blend",
+    "startBlend": "Iniciar blend",
+    "waterAdded": "+{{amount}} ml",
+    "dayStreak": "dias seguidos",
+    "days": "dias",
+    "todaysBlend": "Blend de hoje",
+    "quickStart": "Início Rápido",
+    "proteinRing": "Proteína",
+    "carbsRing": "Carboidratos",
+    "caloriesRing": "Calorias",
+    "hydrationBar": "{{current}} ml / {{target}} ml",
+    "freePlan": "Free",
+    "proPlan": "Pro",
+    "goalMuscleRecipe": "Blend Power Protein",
+    "goalWellnessRecipe": "Smoothie Equilíbrio Verde",
+    "goalEnergyRecipe": "Manga com Aveia Turbo",
+    "goalRecoveryRecipe": "Smoothie Dourado Recovery",
+    "recipeMacros": "{{protein}}g proteína • {{carbs}}g carboidratos • {{calories}} kcal",
+    "blendTime": "{{minutes}} min de blend",
     "greeting": {
       "morning": "Bom dia, {{name}}.",
       "afternoon": "Boa tarde, {{name}}.",
@@ -187,6 +211,12 @@
         "name": "Viagem",
         "description": "Nutrição rápida e prática onde você estiver"
       }
+    },
+    "protocolPrompts": {
+      "gym_protein": "Crie um protocolo BLENDi Pulse para academia com uma opção pré-treino e uma pós-treino focadas em força e recuperação.",
+      "active_moms": "Crie um protocolo BLENDi Pulse para mães ativas com blends rápidos e equilibrados para energia, saciedade e manhãs corridas.",
+      "beach_cocktails": "Crie um protocolo BLENDi Pulse de praia e drinks com blends tropicais estilo mocktail focados em hidratação e sabores frescos.",
+      "travel": "Crie um protocolo BLENDi Pulse para viagens com blends portáteis, rápidos de preparar e fáceis de repetir no dia a dia."
     }
   },
 

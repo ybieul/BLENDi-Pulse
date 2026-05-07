@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 
+import type { CalculateMacrosResponse } from '@blendi/shared';
 import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { api } from '../../config/api';
 import { AuthButton } from '../../components/ui/AuthButton';
@@ -32,14 +33,6 @@ import { useOnboardingStore } from '../../store/onboarding.store';
 
 type ActivityLevel = 'sedentary' | 'lightlyActive' | 'moderatelyActive' | 'veryActive';
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
-
-interface MacroResult {
-  imc: number;
-  imcClassification: 'underweight' | 'normal' | 'overweight' | 'obese';
-  dailyCalorieTarget: number;
-  dailyProteinTarget: number;
-  tdee: number;
-}
 
 type OnboardingBodyScreenProps = {
   navigation: {
@@ -97,7 +90,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const [heightText, setHeightText] = useState('');
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [result, setResult] = useState<MacroResult | null>(null);
+  const [result, setResult] = useState<CalculateMacrosResponse | null>(null);
 
   // Parse and validate inputs
   const weightNum = parseFloat(weightText.replace(',', '.'));
@@ -121,7 +114,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       void (async () => {
         setIsCalculating(true);
         try {
-          const response = await api.post<{ success: true; data: MacroResult }>(
+          const response = await api.post<{ success: true; data: CalculateMacrosResponse }>(
             '/users/calculate-macros',
             { weight: weightNum, height: heightNum, activityLevel, goal },
           );
@@ -172,6 +165,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     setCalculatedMacros({
       calculatedProtein: result.dailyProteinTarget,
       calculatedCalories: result.dailyCalorieTarget,
+      calculatedCarbs: result.dailyCarbTarget,
       imc: result.imc,
     });
     navigation.navigate('OnboardingMacros');

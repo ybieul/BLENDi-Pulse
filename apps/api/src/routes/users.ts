@@ -1,8 +1,14 @@
 import { Router, type IRouter } from 'express';
-import { calculateMacros, updateMe } from '../controllers/user.controller';
+import { calculateMacros, getMe, updateMe } from '../controllers/user.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const usersRouter: IRouter = Router();
+
+/**
+ * GET /users/me  🔒 autenticado
+ * Retorna o perfil completo do usuário autenticado.
+ */
+usersRouter.get('/me', authenticate, getMe);
 
 /**
  * PATCH /users/me  🔒 autenticado

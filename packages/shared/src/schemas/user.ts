@@ -10,6 +10,7 @@
 import { z } from 'zod';
 
 const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
+const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
 
 // ─── Schema: atualização parcial do perfil do usuário ───────────────────────
 
@@ -42,6 +43,15 @@ export const updateUserSchema = z
       .int('errors.validation.integer')
       .min(500, 'errors.validation.number_range')
       .max(10_000, 'errors.validation.number_range'),
+
+    dailyCarbTarget: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(50, 'errors.validation.number_range')
+      .max(800, 'errors.validation.number_range'),
 
     weight: z
       .number({
@@ -123,8 +133,8 @@ export const macroTargetSchema = z.object({
       invalid_type_error: 'errors.validation.number_range',
     })
     .int('errors.validation.integer')
-    .min(0, 'errors.validation.number_range')
-    .max(1_500, 'errors.validation.number_range')
+    .min(50, 'errors.validation.number_range')
+    .max(800, 'errors.validation.number_range')
     .optional(),
 
   dailyFatTarget: z
@@ -160,9 +170,19 @@ export const timezoneSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+export const calculateMacrosResponseSchema = z.object({
+  imc: z.number(),
+  imcClassification: z.enum(imcClassificationValues),
+  dailyCalorieTarget: z.number().int(),
+  dailyProteinTarget: z.number().int(),
+  dailyCarbTarget: z.number().int(),
+  tdee: z.number().int(),
+});
+
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
 export type MacroTargetInput = z.infer<typeof macroTargetSchema>;
 export type TimezoneInput = z.infer<typeof timezoneSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CalculateMacrosInput = z.infer<typeof calculateMacrosSchema>;
+export type CalculateMacrosResponse = z.infer<typeof calculateMacrosResponseSchema>;

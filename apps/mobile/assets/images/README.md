@@ -1,0 +1,1 @@
+Esta pasta contém todos os assets de imagem estáticos do BLENDi Pulse. Para cada imagem, forneça três versões: arquivo.png (1x), arquivo@2x.png (2x para retina), e arquivo@3x.png (3x para super retina). Imagens esperadas: swirl.png (ícone redemoinho da marca BLENDi, fundo transparente, para uso no streak counter), blendi-logo.png (logo completo, fundo transparente).

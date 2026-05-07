@@ -41,6 +41,9 @@ export interface IUser {
   timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
+  dailyCarbTarget?: number;
+  currentStreak: number;
+  blendCount: number;
   /** Peso corporal em quilogramas. Opcional até o onboarding coletar o valor. */
   weight?: number;
   /** Altura em centímetros. Opcional até o onboarding coletar o valor. */
@@ -159,6 +162,31 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: [true, 'errors.validation.required'],
       min: [500, 'errors.validation.number_range'],
       max: [10000, 'errors.validation.number_range'],
+    },
+    dailyCarbTarget: {
+      type: Number,
+      required: false,
+      default: 200,
+      min: [50, 'errors.validation.number_range'],
+      max: [800, 'errors.validation.number_range'],
+    },
+    currentStreak: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    blendCount: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
     },
     weight: {
       type: Number,

@@ -58,6 +58,22 @@ function getLocalDateKey(date: Date, timezone: string): string {
   }).format(date);
 }
 
+function formatRelativeFallback(diffDays: number, locale: SupportedLocale): string {
+  const absoluteDays = Math.abs(diffDays);
+
+  if (locale === 'en') {
+    const dayLabel = absoluteDays === 1 ? 'day' : 'days';
+    return diffDays >= 0
+      ? `${absoluteDays} ${dayLabel} ago`
+      : `in ${absoluteDays} ${dayLabel}`;
+  }
+
+  const dayLabel = absoluteDays === 1 ? 'dia' : 'dias';
+  return diffDays >= 0
+    ? `ha ${absoluteDays} ${dayLabel}`
+    : `em ${absoluteDays} ${dayLabel}`;
+}
+
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
 
 export interface UseDateFormatReturn {
@@ -163,10 +179,12 @@ export function useDateFormat(): UseDateFormatReturn {
     });
 
     // ── formatRelative ──────────────────────────────────────────────────────
-    const relativeFormatter = new Intl.RelativeTimeFormat(intlLocale, {
-      numeric: 'always', // "3 days ago" / "há 3 dias" (não "yesterday" via Intl)
-      style: 'long',
-    });
+    const relativeFormatter = typeof Intl.RelativeTimeFormat === 'function'
+      ? new Intl.RelativeTimeFormat(intlLocale, {
+        numeric: 'always', // "3 days ago" / "há 3 dias" (não "yesterday" via Intl)
+        style: 'long',
+      })
+      : null;
 
     // ── Funções ─────────────────────────────────────────────────────────────
 
@@ -205,7 +223,8 @@ export function useDateFormat(): UseDateFormatReturn {
       const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
 
       // RelativeTimeFormat com valor negativo = passado ("3 days ago" / "há 3 dias")
-      return relativeFormatter.format(-diffDays, 'day');
+      return relativeFormatter?.format(-diffDays, 'day')
+        ?? formatRelativeFallback(diffDays, locale);
     }
 
     function isSameLocalDay(

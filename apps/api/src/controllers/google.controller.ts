@@ -203,6 +203,7 @@ export async function handleGoogleCallback(
         timezone: user.timezone,
         dailyProteinTarget: user.dailyProteinTarget,
         dailyCalorieTarget: user.dailyCalorieTarget,
+        dailyCarbTarget: user.dailyCarbTarget ?? 200,
         createdAt: user.createdAt,
       })
     ).toString('base64');

@@ -17,6 +17,8 @@ import { errorHandler } from './middlewares/errorHandler';
 import { pingRouter } from './routes/ping';
 import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
+import { blendLogsRouter } from './routes/blendLogs';
+import { hydrationLogsRouter } from './routes/hydrationLogs';
 import { sendErrorResponse } from './utils/error.utils';
 
 const app = express();
@@ -65,6 +67,8 @@ app.use(requestLogger);
 app.use('/', pingRouter);
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
+app.use('/blend-logs', blendLogsRouter);
+app.use('/hydration-logs', hydrationLogsRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);
 

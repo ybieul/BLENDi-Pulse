@@ -40,11 +40,13 @@ type CompleteOnboardingAction = () => Promise<void>;
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-// Protein: int 10–400g  |  Calories: int 500–10000 kcal  (matches updateUserSchema)
+// Protein: int 10–400g  |  Calories: int 500–10000 kcal  |  Carbs: int 50–800g
 const PROTEIN_MIN = 10;
 const PROTEIN_MAX = 400;
 const CALORIES_MIN = 500;
 const CALORIES_MAX = 10_000;
+const CARBS_MIN = 50;
+const CARBS_MAX = 800;
 
 // Goal-specific recommendation ranges and suggested defaults shown as placeholders
 // when the user skipped body data collection.
@@ -78,6 +80,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const height           = useOnboardingStore((state) => state.height);
   const calculatedProtein  = useOnboardingStore((state) => state.calculatedProtein);
   const calculatedCalories = useOnboardingStore((state) => state.calculatedCalories);
+  const calculatedCarbs    = useOnboardingStore((state) => state.calculatedCarbs);
   const resetOnboarding  = useOnboardingStore((state) => state.resetOnboarding);
 
   // Pre-fill from calculated values; empty string prompts the placeholder hint.
@@ -86,6 +89,9 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   );
   const [caloriesText, setCaloriesText] = useState(() =>
     calculatedCalories !== null ? String(calculatedCalories) : '',
+  );
+  const [carbsText, setCarbsText] = useState(() =>
+    calculatedCarbs !== null ? String(calculatedCarbs) : '',
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError]       = useState<string | null>(null);
@@ -118,9 +124,11 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
   const proteinNum  = parseInt(proteinText, 10);
   const caloriesNum = parseInt(caloriesText, 10);
+  const carbsNum = parseInt(carbsText, 10);
   const proteinValid  = !isNaN(proteinNum)  && proteinNum  >= PROTEIN_MIN  && proteinNum  <= PROTEIN_MAX;
   const caloriesValid = !isNaN(caloriesNum) && caloriesNum >= CALORIES_MIN && caloriesNum <= CALORIES_MAX;
-  const canSubmit = proteinValid && caloriesValid;
+  const carbsValid = !isNaN(carbsNum) && carbsNum >= CARBS_MIN && carbsNum <= CARBS_MAX;
+  const canSubmit = proteinValid && caloriesValid && carbsValid;
 
   const goalLabel = translateKey(`onboarding.goal${goal}`);
 
@@ -138,6 +146,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
         goal,
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,
+        dailyCarbTarget: carbsNum,
       };
 
       if (weight  !== null) payload['weight']  = weight;
@@ -191,6 +200,16 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                   setFormError(null);
                 }}
                 placeholder={t('onboarding.caloriesPlaceholder')}
+                keyboardType="number-pad"
+                returnKeyType="next"
+              />
+              <AuthInput
+                value={carbsText}
+                onChangeText={(text) => {
+                  setCarbsText(text);
+                  setFormError(null);
+                }}
+                placeholder={t('onboarding.carbTarget')}
                 keyboardType="number-pad"
                 returnKeyType="done"
               />

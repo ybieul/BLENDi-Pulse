@@ -51,11 +51,15 @@ export type CacheConfig = typeof CACHE_CONFIG;
 
 export const QUERY_KEYS = {
   user: ['user'],
+  userProfile: ['userProfile'],
   blendLogsToday: ['blendLogsToday'],
   favorites: ['favorites'],
   hydrationToday: ['hydrationToday'],
   supplementStack: ['supplementStack'],
   pulseAiHistory: ['pulseAiHistory'],
 } as const;
+
+export const HOME_INTERACTION_DELAY = 100;
+export const GOAL_RING_ANIMATION_DURATION = 1200;
 
 export type QueryKeys = typeof QUERY_KEYS;

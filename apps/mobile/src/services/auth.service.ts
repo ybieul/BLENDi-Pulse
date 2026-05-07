@@ -31,6 +31,7 @@ export interface AuthUser {
   timezone: string;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
+  dailyCarbTarget: number;
   createdAt: string;
 }
 

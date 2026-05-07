@@ -53,6 +53,63 @@ function sendValidationError(res: Response, err: ZodError): void {
   });
 }
 
+function sendUnauthorized(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 401,
+    code: 'auth/unauthorized',
+    message: 'Unauthorized.',
+  });
+}
+
+export async function getMe(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findById(userId).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: String(user._id),
+          name: user.name,
+          email: user.email,
+          blendiModel: user.blendiModel,
+          goal: user.goal,
+          preferredLanguage: user.locale,
+          timezone: user.timezone,
+          dailyProteinTarget: user.dailyProteinTarget,
+          dailyCarbTarget: user.dailyCarbTarget ?? 200,
+          dailyCalorieTarget: user.dailyCalorieTarget,
+          profilePhoto: user.profilePhoto,
+          createdAt: user.createdAt,
+          streakDays: user.currentStreak,
+          totalBlends: user.blendCount,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function updateMe(
   req: Request,
   res: Response,
@@ -67,11 +124,7 @@ export async function updateMe(
 
     const userId = req.user?.sub;
     if (!userId) {
-      sendErrorResponse(res, {
-        statusCode: 401,
-        code: 'auth/unauthorized',
-        message: 'Unauthorized.',
-      });
+      sendUnauthorized(res);
       return;
     }
 
@@ -80,6 +133,7 @@ export async function updateMe(
       goal,
       dailyProteinTarget,
       dailyCalorieTarget,
+      dailyCarbTarget,
       weight,
       height,
       preferredLanguage,
@@ -90,6 +144,7 @@ export async function updateMe(
       ...(goal !== undefined && { goal }),
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
       ...(dailyCalorieTarget !== undefined && { dailyCalorieTarget }),
+      ...(dailyCarbTarget !== undefined && { dailyCarbTarget }),
       ...(weight !== undefined && { weight }),
       ...(height !== undefined && { height }),
       ...(preferredLanguage !== undefined && { locale: preferredLanguage }),
@@ -123,6 +178,7 @@ export async function updateMe(
           timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
+          dailyCarbTarget: user.dailyCarbTarget ?? 200,
           weight: user.weight,
           height: user.height,
           createdAt: user.createdAt,
@@ -159,6 +215,10 @@ export async function calculateMacros(
     const tdee = Math.round(basalMetabolism * ACTIVITY_MULTIPLIERS[activityLevel]);
     const dailyCalorieTarget = Math.round(tdee + CALORIE_ADJUSTMENTS[goal]);
     const dailyProteinTarget = Math.round(weight * PROTEIN_MULTIPLIERS[goal]);
+    const dailyFatCalories = dailyCalorieTarget * 0.3;
+    const dailyCarbTarget = Math.round(
+      (dailyCalorieTarget - (dailyProteinTarget * 4) - dailyFatCalories) / 4
+    );
 
     res.status(200).json({
       success: true,
@@ -167,6 +227,7 @@ export async function calculateMacros(
         imcClassification,
         dailyCalorieTarget,
         dailyProteinTarget,
+        dailyCarbTarget,
         tdee,
       },
     });
