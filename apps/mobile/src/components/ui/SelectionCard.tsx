@@ -26,6 +26,8 @@ const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
 const CARD_HIGHLIGHT = 'rgba(255,255,255,0.04)';
 const CARD_BORDER_IDLE = 'rgba(255,255,255,0.10)';
 const CARD_BORDER_SELECTED = 'rgba(154,72,147,0.65)';
+const BADGE_BACKGROUND = 'rgba(255,255,255,0.08)';
+const BADGE_BORDER = 'rgba(255,255,255,0.08)';
 
 export interface SelectionCardProps extends Pick<PressableProps, 'testID' | 'accessibilityHint'> {
   title: string;
@@ -178,9 +180,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: BADGE_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: BADGE_BORDER,
   },
   badgeText: {
     color: colors.text.secondary,

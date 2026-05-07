@@ -30,6 +30,8 @@ const HYDRATION_TEXT_OPACITY = 0.6;
 const HYDRATION_BAR_HEIGHT = 6;
 const HYDRATION_BAR_RADIUS = 3;
 const HYDRATION_BAR_SPACING = 20;
+const GOAL_RING_ANIMATION_DURATION_MS: number = GOAL_RING_ANIMATION_DURATION as number;
+const HOME_INTERACTION_DELAY_MS: number = HOME_INTERACTION_DELAY as number;
 
 export interface GoalRingsSectionProps {
   proteinCurrent: number;
@@ -86,13 +88,13 @@ export function GoalRingsSection({
       timeoutId = setTimeout(() => {
         hydrationAnimation = Animated.timing(hydrationAnimatedProgress, {
           toValue: hydrationProgress,
-          duration: GOAL_RING_ANIMATION_DURATION,
+          duration: GOAL_RING_ANIMATION_DURATION_MS,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         });
 
         hydrationAnimation.start();
-      }, HOME_INTERACTION_DELAY);
+      }, HOME_INTERACTION_DELAY_MS);
     });
 
     return () => {

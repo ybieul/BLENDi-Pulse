@@ -71,7 +71,10 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
 
       // ── Passo 3: verificar resultado do browser ────────────────────────────
-      if (result.type === 'cancel' || result.type === 'dismiss') {
+      if (
+        result.type === WebBrowser.WebBrowserResultType.CANCEL ||
+        result.type === WebBrowser.WebBrowserResultType.DISMISS
+      ) {
         // Usuário fechou o browser sem autorizar — sem erro, sem log
         return;
       }

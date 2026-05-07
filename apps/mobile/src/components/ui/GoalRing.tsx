@@ -27,6 +27,8 @@ const LABEL_OPACITY = 0.6;
 const SEPARATOR_OPACITY = 0.45;
 const CELEBRATION_SCALE = 1.05;
 const CELEBRATION_STEP_DURATION = 140;
+const GOAL_RING_ANIMATION_DURATION_MS: number = GOAL_RING_ANIMATION_DURATION as number;
+const HOME_INTERACTION_DELAY_MS: number = HOME_INTERACTION_DELAY as number;
 
 export interface GoalRingProps {
   current: number;
@@ -106,7 +108,7 @@ export function GoalRing({
       timeoutId = setTimeout(() => {
         ringAnimation = Animated.timing(dashOffset, {
           toValue: targetDashOffset,
-          duration: GOAL_RING_ANIMATION_DURATION,
+          duration: GOAL_RING_ANIMATION_DURATION_MS,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         });
@@ -119,7 +121,7 @@ export function GoalRing({
           celebrationAnimation = createCelebrationAnimation(celebrationScale);
           celebrationAnimation.start();
         });
-      }, HOME_INTERACTION_DELAY);
+      }, HOME_INTERACTION_DELAY_MS);
     });
 
     return () => {

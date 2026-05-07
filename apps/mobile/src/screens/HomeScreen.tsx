@@ -61,6 +61,10 @@ const FADE_DURATION = 300;
 const HYDRATION_TARGET_ML = 2000;
 const BADGE_HEIGHT = 24;
 const BADGE_PADDING_H = 10;
+const BADGE_FREE_BACKGROUND = 'rgba(255,255,255,0.08)';
+const BADGE_FREE_BORDER = 'rgba(255,255,255,0.12)';
+const BADGE_PRO_BACKGROUND = 'rgba(154,72,147,0.25)';
+const BADGE_PRO_BORDER = 'rgba(154,72,147,0.40)';
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
@@ -113,6 +117,11 @@ interface BlendLogsTodayResponse {
   data: BlendLogsTodayData;
 }
 
+async function fetchUserProfile(): Promise<UserProfileResponse> {
+  const response = await api.get<UserProfileResponse>('/users/me');
+  return response.data;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -141,12 +150,9 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   // ── Queries ───────────────────────────────────────────────────────────────
 
   const { data: profileResponse, isLoading: isLoadingProfile } =
-    useQuery<UserProfileResponse>({
+    useQuery<UserProfileResponse, Error, UserProfileResponse, typeof QUERY_KEYS.userProfile>({
       queryKey: QUERY_KEYS.userProfile,
-      queryFn: async () => {
-        const response = await api.get<UserProfileResponse>('/users/me');
-        return response.data;
-      },
+      queryFn: fetchUserProfile,
       staleTime: CACHE_CONFIG.USER_PROFILE_TTL,
     });
 
@@ -386,12 +392,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeFree: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: BADGE_FREE_BACKGROUND,
+    borderColor: BADGE_FREE_BORDER,
   },
   badgePro: {
-    backgroundColor: 'rgba(154,72,147,0.25)',
-    borderColor: 'rgba(154,72,147,0.40)',
+    backgroundColor: BADGE_PRO_BACKGROUND,
+    borderColor: BADGE_PRO_BORDER,
   },
   badgeText: {
     color: colors.text.primary,

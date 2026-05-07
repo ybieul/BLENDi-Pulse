@@ -8,11 +8,10 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, type NavigationProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@blendi/shared';
-import type { OnboardingNavigationProp } from '../../navigation/types';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { AuroraBackground } from './AuroraBackground';
 import { AuthProgressDots } from './AuthProgressDots';
@@ -31,6 +30,19 @@ type RootStackParamList = {
   AppFlow: undefined;
 };
 
+type RootParentNavigation = {
+  reset: (state: {
+    index: number;
+    routes: Array<{ name: keyof RootStackParamList }>;
+  }) => void;
+};
+
+type OnboardingLayoutNavigation = {
+  getParent: () => RootParentNavigation | undefined;
+  canGoBack: () => boolean;
+  goBack: () => void;
+};
+
 export interface OnboardingLayoutProps {
   step: 1 | 2 | 3 | 4;
   topContent: ReactNode;
@@ -44,7 +56,7 @@ export function OnboardingLayout({
   bottomContent,
   onBack,
 }: OnboardingLayoutProps) {
-  const navigation = useNavigation<OnboardingNavigationProp<keyof import('../../navigation/types').OnboardingStackParamList>>();
+  const navigation: OnboardingLayoutNavigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
 
@@ -55,7 +67,7 @@ export function OnboardingLayout({
     }
 
     if (step === 1) {
-      const parentNavigation = navigation.getParent<NavigationProp<RootStackParamList>>();
+      const parentNavigation = navigation.getParent();
       if (parentNavigation) {
         parentNavigation.reset({
           index: 0,
