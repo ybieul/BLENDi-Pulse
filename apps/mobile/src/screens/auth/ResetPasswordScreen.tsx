@@ -135,7 +135,7 @@ export function ResetPasswordScreen({ navigation, route }: AuthScreenProps<'Rese
   const { height } = useWindowDimensions();
   const isMountedRef = useRef(true);
   const confirmPasswordInputRef = useRef<RNTextInput | null>(null);
-  const requestResetPassword = resetPassword as ResetPasswordRequest;
+  const requestResetPassword: ResetPasswordRequest = resetPassword;
 
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const celebrationOpacity = useRef(new Animated.Value(0)).current;

@@ -16,7 +16,7 @@ type ForgotPasswordRequest = (input: { email: string }) => Promise<void>;
 export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPassword'>) {
   const { t } = useAppTranslation();
   const isMountedRef = useRef(true);
-  const requestForgotPassword = forgotPassword as ForgotPasswordRequest;
+  const requestForgotPassword: ForgotPasswordRequest = forgotPassword;
 
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);

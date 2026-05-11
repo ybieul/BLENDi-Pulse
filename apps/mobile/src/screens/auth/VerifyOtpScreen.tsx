@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   Animated,
@@ -51,12 +51,13 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
   const { t } = useAppTranslation();
   const inputRef = useRef<TextInput | null>(null);
   const isMountedRef = useRef(true);
+  const isSubmittingRef = useRef(false);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const errorBorderOpacity = useRef(new Animated.Value(0)).current;
   const resendOpacity = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef(new Animated.Value(0)).current;
-  const requestVerifyOtp = verifyOtp as VerifyOtpRequest;
-  const requestForgotPassword = forgotPassword as ForgotPasswordRequest;
+  const requestVerifyOtp: VerifyOtpRequest = verifyOtp;
+  const requestForgotPassword: ForgotPasswordRequest = forgotPassword;
 
   const [otpCode, setOtpCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +65,7 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
   const [secondsRemaining, setSecondsRemaining] = useState(RESEND_COUNTDOWN_SECONDS);
   const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
 
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = useCallback((key: string) => t(key as TranslationKey), [t]);
   const maskedEmail = useMemo(() => maskEmail(route.params.email), [route.params.email]);
   const digits = otpCode.split('');
   const activeIndex = otpCode.length >= OTP_LENGTH ? -1 : otpCode.length;
@@ -123,18 +124,14 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
   }, [resendOpacity, secondsRemaining]);
 
   useEffect(() => {
-    if (otpCode.length !== OTP_LENGTH || isSubmitting) {
-      return;
-    }
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
 
-    void submitOtpCode(otpCode);
-  }, [isSubmitting, otpCode]);
-
-  const focusInput = () => {
+  const focusInput = useCallback(() => {
     inputRef.current?.focus();
-  };
+  }, []);
 
-  const triggerInvalidCodeFeedback = () => {
+  const triggerInvalidCodeFeedback = useCallback(() => {
     const oscillationDuration = SHAKE_TOTAL_DURATION_MS / 7;
 
     errorBorderOpacity.setValue(1);
@@ -184,12 +181,12 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
         useNativeDriver: true,
       }),
     ]).start();
-  };
+  }, [errorBorderOpacity, shakeAnimation]);
 
-  const clearOtpState = () => {
+  const clearOtpState = useCallback(() => {
     setOtpCode('');
     focusInput();
-  };
+  }, [focusInput]);
 
   const handleChangeOtp = (value: string) => {
     const sanitizedValue = value.replace(/\D/g, '').slice(0, OTP_LENGTH);
@@ -200,12 +197,17 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
     }
   };
 
-  const submitOtpCode = async (submittedOtp: string): Promise<void> => {
+  const submitOtpCode = useCallback(async (submittedOtp: string): Promise<void> => {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
     const parsed = verifyOtpSchema.safeParse({ email: route.params.email, otp: submittedOtp });
     if (!parsed.success) {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setOtpErrorMessage(null);
 
@@ -251,10 +253,19 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
       }
     } finally {
       if (isMountedRef.current) {
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
       }
     }
-  };
+  }, [clearOtpState, navigation, requestVerifyOtp, route.params.email, translateKey, triggerInvalidCodeFeedback]);
+
+  useEffect(() => {
+    if (otpCode.length !== OTP_LENGTH) {
+      return;
+    }
+
+    void submitOtpCode(otpCode);
+  }, [otpCode, submitOtpCode]);
 
   const handleResendCode = async () => {
     const parsed = forgotPasswordSchema.safeParse({ email: route.params.email });

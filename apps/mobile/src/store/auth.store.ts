@@ -297,9 +297,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   // ── completeOnboarding ───────────────────────────────────────────────────
 
-  completeOnboarding: async () => {
+  completeOnboarding: () => {
     persistOnboardingCompletion(true);
     set({ isNewUser: false });
+    return Promise.resolve();
   },
 }));
 

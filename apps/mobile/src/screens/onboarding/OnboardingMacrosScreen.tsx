@@ -36,8 +36,6 @@ interface ApiErrorResponse {
   code?: string;
 }
 
-type CompleteOnboardingAction = () => Promise<void>;
-
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 // Protein: int 10–400g  |  Calories: int 500–10000 kcal  |  Carbs: int 50–800g
@@ -154,7 +152,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
       await api.patch('/users/me', payload);
 
-      await (useAuthStore.getState().completeOnboarding as CompleteOnboardingAction)();
+      await useAuthStore.getState().completeOnboarding();
       resetOnboarding();
       // RootNavigator reacts to isNewUser: false — no manual navigation needed.
     } catch (error) {

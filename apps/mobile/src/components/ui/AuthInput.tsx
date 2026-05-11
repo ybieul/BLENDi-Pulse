@@ -212,13 +212,8 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
           onChangeText={handleChangeText}
           style={[
             styles.input,
-            {
-              paddingLeft: leftInset,
-              paddingRight: HORIZONTAL_PADDING + TRAILING_SLOT_WIDTH,
-              paddingTop: hasLabel ? 24 : 0,
-              paddingBottom: hasLabel ? 10 : 0,
-            },
-            !hasLabel && styles.inputWithoutLabel,
+            leftIcon ? styles.inputWithLeadingIcon : styles.inputWithoutLeadingIcon,
+            hasLabel ? styles.inputWithLabel : styles.inputWithoutLabel,
             style,
           ]}
         />
@@ -296,11 +291,24 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: '100%',
+    paddingRight: HORIZONTAL_PADDING + TRAILING_SLOT_WIDTH,
     color: colors.text.primary,
     fontFamily: 'DMSans_400Regular',
     fontSize: fontSizes.md,
   },
+  inputWithLeadingIcon: {
+    paddingLeft: HORIZONTAL_PADDING + ICON_SLOT_SIZE + LEADING_GAP,
+  },
+  inputWithoutLeadingIcon: {
+    paddingLeft: HORIZONTAL_PADDING,
+  },
+  inputWithLabel: {
+    paddingTop: 24,
+    paddingBottom: 10,
+  },
   inputWithoutLabel: {
+    paddingTop: 0,
+    paddingBottom: 0,
     textAlignVertical: 'center',
   },
   checkIcon: {
