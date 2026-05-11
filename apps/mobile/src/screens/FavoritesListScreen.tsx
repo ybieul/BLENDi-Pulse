@@ -15,6 +15,10 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 
+const CARD_BORDER_COLOR = 'rgba(255,255,255,0.10)';
+const CARD_BACKGROUND_COLOR = 'rgba(255,255,255,0.07)';
+const ICON_SHELL_BACKGROUND_COLOR = 'rgba(154,72,147,0.15)';
+
 export function FavoritesListScreen() {
   const { t } = useAppTranslation();
 
@@ -45,15 +49,15 @@ const styles = StyleSheet.create({
     padding: spacing['3xl'],
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: CARD_BORDER_COLOR,
+    backgroundColor: CARD_BACKGROUND_COLOR,
     width: '100%',
   },
   iconShell: {
     width: 56,
     height: 56,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(154,72,147,0.15)',
+    backgroundColor: ICON_SHELL_BACKGROUND_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
   },

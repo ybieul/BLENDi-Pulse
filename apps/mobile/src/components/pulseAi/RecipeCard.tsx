@@ -421,7 +421,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: GHOST_BUTTON_BORDER,
-    backgroundColor: 'transparent',
   },
   saveButtonLabel: {
     color: colors.text.primary,
