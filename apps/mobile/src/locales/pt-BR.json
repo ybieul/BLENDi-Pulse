@@ -37,7 +37,7 @@
 
   "navigation": {
     "home": "Início",
-    "recipes": "Receitas",
+    "pulseAI": "Pulse AI",
     "blend": "Blend",
     "track": "Acompanhar",
     "me": "Perfil"
@@ -261,7 +261,8 @@
     "favorites": {
       "title": "Favoritos",
       "empty_title": "Nenhum favorito ainda",
-      "empty_message": "Toque no coração de qualquer receita para salvá-la aqui."
+      "empty_message": "Toque no coração de qualquer receita para salvá-la aqui.",
+      "toggle_error": "Não foi possível atualizar o favorito. Tente novamente."
     },
     "substitutes": {
       "label": "Substituições Inteligentes",
@@ -337,6 +338,61 @@
       "label": "Idioma",
       "en": "English",
       "pt_BR": "Português (Brasil)"
+    }
+  },
+
+  "pulseAi": {
+    "ingredients": "Ingredientes",
+    "howToBlend": "Como bater",
+    "smartSubstitutes": "Substituições inteligentes",
+    "queriesRemaining": "{{count}} consultas restantes hoje",
+    "limitReached": "Você atingiu o limite gratuito de Pulse AI de hoje.",
+    "upgradeButton": "Assinar Pro",
+    "fromCache": "Do cache",
+    "sendMessage": "Enviar mensagem",
+    "historyButton": "Histórico de conversas",
+    "voicePlaceholder": "Entrada por voz em breve",
+    "goals": {
+      "muscle": {
+        "welcomeTitle": "O que vamos bater para músculo hoje?",
+        "welcomeSubtitle": "Peça receitas ricas em proteína para força, recuperação e ajustadas ao seu modelo BLENDi.",
+        "suggestion1": "Monte um blend pós-treino com 35g de proteína.",
+        "suggestion2": "Quero um smoothie para ganho de massa com aveia e pasta de amendoim.",
+        "suggestion3": "Crie um shake de café da manhã rico em proteína sem banana.",
+        "inputPlaceholder1": "Blend pós-treino com 35g de proteína",
+        "inputPlaceholder2": "Smoothie para ganho de massa com aveia e pasta de amendoim",
+        "inputPlaceholder3": "Shake rico em proteína sem banana"
+      },
+      "wellness": {
+        "welcomeTitle": "O que vamos bater para bem-estar hoje?",
+        "welcomeSubtitle": "Peça receitas do dia a dia com equilíbrio, ingredientes acessíveis e adaptadas ao seu modelo BLENDi.",
+        "suggestion1": "Faça um smoothie equilibrado para uma manhã corrida.",
+        "suggestion2": "Sugira um blend com pouco açúcar e ingredientes acessíveis.",
+        "suggestion3": "Crie um shake cremoso de bem-estar sem iogurte.",
+        "inputPlaceholder1": "Smoothie equilibrado para uma manhã corrida",
+        "inputPlaceholder2": "Blend com pouco açúcar e ingredientes acessíveis",
+        "inputPlaceholder3": "Shake cremoso de bem-estar sem iogurte"
+      },
+      "energy": {
+        "welcomeTitle": "O que vamos bater para energia hoje?",
+        "welcomeSubtitle": "Peça receitas focadas em performance, foco e constância, sempre ajustadas ao seu modelo BLENDi.",
+        "suggestion1": "Preciso de um blend pré-treino rápido para energia constante.",
+        "suggestion2": "Sugira um smoothie para foco e energia à tarde.",
+        "suggestion3": "Faça um blend energético com aveia sem café.",
+        "inputPlaceholder1": "Blend pré-treino rápido para energia constante",
+        "inputPlaceholder2": "Smoothie para foco e energia à tarde",
+        "inputPlaceholder3": "Blend energético com aveia sem café"
+      },
+      "recovery": {
+        "welcomeTitle": "O que vamos bater para recuperação hoje?",
+        "welcomeSubtitle": "Peça receitas reconfortantes para reparo, digestão leve e ajustadas ao seu modelo BLENDi.",
+        "suggestion1": "Crie um smoothie de recuperação para pernas doloridas após o treino.",
+        "suggestion2": "Preciso de um blend anti-inflamatório fácil de digerir.",
+        "suggestion3": "Sugira um shake calmante de recuperação sem laticínios.",
+        "inputPlaceholder1": "Smoothie de recuperação para pernas doloridas",
+        "inputPlaceholder2": "Blend anti-inflamatório fácil de digerir",
+        "inputPlaceholder3": "Shake calmante de recuperação sem laticínios"
+      }
     }
   },
 
@@ -425,6 +481,9 @@
     "auth_reset_token_expired": "Este link de redefinição de senha expirou.",
     "auth_session_expired": "Sua sessão expirou. Faça login novamente.",
     "auth_unauthorized": "Você não tem acesso a este recurso.",
+    "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
+    "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
+    "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
     "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
     "resource_not_found": "O recurso solicitado não foi encontrado."
   },

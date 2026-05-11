@@ -7,5 +7,6 @@ export * from './tokens';
 
 // Schemas Zod + tipos inferidos (backend e mobile)
 export * from './schemas/auth';
+export * from './schemas/pulseAi';
 export * from './schemas/user';
 export type { CalculateMacrosInput, CalculateMacrosResponse, UpdateUserInput } from './schemas/user';

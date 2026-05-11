@@ -58,6 +58,12 @@ export interface IUser {
    * A lógica de reset por timezone será implementada no CP1.5.
    */
   scanResetDate: Date;
+  /** Quantas consultas ao Pulse AI o usuário consumiu no dia atual do seu timezone. */
+  dailyAiUsage: number;
+  /** Data em que o contador diário do Pulse AI foi zerado pela última vez. */
+  aiUsageResetDate: Date;
+  /** Flag de assinatura Pro; usuários Pro terão limite ilimitado no Pulse AI. */
+  isPro: boolean;
   isActive: boolean;
   /**
    * Timestamp da última troca de senha via fluxo de reset.
@@ -208,6 +214,23 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     scanResetDate: {
       type: Date,
       default: Date.now,
+    },
+    dailyAiUsage: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    aiUsageResetDate: {
+      type: Date,
+      default: Date.now,
+    },
+    isPro: {
+      type: Boolean,
+      default: false,
     },
     isActive: {
       type: Boolean,

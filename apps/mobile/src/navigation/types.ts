@@ -16,9 +16,17 @@ export type AuthStackParamList = {
   ResetPassword: { resetToken: string };
 };
 
+export type RootStackParamList = {
+  AuthFlow: undefined;
+  OnboardingFlow: undefined;
+  AppFlow: undefined;
+  Upgrade: undefined;
+  FavoritesList: undefined;
+};
+
 export type AppTabParamList = {
   Home: undefined;
-  Recipes: undefined;
+  PulseAI: { protocol?: string } | undefined;
   Blend: undefined;
   Track: undefined;
   Me: undefined;
@@ -33,6 +41,9 @@ export type OnboardingStackParamList = {
 
 export type AuthNavigationProp<RouteName extends keyof AuthStackParamList> =
   NativeStackNavigationProp<AuthStackParamList, RouteName>;
+
+export type RootNavigationProp<RouteName extends keyof RootStackParamList> =
+  NativeStackNavigationProp<RootStackParamList, RouteName>;
 
 export type AuthRouteProp<RouteName extends keyof AuthStackParamList> = RouteProp<
   AuthStackParamList,

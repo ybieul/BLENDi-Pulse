@@ -37,7 +37,7 @@
 
   "navigation": {
     "home": "Home",
-    "recipes": "Recipes",
+    "pulseAI": "Pulse AI",
     "blend": "Blend",
     "track": "Track",
     "me": "Me"
@@ -261,7 +261,8 @@
     "favorites": {
       "title": "Favorites",
       "empty_title": "No favorites yet",
-      "empty_message": "Tap the heart on any recipe to save it here."
+      "empty_message": "Tap the heart on any recipe to save it here.",
+      "toggle_error": "Couldn't update favorite. Try again."
     },
     "substitutes": {
       "label": "Smart Substitutes",
@@ -337,6 +338,61 @@
       "label": "Language",
       "en": "English",
       "pt_BR": "Português (Brasil)"
+    }
+  },
+
+  "pulseAi": {
+    "ingredients": "Ingredients",
+    "howToBlend": "How to blend",
+    "smartSubstitutes": "Smart Substitutes",
+    "queriesRemaining": "{{count}} queries remaining today",
+    "limitReached": "You've reached today's free Pulse AI limit.",
+    "upgradeButton": "Upgrade to Pro",
+    "fromCache": "From cache",
+    "sendMessage": "Send message",
+    "historyButton": "Conversation history",
+    "voicePlaceholder": "Voice input coming soon",
+    "goals": {
+      "muscle": {
+        "welcomeTitle": "What should we blend for muscle today?",
+        "welcomeSubtitle": "Ask for protein-forward recipes tuned for strength, recovery, and your BLENDi model.",
+        "suggestion1": "Build me a post-workout blend with 35g of protein.",
+        "suggestion2": "I want a lean-bulk smoothie with oats and peanut butter.",
+        "suggestion3": "Create a high-protein breakfast shake without banana.",
+        "inputPlaceholder1": "Post-workout blend with 35g of protein",
+        "inputPlaceholder2": "Lean-bulk smoothie with oats and peanut butter",
+        "inputPlaceholder3": "High-protein breakfast shake without banana"
+      },
+      "wellness": {
+        "welcomeTitle": "What should we blend for balance today?",
+        "welcomeSubtitle": "Ask for everyday recipes focused on balance, easy ingredients, and your BLENDi model.",
+        "suggestion1": "Make me a balanced smoothie for a busy morning.",
+        "suggestion2": "Suggest a low-sugar blend with accessible ingredients.",
+        "suggestion3": "Create a creamy everyday wellness shake without yogurt.",
+        "inputPlaceholder1": "Balanced smoothie for a busy morning",
+        "inputPlaceholder2": "Low-sugar blend with accessible ingredients",
+        "inputPlaceholder3": "Creamy wellness shake without yogurt"
+      },
+      "energy": {
+        "welcomeTitle": "What should we blend for energy today?",
+        "welcomeSubtitle": "Ask for performance-focused recipes made for stamina, focus, and your BLENDi model.",
+        "suggestion1": "I need a fast pre-workout blend for steady energy.",
+        "suggestion2": "Suggest a smoothie for focus and afternoon energy.",
+        "suggestion3": "Make me an energizing oat blend without coffee.",
+        "inputPlaceholder1": "Fast pre-workout blend for steady energy",
+        "inputPlaceholder2": "Smoothie for focus and afternoon energy",
+        "inputPlaceholder3": "Energizing oat blend without coffee"
+      },
+      "recovery": {
+        "welcomeTitle": "What should we blend for recovery today?",
+        "welcomeSubtitle": "Ask for soothing recipes built for repair, digestion, and your BLENDi model.",
+        "suggestion1": "Create a recovery smoothie for sore legs after training.",
+        "suggestion2": "I need an easy-to-digest anti-inflammatory blend.",
+        "suggestion3": "Suggest a calming recovery shake without dairy.",
+        "inputPlaceholder1": "Recovery smoothie for sore legs after training",
+        "inputPlaceholder2": "Easy-to-digest anti-inflammatory blend",
+        "inputPlaceholder3": "Calming recovery shake without dairy"
+      }
     }
   },
 
@@ -425,6 +481,9 @@
     "auth_reset_token_expired": "This password reset link has expired.",
     "auth_session_expired": "Your session expired. Please sign in again.",
     "auth_unauthorized": "You don't have access to this feature.",
+    "pulseai_daily_limit": "You've reached today's free Pulse AI limit.",
+    "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
+    "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
     "network_internal_server_error": "Server error. We're on it — try again shortly.",
     "resource_not_found": "The requested resource was not found."
   },

@@ -6,12 +6,9 @@ import { useAuthStore } from '../store/auth.store';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
-
-type RootStackParamList = {
-  AuthFlow: undefined;
-  OnboardingFlow: undefined;
-  AppFlow: undefined;
-};
+import { UpgradeScreen } from '../screens/UpgradeScreen';
+import { FavoritesListScreen } from '../screens/FavoritesListScreen';
+import type { RootStackParamList } from './types';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
@@ -44,7 +41,11 @@ export function RootNavigator() {
       {isAuthenticated ? isNewUser ? (
         <RootStack.Screen name="OnboardingFlow" component={OnboardingNavigator} />
       ) : (
-        <RootStack.Screen name="AppFlow" component={AppNavigator} />
+        <>
+          <RootStack.Screen name="AppFlow" component={AppNavigator} />
+          <RootStack.Screen name="Upgrade" component={UpgradeScreen} />
+          <RootStack.Screen name="FavoritesList" component={FavoritesListScreen} />
+        </>
       ) : (
         <RootStack.Screen name="AuthFlow" component={AuthNavigator} />
       )}

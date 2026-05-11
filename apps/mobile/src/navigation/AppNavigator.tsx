@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { HomeScreen } from '../screens/HomeScreen';
+import { PulseAIScreen } from '../screens/PulseAIScreen';
 
 import {
   borderRadius,
@@ -23,7 +24,7 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ICONS: Record<keyof AppTabParamList, { active: IoniconName; inactive: IoniconName }> = {
   Home: { active: 'home', inactive: 'home-outline' },
-  Recipes: { active: 'restaurant', inactive: 'restaurant-outline' },
+  PulseAI: { active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
   Blend: { active: 'flash', inactive: 'flash-outline' },
   Track: { active: 'analytics', inactive: 'analytics-outline' },
   Me: { active: 'person', inactive: 'person-outline' },
@@ -31,7 +32,7 @@ const TAB_ICONS: Record<keyof AppTabParamList, { active: IoniconName; inactive: 
 
 const TAB_LABELS = {
   Home: 'navigation.home',
-  Recipes: 'navigation.recipes',
+  PulseAI: 'navigation.pulseAI',
   Blend: 'navigation.blend',
   Track: 'navigation.track',
   Me: 'navigation.me',
@@ -50,10 +51,6 @@ function AppPlaceholderScreen({
       {children}
     </View>
   );
-}
-
-function RecipesScreen() {
-  return <AppPlaceholderScreen title="Recipes" />;
 }
 
 function BlendScreen() {
@@ -116,7 +113,7 @@ export function AppNavigator() {
             if (isBlendTab) {
               return (
                 <View style={[styles.blendIconShell, { borderColor: color }]}>
-                  <Ionicons name={iconName} size={size + 8} color={color} />
+                  <Ionicons name={iconName} size={size + 10} color={color} />
                 </View>
               );
             }
@@ -127,7 +124,7 @@ export function AppNavigator() {
       }}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Recipes" component={RecipesScreen} />
+      <Tab.Screen name="PulseAI" component={PulseAIScreen} />
       <Tab.Screen name="Blend" component={BlendScreen} />
       <Tab.Screen name="Track" component={TrackScreen} />
       <Tab.Screen name="Me" component={MeScreen} />
@@ -191,13 +188,13 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.medium,
   },
   blendIconShell: {
-    minWidth: 52,
-    minHeight: 52,
+    minWidth: 56,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: borderRadius.full,
     borderWidth: 1,
     backgroundColor: colors.background.secondary,
-    marginTop: -4,
+    marginTop: -6,
   },
 });

@@ -215,10 +215,8 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   }, [navigation]);
 
   const handleProtocolSelect = useCallback(
-    (_protocol: QuickProtocol) => {
-      // Os parâmetros de rota serão adicionados quando RecipesNavigator for
-      // implementado no CP1.5 — por ora navega para a aba sem parâmetros.
-      navigation.navigate('Recipes');
+    (protocol: QuickProtocol) => {
+      navigation.navigate('PulseAI', { protocol: protocol.prompt });
     },
     [navigation],
   );

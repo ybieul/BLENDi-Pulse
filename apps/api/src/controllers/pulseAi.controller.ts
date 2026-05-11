@@ -1,0 +1,445 @@
+import { createHash } from 'node:crypto';
+import type { NextFunction, Request, Response } from 'express';
+import {
+  pulseAiChatSchema,
+  pulseAiRecipeSchema,
+  type PulseAiRecipe,
+} from '@blendi/shared';
+import { ZodError } from 'zod';
+
+import { env } from '../config/env';
+import { BlendLogModel } from '../models/BlendLog';
+import { UserModel, type BlendiModel, type UserGoal, type UserLocale } from '../models/User';
+import {
+  buildPulseAiPrompt,
+  type PulseAiApiMessage,
+} from '../services/promptBuilder.service';
+import { generateCacheKey, getFromCache, setInCache } from '../services/cache.service';
+import { sendErrorResponse } from '../utils/error.utils';
+import { isSameDayInTimezone } from '../utils/timezone.utils';
+
+const DAILY_FREE_LIMIT = 3;
+const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
+const INVALID_JSON_RETRY_INSTRUCTION =
+  'Your previous response had an invalid format. Return only valid JSON.';
+
+interface PulseAiUserProfile {
+  id: string;
+  blendiModel: BlendiModel;
+  goal: UserGoal;
+  locale: UserLocale;
+  timezone: string;
+  dailyProteinTarget: number;
+  dailyCarbTarget: number;
+  dailyCalorieTarget: number;
+  dailyAiUsage: number;
+  aiUsageResetDate: Date;
+  isPro: boolean;
+}
+
+interface OpenAiChatCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+}
+
+class OpenAiUnavailableError extends Error {}
+
+function formatZodErrors(err: ZodError) {
+  return err.issues.map(issue => ({
+    field: issue.path.join('.') || 'root',
+    message: issue.message,
+    ...(issue.code === 'too_small' && { minimum: (issue as { minimum?: number }).minimum }),
+    ...(issue.code === 'too_big' && { maximum: (issue as { maximum?: number }).maximum }),
+  }));
+}
+
+function sendUnauthorized(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 401,
+    code: 'auth/unauthorized',
+    message: 'Unauthorized.',
+  });
+}
+
+function sendUserNotFound(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 404,
+    code: 'resource/not-found',
+    message: 'User not found.',
+  });
+}
+
+function normalizeMessageForCache(message: string): string {
+  return message
+    .normalize('NFKD')
+  .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function getUsageRemaining(dailyAiUsage: number, isPro: boolean): number | null {
+  return isPro ? null : Math.max(0, DAILY_FREE_LIMIT - dailyAiUsage);
+}
+
+async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfile | null> {
+  const user = await UserModel.findById(userId)
+    .select({
+      blendiModel: 1,
+      goal: 1,
+      locale: 1,
+      timezone: 1,
+      dailyProteinTarget: 1,
+      dailyCarbTarget: 1,
+      dailyCalorieTarget: 1,
+      dailyAiUsage: 1,
+      aiUsageResetDate: 1,
+      isPro: 1,
+    })
+    .lean()
+    .exec();
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: String(user._id),
+    blendiModel: user.blendiModel as BlendiModel,
+    goal: user.goal as UserGoal,
+    locale: user.locale as UserLocale,
+    timezone: user.timezone,
+    dailyProteinTarget: user.dailyProteinTarget,
+    dailyCarbTarget: user.dailyCarbTarget ?? 200,
+    dailyCalorieTarget: user.dailyCalorieTarget,
+    dailyAiUsage: user.dailyAiUsage ?? 0,
+    aiUsageResetDate: user.aiUsageResetDate ?? new Date(),
+    isPro: user.isPro ?? false,
+  };
+}
+
+async function resetDailyAiUsageIfNeeded(user: PulseAiUserProfile): Promise<void> {
+  const now = new Date();
+
+  if (isSameDayInTimezone(user.aiUsageResetDate, now, user.timezone)) {
+    return;
+  }
+
+  await UserModel.updateOne(
+    {
+      _id: user.id,
+      aiUsageResetDate: user.aiUsageResetDate,
+    },
+    {
+      $set: {
+        dailyAiUsage: 0,
+        aiUsageResetDate: now,
+      },
+    }
+  ).exec();
+}
+
+async function requestOpenAiJson(
+  systemPrompt: string,
+  messages: PulseAiApiMessage[]
+): Promise<string> {
+  try {
+    const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.7,
+        max_tokens: 800,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          ...messages,
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new OpenAiUnavailableError(`OpenAI request failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as OpenAiChatCompletionResponse;
+    const content = payload.choices?.[0]?.message?.content;
+
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new OpenAiUnavailableError('OpenAI returned empty content.');
+    }
+
+    return content;
+  } catch (error) {
+    if (error instanceof OpenAiUnavailableError) {
+      throw error;
+    }
+
+    throw new OpenAiUnavailableError('OpenAI request failed.');
+  }
+}
+
+function parsePulseAiRecipe(content: string): PulseAiRecipe | null {
+  try {
+    const rawPayload: unknown = JSON.parse(content);
+    const parsed = pulseAiRecipeSchema.safeParse(rawPayload);
+
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function generatePulseAiRecipe(
+  systemPrompt: string,
+  messages: PulseAiApiMessage[]
+): Promise<PulseAiRecipe | null> {
+  const content = await requestOpenAiJson(systemPrompt, messages);
+  return parsePulseAiRecipe(content);
+}
+
+export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const parsed = pulseAiChatSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'pulseai/invalid-message',
+        message: 'Invalid Pulse AI message.',
+        errors: formatZodErrors(parsed.error),
+      });
+      return;
+    }
+
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const normalizedMessage = normalizeMessageForCache(parsed.data.message);
+
+    if (!normalizedMessage) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'pulseai/invalid-message',
+        message: 'Invalid Pulse AI message.',
+      });
+      return;
+    }
+
+    const normalizedMessageHash = sha256(normalizedMessage);
+
+    const initialUser = await findPulseAiUserProfile(userId);
+    if (!initialUser) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    await resetDailyAiUsageIfNeeded(initialUser);
+
+    if (!initialUser.isPro) {
+      const rateLimitUpdate = await UserModel.updateOne(
+        {
+          _id: initialUser.id,
+          isPro: false,
+          dailyAiUsage: { $lt: DAILY_FREE_LIMIT },
+        },
+        {
+          $inc: {
+            dailyAiUsage: 1,
+          },
+        }
+      ).exec();
+
+      if (rateLimitUpdate.modifiedCount === 0) {
+        sendErrorResponse(res, {
+          statusCode: 429,
+          code: 'pulseai/daily-limit-reached',
+          message: 'Daily Pulse AI limit reached.',
+        });
+        return;
+      }
+    }
+
+    const currentUser = await findPulseAiUserProfile(userId);
+    if (!currentUser) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    const usageRemaining = getUsageRemaining(currentUser.dailyAiUsage, currentUser.isPro);
+    const cacheKey = generateCacheKey({
+      userId: currentUser.id,
+      model: currentUser.blendiModel,
+      goal: currentUser.goal,
+      language: currentUser.locale,
+      rawMessage: normalizedMessage,
+    });
+
+    const cacheKeyParts = cacheKey.split(':');
+    if (cacheKeyParts[4] !== normalizedMessageHash) {
+      throw new Error('[pulseAi.controller] cacheKey hash mismatch');
+    }
+
+    const cachedResponse = await getFromCache(cacheKey);
+    if (cachedResponse) {
+      const parsedCachedResponse = pulseAiRecipeSchema.safeParse(cachedResponse);
+
+      if (parsedCachedResponse.success) {
+        res.status(200).json({
+          success: true,
+          data: {
+            recipe: parsedCachedResponse.data,
+            fromCache: true,
+            usageRemaining,
+          },
+        });
+        return;
+      }
+    }
+
+    const recentBlendLogs = await BlendLogModel.find({ userId: currentUser.id })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select({ recipeName: 1, _id: 0 })
+      .lean()
+      .exec();
+
+    const prompt = buildPulseAiPrompt({
+      blendiModel: currentUser.blendiModel,
+      goal: currentUser.goal,
+      locale: currentUser.locale,
+      dailyProteinTarget: currentUser.dailyProteinTarget,
+      dailyCarbTarget: currentUser.dailyCarbTarget,
+      dailyCalorieTarget: currentUser.dailyCalorieTarget,
+      recentBlendRecipeNames: recentBlendLogs.map(log => log.recipeName),
+      message: parsed.data.message,
+    });
+
+    let recipe: PulseAiRecipe | null;
+
+    try {
+      recipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
+    } catch (error) {
+      if (error instanceof OpenAiUnavailableError) {
+        sendErrorResponse(res, {
+          statusCode: 503,
+          code: 'pulseai/ai-unavailable',
+          message: 'Pulse AI is temporarily unavailable.',
+        });
+        return;
+      }
+
+      throw error;
+    }
+
+    if (!recipe) {
+      try {
+        recipe = await generatePulseAiRecipe(prompt.systemPrompt, [
+          ...prompt.messages,
+          {
+            role: 'user',
+            content: INVALID_JSON_RETRY_INSTRUCTION,
+          },
+        ]);
+      } catch (error) {
+        if (error instanceof OpenAiUnavailableError) {
+          sendErrorResponse(res, {
+            statusCode: 503,
+            code: 'pulseai/ai-unavailable',
+            message: 'Pulse AI is temporarily unavailable.',
+          });
+          return;
+        }
+
+        throw error;
+      }
+    }
+
+    if (!recipe) {
+      sendErrorResponse(res, {
+        statusCode: 500,
+        code: 'pulseai/invalid-ai-response',
+        message: 'Pulse AI returned an invalid response.',
+      });
+      return;
+    }
+
+    await setInCache({
+      cacheKey,
+      userId: currentUser.id,
+      model: currentUser.blendiModel,
+      goal: currentUser.goal,
+      language: currentUser.locale,
+      rawMessage: normalizedMessage,
+      response: recipe as unknown as Record<string, unknown>,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        recipe,
+        fromCache: false,
+        usageRemaining,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getUsage(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await findPulseAiUserProfile(userId);
+    if (!user) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    await resetDailyAiUsageIfNeeded(user);
+
+    const currentUser = await findPulseAiUserProfile(userId);
+    if (!currentUser) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        dailyAiUsage: currentUser.dailyAiUsage,
+        isPro: currentUser.isPro,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}

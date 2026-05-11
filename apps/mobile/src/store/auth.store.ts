@@ -57,6 +57,46 @@ type AuthSessionData = AuthResponse['data'] & {
   isNewUser?: boolean;
 };
 
+interface CurrentUserProfileResponse {
+  success: true;
+  data: {
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      profilePhoto?: string;
+      blendiModel: AuthUser['blendiModel'];
+      goal: AuthUser['goal'];
+      preferredLanguage: AuthUser['locale'];
+      timezone: string;
+      dailyProteinTarget: number;
+      dailyCalorieTarget: number;
+      dailyCarbTarget: number;
+      createdAt: string;
+    };
+  };
+}
+
+async function fetchCurrentUserProfile(): Promise<AuthUser> {
+  const response = await api.get<CurrentUserProfileResponse>('/users/me');
+  const { user } = response.data.data;
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    profilePhoto: user.profilePhoto,
+    blendiModel: user.blendiModel,
+    goal: user.goal,
+    locale: user.preferredLanguage,
+    timezone: user.timezone,
+    dailyProteinTarget: user.dailyProteinTarget,
+    dailyCalorieTarget: user.dailyCalorieTarget,
+    dailyCarbTarget: user.dailyCarbTarget,
+    createdAt: user.createdAt,
+  };
+}
+
 function hasPendingOnboarding(): boolean {
   return authStorage.getString(ONBOARDING_COMPLETED_KEY) === 'false';
 }
@@ -128,11 +168,9 @@ interface AuthActions {
    * Tenta restaurar a sessão a partir do refresh token persistido.
    * Deve ser chamada no boot do app (App.tsx) antes de exibir qualquer tela.
    * Não lança exceção — se falhar, o usuário permanece deslogado.
-   *
-   * ⚠️  TODO (Fase N): quando GET /me for implementado, chamar aqui para
-   * carregar o perfil completo (incluindo timezone) após refresh bem-sucedido.
-   * Atualmente user permanece null após restoreSession — o perfil completo
-   * só fica disponível após login/register explícito.
+    * Após refresh bem-sucedido, tenta hidratar o perfil via GET /users/me.
+    * Se essa etapa falhar temporariamente, a sessão continua restaurada e o
+    * perfil pode ser recarregado mais tarde por outras queries da aplicação.
    */
   restoreSession: () => Promise<void>;
   /** @internal Usado pelo interceptor do Axios. Não chamar diretamente em componentes. */
@@ -238,15 +276,19 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       // Persiste o novo refresh token (rotação)
       await setRefreshToken(tokens.refreshToken);
 
-      // Atualiza access token em memória
-      // Nota: restoreSession não retorna dados do usuário — o perfil completo
-      // será carregado pela tela Home via TanStack Query quando necessário.
-      // Para ter o user aqui seria necessário um endpoint GET /me (Fase N).
       set({
+        user: null,
         accessToken: tokens.accessToken,
         isAuthenticated: true,
         isNewUser: hasPendingOnboarding(),
       });
+
+      try {
+        const user = await fetchCurrentUserProfile();
+        set({ user });
+      } catch {
+        // Preserva a sessão restaurada mesmo se o perfil não puder ser hidratado agora.
+      }
     } catch {
       // Refresh token inválido/expirado — limpa sessão silenciosamente
       await get().logout();
@@ -288,9 +330,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   updateTimezone: (timezone) => {
     const { user } = get();
     // Só atualiza se houver um perfil de usuário carregado em memória.
-    // Se user for null (sessão restaurada sem GET /me), a atualização local
-    // é ignorada — o backend já foi sincronizado via PATCH /auth/timezone e
-    // o valor correto será carregado quando o perfil completo for buscado.
+    // Se a hidratação do perfil ainda não tiver acontecido, a atualização
+    // local é ignorada e o valor correto será buscado depois no backend.
     if (user === null) return;
     set({ user: { ...user, timezone } });
   },

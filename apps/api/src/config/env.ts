@@ -59,6 +59,15 @@ const envSchema = z.object({
       uri => uri.startsWith('http://') || uri.startsWith('https://'),
       'GOOGLE_REDIRECT_URI deve ser uma URL válida'
     ),
+
+  // OpenAI
+  OPENAI_API_KEY: z
+    .string()
+    .min(20, 'OPENAI_API_KEY parece curta demais ou inválida')
+    .refine(
+      key => key.trim().toUpperCase() !== 'CHANGE_ME',
+      'OPENAI_API_KEY ainda está com o placeholder CHANGE_ME'
+    ),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo
