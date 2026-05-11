@@ -47,6 +47,22 @@ interface OpenAiChatCompletionResponse {
 
 class OpenAiUnavailableError extends Error {}
 
+function sendPulseAiUnavailable(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 503,
+    code: 'pulseai/ai-unavailable',
+    message: 'Pulse AI is temporarily unavailable.',
+  });
+}
+
+function getOpenAiApiKey(): string {
+  if (!env.OPENAI_API_KEY) {
+    throw new OpenAiUnavailableError('OpenAI API key is not configured.');
+  }
+
+  return env.OPENAI_API_KEY;
+}
+
 function formatZodErrors(err: ZodError) {
   return err.issues.map(issue => ({
     field: issue.path.join('.') || 'root',
@@ -151,11 +167,13 @@ async function requestOpenAiJson(
   messages: PulseAiApiMessage[]
 ): Promise<string> {
   try {
+    const openAiApiKey = getOpenAiApiKey();
+
     const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAiApiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o',
@@ -230,6 +248,11 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 
     if (!userId) {
       sendUnauthorized(res);
+      return;
+    }
+
+    if (!env.OPENAI_API_KEY) {
+      sendPulseAiUnavailable(res);
       return;
     }
 
@@ -339,11 +362,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       recipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
     } catch (error) {
       if (error instanceof OpenAiUnavailableError) {
-        sendErrorResponse(res, {
-          statusCode: 503,
-          code: 'pulseai/ai-unavailable',
-          message: 'Pulse AI is temporarily unavailable.',
-        });
+        sendPulseAiUnavailable(res);
         return;
       }
 
@@ -361,11 +380,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
         ]);
       } catch (error) {
         if (error instanceof OpenAiUnavailableError) {
-          sendErrorResponse(res, {
-            statusCode: 503,
-            code: 'pulseai/ai-unavailable',
-            message: 'Pulse AI is temporarily unavailable.',
-          });
+          sendPulseAiUnavailable(res);
           return;
         }
 

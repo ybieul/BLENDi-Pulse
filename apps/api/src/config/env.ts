@@ -6,6 +6,23 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+const openAiApiKeySchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue || normalizedValue.toUpperCase() === 'CHANGE_ME') {
+      return undefined;
+    }
+
+    return normalizedValue;
+  },
+  z.string().min(20, 'OPENAI_API_KEY parece curta demais ou inválida').optional()
+);
+
 const envSchema = z.object({
   // Servidor
   PORT: z
@@ -61,13 +78,7 @@ const envSchema = z.object({
     ),
 
   // OpenAI
-  OPENAI_API_KEY: z
-    .string()
-    .min(20, 'OPENAI_API_KEY parece curta demais ou inválida')
-    .refine(
-      key => key.trim().toUpperCase() !== 'CHANGE_ME',
-      'OPENAI_API_KEY ainda está com o placeholder CHANGE_ME'
-    ),
+  OPENAI_API_KEY: openAiApiKeySchema,
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo
