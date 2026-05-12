@@ -6,22 +6,18 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-const openAiApiKeySchema = z.preprocess(
-  (value) => {
-    if (typeof value !== 'string') {
-      return undefined;
-    }
+const AI_PROVIDER_VALUES = ['openai', 'anthropic', 'google'] as const;
 
-    const normalizedValue = value.trim();
-
-    if (!normalizedValue || normalizedValue.toUpperCase() === 'CHANGE_ME') {
-      return undefined;
-    }
-
-    return normalizedValue;
-  },
-  z.string().min(20, 'OPENAI_API_KEY parece curta demais ou inválida').optional()
-);
+const requiredString = (name: string) =>
+  z.preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z
+      .string({
+        required_error: `${name} é obrigatória`,
+        invalid_type_error: `${name} deve ser uma string válida`,
+      })
+      .min(1, `${name} é obrigatória`)
+  );
 
 const envSchema = z.object({
   // Servidor
@@ -77,8 +73,24 @@ const envSchema = z.object({
       'GOOGLE_REDIRECT_URI deve ser uma URL válida'
     ),
 
-  // OpenAI
-  OPENAI_API_KEY: openAiApiKeySchema,
+  // AI Provider
+  AI_PROVIDER: z.preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z.enum(AI_PROVIDER_VALUES, {
+      required_error: 'AI_PROVIDER é obrigatória',
+      invalid_type_error: 'AI_PROVIDER deve ser openai, anthropic ou google',
+    })
+  ),
+  AI_MODEL: requiredString('AI_MODEL'),
+  AI_API_KEY: z.preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z
+      .string({
+        required_error: 'AI_API_KEY é obrigatória',
+        invalid_type_error: 'AI_API_KEY deve ser uma string válida',
+      })
+      .min(10, 'AI_API_KEY deve ter pelo menos 10 caracteres')
+  ),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo

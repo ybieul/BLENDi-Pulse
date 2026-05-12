@@ -11,6 +11,8 @@ export interface CacheKeyInput {
   model: string;
   goal: string;
   language: string;
+  aiProvider: string;
+  aiModel: string;
   rawMessage: string;
   dietaryFlags?: string[];
 }
@@ -43,20 +45,31 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 
 /**
  * Entrada: metadados determinísticos da query do usuário.
- * Saída: cacheKey estável no formato userId:model:goal:language:messageHash:dietaryFlagsHash.
+ * Saída: cacheKey estável no formato userId:model:goal:language:aiProvider:aiModel:messageHash:dietaryFlagsHash.
  */
 export function generateCacheKey({
   userId,
   model,
   goal,
   language,
+  aiProvider,
+  aiModel,
   rawMessage,
   dietaryFlags = [],
 }: CacheKeyInput): string {
   const messageHash = sha256(normalizeText(rawMessage));
   const dietaryFlagsHash = buildDietaryFlagsHash(dietaryFlags);
 
-  return [userId.trim(), model.trim(), goal.trim(), language.trim(), messageHash, dietaryFlagsHash].join(':');
+  return [
+    userId.trim(),
+    model.trim(),
+    goal.trim(),
+    language.trim(),
+    aiProvider.trim(),
+    aiModel.trim(),
+    messageHash,
+    dietaryFlagsHash,
+  ].join(':');
 }
 
 /**
@@ -81,7 +94,7 @@ export async function getFromCache(cacheKey: string): Promise<IAiCache['response
 }
 
 /**
- * Entrada: cacheKey, metadados da query original e a resposta estruturada do GPT-4o.
+ * Entrada: cacheKey, metadados da query original e a resposta estruturada do provider configurado.
  * Saída: persiste ou atualiza a entrada de cache com TTL calculado a partir do config central.
  */
 export async function setInCache({
@@ -90,6 +103,8 @@ export async function setInCache({
   model,
   goal,
   language,
+  aiProvider,
+  aiModel,
   rawMessage,
   dietaryFlags = [],
   response,
@@ -99,6 +114,8 @@ export async function setInCache({
     model,
     goal,
     language,
+    aiProvider,
+    aiModel,
     rawMessage,
     dietaryFlags,
   });

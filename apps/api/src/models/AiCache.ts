@@ -1,7 +1,8 @@
 // apps/api/src/models/AiCache.ts
 // Cache persistido das respostas do Pulse AI.
 // Esta coleção existe para evitar recomputar prompts idênticos quando o mesmo
-// usuário repete uma consulta com o mesmo contexto de modelo, goal, idioma e flags.
+// usuário repete uma consulta com o mesmo contexto de modelo, goal, idioma,
+// provider de IA, modelo de IA e flags.
 
 import mongoose, { type Document } from 'mongoose';
 
@@ -20,7 +21,7 @@ export interface IAiCache {
   messageHash: string;
   /** Preferências dietéticas futuras, normalizadas para maximizar cache hits. */
   dietaryFlags: string[];
-  /** Resposta estruturada do GPT-4o; o shape específico será definido no CP1.5. */
+  /** Resposta estruturada do provider configurado, incluindo receita e metadados. */
   response: Record<string, unknown>;
   /** Data de expiração real da entrada; usada pelo índice TTL do MongoDB. */
   expiresAt: Date;

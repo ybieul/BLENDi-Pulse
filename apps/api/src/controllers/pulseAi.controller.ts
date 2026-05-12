@@ -5,7 +5,7 @@ import {
   pulseAiRecipeSchema,
   type PulseAiRecipe,
 } from '@blendi/shared';
-import { ZodError } from 'zod';
+import { ZodError, z } from 'zod';
 
 import { env } from '../config/env';
 import { BlendLogModel } from '../models/BlendLog';
@@ -14,12 +14,16 @@ import {
   buildPulseAiPrompt,
   type PulseAiApiMessage,
 } from '../services/promptBuilder.service';
+import {
+  AiProviderRequestError,
+  callAi,
+  type AiProviderResponse,
+} from '../services/aiProvider.service';
 import { generateCacheKey, getFromCache, setInCache } from '../services/cache.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 
 const DAILY_FREE_LIMIT = 3;
-const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
 const INVALID_JSON_RETRY_INSTRUCTION =
   'Your previous response had an invalid format. Return only valid JSON.';
 
@@ -37,15 +41,22 @@ interface PulseAiUserProfile {
   isPro: boolean;
 }
 
-interface OpenAiChatCompletionResponse {
-  choices?: Array<{
-    message?: {
-      content?: string | null;
-    };
-  }>;
+interface PulseAiCachedResponse {
+  recipe: PulseAiRecipe;
+  aiProvider: string;
+  aiModel: string;
 }
 
-class OpenAiUnavailableError extends Error {}
+interface GeneratedPulseAiRecipe {
+  recipe: PulseAiRecipe | null;
+  aiResponse: AiProviderResponse;
+}
+
+const pulseAiCachedResponseSchema: z.ZodType<PulseAiCachedResponse> = z.object({
+  recipe: pulseAiRecipeSchema,
+  aiProvider: z.string().trim().min(1),
+  aiModel: z.string().trim().min(1),
+});
 
 function sendPulseAiUnavailable(res: Response): void {
   sendErrorResponse(res, {
@@ -53,14 +64,6 @@ function sendPulseAiUnavailable(res: Response): void {
     code: 'pulseai/ai-unavailable',
     message: 'Pulse AI is temporarily unavailable.',
   });
-}
-
-function getOpenAiApiKey(): string {
-  if (!env.OPENAI_API_KEY) {
-    throw new OpenAiUnavailableError('OpenAI API key is not configured.');
-  }
-
-  return env.OPENAI_API_KEY;
 }
 
 function formatZodErrors(err: ZodError) {
@@ -162,55 +165,6 @@ async function resetDailyAiUsageIfNeeded(user: PulseAiUserProfile): Promise<void
   ).exec();
 }
 
-async function requestOpenAiJson(
-  systemPrompt: string,
-  messages: PulseAiApiMessage[]
-): Promise<string> {
-  try {
-    const openAiApiKey = getOpenAiApiKey();
-
-    const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openAiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        temperature: 0.7,
-        max_tokens: 800,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          ...messages,
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new OpenAiUnavailableError(`OpenAI request failed with status ${response.status}`);
-    }
-
-    const payload = (await response.json()) as OpenAiChatCompletionResponse;
-    const content = payload.choices?.[0]?.message?.content;
-
-    if (typeof content !== 'string' || !content.trim()) {
-      throw new OpenAiUnavailableError('OpenAI returned empty content.');
-    }
-
-    return content;
-  } catch (error) {
-    if (error instanceof OpenAiUnavailableError) {
-      throw error;
-    }
-
-    throw new OpenAiUnavailableError('OpenAI request failed.');
-  }
-}
-
 function parsePulseAiRecipe(content: string): PulseAiRecipe | null {
   try {
     const rawPayload: unknown = JSON.parse(content);
@@ -225,9 +179,17 @@ function parsePulseAiRecipe(content: string): PulseAiRecipe | null {
 async function generatePulseAiRecipe(
   systemPrompt: string,
   messages: PulseAiApiMessage[]
-): Promise<PulseAiRecipe | null> {
-  const content = await requestOpenAiJson(systemPrompt, messages);
-  return parsePulseAiRecipe(content);
+): Promise<GeneratedPulseAiRecipe> {
+  const aiResponse = await callAi({
+    systemPrompt,
+    messages,
+    maxTokens: 800,
+  });
+
+  return {
+    recipe: parsePulseAiRecipe(aiResponse.content),
+    aiResponse,
+  };
 }
 
 export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -248,11 +210,6 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 
     if (!userId) {
       sendUnauthorized(res);
-      return;
-    }
-
-    if (!env.OPENAI_API_KEY) {
-      sendPulseAiUnavailable(res);
       return;
     }
 
@@ -313,25 +270,29 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       model: currentUser.blendiModel,
       goal: currentUser.goal,
       language: currentUser.locale,
+      aiProvider: env.AI_PROVIDER,
+      aiModel: env.AI_MODEL,
       rawMessage: normalizedMessage,
     });
 
     const cacheKeyParts = cacheKey.split(':');
-    if (cacheKeyParts[4] !== normalizedMessageHash) {
+    if (cacheKeyParts[6] !== normalizedMessageHash) {
       throw new Error('[pulseAi.controller] cacheKey hash mismatch');
     }
 
     const cachedResponse = await getFromCache(cacheKey);
     if (cachedResponse) {
-      const parsedCachedResponse = pulseAiRecipeSchema.safeParse(cachedResponse);
+      const parsedCachedResponse = pulseAiCachedResponseSchema.safeParse(cachedResponse);
 
       if (parsedCachedResponse.success) {
         res.status(200).json({
           success: true,
           data: {
-            recipe: parsedCachedResponse.data,
+            recipe: parsedCachedResponse.data.recipe,
             fromCache: true,
             usageRemaining,
+            aiProvider: parsedCachedResponse.data.aiProvider,
+            aiModel: parsedCachedResponse.data.aiModel,
           },
         });
         return;
@@ -356,12 +317,15 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       message: parsed.data.message,
     });
 
-    let recipe: PulseAiRecipe | null;
+    let recipe: PulseAiRecipe | null = null;
+    let aiResponse: AiProviderResponse | null = null;
 
     try {
-      recipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
+      const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
+      recipe = generatedRecipe.recipe;
+      aiResponse = generatedRecipe.aiResponse;
     } catch (error) {
-      if (error instanceof OpenAiUnavailableError) {
+      if (error instanceof AiProviderRequestError) {
         sendPulseAiUnavailable(res);
         return;
       }
@@ -371,15 +335,17 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 
     if (!recipe) {
       try {
-        recipe = await generatePulseAiRecipe(prompt.systemPrompt, [
+        const regeneratedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, [
           ...prompt.messages,
           {
             role: 'user',
             content: INVALID_JSON_RETRY_INSTRUCTION,
           },
         ]);
+        recipe = regeneratedRecipe.recipe;
+        aiResponse = regeneratedRecipe.aiResponse;
       } catch (error) {
-        if (error instanceof OpenAiUnavailableError) {
+        if (error instanceof AiProviderRequestError) {
           sendPulseAiUnavailable(res);
           return;
         }
@@ -388,7 +354,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       }
     }
 
-    if (!recipe) {
+    if (!recipe || !aiResponse) {
       sendErrorResponse(res, {
         statusCode: 500,
         code: 'pulseai/invalid-ai-response',
@@ -403,8 +369,14 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       model: currentUser.blendiModel,
       goal: currentUser.goal,
       language: currentUser.locale,
+      aiProvider: aiResponse.provider,
+      aiModel: aiResponse.model,
       rawMessage: normalizedMessage,
-      response: recipe as unknown as Record<string, unknown>,
+      response: {
+        recipe,
+        aiProvider: aiResponse.provider,
+        aiModel: aiResponse.model,
+      },
     });
 
     res.status(200).json({
@@ -413,6 +385,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
         recipe,
         fromCache: false,
         usageRemaining,
+        aiProvider: aiResponse.provider,
+        aiModel: aiResponse.model,
       },
     });
   } catch (error) {

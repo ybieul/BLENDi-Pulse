@@ -10,7 +10,9 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@blendi/shared": "workspace:*",
+    "@google/generative-ai": "^0.24.1",
     "argon2": "^0.44.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -20,6 +22,7 @@
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
+    "openai": "^6.37.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
