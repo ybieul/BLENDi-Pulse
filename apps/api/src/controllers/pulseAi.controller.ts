@@ -115,6 +115,84 @@ function getUsageRemaining(dailyAiUsage: number, isPro: boolean): number | null 
   return isPro ? null : Math.max(0, DAILY_FREE_LIMIT - dailyAiUsage);
 }
 
+type PulseAiUsageReservationResult =
+  | {
+      ok: true;
+      usageRemaining: number | null;
+    }
+  | {
+      ok: false;
+    };
+
+function sendDailyLimitReached(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 429,
+    code: 'pulseai/daily-limit-reached',
+    message: 'Daily Pulse AI limit reached.',
+  });
+}
+
+async function reservePulseAiUsage(
+  user: PulseAiUserProfile
+): Promise<PulseAiUsageReservationResult> {
+  if (user.isPro) {
+    return {
+      ok: true,
+      usageRemaining: null,
+    };
+  }
+
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: user.id,
+      isPro: false,
+      dailyAiUsage: { $lt: DAILY_FREE_LIMIT },
+    },
+    {
+      $inc: {
+        dailyAiUsage: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  )
+    .select({ dailyAiUsage: 1, isPro: 1 })
+    .lean()
+    .exec();
+
+  if (!updatedUser) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    usageRemaining: getUsageRemaining(
+      updatedUser.dailyAiUsage ?? DAILY_FREE_LIMIT,
+      updatedUser.isPro ?? false,
+    ),
+  };
+}
+
+async function rollbackPulseAiUsageReservation(user: PulseAiUserProfile): Promise<void> {
+  if (user.isPro) {
+    return;
+  }
+
+  await UserModel.updateOne(
+    {
+      _id: user.id,
+      isPro: false,
+      dailyAiUsage: { $gt: 0 },
+    },
+    {
+      $inc: {
+        dailyAiUsage: -1,
+      },
+    }
+  ).exec();
+}
+
 async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfile | null> {
   const user = await UserModel.findById(userId)
     .select({
@@ -242,38 +320,12 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     }
 
     await resetDailyAiUsageIfNeeded(initialUser);
-
-    if (!initialUser.isPro) {
-      const rateLimitUpdate = await UserModel.updateOne(
-        {
-          _id: initialUser.id,
-          isPro: false,
-          dailyAiUsage: { $lt: DAILY_FREE_LIMIT },
-        },
-        {
-          $inc: {
-            dailyAiUsage: 1,
-          },
-        }
-      ).exec();
-
-      if (rateLimitUpdate.modifiedCount === 0) {
-        sendErrorResponse(res, {
-          statusCode: 429,
-          code: 'pulseai/daily-limit-reached',
-          message: 'Daily Pulse AI limit reached.',
-        });
-        return;
-      }
-    }
-
     const currentUser = await findPulseAiUserProfile(userId);
     if (!currentUser) {
       sendUserNotFound(res);
       return;
     }
 
-    const usageRemaining = getUsageRemaining(currentUser.dailyAiUsage, currentUser.isPro);
     const cacheKey = generateCacheKey({
       userId: currentUser.id,
       model: currentUser.blendiModel,
@@ -295,12 +347,19 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       const parsedCachedResponse = pulseAiCachedResponseSchema.safeParse(cachedResponse);
 
       if (parsedCachedResponse.success) {
+        const usageReservation = await reservePulseAiUsage(currentUser);
+
+        if (!usageReservation.ok) {
+          sendDailyLimitReached(res);
+          return;
+        }
+
         res.status(200).json({
           success: true,
           data: {
             recipe: parsedCachedResponse.data.recipe,
             fromCache: true,
-            usageRemaining,
+            usageRemaining: usageReservation.usageRemaining,
             aiProvider: parsedCachedResponse.data.aiProvider,
             aiModel: parsedCachedResponse.data.aiModel,
           },
@@ -328,34 +387,29 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       message: parsed.data.message,
     });
 
+    const usageReservation = await reservePulseAiUsage(currentUser);
+
+    if (!usageReservation.ok) {
+      sendDailyLimitReached(res);
+      return;
+    }
+
+    let shouldRollbackUsage = !currentUser.isPro;
+
     let recipe: PulseAiRecipe | null = null;
     let aiResponse: AiProviderResponse | null = null;
 
     try {
-      const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
-      recipe = generatedRecipe.recipe;
-      aiResponse = generatedRecipe.aiResponse;
-    } catch (error) {
-      if (error instanceof AiProviderRequestError) {
-        sendPulseAiUnavailable(res);
-        return;
-      }
-
-      throw error;
-    }
-
-    if (!recipe) {
       try {
-        const regeneratedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, [
-          ...prompt.messages,
-          {
-            role: 'user',
-            content: INVALID_JSON_RETRY_INSTRUCTION,
-          },
-        ]);
-        recipe = regeneratedRecipe.recipe;
-        aiResponse = regeneratedRecipe.aiResponse;
+        const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
+        recipe = generatedRecipe.recipe;
+        aiResponse = generatedRecipe.aiResponse;
       } catch (error) {
+        if (shouldRollbackUsage) {
+          await rollbackPulseAiUsageReservation(currentUser);
+          shouldRollbackUsage = false;
+        }
+
         if (error instanceof AiProviderRequestError) {
           sendPulseAiUnavailable(res);
           return;
@@ -363,44 +417,84 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 
         throw error;
       }
-    }
 
-    if (!recipe || !aiResponse) {
-      sendErrorResponse(res, {
-        statusCode: 500,
-        code: 'pulseai/invalid-ai-response',
-        message: 'Pulse AI returned an invalid response.',
+      if (!recipe) {
+        try {
+          const regeneratedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, [
+            ...prompt.messages,
+            {
+              role: 'user',
+              content: INVALID_JSON_RETRY_INSTRUCTION,
+            },
+          ]);
+          recipe = regeneratedRecipe.recipe;
+          aiResponse = regeneratedRecipe.aiResponse;
+        } catch (error) {
+          if (shouldRollbackUsage) {
+            await rollbackPulseAiUsageReservation(currentUser);
+            shouldRollbackUsage = false;
+          }
+
+          if (error instanceof AiProviderRequestError) {
+            sendPulseAiUnavailable(res);
+            return;
+          }
+
+          throw error;
+        }
+      }
+
+      if (!recipe || !aiResponse) {
+        if (shouldRollbackUsage) {
+          await rollbackPulseAiUsageReservation(currentUser);
+          shouldRollbackUsage = false;
+        }
+
+        sendErrorResponse(res, {
+          statusCode: 500,
+          code: 'pulseai/invalid-ai-response',
+          message: 'Pulse AI returned an invalid response.',
+        });
+        return;
+      }
+
+      await setInCache({
+        cacheKey,
+        userId: currentUser.id,
+        model: currentUser.blendiModel,
+        goal: currentUser.goal,
+        language: currentUser.locale,
+        unitSystem: currentUser.unitSystem,
+        aiProvider: aiResponse.provider,
+        aiModel: aiResponse.model,
+        rawMessage: normalizedMessage,
+        response: {
+          recipe,
+          aiProvider: aiResponse.provider,
+          aiModel: aiResponse.model,
+        },
       });
-      return;
+
+      shouldRollbackUsage = false;
+
+      res.status(200).json({
+        success: true,
+        data: {
+          recipe,
+          fromCache: false,
+          usageRemaining: usageReservation.usageRemaining,
+          aiProvider: aiResponse.provider,
+          aiModel: aiResponse.model,
+        },
+      });
+    } catch (error) {
+      if (shouldRollbackUsage) {
+        await rollbackPulseAiUsageReservation(currentUser);
+        shouldRollbackUsage = false;
+      }
+
+      throw error;
     }
-
-    await setInCache({
-      cacheKey,
-      userId: currentUser.id,
-      model: currentUser.blendiModel,
-      goal: currentUser.goal,
-      language: currentUser.locale,
-      unitSystem: currentUser.unitSystem,
-      aiProvider: aiResponse.provider,
-      aiModel: aiResponse.model,
-      rawMessage: normalizedMessage,
-      response: {
-        recipe,
-        aiProvider: aiResponse.provider,
-        aiModel: aiResponse.model,
-      },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        recipe,
-        fromCache: false,
-        usageRemaining,
-        aiProvider: aiResponse.provider,
-        aiModel: aiResponse.model,
-      },
-    });
   } catch (error) {
     next(error);
   }
