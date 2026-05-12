@@ -129,6 +129,12 @@
     "bodySubtitle": "We'll calculate your ideal daily macro targets.",
     "weightPlaceholder": "Weight",
     "heightPlaceholder": "Height",
+    "weightPlaceholderMetric": "Weight in kg",
+    "weightPlaceholderImperial": "Weight in lbs",
+    "heightPlaceholderMetric": "Height in cm",
+    "heightPlaceholderImperial": "Height in inches",
+    "unitSystemMetric": "Metric (kg, cm, ml)",
+    "unitSystemImperial": "Imperial (lbs, ft, fl oz)",
     "activitySedentary": "Sedentary",
     "activityLight": "Light",
     "activityModerate": "Moderate",
@@ -157,6 +163,8 @@
     "lastBlend": "Last Blend",
     "startBlend": "Start Blend",
     "waterAdded": "+{{amount}} ml",
+    "waterLoggedMl": "{{amount}} ml added",
+    "waterLoggedFlOz": "{{amount}} fl oz added",
     "dayStreak": "day streak",
     "days": "days",
     "todaysBlend": "Today's Blend",
@@ -164,7 +172,7 @@
     "proteinRing": "Protein",
     "carbsRing": "Carbs",
     "caloriesRing": "Calories",
-    "hydrationBar": "{{current}} ml / {{target}} ml",
+    "hydrationBar": "{{current}} / {{target}}",
     "freePlan": "Free",
     "proPlan": "Pro",
     "goalMuscleRecipe": "Power Protein Blend",
@@ -338,7 +346,10 @@
       "label": "Language",
       "en": "English",
       "pt_BR": "Português (Brasil)"
-    }
+    },
+    "unitSystem": "Unit system",
+    "metric": "Metric (kg/cm)",
+    "imperial": "Imperial (lbs/ft)"
   },
 
   "pulseAi": {

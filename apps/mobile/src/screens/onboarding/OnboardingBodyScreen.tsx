@@ -19,14 +19,17 @@ import {
   Text,
   View,
 } from 'react-native';
+import { getLocales } from 'expo-localization';
 
 import type { CalculateMacrosResponse } from '@blendi/shared';
 import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { api } from '../../config/api';
+import { UnitSystemToggle } from '../../components/ui/UnitSystemToggle';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { useOnboardingStore } from '../../store/onboarding.store';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,13 +81,23 @@ const IMC_CLASS_KEYS = {
   obese: 'onboarding.imcObese',
 } as const;
 
+function getDefaultUnitSystem(): 'metric' | 'imperial' {
+  return getLocales()[0]?.languageTag === 'en-US' ? 'imperial' : 'metric';
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) {
   const { t } = useAppTranslation();
   const selectedGoal = useOnboardingStore((state) => state.selectedGoal);
+  const selectedUnitSystem = useOnboardingStore((state) => state.unitSystem);
   const setBodyData = useOnboardingStore((state) => state.setBodyData);
+  const setUnitSystem = useOnboardingStore((state) => state.setUnitSystem);
   const setCalculatedMacros = useOnboardingStore((state) => state.setCalculatedMacros);
+
+  const defaultUnitSystem = useRef(getDefaultUnitSystem()).current;
+  const effectiveUnitSystem = selectedUnitSystem ?? defaultUnitSystem;
+  const { inputHeightUnit, toStorageHeight, toStorageWeight, weightUnit } = useUnits(effectiveUnitSystem);
 
   const [weightText, setWeightText] = useState('');
   const [heightText, setHeightText] = useState('');
@@ -92,11 +105,19 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<CalculateMacrosResponse | null>(null);
 
+  useEffect(() => {
+    if (selectedUnitSystem === null) {
+      setUnitSystem(defaultUnitSystem);
+    }
+  }, [defaultUnitSystem, selectedUnitSystem, setUnitSystem]);
+
   // Parse and validate inputs
-  const weightNum = parseFloat(weightText.replace(',', '.'));
-  const heightNum = parseInt(heightText, 10);
-  const weightValid = !isNaN(weightNum) && weightNum >= 20 && weightNum <= 300;
-  const heightValid = !isNaN(heightNum) && heightNum >= 100 && heightNum <= 250;
+  const rawWeightNum = parseFloat(weightText.replace(',', '.'));
+  const rawHeightNum = parseFloat(heightText.replace(',', '.'));
+  const storageWeight = toStorageWeight(rawWeightNum);
+  const storageHeight = toStorageHeight(rawHeightNum);
+  const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
+  const heightValid = typeof storageHeight === 'number' && storageHeight >= 100 && storageHeight <= 250;
   const canFetch = weightValid && heightValid;
 
   // Debounced API call — stale flag prevents setting state from an outdated request
@@ -116,7 +137,13 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
         try {
           const response = await api.post<{ success: true; data: CalculateMacrosResponse }>(
             '/users/calculate-macros',
-            { weight: weightNum, height: heightNum, activityLevel, goal },
+            {
+              weight: storageWeight,
+              height: storageHeight,
+              activityLevel,
+              goal,
+              unitSystem: 'metric',
+            },
           );
           if (!stale) {
             setResult(response.data.data);
@@ -137,7 +164,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       stale = true;
       clearTimeout(timer);
     };
-  }, [canFetch, weightNum, heightNum, activityLevel, selectedGoal]);
+  }, [activityLevel, canFetch, selectedGoal, storageHeight, storageWeight]);
 
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -160,8 +187,9 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   }, [opacity, translateY]);
 
   const handleContinue = () => {
-    if (!result) return;
-    setBodyData({ weight: weightNum, height: heightNum, activityLevel });
+    if (!result || typeof storageWeight !== 'number' || typeof storageHeight !== 'number') return;
+    setBodyData({ weight: storageWeight, height: storageHeight, activityLevel });
+    setUnitSystem(effectiveUnitSystem);
     setCalculatedMacros({
       calculatedProtein: result.dailyProteinTarget,
       calculatedCalories: result.dailyCalorieTarget,
@@ -172,8 +200,28 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   };
 
   const handleSkip = () => {
+    setUnitSystem(effectiveUnitSystem);
     navigation.navigate('OnboardingMacros');
   };
+
+  const handleUnitSystemChange = (nextUnitSystem: 'metric' | 'imperial') => {
+    if (nextUnitSystem === effectiveUnitSystem) {
+      return;
+    }
+
+    setUnitSystem(nextUnitSystem);
+    setWeightText('');
+    setHeightText('');
+    setResult(null);
+    setIsCalculating(false);
+  };
+
+  const weightPlaceholder = effectiveUnitSystem === 'imperial'
+    ? t('onboarding.weightPlaceholderImperial')
+    : t('onboarding.weightPlaceholderMetric');
+  const heightPlaceholder = effectiveUnitSystem === 'imperial'
+    ? t('onboarding.heightPlaceholderImperial')
+    : t('onboarding.heightPlaceholderMetric');
 
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
@@ -184,18 +232,25 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
             <Text style={styles.title}>{t('onboarding.bodyTitle')}</Text>
             <Text style={styles.subtitle}>{t('onboarding.bodySubtitle')}</Text>
 
+            <UnitSystemToggle
+              value={effectiveUnitSystem}
+              onChange={handleUnitSystemChange}
+              metricLabel={t('onboarding.unitSystemMetric')}
+              imperialLabel={t('onboarding.unitSystemImperial')}
+            />
+
             {/* Campos numéricos com label de unidade sobreposto */}
             <View style={styles.fields}>
               <View style={styles.inputContainer}>
                 <AuthInput
                   value={weightText}
                   onChangeText={setWeightText}
-                  placeholder={t('onboarding.weightPlaceholder')}
+                  placeholder={weightPlaceholder}
                   keyboardType="decimal-pad"
                   returnKeyType="next"
                 />
                 <View pointerEvents="none" style={styles.unitOverlay}>
-                  <Text style={styles.unitText}>kg</Text>
+                  <Text style={styles.unitText}>{weightUnit}</Text>
                 </View>
               </View>
 
@@ -203,12 +258,12 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                 <AuthInput
                   value={heightText}
                   onChangeText={setHeightText}
-                  placeholder={t('onboarding.heightPlaceholder')}
-                  keyboardType="number-pad"
+                  placeholder={heightPlaceholder}
+                  keyboardType="decimal-pad"
                   returnKeyType="done"
                 />
                 <View pointerEvents="none" style={styles.unitOverlay}>
-                  <Text style={styles.unitText}>cm</Text>
+                  <Text style={styles.unitText}>{inputHeightUnit}</Text>
                 </View>
               </View>
             </View>
@@ -293,7 +348,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     position: 'relative',
   },
-  // Label de unidade (kg / cm) — absoluto dentro de inputContainer,
+  // Label de unidade — absoluto dentro de inputContainer,
   // alinhado à altura do fieldOuter (56px). Posicionado a 40px da direita
   // para não colidir com o ícone de check (right: 16, tamanho 18).
   unitOverlay: {

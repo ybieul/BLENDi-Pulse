@@ -22,6 +22,7 @@ import {
   HOME_INTERACTION_DELAY,
 } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { GoalRing } from '../ui/GoalRing';
 
 const HYDRATION_TRACK_COLOR = 'rgba(255,255,255,0.08)';
@@ -52,14 +53,6 @@ function clampProgress(current: number, target: number): number {
   return Math.max(0, Math.min(current / target, 1));
 }
 
-function formatHydrationValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
-}
-
 export function GoalRingsSection({
   proteinCurrent,
   proteinTarget,
@@ -71,6 +64,7 @@ export function GoalRingsSection({
   hydrationTarget,
 }: GoalRingsSectionProps) {
   const { t } = useAppTranslation();
+  const { displayHydration } = useUnits();
   const [hydrationTrackWidth, setHydrationTrackWidth] = useState(0);
   const hydrationProgress = useMemo(
     () => clampProgress(hydrationCurrent, hydrationTarget),
@@ -119,6 +113,11 @@ export function GoalRingsSection({
     outputRange: [0, hydrationTrackWidth],
   });
 
+  const hydrationProgressLabel = t('home.hydrationBar', {
+    current: displayHydration(hydrationCurrent),
+    target: displayHydration(hydrationTarget),
+  });
+
   return (
     <View style={styles.section}>
       <View style={styles.ringsRow}>
@@ -151,7 +150,7 @@ export function GoalRingsSection({
       </View>
 
       <View
-        accessibilityLabel={t('home.hydrationBar')}
+        accessibilityLabel={hydrationProgressLabel}
         style={styles.hydrationRow}
       >
         <Ionicons name="water-outline" size={14} color={colors.feedback.info} />
@@ -168,10 +167,7 @@ export function GoalRingsSection({
         </View>
 
         <Text style={styles.hydrationText}>
-          {t('home.hydrationBar', {
-            current: formatHydrationValue(hydrationCurrent),
-            target: formatHydrationValue(hydrationTarget),
-          })}
+          {hydrationProgressLabel}
         </Text>
       </View>
     </View>

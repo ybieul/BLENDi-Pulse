@@ -1,6 +1,6 @@
 import type { PulseAiChatInput } from '@blendi/shared';
 
-import type { BlendiModel, UserGoal, UserLocale } from '../models/User';
+import type { BlendiModel, UserGoal, UserLocale, UserUnitSystem } from '../models/User';
 
 type PulseAiApiMessageRole = 'user' | 'assistant';
 
@@ -14,11 +14,34 @@ export interface PulseAiPromptUserContext {
   blendiModel: BlendiModel;
   goal: UserGoal;
   locale: UserLocale;
+  unitSystem: UserUnitSystem;
   dailyProteinTarget: number;
   dailyCarbTarget: number;
   dailyCalorieTarget: number;
   recentBlendRecipeNames?: string[];
 }
+
+const UNIT_SYSTEM_CONTEXT: Record<
+  UserUnitSystem,
+  {
+    label: string;
+    instruction: string;
+    example: string;
+  }
+> = {
+  metric: {
+    label: 'Metric',
+    instruction:
+      'Express ingredient quantities using metric units such as grams, milliliters, and liters.',
+    example: 'Use metric units: 90g oats, 240ml almond milk.',
+  },
+  imperial: {
+    label: 'Imperial',
+    instruction:
+      'Express ingredient quantities using American units such as cups, tablespoons, teaspoons, ounces for solids, and fluid ounces or cups for liquids.',
+    example: 'Use imperial units: 1 cup oats, 1 cup almond milk.',
+  },
+};
 
 export interface BuildPulseAiPromptInput extends PulseAiPromptUserContext {
   message: PulseAiChatInput['message'];
@@ -106,6 +129,7 @@ function buildSystemPrompt({
   blendiModel,
   goal,
   locale,
+  unitSystem,
   dailyProteinTarget,
   dailyCarbTarget,
   dailyCalorieTarget,
@@ -113,6 +137,7 @@ function buildSystemPrompt({
 }: PulseAiPromptUserContext): string {
   const modelContext = MODEL_CONTEXT[blendiModel];
   const responseLanguage = LANGUAGE_CONTEXT[locale];
+  const unitSystemContext = UNIT_SYSTEM_CONTEXT[unitSystem];
   const recentRecipesSection = buildRecentRecipesSection(
     normalizeRecentRecipeNames(recentBlendRecipeNames)
   );
@@ -128,6 +153,8 @@ function buildSystemPrompt({
     '- Personalize the blendInstruction for the user hardware and ingredient difficulty.',
     '- Calibrate the recipe macros so the suggestion fits the user daily targets and goal context. Keep the serving practical instead of arbitrarily oversized.',
     '- Prioritize common, accessible, supermarket-friendly ingredients.',
+    `- ${unitSystemContext.instruction}`,
+    `- ${unitSystemContext.example}`,
     "- If the user says they are missing an ingredient using phrases like 'sem', 'without', 'don't have', 'nao tenho', 'não tenho', or equivalent, you must include substitution suggestions inside the optional tip field and set hasSubstitutes to true.",
     '- If no substitutions are needed, set hasSubstitutes to false and omit the tip field unless it adds useful nutritional value.',
     '',
@@ -135,6 +162,7 @@ function buildSystemPrompt({
     `- BLENDi model: ${modelContext.displayName} (${modelContext.wattage}W).`,
     `- Hardware guidance: ${modelContext.hardwareGuidance}`,
     `- Goal: ${goal} (${GOAL_CONTEXT[goal]}).`,
+    `- Unit system: ${unitSystemContext.label}.`,
     `- Daily protein target: ${dailyProteinTarget} g.`,
     `- Daily carbs target: ${dailyCarbTarget} g.`,
     `- Daily calories target: ${dailyCalorieTarget} kcal.`,

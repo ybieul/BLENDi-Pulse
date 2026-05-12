@@ -11,6 +11,7 @@ export interface CacheKeyInput {
   model: string;
   goal: string;
   language: string;
+  unitSystem: string;
   aiProvider: string;
   aiModel: string;
   rawMessage: string;
@@ -45,13 +46,14 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 
 /**
  * Entrada: metadados determinísticos da query do usuário.
- * Saída: cacheKey estável no formato userId:model:goal:language:aiProvider:aiModel:messageHash:dietaryFlagsHash.
+ * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:aiProvider:aiModel:messageHash:dietaryFlagsHash.
  */
 export function generateCacheKey({
   userId,
   model,
   goal,
   language,
+  unitSystem,
   aiProvider,
   aiModel,
   rawMessage,
@@ -65,6 +67,7 @@ export function generateCacheKey({
     model.trim(),
     goal.trim(),
     language.trim(),
+    unitSystem.trim(),
     aiProvider.trim(),
     aiModel.trim(),
     messageHash,
@@ -103,6 +106,7 @@ export async function setInCache({
   model,
   goal,
   language,
+  unitSystem,
   aiProvider,
   aiModel,
   rawMessage,
@@ -114,6 +118,7 @@ export async function setInCache({
     model,
     goal,
     language,
+    unitSystem,
     aiProvider,
     aiModel,
     rawMessage,

@@ -68,6 +68,7 @@ interface CurrentUserProfileResponse {
       blendiModel: AuthUser['blendiModel'];
       goal: AuthUser['goal'];
       preferredLanguage: AuthUser['locale'];
+      unitSystem: AuthUser['unitSystem'];
       timezone: string;
       dailyProteinTarget: number;
       dailyCalorieTarget: number;
@@ -89,6 +90,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     blendiModel: user.blendiModel,
     goal: user.goal,
     locale: user.preferredLanguage,
+    unitSystem: user.unitSystem,
     timezone: user.timezone,
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
@@ -188,6 +190,7 @@ interface AuthActions {
    * Chamada por timezone.service.ts — não chamar diretamente em componentes.
    */
   updateTimezone: (timezone: string) => void;
+  updateUserProfile: (updates: Partial<AuthUser>) => void;
   /** Marca o onboarding como concluído e libera o acesso ao app principal. */
   completeOnboarding: () => Promise<void>;
 }
@@ -334,6 +337,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // local é ignorada e o valor correto será buscado depois no backend.
     if (user === null) return;
     set({ user: { ...user, timezone } });
+  },
+
+  updateUserProfile: (updates) => {
+    const { user } = get();
+
+    if (user === null) {
+      return;
+    }
+
+    set({ user: { ...user, ...updates } });
   },
 
   // ── completeOnboarding ───────────────────────────────────────────────────

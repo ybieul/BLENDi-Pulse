@@ -74,6 +74,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
   const selectedModel    = useOnboardingStore((state) => state.selectedModel);
   const selectedGoal     = useOnboardingStore((state) => state.selectedGoal);
+  const unitSystem       = useOnboardingStore((state) => state.unitSystem);
   const weight           = useOnboardingStore((state) => state.weight);
   const height           = useOnboardingStore((state) => state.height);
   const calculatedProtein  = useOnboardingStore((state) => state.calculatedProtein);
@@ -145,12 +146,22 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,
         dailyCarbTarget: carbsNum,
+        unitSystem: unitSystem ?? 'metric',
       };
 
       if (weight  !== null) payload['weight']  = weight;
       if (height  !== null) payload['height']  = height;
 
       await api.patch('/users/me', payload);
+
+      useAuthStore.getState().updateUserProfile({
+        blendiModel,
+        goal,
+        dailyProteinTarget: proteinNum,
+        dailyCalorieTarget: caloriesNum,
+        dailyCarbTarget: carbsNum,
+        unitSystem: unitSystem ?? 'metric',
+      });
 
       await useAuthStore.getState().completeOnboarding();
       resetOnboarding();

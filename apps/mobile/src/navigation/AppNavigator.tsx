@@ -1,9 +1,10 @@
 import type { ComponentProps } from 'react';
-import { Pressable, Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { HomeScreen } from '../screens/HomeScreen';
+import { MeScreen } from '../screens/MeScreen';
 import { PulseAIScreen } from '../screens/PulseAIScreen';
 
 import {
@@ -15,7 +16,6 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../hooks/useAppTranslation';
-import { useAuthStore } from '../store/auth.store';
 import type { AppTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
@@ -59,33 +59,6 @@ function BlendScreen() {
 
 function TrackScreen() {
   return <AppPlaceholderScreen title="Track" />;
-}
-
-function MeScreen() {
-  const { t, locale, changeLocale } = useAppTranslation();
-  const logout = useAuthStore((state) => state.logout);
-
-  return (
-    <AppPlaceholderScreen title="Me">
-      <Text style={styles.subtitle}>{`${t('profile.language.label')}: ${locale}`}</Text>
-
-      <View style={styles.languageActions}>
-        <Pressable onPress={() => void changeLocale('en')} style={styles.languageButton}>
-          <Text style={styles.languageButtonLabel}>{t('profile.language.en')}</Text>
-        </Pressable>
-
-        <Pressable onPress={() => void changeLocale('pt-BR')} style={styles.languageButton}>
-          <Text style={styles.languageButtonLabel}>{t('profile.language.pt_BR')}</Text>
-        </Pressable>
-
-        {__DEV__ ? (
-          <Pressable onPress={() => void logout()} style={styles.languageButton}>
-            <Text style={styles.languageButtonLabel}>Dev: reset session</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </AppPlaceholderScreen>
-  );
 }
 
 export function AppNavigator() {
@@ -144,32 +117,6 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontFamily: fonts.display,
     fontSize: fontSizes['2xl'],
-  },
-  subtitle: {
-    marginTop: spacing.lg,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-  },
-  languageActions: {
-    width: '100%',
-    marginTop: spacing['3xl'],
-    gap: spacing.md,
-  },
-  languageButton: {
-    width: '100%',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.background.secondary,
-  },
-  languageButtonLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
   },
   tabBar: {
     height: 88,

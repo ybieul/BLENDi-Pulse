@@ -8,6 +8,7 @@ import argon2 from 'argon2';
 export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 export type UserLocale = 'en' | 'pt-BR';
+export type UserUnitSystem = 'metric' | 'imperial';
 
 export interface IUser {
   email: string;
@@ -31,6 +32,7 @@ export interface IUser {
   blendiModel: BlendiModel;
   goal: UserGoal;
   locale: UserLocale;
+  unitSystem: UserUnitSystem;
   /**
    * Timezone IANA do dispositivo do usuário.
    * Exemplos: 'America/Sao_Paulo', 'Europe/London', 'Asia/Tokyo'.
@@ -147,6 +149,11 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: String,
       enum: ['en', 'pt-BR'] satisfies UserLocale[],
       default: 'en',
+    },
+    unitSystem: {
+      type: String,
+      enum: ['metric', 'imperial'] satisfies UserUnitSystem[],
+      default: 'metric',
     },
     // Timezone IANA — ver comentário na interface IUser acima.
     // Padrão: 'America/New_York' (UTC-5/-4) — escolhido por ser o timezone

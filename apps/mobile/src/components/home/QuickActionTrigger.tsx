@@ -16,6 +16,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
@@ -40,6 +41,7 @@ export function QuickActionTrigger({
   onPressLastBlend,
 }: QuickActionTriggerProps) {
   const { t } = useAppTranslation();
+  const { displayVolume } = useUnits();
   const waterScale = useRef(new Animated.Value(1)).current;
   const waterConfirmationOpacity = useRef(new Animated.Value(0)).current;
   const waterConfirmationTranslateY = useRef(new Animated.Value(0)).current;
@@ -97,6 +99,8 @@ export function QuickActionTrigger({
     void onLogWater();
   };
 
+  const waterConfirmationText = displayVolume(WATER_CONFIRMATION_AMOUNT_ML);
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -114,7 +118,7 @@ export function QuickActionTrigger({
             },
           ]}
         >
-          {t('home.waterAdded', { amount: WATER_CONFIRMATION_AMOUNT_ML })}
+          {waterConfirmationText === '—' ? waterConfirmationText : `+${waterConfirmationText}`}
         </Animated.Text>
 
         <View style={styles.buttonContent}>

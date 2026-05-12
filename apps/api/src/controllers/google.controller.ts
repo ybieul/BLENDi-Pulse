@@ -200,6 +200,7 @@ export async function handleGoogleCallback(
         blendiModel: user.blendiModel,
         goal: user.goal,
         locale: user.locale,
+        unitSystem: user.unitSystem,
         timezone: user.timezone,
         dailyProteinTarget: user.dailyProteinTarget,
         dailyCalorieTarget: user.dailyCalorieTarget,

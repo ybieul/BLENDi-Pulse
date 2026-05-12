@@ -9,7 +9,13 @@ import { ZodError, z } from 'zod';
 
 import { env } from '../config/env';
 import { BlendLogModel } from '../models/BlendLog';
-import { UserModel, type BlendiModel, type UserGoal, type UserLocale } from '../models/User';
+import {
+  UserModel,
+  type BlendiModel,
+  type UserGoal,
+  type UserLocale,
+  type UserUnitSystem,
+} from '../models/User';
 import {
   buildPulseAiPrompt,
   type PulseAiApiMessage,
@@ -32,6 +38,7 @@ interface PulseAiUserProfile {
   blendiModel: BlendiModel;
   goal: UserGoal;
   locale: UserLocale;
+  unitSystem: UserUnitSystem;
   timezone: string;
   dailyProteinTarget: number;
   dailyCarbTarget: number;
@@ -114,6 +121,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
       blendiModel: 1,
       goal: 1,
       locale: 1,
+      unitSystem: 1,
       timezone: 1,
       dailyProteinTarget: 1,
       dailyCarbTarget: 1,
@@ -134,6 +142,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     blendiModel: user.blendiModel as BlendiModel,
     goal: user.goal as UserGoal,
     locale: user.locale as UserLocale,
+    unitSystem: user.unitSystem as UserUnitSystem,
     timezone: user.timezone,
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCarbTarget: user.dailyCarbTarget ?? 200,
@@ -270,13 +279,14 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       model: currentUser.blendiModel,
       goal: currentUser.goal,
       language: currentUser.locale,
+      unitSystem: currentUser.unitSystem,
       aiProvider: env.AI_PROVIDER,
       aiModel: env.AI_MODEL,
       rawMessage: normalizedMessage,
     });
 
     const cacheKeyParts = cacheKey.split(':');
-    if (cacheKeyParts[6] !== normalizedMessageHash) {
+    if (cacheKeyParts[7] !== normalizedMessageHash) {
       throw new Error('[pulseAi.controller] cacheKey hash mismatch');
     }
 
@@ -310,6 +320,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       blendiModel: currentUser.blendiModel,
       goal: currentUser.goal,
       locale: currentUser.locale,
+      unitSystem: currentUser.unitSystem,
       dailyProteinTarget: currentUser.dailyProteinTarget,
       dailyCarbTarget: currentUser.dailyCarbTarget,
       dailyCalorieTarget: currentUser.dailyCalorieTarget,
@@ -369,6 +380,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       model: currentUser.blendiModel,
       goal: currentUser.goal,
       language: currentUser.locale,
+      unitSystem: currentUser.unitSystem,
       aiProvider: aiResponse.provider,
       aiModel: aiResponse.model,
       rawMessage: normalizedMessage,

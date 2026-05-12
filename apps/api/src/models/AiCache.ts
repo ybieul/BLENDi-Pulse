@@ -2,7 +2,7 @@
 // Cache persistido das respostas do Pulse AI.
 // Esta coleção existe para evitar recomputar prompts idênticos quando o mesmo
 // usuário repete uma consulta com o mesmo contexto de modelo, goal, idioma,
-// provider de IA, modelo de IA e flags.
+// sistema de unidades, provider de IA, modelo de IA e flags.
 
 import mongoose, { type Document } from 'mongoose';
 

@@ -27,6 +27,7 @@ export interface AuthUser {
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
+  unitSystem: 'metric' | 'imperial';
   /** Timezone IANA do usuário (ex: 'America/Sao_Paulo'). Sincronizado com o dispositivo. */
   timezone: string;
   dailyProteinTarget: number;

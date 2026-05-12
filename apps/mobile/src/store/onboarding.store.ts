@@ -10,6 +10,7 @@ import { create } from 'zustand';
 interface OnboardingState {
   selectedModel: string | null;
   selectedGoal: string | null;
+  unitSystem: 'metric' | 'imperial' | null;
   weight: number | null;
   height: number | null;
   activityLevel: string | null;
@@ -35,6 +36,7 @@ interface SetCalculatedMacrosInput {
 interface OnboardingActions {
   setModel: (selectedModel: string) => void;
   setGoal: (selectedGoal: string) => void;
+  setUnitSystem: (unitSystem: 'metric' | 'imperial') => void;
   setBodyData: (input: SetBodyDataInput) => void;
   setCalculatedMacros: (input: SetCalculatedMacrosInput) => void;
   resetOnboarding: () => void;
@@ -43,6 +45,7 @@ interface OnboardingActions {
 const initialState: OnboardingState = {
   selectedModel: null,
   selectedGoal: null,
+  unitSystem: null,
   weight: null,
   height: null,
   activityLevel: null,
@@ -61,6 +64,10 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
 
   setGoal: (selectedGoal) => {
     set({ selectedGoal });
+  },
+
+  setUnitSystem: (unitSystem) => {
+    set({ unitSystem });
   },
 
   setBodyData: ({ weight, height, activityLevel }) => {

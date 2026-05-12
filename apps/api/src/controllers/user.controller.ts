@@ -31,6 +31,9 @@ const PROTEIN_MULTIPLIERS = {
   Recovery: 2.2,
 } as const;
 
+const POUNDS_PER_KILOGRAM = 2.205;
+const CENTIMETERS_PER_INCH = 2.54;
+
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -94,6 +97,7 @@ export async function getMe(
           blendiModel: user.blendiModel,
           goal: user.goal,
           preferredLanguage: user.locale,
+          unitSystem: user.unitSystem,
           timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
@@ -137,6 +141,7 @@ export async function updateMe(
       weight,
       height,
       preferredLanguage,
+      unitSystem,
     } = parsed.data;
 
     const updates = {
@@ -148,6 +153,7 @@ export async function updateMe(
       ...(weight !== undefined && { weight }),
       ...(height !== undefined && { height }),
       ...(preferredLanguage !== undefined && { locale: preferredLanguage }),
+      ...(unitSystem !== undefined && { unitSystem }),
     };
 
     const user = await UserModel.findByIdAndUpdate(userId, updates, {
@@ -175,6 +181,7 @@ export async function updateMe(
           blendiModel: user.blendiModel,
           goal: user.goal,
           locale: user.locale,
+          unitSystem: user.unitSystem,
           timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
@@ -203,18 +210,21 @@ export async function calculateMacros(
       return;
     }
 
-    const { weight, height, activityLevel, goal } = parsed.data;
+    const { weight, height, activityLevel, goal, unitSystem } = parsed.data;
 
-    const heightInMeters = height / 100;
-    const imc = roundToOneDecimal(weight / (heightInMeters * heightInMeters));
+    const metricWeight = unitSystem === 'imperial' ? weight / POUNDS_PER_KILOGRAM : weight;
+    const metricHeight = unitSystem === 'imperial' ? height * CENTIMETERS_PER_INCH : height;
+
+    const heightInMeters = metricHeight / 100;
+    const imc = roundToOneDecimal(metricWeight / (heightInMeters * heightInMeters));
 
     const imcClassification =
       imc < 18.5 ? 'underweight' : imc < 25 ? 'normal' : imc < 30 ? 'overweight' : 'obese';
 
-    const basalMetabolism = (10 * weight) + (6.25 * height) - (5 * ASSUMED_AGE) + 5;
+    const basalMetabolism = (10 * metricWeight) + (6.25 * metricHeight) - (5 * ASSUMED_AGE) + 5;
     const tdee = Math.round(basalMetabolism * ACTIVITY_MULTIPLIERS[activityLevel]);
     const dailyCalorieTarget = Math.round(tdee + CALORIE_ADJUSTMENTS[goal]);
-    const dailyProteinTarget = Math.round(weight * PROTEIN_MULTIPLIERS[goal]);
+    const dailyProteinTarget = Math.round(metricWeight * PROTEIN_MULTIPLIERS[goal]);
     const dailyFatCalories = dailyCalorieTarget * 0.3;
     const dailyCarbTarget = Math.round(
       (dailyCalorieTarget - (dailyProteinTarget * 4) - dailyFatCalories) / 4
@@ -224,6 +234,7 @@ export async function calculateMacros(
       success: true,
       data: {
         imc,
+        imcUnit: 'kg/m²',
         imcClassification,
         dailyCalorieTarget,
         dailyProteinTarget,

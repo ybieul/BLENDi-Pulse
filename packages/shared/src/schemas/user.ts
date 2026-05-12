@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
+const unitSystemValues = ['metric', 'imperial'] as const;
 
 // ─── Schema: atualização parcial do perfil do usuário ───────────────────────
 
@@ -66,11 +67,15 @@ export const updateUserSchema = z
         required_error: 'errors.validation.required',
         invalid_type_error: 'errors.validation.number_range',
       })
-      .int('errors.validation.integer')
       .min(100, 'errors.validation.number_range')
       .max(250, 'errors.validation.number_range'),
 
     preferredLanguage: z.enum(['en', 'pt-BR'], {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
+    unitSystem: z.enum(unitSystemValues, {
       required_error: 'errors.validation.required',
       message: 'errors.validation.invalid_option',
     }),
@@ -92,7 +97,6 @@ export const calculateMacrosSchema = z.object({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.number_range',
     })
-    .int('errors.validation.integer')
     .positive('errors.validation.number_range'),
 
   activityLevel: z.enum(['sedentary', 'lightlyActive', 'moderatelyActive', 'veryActive'], {
@@ -101,6 +105,11 @@ export const calculateMacrosSchema = z.object({
   }),
 
   goal: z.enum(userGoalValues, {
+    required_error: 'errors.validation.required',
+    message: 'errors.validation.invalid_option',
+  }),
+
+  unitSystem: z.enum(unitSystemValues, {
     required_error: 'errors.validation.required',
     message: 'errors.validation.invalid_option',
   }),
@@ -172,6 +181,7 @@ export const timezoneSchema = z.object({
 
 export const calculateMacrosResponseSchema = z.object({
   imc: z.number(),
+  imcUnit: z.literal('kg/m²'),
   imcClassification: z.enum(imcClassificationValues),
   dailyCalorieTarget: z.number().int(),
   dailyProteinTarget: z.number().int(),
