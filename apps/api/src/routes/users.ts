@@ -1,5 +1,5 @@
 import { Router, type IRouter } from 'express';
-import { calculateMacros, getMe, updateMe } from '../controllers/user.controller';
+import { calculateMacros, getMe, markCleaned, updateMe } from '../controllers/user.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const usersRouter: IRouter = Router();
@@ -15,6 +15,12 @@ usersRouter.get('/me', authenticate, getMe);
  * Atualiza parcialmente o perfil e as metas do usuário autenticado.
  */
 usersRouter.patch('/me', authenticate, updateMe);
+
+/**
+ * PATCH /users/me/cleaned  🔒 autenticado
+ * Marca o BLENDi como limpo no timestamp atual.
+ */
+usersRouter.patch('/me/cleaned', authenticate, markCleaned);
 
 /**
  * POST /users/calculate-macros  🔒 autenticado

@@ -65,6 +65,7 @@ interface CurrentUserProfileResponse {
       email: string;
       name: string;
       profilePhoto?: string;
+      lastCleanedAt?: string | null;
       blendiModel: AuthUser['blendiModel'];
       goal: AuthUser['goal'];
       preferredLanguage: AuthUser['locale'];
@@ -87,6 +88,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     email: user.email,
     name: user.name,
     profilePhoto: user.profilePhoto,
+    lastCleanedAt: user.lastCleanedAt ?? null,
     blendiModel: user.blendiModel,
     goal: user.goal,
     locale: user.preferredLanguage,

@@ -43,6 +43,7 @@ import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useAuthStore } from '../store/auth.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
+import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
 import type { AppTabScreenProps } from '../navigation/types';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
@@ -94,29 +95,6 @@ interface UserProfileResponse {
   };
 }
 
-interface BlendLog {
-  _id: string;
-  recipeName: string;
-  protein: number;
-  carbs: number;
-  fat: number;
-  calories: number;
-  createdAt: string;
-}
-
-interface BlendLogsTodayData {
-  totalProtein: number;
-  totalCarbs: number;
-  totalCalories: number;
-  blendCount: number;
-  logs: BlendLog[];
-}
-
-interface BlendLogsTodayResponse {
-  success: true;
-  data: BlendLogsTodayData;
-}
-
 async function fetchUserProfile(): Promise<UserProfileResponse> {
   const response = await api.get<UserProfileResponse>('/users/me');
   return response.data;
@@ -157,12 +135,9 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     });
 
   const { data: logsResponse, isLoading: isLoadingLogs } =
-    useQuery<BlendLogsTodayResponse>({
+    useQuery<BlendLogsTodayData>({
       queryKey: QUERY_KEYS.blendLogsToday,
-      queryFn: async () => {
-        const response = await api.get<BlendLogsTodayResponse>('/blend-logs/today');
-        return response.data;
-      },
+      queryFn: getTodayLogs,
       staleTime: CACHE_CONFIG.HYDRATION_TODAY_TTL,
     });
 
@@ -191,7 +166,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   // ── Dados derivados ───────────────────────────────────────────────────────
 
   const profile = profileResponse?.data.user;
-  const logsData = logsResponse?.data;
+  const logsData = logsResponse;
   const hydrationData = hydrationResponse?.data;
 
   const displayName = profile?.name ?? authUser?.name ?? '';
@@ -201,18 +176,12 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   // Pro se o modelo for ProPlus ou Steel; Free se for Lite ou indefinido
   const isPro = (profile?.blendiModel ?? authUser?.blendiModel) !== 'Lite';
 
-  const hasLastBlend = (logsData?.blendCount ?? 0) > 0;
-
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLogWater = useCallback(async () => {
     await logWater();
     await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
   }, [queryClient]);
-
-  const handleLastBlend = useCallback(() => {
-    navigation.navigate('Blend');
-  }, [navigation]);
 
   const handleProtocolSelect = useCallback(
     (protocol: QuickProtocol) => {
@@ -277,11 +246,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
 
             {/* ── Quick Actions ──────────────────────────────────────────── */}
             <View style={styles.rowPad}>
-              <QuickActionTrigger
-                hasLastBlend={hasLastBlend}
-                onLogWater={handleLogWater}
-                onPressLastBlend={handleLastBlend}
-              />
+              <QuickActionTrigger onLogWater={handleLogWater} />
             </View>
 
             <View style={styles.spacer24} />

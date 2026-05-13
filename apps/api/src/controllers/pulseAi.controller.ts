@@ -383,7 +383,9 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       dailyProteinTarget: currentUser.dailyProteinTarget,
       dailyCarbTarget: currentUser.dailyCarbTarget,
       dailyCalorieTarget: currentUser.dailyCalorieTarget,
-      recentBlendRecipeNames: recentBlendLogs.map(log => log.recipeName),
+      recentBlendRecipeNames: recentBlendLogs.flatMap(log => (
+        log.recipeName ? [log.recipeName] : []
+      )),
       message: parsed.data.message,
     });
 

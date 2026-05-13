@@ -46,6 +46,7 @@ export interface IUser {
   dailyCarbTarget?: number;
   currentStreak: number;
   blendCount: number;
+  lastCleanedAt?: Date;
   /** Peso corporal em quilogramas. Opcional até o onboarding coletar o valor. */
   weight?: number;
   /** Altura em centímetros. Opcional até o onboarding coletar o valor. */
@@ -200,6 +201,10 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
         validator: Number.isInteger,
         message: 'errors.validation.integer',
       },
+    },
+    lastCleanedAt: {
+      type: Date,
+      required: false,
     },
     weight: {
       type: Number,

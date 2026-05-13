@@ -7,6 +7,7 @@ import type {
   BottomTabNavigationProp,
   BottomTabScreenProps,
 } from '@react-navigation/bottom-tabs';
+import type { PulseAiRecipe } from '@blendi/shared';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -27,7 +28,7 @@ export type RootStackParamList = {
 export type AppTabParamList = {
   Home: undefined;
   PulseAI: { protocol?: string } | undefined;
-  Blend: undefined;
+  Blend: { recipe?: PulseAiRecipe } | undefined;
   Track: undefined;
   Me: undefined;
 };

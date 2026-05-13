@@ -2,15 +2,16 @@
 // Registro de cada blend consumido pelo usuário.
 
 import mongoose, { type Document } from 'mongoose';
+import type { BlendiModel } from './User';
 
 export interface IBlendLog {
   userId: mongoose.Types.ObjectId;
-  recipeName: string;
+  recipeName?: string;
   protein: number;
   carbs: number;
   fat: number;
   calories: number;
-  blendiModel?: string;
+  blendiModel: BlendiModel;
   durationSeconds: number;
   rating?: number;
   createdAt: Date;
@@ -28,7 +29,7 @@ const blendLogSchema = new mongoose.Schema<IBlendLog>(
     },
     recipeName: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     protein: {
@@ -57,13 +58,14 @@ const blendLogSchema = new mongoose.Schema<IBlendLog>(
     },
     blendiModel: {
       type: String,
-      required: false,
+      enum: ['Lite', 'ProPlus', 'Steel'] satisfies BlendiModel[],
+      required: true,
       trim: true,
     },
     durationSeconds: {
       type: Number,
-      default: 30,
-      min: [0, 'errors.validation.number_range'],
+      required: true,
+      min: [5, 'errors.validation.number_range'],
       validate: {
         validator: Number.isInteger,
         message: 'errors.validation.integer',

@@ -229,6 +229,20 @@
   },
 
   "blend": {
+    "ready": "Ready to blend",
+    "blending": "Blending...",
+    "done": "Done!",
+    "start": "Start Blend",
+    "stop": "Stop",
+    "rateYourBlend": "Rate your blend",
+    "rateYourBlendWithName": "Rate {{recipeName}}",
+    "howWasIt": "How was it?",
+    "skip": "Skip",
+    "cleanReminder": "Time to clean your BLENDi",
+    "markCleaned": "Done ✓",
+    "freeMode": "Free blend",
+    "timerDuration": "{{seconds}}s",
+    "adjustTimer": "Adjust time",
     "timer": {
       "ready": "Ready to blend",
       "blending": "Blending…",

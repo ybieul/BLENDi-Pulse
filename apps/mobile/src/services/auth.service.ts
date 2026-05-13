@@ -24,6 +24,7 @@ export interface AuthUser {
   email: string;
   name: string;
   profilePhoto?: string;
+  lastCleanedAt?: string | null;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';

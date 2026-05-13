@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import {
   colors,
@@ -17,6 +18,8 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useUnits } from '../../hooks/useUnits';
+import type { AppTabNavigationProp } from '../../navigation/types';
+import { useBlendStore } from '../../store/blend.store';
 
 const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
@@ -30,18 +33,16 @@ const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
 
 export interface QuickActionTriggerProps {
-  hasLastBlend: boolean;
   onLogWater: () => void | Promise<void>;
-  onPressLastBlend?: () => void;
 }
 
 export function QuickActionTrigger({
-  hasLastBlend,
   onLogWater,
-  onPressLastBlend,
 }: QuickActionTriggerProps) {
   const { t } = useAppTranslation();
   const { displayVolume } = useUnits();
+  const navigation = useNavigation<AppTabNavigationProp<'Home'>>();
+  const lastBlend = useBlendStore((state) => state.lastBlend);
   const waterScale = useRef(new Animated.Value(1)).current;
   const waterConfirmationOpacity = useRef(new Animated.Value(0)).current;
   const waterConfirmationTranslateY = useRef(new Animated.Value(0)).current;
@@ -99,6 +100,15 @@ export function QuickActionTrigger({
     void onLogWater();
   };
 
+  const handleBlendPress = () => {
+    if (lastBlend !== null) {
+      navigation.navigate('Blend', { recipe: lastBlend });
+      return;
+    }
+
+    navigation.navigate('Blend');
+  };
+
   const waterConfirmationText = displayVolume(WATER_CONFIRMATION_AMOUNT_ML);
 
   return (
@@ -130,14 +140,14 @@ export function QuickActionTrigger({
       </Pressable>
 
       <Pressable
-        onPress={onPressLastBlend}
+        onPress={handleBlendPress}
         accessibilityRole="button"
         style={styles.button}
       >
         <View style={styles.buttonContent}>
           <Ionicons name="flash-outline" size={18} color={colors.brand.pulse} />
           <Text style={styles.buttonLabel}>
-            {hasLastBlend ? t('home.lastBlend') : t('home.startBlend')}
+            {lastBlend !== null ? t('home.lastBlend') : t('home.startBlend')}
           </Text>
         </View>
       </Pressable>

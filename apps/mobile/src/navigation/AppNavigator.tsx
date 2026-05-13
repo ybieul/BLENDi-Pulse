@@ -3,6 +3,7 @@ import { Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
+import { BlendScreen } from '../screens/BlendScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { MeScreen } from '../screens/MeScreen';
 import { PulseAIScreen } from '../screens/PulseAIScreen';
@@ -51,10 +52,6 @@ function AppPlaceholderScreen({
       {children}
     </View>
   );
-}
-
-function BlendScreen() {
-  return <AppPlaceholderScreen title="Blend" />;
 }
 
 function TrackScreen() {

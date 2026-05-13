@@ -106,6 +106,55 @@ export async function getMe(
           createdAt: user.createdAt,
           streakDays: user.currentStreak,
           totalBlends: user.blendCount,
+          lastCleanedAt: user.lastCleanedAt ?? null,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function markCleaned(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          lastCleanedAt: new Date(),
+        },
+      },
+      {
+        new: true,
+      }
+    ).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: String(user._id),
+          lastCleanedAt: user.lastCleanedAt ?? null,
+          updatedAt: user.updatedAt,
         },
       },
     });
