@@ -20,7 +20,7 @@ import {
 import { AuthButton, AuthScreenLayout } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { forgotPassword, verifyOtp } from '../../services/auth.service';
-import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 const OTP_LENGTH = 6;
@@ -226,7 +226,7 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
 
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data as ApiErrorResponse | undefined;
-        const translationKey = getApiErrorTranslationKey(responseData?.code);
+        const translationKey = getAxiosErrorTranslationKey(error);
         const translatedMessage = translateKey(translationKey);
 
         setOtpErrorMessage(translatedMessage);

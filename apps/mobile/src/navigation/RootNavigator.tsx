@@ -7,7 +7,6 @@ import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { UpgradeScreen } from '../screens/UpgradeScreen';
-import { FavoritesListScreen } from '../screens/FavoritesListScreen';
 import type { RootStackParamList } from './types';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -44,7 +43,6 @@ export function RootNavigator() {
         <>
           <RootStack.Screen name="AppFlow" component={AppNavigator} />
           <RootStack.Screen name="Upgrade" component={UpgradeScreen} />
-          <RootStack.Screen name="FavoritesList" component={FavoritesListScreen} />
         </>
       ) : (
         <RootStack.Screen name="AuthFlow" component={AuthNavigator} />

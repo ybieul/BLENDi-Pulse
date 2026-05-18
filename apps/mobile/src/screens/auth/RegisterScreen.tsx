@@ -24,7 +24,7 @@ import {
 } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useAuthStore } from '../../store/auth.store';
-import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 const PASSWORD_MIN_LENGTH = 8;
@@ -340,7 +340,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data as ApiErrorResponse | undefined;
-        const translationKey = getApiErrorTranslationKey(responseData?.code);
+        const translationKey = getAxiosErrorTranslationKey(error);
         const translatedMessage = translateKey(translationKey);
 
         if (responseData?.code === 'auth/email-already-exists') {

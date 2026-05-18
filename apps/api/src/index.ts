@@ -19,6 +19,7 @@ import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
 import { blendLogsRouter } from './routes/blendLogs';
 import { hydrationLogsRouter } from './routes/hydrationLogs';
+import { favoritesRouter } from './routes/favorites';
 import { pulseAiRouter } from './routes/pulseAi';
 import { sendErrorResponse } from './utils/error.utils';
 
@@ -70,6 +71,7 @@ app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/blend-logs', blendLogsRouter);
 app.use('/hydration-logs', hydrationLogsRouter);
+app.use('/favorites', favoritesRouter);
 app.use('/pulse-ai', pulseAiRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);

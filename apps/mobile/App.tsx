@@ -27,6 +27,7 @@ import { persistOptions, queryClient } from './src/config/queryClient';
 
 // Navigation — root switch entre auth e app
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { ToastViewport } from './src/utils/toast.utils';
 
 // Timezone — sincronização silenciosa ao voltar ao foreground
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
@@ -159,6 +160,7 @@ export default function App() {
         <NavigationContainer theme={navigationTheme}>
           <StatusBar style="light" backgroundColor={colors.background.primary} />
           <RootNavigator />
+          <ToastViewport />
         </NavigationContainer>
       </PersistQueryClientProvider>
     </SafeAreaProvider>

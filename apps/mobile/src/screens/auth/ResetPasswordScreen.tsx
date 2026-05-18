@@ -20,7 +20,7 @@ import {
 import { AuthButton, AuthInput, AuthScreenLayout } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { resetPassword } from '../../services/auth.service';
-import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 const PASSWORD_MIN_LENGTH = 8;
@@ -39,7 +39,6 @@ const SUCCESS_RESET_DELAY_MS = 2500;
 const WAVE_SIZE = 80;
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
-type ApiErrorResponse = { code?: string };
 type ResetPasswordRequest = (input: { resetToken: string; newPassword: string }) => Promise<void>;
 
 interface PasswordStrengthMeterProps {
@@ -338,8 +337,7 @@ export function ResetPasswordScreen({ navigation, route }: AuthScreenProps<'Rese
       }
 
       if (axios.isAxiosError(error)) {
-        const responseData = error.response?.data as ApiErrorResponse | undefined;
-        const translationKey = getApiErrorTranslationKey(responseData?.code);
+        const translationKey = getAxiosErrorTranslationKey(error);
         setFormError(translateKey(translationKey));
       } else {
         setFormError(translateKey('errors.network_internal_server_error'));

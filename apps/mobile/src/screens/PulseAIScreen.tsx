@@ -8,8 +8,9 @@
 //   - ChatInput absolutamente posicionado (gerencia seu próprio bottom)
 //   - UsageIndicator acima do ChatInput quando usuário free
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   Pressable,
   StyleSheet,
@@ -18,10 +19,9 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { type NavigationProp } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { FavoriteItem, PulseAiRecipe } from '@blendi/shared';
 
 import {
   borderRadius,
@@ -31,8 +31,10 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
+import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useAuthStore } from '../store/auth.store';
+import { usePulseAIStore } from '../store/pulseAi.store';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ChatMessage } from '../components/pulseAi/ChatMessage';
 import { ChatInput, type ChatInputHandle } from '../components/pulseAi/ChatInput';
@@ -40,29 +42,27 @@ import { ChatMessageSkeleton } from '../components/pulseAi/ChatMessageSkeleton';
 import { UsageIndicator } from '../components/pulseAi/UsageIndicator';
 import { imagePlaceholderStyles } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
-import {
-  FavoritesServiceError,
-  getRecipeFavoriteKey,
-  toggleFavorite,
-} from '../services/favorites.service';
+import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { PulseAiServiceError } from '../services/pulseAi.service';
 import { QUERY_KEYS } from '../config/cache.config';
-import type { AppTabScreenProps, RootStackParamList } from '../navigation/types';
+import type { AppTabParamList, PulseAIStackScreenProps } from '../navigation/types';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const DAILY_FREE_LIMIT = 3;
 const MAX_MESSAGES = 20;
 const LOGO_PLACEHOLDER_SIZE = 64;
-const TOAST_HIDE_DELAY_MS = 3200;
-const TOAST_BORDER_COLOR = 'rgba(255,107,107,0.22)';
-const TOAST_BACKGROUND_COLOR = 'rgba(60,24,24,0.94)';
 const SUGGESTION_BORDER_COLOR = 'rgba(255,255,255,0.10)';
 const SUGGESTION_BACKGROUND_COLOR = 'rgba(255,255,255,0.06)';
 
 // Altura estimada do ChatInput acima da tab bar (fade + campo + padding).
 // Usado para garantir que o conteúdo não fique atrás do input fixado.
 const ESTIMATED_CHAT_INPUT_HEIGHT = 172;
+
+const BADGE_SIZE = 16;
+const BADGE_FONT_SIZE_NORMAL = 10;
+const BADGE_FONT_SIZE_OVERFLOW = 8;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -78,11 +78,6 @@ interface ChatMessageItem {
   isFromCache?: boolean;
 }
 
-interface ToastState {
-  id: number;
-  message: string;
-}
-
 const GOAL_I18N_KEYS: Record<UserGoal, PulseAiGoalKey> = {
   Muscle: 'muscle',
   Wellness: 'wellness',
@@ -94,6 +89,23 @@ const GOAL_SUGGESTION_FIELDS = ['suggestion1', 'suggestion2', 'suggestion3'] as 
 
 function toUsageRemaining(dailyAiUsage: number, isPro: boolean): number | null {
   return isPro ? null : Math.max(0, DAILY_FREE_LIMIT - dailyAiUsage);
+}
+
+function favoriteItemToRecipe(favorite: FavoriteItem): PulseAiRecipe {
+  return {
+    title: favorite.recipeName,
+    ingredients: favorite.ingredients,
+    macros: {
+      protein: favorite.protein,
+      carbs: favorite.carbs,
+      fat: favorite.fat,
+      calories: favorite.calories,
+    },
+    prepTimeSeconds: favorite.prepTimeSeconds,
+    blendInstruction: favorite.blendInstruction,
+    tip: favorite.tip,
+    hasSubstitutes: favorite.hasSubstitutes,
+  };
 }
 
 // ─── WelcomeState ─────────────────────────────────────────────────────────────
@@ -132,46 +144,64 @@ function WelcomeState({ title, subtitle, suggestions, onSuggestionPress }: Welco
 
 // ─── PulseAIScreen ────────────────────────────────────────────────────────────
 
-export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'>) {
+export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAIChat'>) {
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { favorites } = useFavorites();
+  const pendingProtocol = usePulseAIStore((state) => state.pendingProtocol);
+  const clearPendingProtocol = usePulseAIStore((state) => state.clearPendingProtocol);
   const userGoal = useAuthStore((state) => state.user?.goal ?? 'Wellness');
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
-  const [favoriteStates, setFavoriteStates] = useState<Record<string, boolean>>({});
-  const [toastState, setToastState] = useState<ToastState | null>(null);
 
   const flatListRef = useRef<FlatList<ChatMessageItem>>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
-  const pendingFavoriteKeysRef = useRef(new Set<string>());
+
+  // ── Badge de favoritos ────────────────────────────────────────────────────
+  const favoritesCount = favorites.length;
+  const badgeScale = useRef(new Animated.Value(favoritesCount > 0 ? 1 : 0)).current;
+  const prevCountRef = useRef(favoritesCount);
+
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    prevCountRef.current = favoritesCount;
+
+    if (prev === 0 && favoritesCount > 0) {
+      badgeScale.setValue(0);
+      Animated.spring(badgeScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        bounciness: 12,
+      }).start();
+    } else if (favoritesCount === 0) {
+      badgeScale.setValue(0);
+    }
+  }, [favoritesCount, badgeScale]);
 
   const welcomeTitle = t(`pulseAi.goals.${goalKey}.welcomeTitle`);
   const welcomeSubtitle = t(`pulseAi.goals.${goalKey}.welcomeSubtitle`);
   const suggestions = GOAL_SUGGESTION_FIELDS.map((field) =>
     t(`pulseAi.goals.${goalKey}.${field}`),
   ) as [string, string, string];
+  const favoriteIdsByRecipeKey = useMemo<Record<string, string>>(() => {
+    const nextFavoriteIdsByRecipeKey: Record<string, string> = {};
+
+    favorites.forEach((favorite) => {
+      nextFavoriteIdsByRecipeKey[getRecipeFavoriteKey(favoriteItemToRecipe(favorite))] = favorite.id;
+    });
+
+    return nextFavoriteIdsByRecipeKey;
+  }, [favorites]);
 
   // ── Auto-scroll ao final quando uma nova mensagem chega ──────────────────
   useEffect(() => {
     if (messages.length === 0) return;
     flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages.length]);
-
-  useEffect(() => {
-    if (!toastState) return;
-
-    const timeoutId = setTimeout(() => {
-      setToastState(null);
-    }, TOAST_HIDE_DELAY_MS);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [toastState]);
 
   // ── Busca uso inicial na montagem ─────────────────────────────────────────
   useEffect(() => {
@@ -263,17 +293,17 @@ export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'
     [queryClient, t],
   );
 
-  // ── Auto-envio do protocolo vindo da Home (executa a cada novo param) ─────
+  // ── Auto-envio do protocolo vindo da Home (transitório via store) ─────────
   useEffect(() => {
-    const protocol = route.params?.protocol?.trim();
+    const protocol = pendingProtocol?.trim();
 
     if (!protocol) {
       return;
     }
 
-    navigation.setParams({ protocol: undefined });
+    clearPendingProtocol();
     void handleSend(protocol);
-  }, [handleSend, navigation, route.params?.protocol]);
+  }, [clearPendingProtocol, handleSend, pendingProtocol]);
 
   // ── Chip de sugestão → preenche ChatInput sem enviar ─────────────────────
   const handleSuggestionPress = useCallback((text: string) => {
@@ -282,63 +312,13 @@ export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'
 
   // ── Navegação ─────────────────────────────────────────────────────────────
   const handleStartBlend = useCallback((recipe: PulseAiRecipe) => {
-    void recipe;
-    navigation.navigate('Blend');
+    navigation
+      .getParent<BottomTabNavigationProp<AppTabParamList>>()
+      ?.navigate('Blend', { recipe });
   }, [navigation]);
 
-  const handleFavoriteToggle = useCallback(
-    async (recipe: PulseAiRecipe) => {
-      const recipeKey = getRecipeFavoriteKey(recipe);
-
-      if (pendingFavoriteKeysRef.current.has(recipeKey)) {
-        return;
-      }
-
-      pendingFavoriteKeysRef.current.add(recipeKey);
-
-      const previousValue = Boolean(favoriteStates[recipeKey]);
-      const nextValue = !previousValue;
-
-      setFavoriteStates((prev) => ({
-        ...prev,
-        [recipeKey]: nextValue,
-      }));
-
-      try {
-        const result = await toggleFavorite(recipe);
-
-        setFavoriteStates((prev) => ({
-          ...prev,
-          [recipeKey]: result.isFavorited,
-        }));
-
-        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.favorites });
-      } catch (error) {
-        setFavoriteStates((prev) => ({
-          ...prev,
-          [recipeKey]: previousValue,
-        }));
-
-        const errorText =
-          error instanceof FavoritesServiceError
-            ? t(error.translationKey as Parameters<typeof t>[0])
-            : t('recipes.favorites.toggle_error');
-
-        setToastState({
-          id: Date.now(),
-          message: errorText,
-        });
-      } finally {
-        pendingFavoriteKeysRef.current.delete(recipeKey);
-      }
-    },
-    [favoriteStates, queryClient, t],
-  );
-
   const handleFavoritesPress = useCallback(() => {
-    navigation
-      .getParent<NavigationProp<RootStackParamList>>()
-      ?.navigate('FavoritesList');
+    navigation.push('Favorites');
   }, [navigation]);
 
   // ── FlatList render ───────────────────────────────────────────────────────
@@ -373,14 +353,12 @@ export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'
         content={recipe}
         timestamp={item.timestamp}
         isFromCache={item.isFromCache}
-        isFavorited={Boolean(favoriteStates[favoriteKey])}
-        onFavorite={() => {
-          void handleFavoriteToggle(recipe);
-        }}
+        isFavorited={Boolean(favoriteIdsByRecipeKey[favoriteKey])}
+        favoriteId={favoriteIdsByRecipeKey[favoriteKey]}
         onStartBlend={() => handleStartBlend(recipe)}
       />
     );
-  }, [favoriteStates, handleFavoriteToggle, handleStartBlend]);
+  }, [favoriteIdsByRecipeKey, handleStartBlend]);
 
   const ListFooterComponent = isLoading ? <ChatMessageSkeleton /> : null;
 
@@ -414,9 +392,21 @@ export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'
           style={styles.headerButton}
           onPress={handleFavoritesPress}
           accessibilityRole="button"
-          accessibilityLabel={t('recipes.favorites.title')}
+          accessibilityLabel={t('favorites.title')}
         >
           <Ionicons name="heart-outline" size={24} color={colors.text.secondary} />
+          {favoritesCount > 0 && (
+            <Animated.View
+              style={[styles.badge, { transform: [{ scale: badgeScale }] }]}
+            >
+              <Text style={[
+                styles.badgeText,
+                favoritesCount > 9 && styles.badgeTextOverflow,
+              ]}>
+                {favoritesCount > 9 ? '9+' : String(favoritesCount)}
+              </Text>
+            </Animated.View>
+          )}
         </Pressable>
       </View>
 
@@ -438,19 +428,6 @@ export function PulseAIScreen({ route, navigation }: AppTabScreenProps<'PulseAI'
         removeClippedSubviews={true}
         inverted={false}
       />
-
-      {toastState ? (
-        <View pointerEvents="none" style={[styles.toastViewport, { top: insets.top + 88 }]}> 
-          <View style={styles.toast}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={16}
-              color={colors.text.primary}
-            />
-            <Text style={styles.toastText}>{toastState.message}</Text>
-          </View>
-        </View>
-      ) : null}
 
       {/* ── Indicador de uso (acima do ChatInput) ── */}
       <UsageIndicator usageRemaining={usageRemaining} />
@@ -488,31 +465,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-  },
-  toastViewport: {
+
+  // Badge de favoritos
+  badge: {
     position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    zIndex: 20,
-  },
-  toast: {
-    flexDirection: 'row',
+    top: 4,
+    right: 4,
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    backgroundColor: colors.brand.pulse,
     alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: TOAST_BORDER_COLOR,
-    backgroundColor: TOAST_BACKGROUND_COLOR,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    justifyContent: 'center',
   },
-  toastText: {
-    flex: 1,
+  badgeText: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: BADGE_FONT_SIZE_NORMAL,
+    fontWeight: fontWeights.bold,
+    lineHeight: BADGE_FONT_SIZE_NORMAL + 2,
+    includeFontPadding: false,
+  },
+  badgeTextOverflow: {
+    fontSize: BADGE_FONT_SIZE_OVERFLOW,
+    lineHeight: BADGE_FONT_SIZE_OVERFLOW + 2,
+  },
+  headerTitle: {
     color: colors.text.primary,
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,

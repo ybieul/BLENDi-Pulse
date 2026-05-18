@@ -32,7 +32,7 @@ interface AssistantChatMessageProps extends BaseChatMessageProps {
   role: 'assistant';
   content: PulseAiRecipe;
   isFavorited?: boolean;
-  onFavorite?: () => void;
+  favoriteId?: string;
   onStartBlend?: () => void;
   isFromCache?: boolean;
   isError?: never;
@@ -130,7 +130,7 @@ export function ChatMessage(props: ChatMessageProps) {
       <RecipeCard
         recipe={props.content}
         isFavorited={props.isFavorited ?? false}
-        onFavorite={props.onFavorite ?? NOOP}
+        favoriteId={props.favoriteId}
         onStartBlend={props.onStartBlend ?? NOOP}
         isFromCache={props.isFromCache}
       />

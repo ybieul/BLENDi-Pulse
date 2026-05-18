@@ -7,6 +7,7 @@ import type {
   BottomTabNavigationProp,
   BottomTabScreenProps,
 } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { PulseAiRecipe } from '@blendi/shared';
 
 export type AuthStackParamList = {
@@ -22,12 +23,16 @@ export type RootStackParamList = {
   OnboardingFlow: undefined;
   AppFlow: undefined;
   Upgrade: undefined;
-  FavoritesList: undefined;
+};
+
+export type PulseAIStackParamList = {
+  PulseAIChat: undefined;
+  Favorites: undefined;
 };
 
 export type AppTabParamList = {
   Home: undefined;
-  PulseAI: { protocol?: string } | undefined;
+  PulseAI: NavigatorScreenParams<PulseAIStackParamList> | undefined;
   Blend: { recipe?: PulseAiRecipe } | undefined;
   Track: undefined;
   Me: undefined;
@@ -75,3 +80,9 @@ export type OnboardingRouteProp<RouteName extends keyof OnboardingStackParamList
 
 export type OnboardingScreenProps<RouteName extends keyof OnboardingStackParamList> =
   NativeStackScreenProps<OnboardingStackParamList, RouteName>;
+
+export type PulseAIStackNavigationProp<RouteName extends keyof PulseAIStackParamList> =
+  NativeStackNavigationProp<PulseAIStackParamList, RouteName>;
+
+export type PulseAIStackScreenProps<RouteName extends keyof PulseAIStackParamList> =
+  NativeStackScreenProps<PulseAIStackParamList, RouteName>;

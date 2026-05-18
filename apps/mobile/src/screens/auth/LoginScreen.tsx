@@ -19,7 +19,7 @@ import { AuthButton, AuthInput, AuthScreenLayout, GoogleSignInButton } from '../
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
-import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 interface ApiErrorResponse {
@@ -109,7 +109,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data as ApiErrorResponse | undefined;
-        const translationKey = getApiErrorTranslationKey(responseData?.code);
+        const translationKey = getAxiosErrorTranslationKey(error);
         const translatedMessage = translateKey(translationKey);
 
         if (responseData?.code === 'auth/invalid-credentials') {

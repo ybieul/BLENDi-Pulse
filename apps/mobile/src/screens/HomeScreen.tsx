@@ -42,6 +42,7 @@ import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useAuthStore } from '../store/auth.store';
+import { usePulseAIStore } from '../store/pulseAi.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
 import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
 import type { AppTabScreenProps } from '../navigation/types';
@@ -122,6 +123,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const { formatDate } = useDateFormat();
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
+  const setPendingProtocol = usePulseAIStore((state) => state.setPendingProtocol);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -185,9 +187,10 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
 
   const handleProtocolSelect = useCallback(
     (protocol: QuickProtocol) => {
-      navigation.navigate('PulseAI', { protocol: protocol.prompt });
+      setPendingProtocol(protocol.prompt);
+      navigation.navigate('PulseAI', { screen: 'PulseAIChat' });
     },
-    [navigation],
+    [navigation, setPendingProtocol],
   );
 
   const handleStartBlend = useCallback(() => {

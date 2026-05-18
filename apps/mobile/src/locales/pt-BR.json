@@ -292,6 +292,19 @@
     }
   },
 
+  "favorites": {
+    "title": "Favoritos",
+    "emptyTitle": "Nenhum favorito ainda",
+    "emptySubtitle": "As receitas que você curtir no Pulse AI aparecerão aqui",
+    "discoverRecipes": "Descobrir Receitas",
+    "moreIngredients": "+{{count}} itens",
+    "removeSuccess": "Receita removida",
+    "removeError": "Não foi possível remover",
+    "addSuccess": "Receita salva!",
+    "addError": "Não foi possível salvar",
+    "alreadySaved": "Já salva"
+  },
+
   "track": {
     "hydration": {
       "title": "Hidratação",
@@ -509,6 +522,9 @@
     "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
+    "favorites_invalid_data": "Não foi possível salvar esta receita. Revise os dados e tente novamente.",
+    "favorites_not_found": "Este favorito não existe mais.",
+    "favorites_forbidden": "Você não tem permissão para alterar este favorito.",
     "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
     "resource_not_found": "O recurso solicitado não foi encontrado."
   },

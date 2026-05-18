@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -16,7 +16,9 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
+import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { showToast } from '../../utils/toast.utils';
 import { AuthButton } from '../ui/AuthButton';
 
 const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
@@ -51,7 +53,7 @@ interface MacroPillData {
 export interface RecipeCardProps {
   recipe: PulseAiRecipe;
   isFavorited: boolean;
-  onFavorite: () => void;
+  favoriteId?: string;
   onStartBlend: () => void;
   isFromCache?: boolean;
 }
@@ -86,12 +88,24 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
 export function RecipeCard({
   recipe,
   isFavorited,
-  onFavorite,
+  favoriteId,
   onStartBlend,
   isFromCache = false,
 }: RecipeCardProps) {
   const { t } = useAppTranslation();
   const favoriteScale = useRef(new Animated.Value(HEART_SCALE_DEFAULT)).current;
+  const addFavoriteMutation = useAddFavorite();
+  const removeFavoriteMutation = useRemoveFavorite();
+  const [optimisticIsFavorited, setOptimisticIsFavorited] = useState(isFavorited);
+  const [optimisticFavoriteId, setOptimisticFavoriteId] = useState(favoriteId);
+
+  useEffect(() => {
+    setOptimisticIsFavorited(isFavorited);
+  }, [isFavorited]);
+
+  useEffect(() => {
+    setOptimisticFavoriteId(favoriteId);
+  }, [favoriteId]);
 
   const macroPills = useMemo<MacroPillData[]>(() => [
     {
@@ -121,8 +135,13 @@ export function RecipeCard({
   ], [recipe.macros, t]);
 
   const substitutesText = recipe.tip?.trim();
+  const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
 
   const handleFavoritePress = () => {
+    if (isFavoriteMutationPending) {
+      return;
+    }
+
     Animated.sequence([
       Animated.spring(favoriteScale, {
         toValue: HEART_SCALE_ACTIVE,
@@ -140,7 +159,43 @@ export function RecipeCard({
       }),
     ]).start();
 
-    onFavorite();
+    if (!optimisticIsFavorited) {
+      setOptimisticIsFavorited(true);
+
+      addFavoriteMutation.mutate(recipe, {
+        onSuccess: ({ favorite }) => {
+          setOptimisticIsFavorited(true);
+          setOptimisticFavoriteId(favorite.id);
+        },
+        onError: (error) => {
+          setOptimisticIsFavorited(false);
+          setOptimisticFavoriteId(undefined);
+          showToast(t(error.translationKey as Parameters<typeof t>[0]));
+        },
+      });
+
+      return;
+    }
+
+    const nextFavoriteId = optimisticFavoriteId ?? favoriteId;
+
+    if (!nextFavoriteId) {
+      showToast(t('recipes.favorites.toggle_error'));
+      return;
+    }
+
+    setOptimisticIsFavorited(false);
+
+    removeFavoriteMutation.mutate(nextFavoriteId, {
+      onSuccess: () => {
+        setOptimisticFavoriteId(undefined);
+      },
+      onError: (error) => {
+        setOptimisticIsFavorited(true);
+        setOptimisticFavoriteId(nextFavoriteId);
+        showToast(t(error.translationKey as Parameters<typeof t>[0]));
+      },
+    });
   };
 
   return (
@@ -167,9 +222,9 @@ export function RecipeCard({
         >
           <Animated.View style={{ transform: [{ scale: favoriteScale }] }}>
             <Ionicons
-              name={isFavorited ? 'heart' : 'heart-outline'}
+              name={optimisticIsFavorited ? 'heart' : 'heart-outline'}
               size={20}
-              color={isFavorited ? colors.feedback.error : colors.text.secondary}
+              color={optimisticIsFavorited ? colors.feedback.error : colors.text.secondary}
             />
           </Animated.View>
         </Pressable>
@@ -225,7 +280,8 @@ export function RecipeCard({
 
         <Pressable
           accessibilityRole="button"
-          onPress={onFavorite}
+          onPress={handleFavoritePress}
+          disabled={isFavoriteMutationPending}
           style={styles.saveButton}
         >
           <Text style={styles.saveButtonLabel}>{t('common.actions.save')}</Text>
