@@ -1,4 +1,7 @@
+import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
+import { ZodError } from 'zod';
+import { historyQuerySchema } from '@blendi/shared';
 import { HydrationLogModel } from '../models/HydrationLog';
 import { UserModel } from '../models/User';
 import {
@@ -6,7 +9,7 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
-import { getMidnightUTC } from '../utils/timezone.utils';
+import { getMidnightUTC, toUTC } from '../utils/timezone.utils';
 
 const DEFAULT_HYDRATION_AMOUNT_ML = 250;
 const DEFAULT_HYDRATION_GOAL_ML = 2000;
@@ -21,6 +24,13 @@ interface HydrationLogResponseItem {
   amountMl: number;
   createdAt: Date;
 }
+
+interface HydrationHistoryDailyBreakdownItem {
+  date: string;
+  totalMl: number;
+}
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function sendUnauthorized(res: Response): void {
   sendErrorResponse(res, {
@@ -42,6 +52,91 @@ function sendInvalidAmountMl(res: Response): void {
       },
     ],
   });
+}
+
+function formatZodErrors(err: ZodError) {
+  return err.issues.map(issue => ({
+    field: issue.path.join('.') || 'root',
+    message: issue.message,
+    ...(issue.code === 'too_small' && { minimum: (issue as { minimum?: number }).minimum }),
+    ...(issue.code === 'too_big' && { maximum: (issue as { maximum?: number }).maximum }),
+  }));
+}
+
+function sendValidationError(res: Response, err: ZodError): void {
+  sendErrorResponse(res, {
+    statusCode: 400,
+    code: VALIDATION_ERROR_CODE,
+    message: VALIDATION_ERROR_MESSAGE,
+    errors: formatZodErrors(err),
+  });
+}
+
+function getFirstQueryValue(value: unknown): string | undefined {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  return typeof rawValue === 'string' ? rawValue : undefined;
+}
+
+function coerceHistoryQueryInput(query: Request['query']) {
+  const page = getFirstQueryValue(query.page);
+  const limit = getFirstQueryValue(query.limit);
+
+  return {
+    from: getFirstQueryValue(query.from),
+    to: getFirstQueryValue(query.to),
+    ...(page !== undefined && { page: Number(page) }),
+    ...(limit !== undefined && { limit: Number(limit) }),
+  };
+}
+
+function getIsoDateKey(value: string): string {
+  const date = new Date(value);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function buildLocalDayUtcRange(from: string, to: string, timezone: string): {
+  startAt: Date;
+  endAtExclusive: Date;
+} {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  const startAt = toUTC(
+    new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate(), 0, 0, 0)),
+    timezone
+  );
+
+  const endAtExclusive = toUTC(
+    new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate() + 1, 0, 0, 0)),
+    timezone
+  );
+
+  return {
+    startAt,
+    endAtExclusive,
+  };
+}
+
+function getInclusiveDayKeys(from: string, to: string): string[] {
+  const dayKeys: string[] = [];
+  const current = new Date(`${getIsoDateKey(from)}T00:00:00.000Z`);
+  const end = new Date(`${getIsoDateKey(to)}T00:00:00.000Z`);
+
+  while (current.getTime() <= end.getTime()) {
+    dayKeys.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dayKeys;
+}
+
+function roundToTwoDecimals(value: number): number {
+  return Number(value.toFixed(2));
 }
 
 function getAmountMl(body: Request['body']): number | null {
@@ -175,6 +270,158 @@ export async function getTodayHydration(
         totalMl: summary.totalMl,
         goalMl: hydrationContext.goalMl,
         logs: summary.logs,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getHydrationHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = historyQuerySchema.safeParse(coerceHistoryQueryInput(req.query));
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const hydrationContext = await getHydrationContext(userId);
+    if (!hydrationContext) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    const { from, to, page, limit } = parsed.data;
+    const { startAt, endAtExclusive } = buildLocalDayUtcRange(from, to, hydrationContext.timezone);
+    const matchQuery = {
+      userId,
+      createdAt: {
+        $gte: startAt,
+        $lt: endAtExclusive,
+      },
+    };
+
+    const [logs, aggregateResult] = await Promise.all([
+      HydrationLogModel.find(matchQuery)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      HydrationLogModel.aggregate<{
+        summary: Array<{ totalMl: number }>;
+        dailyBreakdown: HydrationHistoryDailyBreakdownItem[];
+        total: Array<{ count: number }>;
+      }>([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: {
+              $gte: startAt,
+              $lt: endAtExclusive,
+            },
+          },
+        },
+        {
+          $addFields: {
+            logDate: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: hydrationContext.timezone,
+              },
+            },
+          },
+        },
+        {
+          $facet: {
+            summary: [
+              {
+                $group: {
+                  _id: null,
+                  totalMl: { $sum: '$amountMl' },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalMl: 1,
+                },
+              },
+            ],
+            dailyBreakdown: [
+              {
+                $group: {
+                  _id: '$logDate',
+                  totalMl: { $sum: '$amountMl' },
+                },
+              },
+              { $sort: { _id: -1 } },
+              {
+                $project: {
+                  _id: 0,
+                  date: '$_id',
+                  totalMl: 1,
+                },
+              },
+            ],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ]),
+    ]);
+
+    const aggregate = aggregateResult[0];
+    const total = aggregate?.total[0]?.count ?? 0;
+    const totalMl = aggregate?.summary[0]?.totalMl ?? 0;
+    const dayKeys = getInclusiveDayKeys(from, to);
+    const dailyBreakdownMap = new Map(
+      (aggregate?.dailyBreakdown ?? []).map(item => [item.date, item])
+    );
+    const dailyBreakdown = [...dayKeys]
+      .reverse()
+      .map(date => dailyBreakdownMap.get(date) ?? {
+        date,
+        totalMl: 0,
+      });
+    const totalDays = Math.max(
+      1,
+      Math.floor(
+        (new Date(`${getIsoDateKey(to)}T00:00:00.000Z`).getTime()
+          - new Date(`${getIsoDateKey(from)}T00:00:00.000Z`).getTime()) / MILLISECONDS_PER_DAY
+      ) + 1
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        logs: logs.map(log => ({
+          id: String(log._id),
+          amountMl: log.amountMl,
+          createdAt: log.createdAt,
+        })),
+        summary: {
+          totalMl,
+          averageDailyMl: roundToTwoDecimals(totalMl / totalDays),
+        },
+        dailyBreakdown,
+        dailyHydrationTarget: hydrationContext.goalMl,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (err) {

@@ -21,6 +21,8 @@ import { blendLogsRouter } from './routes/blendLogs';
 import { hydrationLogsRouter } from './routes/hydrationLogs';
 import { favoritesRouter } from './routes/favorites';
 import { pulseAiRouter } from './routes/pulseAi';
+import { supplementLogsRouter } from './routes/supplementLogs';
+import { supplementStackRouter } from './routes/supplementStack';
 import { sendErrorResponse } from './utils/error.utils';
 
 const app = express();
@@ -71,6 +73,8 @@ app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/blend-logs', blendLogsRouter);
 app.use('/hydration-logs', hydrationLogsRouter);
+app.use('/supplement-stack', supplementStackRouter);
+app.use('/supplement-logs', supplementLogsRouter);
 app.use('/favorites', favoritesRouter);
 app.use('/pulse-ai', pulseAiRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:

@@ -6,7 +6,7 @@ import {
 import type { PersistQueryClientOptions } from '@tanstack/query-persist-client-core';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
-import { CACHE_CONFIG, QUERY_KEYS } from './cache.config';
+import { CACHE_CONFIG, PERSISTABLE_QUERY_KEYS, QUERY_KEYS } from './cache.config';
 import { createAppStorage } from './storage';
 
 const QUERY_CACHE_STORAGE_ID = 'blendi-pulse';
@@ -18,9 +18,7 @@ const queryCacheStorage = createAppStorage(QUERY_CACHE_STORAGE_ID);
 
 type PersistableQueryRoot = keyof typeof QUERY_KEYS;
 
-const persistableQueryRoots = new Set<PersistableQueryRoot>(
-  Object.keys(QUERY_KEYS) as PersistableQueryRoot[]
-);
+const persistableQueryRoots = new Set<PersistableQueryRoot>(PERSISTABLE_QUERY_KEYS);
 
 function isPersistableQueryRoot(value: unknown): value is PersistableQueryRoot {
   return typeof value === 'string' && value in QUERY_KEYS;

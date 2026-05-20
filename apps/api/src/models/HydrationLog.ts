@@ -3,7 +3,7 @@
 
 import mongoose, { type Document } from 'mongoose';
 
-const HYDRATION_LOG_TTL_SECONDS = 90 * 24 * 60 * 60;
+const HYDRATION_LOG_TTL_SECONDS = 31_536_000;
 
 export interface IHydrationLog {
   userId: mongoose.Types.ObjectId;

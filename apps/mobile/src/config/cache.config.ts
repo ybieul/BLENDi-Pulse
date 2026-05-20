@@ -52,12 +52,25 @@ export type CacheConfig = typeof CACHE_CONFIG;
 export const QUERY_KEYS = {
   user: ['user'],
   userProfile: ['userProfile'],
+  blendHistory: ['blendHistory'],
   blendLogsToday: ['blendLogsToday'],
   favorites: ['favorites'],
+  hydrationHistory: ['hydrationHistory'],
   hydrationToday: ['hydrationToday'],
+  supplementHistory: ['supplementHistory'],
   supplementStack: ['supplementStack'],
   pulseAiHistory: ['pulseAiHistory'],
 } as const;
+
+export const PERSISTABLE_QUERY_KEYS = [
+  'user',
+  'userProfile',
+  'blendLogsToday',
+  'favorites',
+  'hydrationToday',
+  'supplementStack',
+  'pulseAiHistory',
+] as const satisfies ReadonlyArray<keyof typeof QUERY_KEYS>;
 
 export const HOME_INTERACTION_DELAY = 100;
 export const GOAL_RING_ANIMATION_DURATION = 1200;

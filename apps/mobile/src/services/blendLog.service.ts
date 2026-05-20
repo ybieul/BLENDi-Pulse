@@ -20,6 +20,11 @@ interface GetTodayLogsResponse {
   data: BlendLogsTodayData;
 }
 
+interface GetBlendHistoryResponse {
+  success: true;
+  data: BlendHistoryData;
+}
+
 export interface BlendLogEntry {
   id: string;
   recipeName: string | null;
@@ -46,6 +51,33 @@ export interface BlendLogsTodayData {
   totalCalories: number;
   blendCount: number;
   logs: BlendLogEntry[];
+}
+
+export interface BlendHistoryDailyBreakdownItem {
+  date: string;
+  count: number;
+  protein: number;
+  carbs: number;
+  calories: number;
+}
+
+export interface BlendHistorySummary {
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  totalCalories: number;
+  blendCount: number;
+  averageDailyProtein: number;
+  averageDailyCalories: number;
+}
+
+export interface BlendHistoryData {
+  logs: BlendLogEntry[];
+  summary: BlendHistorySummary;
+  dailyBreakdown: BlendHistoryDailyBreakdownItem[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 const BLEND_LOG_ERROR_TRANSLATION_KEYS = {
@@ -114,6 +146,28 @@ export async function createBlendLog(input: CreateBlendLogInput): Promise<Create
 export async function getTodayLogs(): Promise<BlendLogsTodayData> {
   try {
     const response = await api.get<GetTodayLogsResponse>('/blend-logs/today');
+    return response.data.data;
+  } catch (error) {
+    throw toBlendLogServiceError(error);
+  }
+}
+
+export async function getBlendHistory(
+  from: string,
+  to: string,
+  page: number = 1,
+  limit: number = 30
+): Promise<BlendHistoryData> {
+  try {
+    const response = await api.get<GetBlendHistoryResponse>('/blend-logs/history', {
+      params: {
+        from,
+        to,
+        page,
+        limit,
+      },
+    });
+
     return response.data.data;
   } catch (error) {
     throw toBlendLogServiceError(error);

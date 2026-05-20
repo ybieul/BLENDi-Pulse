@@ -1,6 +1,6 @@
 import { Router, type IRouter } from 'express';
 import { authenticate } from '../middlewares/authenticate';
-import { getTodayHydration, logWater } from '../controllers/hydration.controller';
+import { getHydrationHistory, getTodayHydration, logWater } from '../controllers/hydration.controller';
 
 export const hydrationLogsRouter: IRouter = Router();
 
@@ -9,6 +9,12 @@ export const hydrationLogsRouter: IRouter = Router();
  * Registra um consumo de água e devolve o total do dia atual.
  */
 hydrationLogsRouter.post('/', authenticate, logWater);
+
+/**
+ * GET /hydration-logs/history  🔒 autenticado
+ * Retorna o histórico paginado de hidratação em um período com agregados diários.
+ */
+hydrationLogsRouter.get('/history', authenticate, getHydrationHistory);
 
 /**
  * GET /hydration-logs/today  🔒 autenticado

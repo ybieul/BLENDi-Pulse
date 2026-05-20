@@ -1,5 +1,6 @@
 // apps/api/src/models/User.ts
 
+import { randomUUID } from 'node:crypto';
 import mongoose, { type Document, type Model } from 'mongoose';
 import argon2 from 'argon2';
 
@@ -9,6 +10,17 @@ export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 export type UserLocale = 'en' | 'pt-BR';
 export type UserUnitSystem = 'metric' | 'imperial';
+export type SupplementTiming = 'morning' | 'preWorkout' | 'postWorkout' | 'evening' | 'withMeal';
+
+export interface IUserSupplement {
+  supplementId: string;
+  name: string;
+  dosage: string;
+  dailyTargetCount?: number;
+  timing: SupplementTiming;
+  isActive: boolean;
+  order: number;
+}
 
 export interface IUser {
   email: string;
@@ -44,6 +56,7 @@ export interface IUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget?: number;
+  supplementStack: IUserSupplement[];
   currentStreak: number;
   blendCount: number;
   lastCleanedAt?: Date;
@@ -95,6 +108,68 @@ const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
   timeCost: 3,
   parallelism: 4,
 };
+
+const supplementTimingValues = [
+  'morning',
+  'preWorkout',
+  'postWorkout',
+  'evening',
+  'withMeal',
+] as const satisfies readonly SupplementTiming[];
+
+const userSupplementSchema = new mongoose.Schema<IUserSupplement>(
+  {
+    supplementId: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      default: () => randomUUID(),
+      immutable: true,
+    },
+    name: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      trim: true,
+      maxlength: [60, 'errors.validation.too_long'],
+    },
+    dosage: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      trim: true,
+      maxlength: [30, 'errors.validation.too_long'],
+    },
+    dailyTargetCount: {
+      type: Number,
+      default: 1,
+      min: [1, 'errors.validation.number_range'],
+      max: [20, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    timing: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      enum: supplementTimingValues,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    order: {
+      type: Number,
+      required: [true, 'errors.validation.required'],
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+  },
+  {
+    _id: false,
+  }
+);
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -183,6 +258,10 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       default: 200,
       min: [50, 'errors.validation.number_range'],
       max: [800, 'errors.validation.number_range'],
+    },
+    supplementStack: {
+      type: [userSupplementSchema],
+      default: [],
     },
     currentStreak: {
       type: Number,

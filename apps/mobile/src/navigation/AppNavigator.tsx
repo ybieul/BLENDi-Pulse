@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -7,6 +7,7 @@ import { BlendScreen } from '../screens/BlendScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { MeScreen } from '../screens/MeScreen';
 import { PulseAINavigator } from './PulseAINavigator';
+import { TrackNavigator } from './TrackNavigator';
 
 import {
   borderRadius,
@@ -38,25 +39,6 @@ const TAB_LABELS = {
   Track: 'navigation.track',
   Me: 'navigation.me',
 } as const;
-
-function AppPlaceholderScreen({
-  title,
-  children,
-}: {
-  title: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-function TrackScreen() {
-  return <AppPlaceholderScreen title="Track" />;
-}
 
 export function AppNavigator() {
   const { t } = useAppTranslation();
@@ -96,25 +78,13 @@ export function AppNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="PulseAI" component={PulseAINavigator} />
       <Tab.Screen name="Blend" component={BlendScreen} />
-      <Tab.Screen name="Track" component={TrackScreen} />
+      <Tab.Screen name="Track" component={TrackNavigator} />
       <Tab.Screen name="Me" component={MeScreen} />
     </Tab.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing['3xl'],
-    backgroundColor: colors.background.primary,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['2xl'],
-  },
   tabBar: {
     height: 88,
     paddingTop: spacing.md,

@@ -30,11 +30,16 @@ export type PulseAIStackParamList = {
   Favorites: undefined;
 };
 
+export type TrackStackParamList = {
+  TrackMain: undefined;
+  ManageStack: undefined;
+};
+
 export type AppTabParamList = {
   Home: undefined;
   PulseAI: NavigatorScreenParams<PulseAIStackParamList> | undefined;
   Blend: { recipe?: PulseAiRecipe } | undefined;
-  Track: undefined;
+  Track: NavigatorScreenParams<TrackStackParamList> | undefined;
   Me: undefined;
 };
 
@@ -86,3 +91,9 @@ export type PulseAIStackNavigationProp<RouteName extends keyof PulseAIStackParam
 
 export type PulseAIStackScreenProps<RouteName extends keyof PulseAIStackParamList> =
   NativeStackScreenProps<PulseAIStackParamList, RouteName>;
+
+export type TrackStackNavigationProp<RouteName extends keyof TrackStackParamList> =
+  NativeStackNavigationProp<TrackStackParamList, RouteName>;
+
+export type TrackStackScreenProps<RouteName extends keyof TrackStackParamList> =
+  NativeStackScreenProps<TrackStackParamList, RouteName>;

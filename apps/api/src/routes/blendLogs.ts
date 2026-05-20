@@ -1,5 +1,5 @@
 import { Router, type IRouter } from 'express';
-import { createBlendLog, getTodayLogs } from '../controllers/blendLog.controller';
+import { createBlendLog, getBlendHistory, getTodayLogs } from '../controllers/blendLog.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const blendLogsRouter: IRouter = Router();
@@ -9,6 +9,12 @@ export const blendLogsRouter: IRouter = Router();
  * Cria um novo blend log e atualiza métricas derivadas do usuário.
  */
 blendLogsRouter.post('/', authenticate, createBlendLog);
+
+/**
+ * GET /blend-logs/history  🔒 autenticado
+ * Retorna o histórico paginado de blends em um período com agregados do intervalo.
+ */
+blendLogsRouter.get('/history', authenticate, getBlendHistory);
 
 /**
  * GET /blend-logs/today  🔒 autenticado

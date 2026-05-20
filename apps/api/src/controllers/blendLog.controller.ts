@@ -1,11 +1,13 @@
+import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { createBlendLogSchema } from '@blendi/shared';
+import { createBlendLogSchema, historyQuerySchema } from '@blendi/shared';
 import { BlendLogModel } from '../models/BlendLog';
 import { UserModel } from '../models/User';
 import {
   getMidnightUTC,
   isSameDayInTimezone,
+  toUTC,
   toLocalDate,
 } from '../utils/timezone.utils';
 import {
@@ -19,6 +21,26 @@ interface BlendUserContext {
   currentStreak: number;
   blendCount: number;
 }
+
+interface BlendHistorySummary {
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  totalCalories: number;
+  blendCount: number;
+  averageDailyProtein: number;
+  averageDailyCalories: number;
+}
+
+interface BlendHistoryDailyBreakdownItem {
+  date: string;
+  count: number;
+  protein: number;
+  carbs: number;
+  calories: number;
+}
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function sendUnauthorized(res: Response): void {
   sendErrorResponse(res, {
@@ -44,6 +66,73 @@ function sendValidationError(res: Response, err: ZodError): void {
     message: VALIDATION_ERROR_MESSAGE,
     errors: formatZodErrors(err),
   });
+}
+
+function getFirstQueryValue(value: unknown): string | undefined {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  return typeof rawValue === 'string' ? rawValue : undefined;
+}
+
+function coerceHistoryQueryInput(query: Request['query']) {
+  const page = getFirstQueryValue(query.page);
+  const limit = getFirstQueryValue(query.limit);
+
+  return {
+    from: getFirstQueryValue(query.from),
+    to: getFirstQueryValue(query.to),
+    ...(page !== undefined && { page: Number(page) }),
+    ...(limit !== undefined && { limit: Number(limit) }),
+  };
+}
+
+function getIsoDateKey(value: string): string {
+  const date = new Date(value);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+function buildLocalDayUtcRange(from: string, to: string, timezone: string): {
+  startAt: Date;
+  endAtExclusive: Date;
+} {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  const startAt = toUTC(
+    new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate(), 0, 0, 0)),
+    timezone
+  );
+
+  const endAtExclusive = toUTC(
+    new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate() + 1, 0, 0, 0)),
+    timezone
+  );
+
+  return {
+    startAt,
+    endAtExclusive,
+  };
+}
+
+function getInclusiveDayKeys(from: string, to: string): string[] {
+  const dayKeys: string[] = [];
+  const current = new Date(`${getIsoDateKey(from)}T00:00:00.000Z`);
+  const end = new Date(`${getIsoDateKey(to)}T00:00:00.000Z`);
+
+  while (current.getTime() <= end.getTime()) {
+    dayKeys.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return dayKeys;
+}
+
+function roundToTwoDecimals(value: number): number {
+  return Number(value.toFixed(2));
 }
 
 function isPreviousDayInTimezone(previousDate: Date, currentDate: Date, timezone: string): boolean {
@@ -251,6 +340,196 @@ export async function getTodayLogs(
           rating: log.rating,
           createdAt: log.createdAt,
         })),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getBlendHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = historyQuerySchema.safeParse(coerceHistoryQueryInput(req.query));
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findById(userId).select({ timezone: 1 }).lean();
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    const { from, to, page, limit } = parsed.data;
+    const { startAt, endAtExclusive } = buildLocalDayUtcRange(from, to, user.timezone);
+    const matchQuery = {
+      userId,
+      createdAt: {
+        $gte: startAt,
+        $lt: endAtExclusive,
+      },
+    };
+
+    const [logs, aggregateResult] = await Promise.all([
+      BlendLogModel.find(matchQuery)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      BlendLogModel.aggregate<{
+        summary: Array<{
+          totalProtein: number;
+          totalCarbs: number;
+          totalFat: number;
+          totalCalories: number;
+          blendCount: number;
+        }>;
+        dailyBreakdown: BlendHistoryDailyBreakdownItem[];
+        total: Array<{ count: number }>;
+      }>([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            createdAt: {
+              $gte: startAt,
+              $lt: endAtExclusive,
+            },
+          },
+        },
+        {
+          $addFields: {
+            logDate: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt',
+                timezone: user.timezone,
+              },
+            },
+          },
+        },
+        {
+          $facet: {
+            summary: [
+              {
+                $group: {
+                  _id: null,
+                  totalProtein: { $sum: '$protein' },
+                  totalCarbs: { $sum: '$carbs' },
+                  totalFat: { $sum: '$fat' },
+                  totalCalories: { $sum: '$calories' },
+                  blendCount: { $sum: 1 },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalProtein: 1,
+                  totalCarbs: 1,
+                  totalFat: 1,
+                  totalCalories: 1,
+                  blendCount: 1,
+                },
+              },
+            ],
+            dailyBreakdown: [
+              {
+                $group: {
+                  _id: '$logDate',
+                  count: { $sum: 1 },
+                  protein: { $sum: '$protein' },
+                  carbs: { $sum: '$carbs' },
+                  calories: { $sum: '$calories' },
+                },
+              },
+              { $sort: { _id: -1 } },
+              {
+                $project: {
+                  _id: 0,
+                  date: '$_id',
+                  count: 1,
+                  protein: 1,
+                  carbs: 1,
+                  calories: 1,
+                },
+              },
+            ],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ]),
+    ]);
+
+    const aggregate = aggregateResult[0];
+    const total = aggregate?.total[0]?.count ?? 0;
+    const dayKeys = getInclusiveDayKeys(from, to);
+    const dailyBreakdownMap = new Map(
+      (aggregate?.dailyBreakdown ?? []).map(item => [item.date, item])
+    );
+    const dailyBreakdown = [...dayKeys]
+      .reverse()
+      .map(date => dailyBreakdownMap.get(date) ?? {
+        date,
+        count: 0,
+        protein: 0,
+        carbs: 0,
+        calories: 0,
+      });
+
+    const totals = aggregate?.summary[0] ?? {
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFat: 0,
+      totalCalories: 0,
+      blendCount: 0,
+    };
+    const totalDays = Math.max(
+      1,
+      Math.floor(
+        (new Date(`${getIsoDateKey(to)}T00:00:00.000Z`).getTime()
+          - new Date(`${getIsoDateKey(from)}T00:00:00.000Z`).getTime()) / MILLISECONDS_PER_DAY
+      ) + 1
+    );
+    const summary: BlendHistorySummary = {
+      ...totals,
+      averageDailyProtein: roundToTwoDecimals(totals.totalProtein / totalDays),
+      averageDailyCalories: roundToTwoDecimals(totals.totalCalories / totalDays),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        logs: logs.map(log => ({
+          id: String(log._id),
+          recipeName: log.recipeName ?? null,
+          protein: log.protein,
+          carbs: log.carbs,
+          fat: log.fat,
+          calories: log.calories,
+          blendiModel: log.blendiModel,
+          durationSeconds: log.durationSeconds,
+          rating: log.rating,
+          createdAt: log.createdAt,
+        })),
+        summary,
+        dailyBreakdown,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (err) {
