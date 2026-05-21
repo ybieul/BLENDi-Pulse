@@ -11,11 +11,19 @@ import {
   removePendingBlend,
   type PendingBlendLog,
 } from './pendingBlends.utils';
-import { showPersistentToast } from './toast.utils';
+import { showPersistentToast } from './toast.events';
 
 function toCreateBlendLogInput(pendingBlend: PendingBlendLog): CreateBlendLogInput {
-  const { localId, queuedAt, attemptCount, ...blendInput } = pendingBlend;
-  return blendInput;
+  return {
+    recipeName: pendingBlend.recipeName,
+    protein: pendingBlend.protein,
+    carbs: pendingBlend.carbs,
+    fat: pendingBlend.fat,
+    calories: pendingBlend.calories,
+    blendiModel: pendingBlend.blendiModel,
+    durationSeconds: pendingBlend.durationSeconds,
+    ...(pendingBlend.rating !== undefined ? { rating: pendingBlend.rating } : {}),
+  };
 }
 
 function getSyncFailureMessage(pendingBlend: PendingBlendLog): string {
@@ -33,6 +41,17 @@ function requeueForManualRetry(pendingBlend: PendingBlendLog): void {
   addPendingBlend(toCreateBlendLogInput(pendingBlend));
 }
 
+function buildRetryAction(
+  pendingBlend: PendingBlendLog
+): Parameters<typeof showPersistentToast>[1] {
+  return {
+    label: String(i18n.t('common.actions.retry')),
+    onPress: () => {
+      requeueForManualRetry(pendingBlend);
+    },
+  };
+}
+
 async function processPendingBlendQueue(): Promise<void> {
   const pendingBlends = getPendingBlends();
 
@@ -46,19 +65,16 @@ async function processPendingBlendQueue(): Promise<void> {
       removePendingBlend(pendingBlend.localId);
 
       if (nextAttemptCount >= 3) {
-        showPersistentToast(getSyncFailureMessage(pendingBlend), {
-          label: String(i18n.t('common.actions.retry')),
-          onPress: () => {
-            requeueForManualRetry(pendingBlend);
-          },
-        });
+        showPersistentToast(getSyncFailureMessage(pendingBlend), buildRetryAction(pendingBlend));
         continue;
       }
 
-      addPendingBlend({
+      const retryablePendingBlend: PendingBlendLog = {
         ...pendingBlend,
         attemptCount: nextAttemptCount,
-      });
+      };
+
+      addPendingBlend(retryablePendingBlend);
     }
   }
 }

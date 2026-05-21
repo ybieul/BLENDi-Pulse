@@ -1,65 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
-  ToastAndroid,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { borderRadius, colors, fontSizes, fonts, shadows, spacing } from '@blendi/shared';
 
-const IOS_TOAST_DURATION_MS = 3200;
+import { subscribeToToasts, type ToastPayload } from './toast.events';
+
+export { showPersistentToast, showToast } from './toast.events';
+
 const IOS_TOAST_ENTRY_OFFSET = -12;
 const IOS_TOAST_BORDER_COLOR = 'rgba(255,107,107,0.22)';
 const IOS_TOAST_BACKGROUND_COLOR = 'rgba(60,24,24,0.94)';
 const TOAST_ACTION_BACKGROUND_COLOR = colors.brand.pulse;
-
-interface ToastAction {
-  label: string;
-  onPress: () => void;
-}
-
-interface ToastPayload {
-  id: number;
-  message: string;
-  duration: number | null;
-  action?: ToastAction;
-}
-
-type ToastListener = (payload: ToastPayload) => void;
-
-const toastListeners = new Set<ToastListener>();
-
-function emitToast(payload: ToastPayload): void {
-  toastListeners.forEach((listener) => {
-    listener(payload);
-  });
-}
-
-export function showToast(message: string, duration = IOS_TOAST_DURATION_MS): void {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(message, duration >= 3500 ? ToastAndroid.LONG : ToastAndroid.SHORT);
-    return;
-  }
-
-  emitToast({
-    id: Date.now(),
-    message,
-    duration,
-  });
-}
-
-export function showPersistentToast(message: string, action: ToastAction): void {
-  emitToast({
-    id: Date.now(),
-    message,
-    duration: null,
-    action,
-  });
-}
 
 export function ToastViewport() {
   const insets = useSafeAreaInsets();
@@ -68,15 +25,9 @@ export function ToastViewport() {
   const translateY = useRef(new Animated.Value(IOS_TOAST_ENTRY_OFFSET)).current;
 
   useEffect(() => {
-    const listener: ToastListener = (payload) => {
+    return subscribeToToasts((payload) => {
       setToast(payload);
-    };
-
-    toastListeners.add(listener);
-
-    return () => {
-      toastListeners.delete(listener);
-    };
+    });
   }, []);
 
   useEffect(() => {
