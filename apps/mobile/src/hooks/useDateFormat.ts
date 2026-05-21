@@ -91,6 +91,26 @@ export interface UseDateFormatReturn {
   formatDate: (date: Date | number | string) => string;
 
   /**
+   * Formata o dia da semana abreviado no idioma e timezone do dispositivo.
+   *
+   * @example
+   *   formatWeekdayShort(new Date('2026-04-23T03:00:00Z'))
+   *   // en-US → "Wed"
+   *   // pt-BR → "Qua"
+   */
+  formatWeekdayShort: (date: Date | number | string) => string;
+
+  /**
+   * Formata uma data curta numérica no idioma e timezone do dispositivo.
+   *
+   * @example
+   *   formatShortDate(new Date('2026-04-23T03:00:00Z'))
+   *   // en-US → "4/22"
+   *   // pt-BR → "22/04"
+   */
+  formatShortDate: (date: Date | number | string) => string;
+
+  /**
    * Formata apenas o horário no idioma e timezone do dispositivo.
    * Em inglês usa 12h com AM/PM; em português usa 24h — convenção local de cada idioma.
    *
@@ -169,6 +189,17 @@ export function useDateFormat(): UseDateFormatReturn {
       // 'long' → "April 22, 2026" (en-US) | "22 de abril de 2026" (pt-BR)
     });
 
+    const weekdayFormatter = new Intl.DateTimeFormat(intlLocale, {
+      timeZone: timezone,
+      weekday: 'short',
+    });
+
+    const shortDateFormatter = new Intl.DateTimeFormat(intlLocale, {
+      timeZone: timezone,
+      month: 'numeric',
+      day: 'numeric',
+    });
+
     // ── formatTime ──────────────────────────────────────────────────────────
     // timeStyle: 'short' segue automaticamente a convenção do locale:
     //   en-US → 12h com AM/PM ("11:00 PM")
@@ -190,6 +221,15 @@ export function useDateFormat(): UseDateFormatReturn {
 
     function formatDate(value: Date | number | string): string {
       return dateFormatter.format(toDate(value));
+    }
+
+    function formatWeekdayShort(value: Date | number | string): string {
+      const formatted = weekdayFormatter.format(toDate(value)).replace('.', '');
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+
+    function formatShortDate(value: Date | number | string): string {
+      return shortDateFormatter.format(toDate(value));
     }
 
     function formatTime(value: Date | number | string): string {
@@ -234,6 +274,13 @@ export function useDateFormat(): UseDateFormatReturn {
       return getLocalDateKey(toDate(a), timezone) === getLocalDateKey(toDate(b), timezone);
     }
 
-    return { formatDate, formatTime, formatRelative, isSameLocalDay };
+    return {
+      formatDate,
+      formatWeekdayShort,
+      formatShortDate,
+      formatTime,
+      formatRelative,
+      isSameLocalDay,
+    };
   }, [intlLocale, timezone, locale]);
 }

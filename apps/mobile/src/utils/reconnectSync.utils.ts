@@ -82,6 +82,7 @@ async function processPendingBlendQueue(): Promise<void> {
 async function invalidateCriticalQueries(queryClient: QueryClient): Promise<void> {
   await Promise.allSettled([
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendLogsToday }),
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendHistory }),
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }),
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday }),
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.supplementStack }),

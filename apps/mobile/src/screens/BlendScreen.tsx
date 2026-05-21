@@ -246,6 +246,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
 
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendLogsToday }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendHistory }),
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }),
           ]);
         } else {

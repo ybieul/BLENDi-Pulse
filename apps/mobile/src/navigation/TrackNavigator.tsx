@@ -13,6 +13,7 @@ import {
 import type { SupplementStackItem } from '../services/supplementStack.service';
 import { TrackScreen } from '../screens/TrackScreen';
 import { ManageStackScreen } from '../screens/ManageStackScreen';
+import { HistoryScreen } from '../screens/HistoryScreen';
 import type { NewSupplementFormData } from '../screens/ManageStackScreen';
 import type { TrackStackParamList } from './types';
 
@@ -90,6 +91,7 @@ export function TrackNavigator() {
     <Stack.Navigator initialRouteName="TrackMain" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="TrackMain" component={TrackScreen} />
       <Stack.Screen name="ManageStack" component={ManageStackRoute} />
+      <Stack.Screen name="History" component={HistoryScreen} />
     </Stack.Navigator>
   );
 }

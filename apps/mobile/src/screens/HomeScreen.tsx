@@ -186,7 +186,10 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
 
   const handleLogWater = useCallback(async () => {
     await logWater();
-    await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationHistory }),
+    ]);
   }, [queryClient]);
 
   const handleProtocolSelect = useCallback(

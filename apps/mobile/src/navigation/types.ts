@@ -33,6 +33,7 @@ export type PulseAIStackParamList = {
 export type TrackStackParamList = {
   TrackMain: undefined;
   ManageStack: undefined;
+  History: undefined;
 };
 
 export type AppTabParamList = {

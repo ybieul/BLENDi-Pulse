@@ -316,6 +316,7 @@
     "title": "Track",
     "hydration": "Hydration",
     "logWater": "Log Water",
+    "viewHistory": "View full history",
     "myStack": "My Stack",
     "manage": "Manage",
     "manageStack": "Manage Stack",
@@ -362,6 +363,36 @@
       "generate_cta": "Generate my card",
       "loading": "Creating your card…"
     }
+  },
+
+  "history": {
+    "title": "History",
+    "days7": "7 days",
+    "days30": "30 days",
+    "days90": "90 days",
+    "week": "Wk {{number}}",
+    "nutrition": "Nutrition",
+    "hydration": "Hydration",
+    "supplements": "Supplements",
+    "totalBlends": "Total blends",
+    "avgProtein": "Avg protein/day",
+    "totalCalories": "Total calories",
+    "bestDay": "Best day",
+    "totalConsumed": "Total consumed",
+    "daysGoalReached": "Goal reached",
+    "avgDaily": "Daily average",
+    "avgAdherence": "Avg adherence",
+    "perfectDays": "Perfect days",
+    "topSupplement": "Most consistent",
+    "allBlends": "All blends",
+    "freeBlend": "Free blend",
+    "loadMore": "Load more",
+    "allLoaded": "All blends loaded",
+    "loadError": "Couldn't load data",
+    "noData": "No data",
+    "partial": "Partial",
+    "good": "Good",
+    "perfect": "Perfect"
   },
 
   "profile": {

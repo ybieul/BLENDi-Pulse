@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   colors,
@@ -60,6 +61,8 @@ import { MyStackSection } from '../components/track/MyStackSection';
 const DEFAULT_HYDRATION_TARGET_ML = 2000;
 const HISTORY_7D_QUERY_KEY = [...QUERY_KEYS.hydrationHistory, '7days'] as const;
 const RETRY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.15)';
+const HISTORY_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
+const HISTORY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.12)';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -205,7 +208,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     mutationFn: () => logWater(250),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
-      void queryClient.invalidateQueries({ queryKey: HISTORY_7D_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationHistory });
     },
   });
 
@@ -269,6 +272,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
 
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.supplementStack });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.supplementHistory });
     },
   });
 
@@ -316,6 +320,10 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
 
   const handleManage = useCallback(() => {
     navigation.navigate('ManageStack');
+  }, [navigation]);
+
+  const handleViewHistory = useCallback(() => {
+    navigation.navigate('History');
   }, [navigation]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -408,6 +416,19 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 onManage={handleManage}
               />
             </View>
+
+            <View style={styles.historyButtonSection}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleViewHistory}
+                style={styles.historyButton}
+              >
+                <View style={styles.historyButtonContent}>
+                  <Ionicons name="bar-chart-outline" size={18} color={colors.brand.pulse} />
+                  <Text style={styles.historyButtonLabel}>{t('track.viewHistory')}</Text>
+                </View>
+              </Pressable>
+            </View>
           </>
         )}
       </ScrollView>
@@ -443,6 +464,32 @@ const styles = StyleSheet.create({
   sectionSpacingSmall: {
     paddingHorizontal: 16,
     marginTop: 16,
+  },
+  historyButtonSection: {
+    paddingHorizontal: 16,
+    marginTop: 20,
+  },
+  historyButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: HISTORY_BUTTON_BORDER_COLOR,
+    backgroundColor: HISTORY_BUTTON_BACKGROUND,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  historyButtonLabel: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.medium,
   },
 
   // Skeleton
