@@ -18,7 +18,10 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useDateFormat } from '../../hooks/useDateFormat';
 import { useUnits } from '../../hooks/useUnits';
+import { getDeviceTimezone } from '../../services/timezone.service';
+import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
 import type { HydrationHistoryDailyBreakdownItem } from '../../services/hydration.service';
 import { showToast } from '../../utils/toast.utils';
@@ -51,8 +54,6 @@ const CHART_BAR_WIDTH = 16;
 const HISTORY_DAYS = 7;
 const BAR_ANIMATION_DURATION = 500;
 
-type Locale = 'en' | 'pt-BR';
-
 export interface HydrationSectionProps {
   todayTotal: number;
   dailyTarget: number;
@@ -69,16 +70,24 @@ function clampProgress(current: number, target: number): number {
   return Math.max(0, Math.min(current / target, 1));
 }
 
-function getIntlLocale(locale: Locale): string {
-  return locale === 'en' ? 'en-US' : 'pt-BR';
+function getLocalDateKey(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
 }
 
-function buildTrailingSevenDays(history: HydrationHistoryDailyBreakdownItem[]): HydrationHistoryDailyBreakdownItem[] {
+function buildTrailingSevenDays(
+  history: HydrationHistoryDailyBreakdownItem[],
+  timezone: string,
+): HydrationHistoryDailyBreakdownItem[] {
   const sortedHistory = [...history]
     .filter((item) => typeof item.date === 'string' && item.date.length > 0)
     .sort((left, right) => left.date.localeCompare(right.date));
 
-  const latestDateKey = sortedHistory.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
+  const latestDateKey = sortedHistory.at(-1)?.date ?? getLocalDateKey(new Date(), timezone);
   const latestDate = new Date(`${latestDateKey}T00:00:00.000Z`);
   const historyByDate = new Map(sortedHistory.map((item) => [item.date, item]));
 
@@ -94,15 +103,6 @@ function buildTrailingSevenDays(history: HydrationHistoryDailyBreakdownItem[]): 
   });
 }
 
-function formatWeekdayLabel(dateKey: string, locale: Locale): string {
-  const formatter = new Intl.DateTimeFormat(getIntlLocale(locale), {
-    weekday: 'short',
-  });
-  const value = formatter.format(new Date(`${dateKey}T12:00:00`)).replace('.', '');
-
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 export function HydrationSection({
   todayTotal,
   dailyTarget,
@@ -110,8 +110,11 @@ export function HydrationSection({
   history7Days,
   dataUpdatedAt,
 }: HydrationSectionProps) {
-  const { t, locale } = useAppTranslation();
+  const { t } = useAppTranslation();
+  const { formatWeekdayShort } = useDateFormat();
   const { displayHydration } = useUnits();
+  const userTimezone = useAuthStore((state) => state.user?.timezone);
+  const historyTimezone = userTimezone ?? getDeviceTimezone();
   const isConnected = useNetworkStore((state) => state.isConnected);
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const waterScale = useRef(new Animated.Value(1)).current;
@@ -127,8 +130,8 @@ export function HydrationSection({
   const progressText = `${displayHydration(todayTotal)} / ${displayHydration(dailyTarget)}`;
   const quickLogAmount = displayHydration(WATER_CONFIRMATION_AMOUNT_ML);
   const chartData = useMemo(
-    () => buildTrailingSevenDays(history7Days),
-    [history7Days]
+    () => buildTrailingSevenDays(history7Days, historyTimezone),
+    [history7Days, historyTimezone]
   );
   const maxPeriodTotal = useMemo(
     () => Math.max(...chartData.map((item) => item.totalMl), 0),
@@ -350,7 +353,7 @@ export function HydrationSection({
                   })}
                 />
               </Svg>
-              <Text style={styles.barLabel}>{formatWeekdayLabel(item.date, locale)}</Text>
+              <Text style={styles.barLabel}>{formatWeekdayShort(item.date)}</Text>
             </View>
           );
         })}

@@ -50,6 +50,8 @@ import {
 import type { SupplementStackItem } from '../services/supplementStack.service';
 
 import type { TrackStackScreenProps } from '../navigation/types';
+import { getDeviceTimezone } from '../services/timezone.service';
+import { useAuthStore } from '../store/auth.store';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { RecipeCardSkeleton } from '../components/ui';
@@ -59,20 +61,31 @@ import { MyStackSection } from '../components/track/MyStackSection';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_HYDRATION_TARGET_ML = 2000;
-const HISTORY_7D_QUERY_KEY = [...QUERY_KEYS.hydrationHistory, '7days'] as const;
 const RETRY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.15)';
 const HISTORY_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
 const HISTORY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.12)';
 
+type TrackHydrationHistoryQueryKey = readonly [...typeof QUERY_KEYS.hydrationHistory, string, '7days'];
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function getDateRange7Days(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to);
-  from.setDate(from.getDate() - 6);
+function getLocalDateKey(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function getDateRange7Days(timezone: string): { from: string; to: string } {
+  const to = getLocalDateKey(new Date(), timezone);
+  const from = new Date(`${to}T00:00:00.000Z`);
+  from.setUTCDate(from.getUTCDate() - 6);
+
   return {
     from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
+    to,
   };
 }
 
@@ -137,6 +150,8 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
+  const userTimezone = useAuthStore((state) => state.user?.timezone);
+  const historyTimezone = userTimezone ?? getDeviceTimezone();
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -175,7 +190,14 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     retry: 1,
   });
 
-  const { from: historyFrom, to: historyTo } = useMemo(getDateRange7Days, []);
+  const { from: historyFrom, to: historyTo } = useMemo(
+    () => getDateRange7Days(historyTimezone),
+    [historyTimezone],
+  );
+  const historyQueryKey = useMemo(
+    () => [...QUERY_KEYS.hydrationHistory, historyTimezone, '7days'] as const,
+    [historyTimezone],
+  );
 
   const hydrationHistoryFetcher = toHydrationHistoryFetcher(getHydrationHistory);
 
@@ -188,9 +210,9 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     HydrationHistoryData,
     Error,
     HydrationHistoryData,
-    typeof HISTORY_7D_QUERY_KEY
+    TrackHydrationHistoryQueryKey
   >({
-    queryKey: HISTORY_7D_QUERY_KEY,
+    queryKey: historyQueryKey,
     queryFn: fetchHydrationHistory,
     staleTime: CACHE_CONFIG.HYDRATION_TODAY_TTL,
     retry: 1,

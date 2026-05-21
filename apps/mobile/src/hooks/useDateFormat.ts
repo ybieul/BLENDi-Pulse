@@ -21,6 +21,7 @@
 import { useMemo } from 'react';
 import { useAppTranslation } from './useAppTranslation';
 import type { SupportedLocale } from '../locales/i18n';
+import { useAuthStore } from '../store/auth.store';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,12 +36,87 @@ function toIntlLocale(locale: SupportedLocale): string {
   return locale === 'en' ? 'en-US' : 'pt-BR';
 }
 
+const LOCAL_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+type DateParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function getParts(date: Date, timezone: string): DateParts {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parseInt(parts.find((part) => part.type === type)?.value ?? '0', 10);
+  const hour = get('hour') === 24 ? 0 : get('hour');
+
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour,
+    minute: get('minute'),
+    second: get('second'),
+  };
+}
+
+function buildUTCFromLocal(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  timezone: string,
+): Date {
+  const naive = Date.UTC(year, month - 1, day, hour, minute, second);
+  const naiveDate = new Date(naive);
+  const localParts = getParts(naiveDate, timezone);
+  const wantedMs = Date.UTC(year, month - 1, day, hour, minute, second);
+  const gotMs = Date.UTC(
+    localParts.year,
+    localParts.month - 1,
+    localParts.day,
+    localParts.hour,
+    localParts.minute,
+    localParts.second,
+  );
+
+  return new Date(naive + (wantedMs - gotMs));
+}
+
 /**
  * Normaliza qualquer valor de data para um objeto Date.
  * Aceita Date, timestamp numérico ou string ISO 8601.
  */
-function toDate(value: Date | number | string): Date {
-  return value instanceof Date ? value : new Date(value);
+function toDate(value: Date | number | string, timezone: string): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return new Date(value);
+  }
+
+  if (LOCAL_DATE_KEY_PATTERN.test(value)) {
+    const [year, month, day] = value.split('-').map((part) => Number(part));
+    return buildUTCFromLocal(year, month, day, 12, 0, 0, timezone);
+  }
+
+  return new Date(value);
 }
 
 /**
@@ -175,10 +251,12 @@ export interface UseDateFormatReturn {
  */
 export function useDateFormat(): UseDateFormatReturn {
   const { locale } = useAppTranslation();
+  const userTimezone = useAuthStore((state) => state.user?.timezone);
 
-  // Timezone do dispositivo: lido no momento do render para capturar mudanças
-  // de fuso sem precisar de subscribe em nenhum store externo.
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Usa o timezone persistido do usuário quando disponível, para garantir que
+  // a UI formate os mesmos dias-calendário usados pelos endpoints de histórico.
+  // Sem sessão ativa, cai para o timezone atual do dispositivo.
+  const timezone = userTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const intlLocale = toIntlLocale(locale);
 
   return useMemo(() => {
@@ -220,24 +298,24 @@ export function useDateFormat(): UseDateFormatReturn {
     // ── Funções ─────────────────────────────────────────────────────────────
 
     function formatDate(value: Date | number | string): string {
-      return dateFormatter.format(toDate(value));
+      return dateFormatter.format(toDate(value, timezone));
     }
 
     function formatWeekdayShort(value: Date | number | string): string {
-      const formatted = weekdayFormatter.format(toDate(value)).replace('.', '');
+      const formatted = weekdayFormatter.format(toDate(value, timezone)).replace('.', '');
       return formatted.charAt(0).toUpperCase() + formatted.slice(1);
     }
 
     function formatShortDate(value: Date | number | string): string {
-      return shortDateFormatter.format(toDate(value));
+      return shortDateFormatter.format(toDate(value, timezone));
     }
 
     function formatTime(value: Date | number | string): string {
-      return timeFormatter.format(toDate(value));
+      return timeFormatter.format(toDate(value, timezone));
     }
 
     function formatRelative(value: Date | number | string): string {
-      const date = toDate(value);
+      const date = toDate(value, timezone);
       const now = new Date();
 
       const dateKey = getLocalDateKey(date, timezone);
@@ -257,8 +335,8 @@ export function useDateFormat(): UseDateFormatReturn {
 
       // Para datas mais antigas: calcular diferença em dias calendário locais.
       // Compara meia-noite local de cada dia para evitar artefatos de hora.
-      const dateMidnight = new Date(dateKey + 'T00:00:00');
-      const todayMidnight = new Date(todayKey + 'T00:00:00');
+      const dateMidnight = new Date(`${dateKey}T00:00:00.000Z`);
+      const todayMidnight = new Date(`${todayKey}T00:00:00.000Z`);
       const diffMs = todayMidnight.getTime() - dateMidnight.getTime();
       const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
 
@@ -271,7 +349,7 @@ export function useDateFormat(): UseDateFormatReturn {
       a: Date | number | string,
       b: Date | number | string
     ): boolean {
-      return getLocalDateKey(toDate(a), timezone) === getLocalDateKey(toDate(b), timezone);
+      return getLocalDateKey(toDate(a, timezone), timezone) === getLocalDateKey(toDate(b, timezone), timezone);
     }
 
     return {

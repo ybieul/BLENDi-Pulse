@@ -20,6 +20,7 @@ import {
   type SupplementHistoryData,
 } from '../services/supplementLog.service';
 import { getDeviceTimezone } from '../services/timezone.service';
+import { useAuthStore } from '../store/auth.store';
 
 export type HistoryPeriod = 7 | 30 | 90;
 
@@ -32,10 +33,10 @@ type DateParts = {
   second: number;
 };
 
-type BlendSummaryQueryKey = readonly [...typeof QUERY_KEYS.blendHistory, HistoryPeriod];
-type HydrationSummaryQueryKey = readonly [...typeof QUERY_KEYS.hydrationHistory, HistoryPeriod];
-type SupplementSummaryQueryKey = readonly [...typeof QUERY_KEYS.supplementHistory, HistoryPeriod];
-type BlendInfiniteQueryKey = readonly [...typeof QUERY_KEYS.blendHistory, HistoryPeriod, 'infinite'];
+type BlendSummaryQueryKey = readonly [...typeof QUERY_KEYS.blendHistory, string, HistoryPeriod];
+type HydrationSummaryQueryKey = readonly [...typeof QUERY_KEYS.hydrationHistory, string, HistoryPeriod];
+type SupplementSummaryQueryKey = readonly [...typeof QUERY_KEYS.supplementHistory, string, HistoryPeriod];
+type BlendInfiniteQueryKey = readonly [...typeof QUERY_KEYS.blendHistory, string, HistoryPeriod, 'infinite'];
 
 function getParts(utcDate: Date, timezone: string): DateParts {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -117,7 +118,8 @@ function buildHistoryRange(period: HistoryPeriod, timezone: string): { from: str
 }
 
 export function useHistoryData(period: HistoryPeriod) {
-  const timezone = getDeviceTimezone();
+  const userTimezone = useAuthStore((state) => state.user?.timezone);
+  const timezone = userTimezone ?? getDeviceTimezone();
 
   const { from, to } = useMemo(
     () => buildHistoryRange(period, timezone),
@@ -125,20 +127,20 @@ export function useHistoryData(period: HistoryPeriod) {
   );
 
   const blendSummaryQueryKey = useMemo(
-    () => [...QUERY_KEYS.blendHistory, period] as const,
-    [period],
+    () => [...QUERY_KEYS.blendHistory, timezone, period] as const,
+    [period, timezone],
   );
   const hydrationSummaryQueryKey = useMemo(
-    () => [...QUERY_KEYS.hydrationHistory, period] as const,
-    [period],
+    () => [...QUERY_KEYS.hydrationHistory, timezone, period] as const,
+    [period, timezone],
   );
   const supplementSummaryQueryKey = useMemo(
-    () => [...QUERY_KEYS.supplementHistory, period] as const,
-    [period],
+    () => [...QUERY_KEYS.supplementHistory, timezone, period] as const,
+    [period, timezone],
   );
   const blendInfiniteQueryKey = useMemo(
-    () => [...QUERY_KEYS.blendHistory, period, 'infinite'] as const,
-    [period],
+    () => [...QUERY_KEYS.blendHistory, timezone, period, 'infinite'] as const,
+    [period, timezone],
   );
 
   const fetchBlendSummary: () => Promise<BlendHistoryData> = useCallback(
