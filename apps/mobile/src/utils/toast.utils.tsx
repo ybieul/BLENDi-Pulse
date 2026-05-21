@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   ToastAndroid,
@@ -14,11 +15,18 @@ const IOS_TOAST_DURATION_MS = 3200;
 const IOS_TOAST_ENTRY_OFFSET = -12;
 const IOS_TOAST_BORDER_COLOR = 'rgba(255,107,107,0.22)';
 const IOS_TOAST_BACKGROUND_COLOR = 'rgba(60,24,24,0.94)';
+const TOAST_ACTION_BACKGROUND_COLOR = colors.brand.pulse;
+
+interface ToastAction {
+  label: string;
+  onPress: () => void;
+}
 
 interface ToastPayload {
   id: number;
   message: string;
-  duration: number;
+  duration: number | null;
+  action?: ToastAction;
 }
 
 type ToastListener = (payload: ToastPayload) => void;
@@ -44,6 +52,15 @@ export function showToast(message: string, duration = IOS_TOAST_DURATION_MS): vo
   });
 }
 
+export function showPersistentToast(message: string, action: ToastAction): void {
+  emitToast({
+    id: Date.now(),
+    message,
+    duration: null,
+    action,
+  });
+}
+
 export function ToastViewport() {
   const insets = useSafeAreaInsets();
   const [toast, setToast] = useState<ToastPayload | null>(null);
@@ -63,7 +80,7 @@ export function ToastViewport() {
   }, []);
 
   useEffect(() => {
-    if (!toast || Platform.OS === 'android') {
+    if (!toast) {
       return;
     }
 
@@ -82,6 +99,10 @@ export function ToastViewport() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    if (toast.duration === null) {
+      return undefined;
+    }
 
     const timeoutId = setTimeout(() => {
       Animated.parallel([
@@ -107,13 +128,19 @@ export function ToastViewport() {
     };
   }, [opacity, toast, translateY]);
 
-  if (Platform.OS === 'android' || !toast) {
+  if (!toast) {
     return null;
   }
 
+  const handleActionPress = () => {
+    toast.action?.onPress();
+    setToast((currentToast) => (currentToast?.id === toast.id ? null : currentToast));
+  };
+
   return (
-    <View pointerEvents="none" style={[styles.viewport, { top: insets.top + spacing.lg }]}>
+    <View pointerEvents="box-none" style={[styles.viewport, { top: insets.top + spacing.lg }]}>
       <Animated.View
+        pointerEvents={toast.action ? 'auto' : 'none'}
         style={[
           styles.toast,
           {
@@ -123,6 +150,11 @@ export function ToastViewport() {
         ]}
       >
         <Text style={styles.toastText}>{toast.message}</Text>
+        {toast.action ? (
+          <Pressable onPress={handleActionPress} style={styles.actionButton}>
+            <Text style={styles.actionButtonText}>{toast.action.label}</Text>
+          </Pressable>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -155,5 +187,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
     lineHeight: 20,
+  },
+  actionButton: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: TOAST_ACTION_BACKGROUND_COLOR,
+  },
+  actionButtonText: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    lineHeight: 18,
   },
 });

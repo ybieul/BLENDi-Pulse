@@ -24,3 +24,6 @@ export type { AuthScreenLayoutProps } from './AuthScreenLayout';
 
 export { GoogleSignInButton } from './GoogleSignInButton';
 export type { GoogleSignInButtonProps } from './GoogleSignInButton';
+
+export { StaleDataIndicator } from './StaleDataIndicator';
+export type { StaleDataIndicatorProps } from './StaleDataIndicator';

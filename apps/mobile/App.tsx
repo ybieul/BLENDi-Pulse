@@ -3,6 +3,7 @@
 // primeiro render, sem flicker de chaves ou textos em idioma errado.
 import './src/locales/i18n';
 
+import NetInfo from '@react-native-community/netinfo';
 import { enableScreens } from 'react-native-screens';
 
 // Ativa telas nativas do React Navigation para reduzir custo de memória e
@@ -27,7 +28,9 @@ import { persistOptions, queryClient } from './src/config/queryClient';
 
 // Navigation — root switch entre auth e app
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { OfflineBanner } from './src/components/ui/OfflineBanner';
 import { ToastViewport } from './src/utils/toast.utils';
+import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 
 // Timezone — sincronização silenciosa ao voltar ao foreground
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
@@ -71,6 +74,21 @@ const navigationTheme: Theme = {
 };
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <AppShell />
+      </PersistQueryClientProvider>
+      <OfflineBanner />
+    </SafeAreaProvider>
+  );
+}
+
+function AppShell() {
+  // Inicia a assinatura de conectividade antes da lógica de auth/navegação,
+  // usando a mesma instância de queryClient provida para o restante do app.
+  useNetworkStatus({ netInfoClient: NetInfo, queryClient });
+
   const restoreSession = useAuthStore((s) => s.restoreSession);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isRestoringSession = useAuthStore((s) => s.isRestoringSession);
@@ -155,14 +173,10 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <NavigationContainer theme={navigationTheme}>
-          <StatusBar style="light" backgroundColor={colors.background.primary} />
-          <RootNavigator />
-          <ToastViewport />
-        </NavigationContainer>
-      </PersistQueryClientProvider>
-    </SafeAreaProvider>
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style="light" backgroundColor={colors.background.primary} />
+      <RootNavigator />
+      <ToastViewport />
+    </NavigationContainer>
   );
 }

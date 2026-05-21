@@ -18,6 +18,7 @@ import {
 } from '@blendi/shared';
 import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useNetworkStore } from '../../store/network.store';
 import { showToast } from '../../utils/toast.utils';
 import { AuthButton } from '../ui/AuthButton';
 
@@ -93,6 +94,7 @@ export function RecipeCard({
   isFromCache = false,
 }: RecipeCardProps) {
   const { t } = useAppTranslation();
+  const isConnected = useNetworkStore((state) => state.isConnected);
   const favoriteScale = useRef(new Animated.Value(HEART_SCALE_DEFAULT)).current;
   const addFavoriteMutation = useAddFavorite();
   const removeFavoriteMutation = useRemoveFavorite();
@@ -139,6 +141,11 @@ export function RecipeCard({
 
   const handleFavoritePress = () => {
     if (isFavoriteMutationPending) {
+      return;
+    }
+
+    if (!isConnected) {
+      showToast(t('common.actionRequiresConnection'));
       return;
     }
 

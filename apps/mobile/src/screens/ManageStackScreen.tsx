@@ -36,8 +36,10 @@ import {
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthInput } from '../components/ui/AuthInput';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useNetworkStore } from '../store/network.store';
 import type { SupplementStackItem } from '../services/supplementStack.service';
 import type { TrackStackParamList } from '../navigation/types';
+import { showToast } from '../utils/toast.utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -196,6 +198,7 @@ export function ManageStackScreen({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const navigation = useNavigation<NativeStackNavigationProp<TrackStackParamList>>();
+  const isConnected = useNetworkStore((state) => state.isConnected);
 
   // ── Bottom sheet visibility ─────────────────────────────────────────────
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -312,6 +315,11 @@ export function ManageStackScreen({
       return;
     }
 
+    if (!isConnected) {
+      showToast(t('common.actionRequiresConnection'));
+      return;
+    }
+
     onAdd({
       name: trimmedName,
       dosage: formDosage.trim(),
@@ -319,6 +327,24 @@ export function ManageStackScreen({
       timing: formTiming,
     });
     closeSheet();
+  }
+
+  function handleDelete(supplementId: string) {
+    if (!isConnected) {
+      showToast(t('common.actionRequiresConnection'));
+      return;
+    }
+
+    onDelete(supplementId);
+  }
+
+  function handleToggleActive(supplementId: string, isActive: boolean) {
+    if (!isConnected) {
+      showToast(t('common.actionRequiresConnection'));
+      return;
+    }
+
+    onToggleActive(supplementId, isActive);
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -351,8 +377,8 @@ export function ManageStackScreen({
           <SupplementManageItem
             key={item.supplementId}
             item={item}
-            onToggleActive={onToggleActive}
-            onDelete={onDelete}
+            onToggleActive={handleToggleActive}
+            onDelete={handleDelete}
             deleteTitle={t('track.deleteConfirmTitle')}
             deleteMessage={t('track.deleteConfirmMessage')}
             deleteConfirm={t('track.delete')}

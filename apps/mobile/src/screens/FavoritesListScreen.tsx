@@ -23,8 +23,10 @@ import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { FavoriteCard } from '../components/favorites/FavoriteCard';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton, RecipeCardSkeleton } from '../components/ui';
+import { StaleDataIndicator } from '../components/ui/StaleDataIndicator';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useFavorites, useRemoveFavorite } from '../hooks/useFavorites';
+import { useNetworkStore } from '../store/network.store';
 import type { AppTabParamList, PulseAIStackParamList } from '../navigation/types';
 import { showToast } from '../utils/toast.utils';
 
@@ -59,8 +61,9 @@ function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
 export function FavoritesListScreen({ navigation }: Props) {
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
-  const { favorites, isLoading, isError, refetch } = useFavorites();
+  const { favorites, isLoading, isError, refetch, dataUpdatedAt } = useFavorites();
   const removeFavorite = useRemoveFavorite();
+  const isConnected = useNetworkStore((state) => state.isConnected);
 
   const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -105,6 +108,11 @@ export function FavoritesListScreen({ navigation }: Props) {
 
   const handleRemove = useCallback(
     (item: FavoriteItem) => {
+      if (!isConnected) {
+        showToast(t('common.actionRequiresConnection'));
+        return;
+      }
+
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setPendingRemovals((prev) => new Set([...prev, item.id]));
 
@@ -127,7 +135,7 @@ export function FavoritesListScreen({ navigation }: Props) {
         },
       });
     },
-    [removeFavorite, t],
+    [isConnected, removeFavorite, t],
   );
 
   const handleRefresh = useCallback(async () => {
@@ -223,7 +231,12 @@ export function FavoritesListScreen({ navigation }: Props) {
           <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
         </Pressable>
 
-        <Text style={styles.headerTitle}>{t('favorites.title')}</Text>
+        <View style={styles.headerTitleBlock}>
+          <Text style={styles.headerTitle}>{t('favorites.title')}</Text>
+          <View style={styles.staleIndicatorAnchor}>
+            <StaleDataIndicator dataUpdatedAt={dataUpdatedAt} />
+          </View>
+        </View>
 
         <View style={styles.headerSpacer} />
       </View>
@@ -255,11 +268,24 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  headerTitleBlock: {
+    position: 'relative',
+    minWidth: 120,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
   headerTitle: {
     color: colors.text.primary,
     fontFamily: fonts.display,
     fontSize: 18,
     fontWeight: fontWeights.bold,
+  },
+  staleIndicatorAnchor: {
+    position: 'relative',
+    width: '100%',
+    minHeight: 12,
+    marginTop: spacing.xs,
   },
   skeletonList: {
     paddingHorizontal: 16,

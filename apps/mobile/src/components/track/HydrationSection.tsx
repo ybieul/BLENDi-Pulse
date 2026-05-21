@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -19,7 +19,10 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useUnits } from '../../hooks/useUnits';
+import { useNetworkStore } from '../../store/network.store';
 import type { HydrationHistoryDailyBreakdownItem } from '../../services/hydration.service';
+import { showToast } from '../../utils/toast.utils';
+import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
@@ -37,6 +40,8 @@ const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
+const WATER_OFFLINE_ICON_COLOR = 'rgba(255,255,255,0.82)';
+const WATER_OFFLINE_ICON_SIZE = 10;
 const CARD_RADIUS = 16;
 const PROGRESS_RADIUS = 4;
 const PROGRESS_HEIGHT = 8;
@@ -53,6 +58,7 @@ export interface HydrationSectionProps {
   dailyTarget: number;
   onLogWater: () => void | Promise<void>;
   history7Days: HydrationHistoryDailyBreakdownItem[];
+  dataUpdatedAt: number;
 }
 
 function clampProgress(current: number, target: number): number {
@@ -102,13 +108,17 @@ export function HydrationSection({
   dailyTarget,
   onLogWater,
   history7Days,
+  dataUpdatedAt,
 }: HydrationSectionProps) {
   const { t, locale } = useAppTranslation();
   const { displayHydration } = useUnits();
+  const isConnected = useNetworkStore((state) => state.isConnected);
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const waterScale = useRef(new Animated.Value(1)).current;
   const waterConfirmationOpacity = useRef(new Animated.Value(0)).current;
   const waterConfirmationTranslateY = useRef(new Animated.Value(0)).current;
+  const offlineIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showOfflineIndicator, setShowOfflineIndicator] = useState(false);
   const barAnimations = useRef(
     Array.from({ length: HISTORY_DAYS }, () => new Animated.Value(0))
   ).current;
@@ -179,20 +189,29 @@ export function HydrationSection({
 
   useEffect(() => {
     return () => {
+      if (offlineIndicatorTimeoutRef.current) {
+        clearTimeout(offlineIndicatorTimeoutRef.current);
+      }
+
       waterScale.stopAnimation();
       waterConfirmationOpacity.stopAnimation();
       waterConfirmationTranslateY.stopAnimation();
     };
   }, [waterConfirmationOpacity, waterConfirmationTranslateY, waterScale]);
 
-  const animateWaterConfirmation = () => {
+  const animateWaterConfirmation = (offlineFeedback: boolean) => {
     waterScale.stopAnimation();
     waterConfirmationOpacity.stopAnimation();
     waterConfirmationTranslateY.stopAnimation();
 
+    if (offlineIndicatorTimeoutRef.current) {
+      clearTimeout(offlineIndicatorTimeoutRef.current);
+    }
+
     waterScale.setValue(1);
     waterConfirmationOpacity.setValue(1);
     waterConfirmationTranslateY.setValue(0);
+    setShowOfflineIndicator(offlineFeedback);
 
     Animated.sequence([
       Animated.spring(waterScale, {
@@ -223,18 +242,36 @@ export function HydrationSection({
         useNativeDriver: true,
       }),
     ]).start();
+
+    offlineIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowOfflineIndicator(false);
+      offlineIndicatorTimeoutRef.current = null;
+    }, WATER_CONFIRMATION_DURATION);
   };
 
   const handleLogWater = () => {
-    animateWaterConfirmation();
+    const isOffline = !isConnected;
+
+    animateWaterConfirmation(isOffline);
+
+    if (isOffline) {
+      showToast(t('common.actionRequiresConnection'));
+      return;
+    }
+
     void onLogWater();
   };
 
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>{t('track.hydration')}</Text>
-        <Text style={styles.progressText}>{progressText}</Text>
+      <View style={styles.headerBlock}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>{t('track.hydration')}</Text>
+          <Text style={styles.progressText}>{progressText}</Text>
+        </View>
+        <View style={styles.staleIndicatorAnchor}>
+          <StaleDataIndicator dataUpdatedAt={dataUpdatedAt} />
+        </View>
       </View>
 
       <View style={styles.progressTrack}>
@@ -256,7 +293,7 @@ export function HydrationSection({
         onPress={handleLogWater}
         style={styles.logButton}
       >
-        <Animated.Text
+        <Animated.View
           pointerEvents="none"
           style={[
             styles.waterConfirmation,
@@ -266,8 +303,17 @@ export function HydrationSection({
             },
           ]}
         >
-          {quickLogAmount === '—' ? quickLogAmount : `+${quickLogAmount}`}
-        </Animated.Text>
+          <Text style={styles.waterConfirmationText}>
+            {quickLogAmount === '—' ? quickLogAmount : `+${quickLogAmount}`}
+          </Text>
+          {showOfflineIndicator ? (
+            <Ionicons
+              name="cloud-offline-outline"
+              size={WATER_OFFLINE_ICON_SIZE}
+              color={WATER_OFFLINE_ICON_COLOR}
+            />
+          ) : null}
+        </Animated.View>
 
         <View style={styles.logButtonContent}>
           <Animated.View style={{ transform: [{ scale: waterScale }] }}>
@@ -328,6 +374,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
   },
+  headerBlock: {
+    position: 'relative',
+    paddingBottom: spacing.lg,
+  },
   title: {
     flex: 1,
     color: colors.text.primary,
@@ -342,6 +392,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: fontWeights.medium,
     opacity: 0.85,
+  },
+  staleIndicatorAnchor: {
+    position: 'relative',
+    width: '100%',
+    minHeight: 12,
   },
   progressTrack: {
     height: PROGRESS_HEIGHT,
@@ -380,6 +435,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -spacing.lg,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  waterConfirmationText: {
     color: WATER_ICON_COLOR,
     fontFamily: fonts.body,
     fontSize: fontSizes.xs,

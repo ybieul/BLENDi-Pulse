@@ -45,6 +45,7 @@ const UNIT_SYSTEM_CONTEXT: Record<
 
 export interface BuildPulseAiPromptInput extends PulseAiPromptUserContext {
   message: PulseAiChatInput['message'];
+  language?: PulseAiChatInput['language'];
 }
 
 export interface PulseAiApiMessage {
@@ -128,15 +129,21 @@ function buildRecentRecipesSection(recipeNames: string[]): string {
 function buildSystemPrompt({
   blendiModel,
   goal,
+  language,
   locale,
   unitSystem,
   dailyProteinTarget,
   dailyCarbTarget,
   dailyCalorieTarget,
   recentBlendRecipeNames,
-}: PulseAiPromptUserContext): string {
+}: PulseAiPromptUserContext & {
+  language?: PulseAiChatInput['language'];
+}): string {
   const modelContext = MODEL_CONTEXT[blendiModel];
-  const responseLanguage = LANGUAGE_CONTEXT[locale];
+  // Priority: explicit request language from the active app session, then the
+  // persisted profile locale as a backward-compatible fallback.
+  const responseLocale: UserLocale = language ?? locale;
+  const responseLanguage = LANGUAGE_CONTEXT[responseLocale];
   const unitSystemContext = UNIT_SYSTEM_CONTEXT[unitSystem];
   const recentRecipesSection = buildRecentRecipesSection(
     normalizeRecentRecipeNames(recentBlendRecipeNames)

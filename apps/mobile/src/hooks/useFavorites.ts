@@ -23,6 +23,7 @@ export function useFavorites() {
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,
+    dataUpdatedAt: query.dataUpdatedAt,
   };
 }
 

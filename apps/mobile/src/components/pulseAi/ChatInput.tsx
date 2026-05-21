@@ -27,6 +27,7 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useAuthStore } from '../../store/auth.store';
+import { useNetworkStore } from '../../store/network.store';
 import type { AppTabNavigationProp, RootStackParamList } from '../../navigation/types';
 
 const BASE_TAB_BAR_HEIGHT = 88;
@@ -42,7 +43,10 @@ const INPUT_HIGHLIGHT = 'rgba(255,255,255,0.04)';
 const INPUT_BORDER = 'rgba(255,255,255,0.10)';
 const INPUT_DISABLED_OPACITY = 0.72;
 const MICROPHONE_COLOR = 'rgba(255,255,255,0.30)';
+const OFFLINE_ICON_COLOR = 'rgba(255,255,255,0.30)';
 const KEYBOARD_CLEARANCE = spacing.md;
+const OFFLINE_INPUT_OPACITY = 0.5;
+const RECONNECT_OPACITY_DURATION = 300;
 
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery';
@@ -76,12 +80,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   const navigation = useNavigation<AppTabNavigationProp<'PulseAI'>>();
   const { t } = useAppTranslation();
   const userGoal = useAuthStore((state) => state.user?.goal ?? 'Wellness');
+  const isConnected = useNetworkStore((state) => state.isConnected);
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
   const [message, setMessage] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const sendScale = useRef(new Animated.Value(SEND_ICON_SCALE_END)).current;
+  const fieldOpacity = useRef(new Animated.Value(isConnected ? 1 : OFFLINE_INPUT_OPACITY)).current;
+  const previousIsConnected = useRef(isConnected);
 
   useImperativeHandle(ref, () => ({ setText: setMessage }), []);
 
@@ -95,7 +102,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
   const trimmedMessage = message.trim();
   const isLimitReached = usageRemaining === 0;
-  const isFieldDisabled = isLoading || isLimitReached;
+  const isOffline = !isConnected;
+  const isFieldDisabled = isLoading || isLimitReached || isOffline;
   const canSend = trimmedMessage.length > 0 && !isFieldDisabled;
   const restingBottomPadding = BASE_TAB_BAR_HEIGHT + insets.bottom + spacing.md;
   const bottomPadding = keyboardHeight > 0
@@ -127,6 +135,29 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       useNativeDriver: true,
     }).start();
   }, [sendScale, trimmedMessage]);
+
+  useEffect(() => {
+    fieldOpacity.stopAnimation();
+
+    if (!isConnected) {
+      fieldOpacity.setValue(OFFLINE_INPUT_OPACITY);
+      previousIsConnected.current = false;
+      return;
+    }
+
+    if (!previousIsConnected.current) {
+      fieldOpacity.setValue(OFFLINE_INPUT_OPACITY);
+      Animated.timing(fieldOpacity, {
+        toValue: 1,
+        duration: RECONNECT_OPACITY_DURATION,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fieldOpacity.setValue(1);
+    }
+
+    previousIsConnected.current = true;
+  }, [fieldOpacity, isConnected]);
 
   useEffect(() => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
@@ -191,43 +222,53 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         pointerEvents="none"
       />
 
-      <View style={styles.fieldOuter}>
-        <View style={styles.fieldBackground} />
-        <View style={styles.fieldHighlight} />
+      <Animated.View style={{ opacity: fieldOpacity }}>
+        <View style={styles.fieldOuter}>
+          <View style={styles.fieldBackground} />
+          <View style={styles.fieldHighlight} />
 
-        <TextInput
-          editable={!isFieldDisabled}
-          value={message}
-          onChangeText={setMessage}
-          onSubmitEditing={handleSubmitEditing}
-          placeholder={placeholders[placeholderIndex]}
-          placeholderTextColor={colors.text.tertiary}
-          selectionColor={colors.brand.pulse}
-          returnKeyType="send"
-          autoCapitalize="sentences"
-          autoCorrect={true}
-          maxLength={500}
-          style={[styles.input, isFieldDisabled && styles.inputDisabled]}
-        />
+          <TextInput
+            editable={!isFieldDisabled}
+            value={message}
+            onChangeText={setMessage}
+            onSubmitEditing={handleSubmitEditing}
+            placeholder={isOffline ? t('pulseAi.offlineMessage') : placeholders[placeholderIndex]}
+            placeholderTextColor={colors.text.tertiary}
+            selectionColor={colors.brand.pulse}
+            returnKeyType="send"
+            autoCapitalize="sentences"
+            autoCorrect={true}
+            maxLength={500}
+            style={[styles.input, isFieldDisabled && !isOffline && styles.inputDisabled]}
+          />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={canSend ? t('pulseAi.sendMessage') : t('pulseAi.voicePlaceholder')}
-          disabled={!canSend || isLoading}
-          onPress={() => { void handleSend(); }}
-          style={styles.sendButton}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={colors.brand.pulse} />
-          ) : trimmedMessage ? (
-            <Animated.View style={{ transform: [{ scale: sendScale }] }}>
-              <Ionicons name="arrow-up-circle" size={22} color={colors.brand.pulse} />
-            </Animated.View>
-          ) : (
-            <Ionicons name="mic-outline" size={20} color={MICROPHONE_COLOR} />
-          )}
-        </Pressable>
-      </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              isOffline
+                ? t('pulseAi.offlineMessage')
+                : canSend
+                  ? t('pulseAi.sendMessage')
+                  : t('pulseAi.voicePlaceholder')
+            }
+            disabled={!canSend || isLoading}
+            onPress={() => { void handleSend(); }}
+            style={styles.sendButton}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color={colors.brand.pulse} />
+            ) : isOffline ? (
+              <Ionicons name="cloud-offline-outline" size={20} color={OFFLINE_ICON_COLOR} />
+            ) : trimmedMessage ? (
+              <Animated.View style={{ transform: [{ scale: sendScale }] }}>
+                <Ionicons name="arrow-up-circle" size={22} color={colors.brand.pulse} />
+              </Animated.View>
+            ) : (
+              <Ionicons name="mic-outline" size={20} color={MICROPHONE_COLOR} />
+            )}
+          </Pressable>
+        </View>
+      </Animated.View>
 
       {isLimitReached ? (
         <View style={styles.limitRow}>

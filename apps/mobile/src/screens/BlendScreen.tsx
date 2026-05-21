@@ -35,9 +35,12 @@ import { RatingBottomSheet } from '../components/blend/RatingBottomSheet';
 import { CleaningReminder } from '../components/blend/CleaningReminder';
 import { useBlendStore } from '../store/blend.store';
 import { useAuthStore } from '../store/auth.store';
+import { useNetworkStore } from '../store/network.store';
 import { createBlendLog } from '../services/blendLog.service';
 import { QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { addPendingBlend } from '../utils/pendingBlends.utils';
+import { showToast } from '../utils/toast.utils';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -157,6 +160,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   // ── Auth store ───────────────────────────────────────────────────────────
 
   const blendiModel = useAuthStore((s) => s.user?.blendiModel);
+  const isConnected = useNetworkStore((s) => s.isConnected);
 
   // ── Local state ──────────────────────────────────────────────────────────
 
@@ -226,7 +230,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       setIsLogging(true);
 
       try {
-        await createBlendLog({
+        const blendLogInput = {
           recipeName: activeRecipe?.title,
           protein: activeRecipe?.macros.protein ?? 0,
           carbs: activeRecipe?.macros.carbs ?? 0,
@@ -235,12 +239,19 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
           blendiModel: blendiModel ?? 'Lite',
           durationSeconds: timerDuration,
           ...(rating !== undefined ? { rating } : {}),
-        });
+        };
 
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendLogsToday }),
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }),
-        ]);
+        if (isConnected) {
+          await createBlendLog(blendLogInput);
+
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.blendLogsToday }),
+            queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }),
+          ]);
+        } else {
+          addPendingBlend(blendLogInput);
+          showToast(t('blend.savedLocally'));
+        }
 
         completeBlend();
         setIsLogging(false);
@@ -264,6 +275,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       isLogging,
       activeRecipe,
       blendiModel,
+      isConnected,
       timerDuration,
       queryClient,
       completeBlend,

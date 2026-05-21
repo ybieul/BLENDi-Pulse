@@ -23,6 +23,7 @@ import {
 } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useUnits } from '../../hooks/useUnits';
+import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 import { GoalRing } from '../ui/GoalRing';
 
 const HYDRATION_TRACK_COLOR = 'rgba(255,255,255,0.08)';
@@ -43,6 +44,7 @@ export interface GoalRingsSectionProps {
   calorieTarget: number;
   hydrationCurrent: number;
   hydrationTarget: number;
+  dataUpdatedAt: number;
 }
 
 function clampProgress(current: number, target: number): number {
@@ -62,6 +64,7 @@ export function GoalRingsSection({
   calorieTarget,
   hydrationCurrent,
   hydrationTarget,
+  dataUpdatedAt,
 }: GoalRingsSectionProps) {
   const { t } = useAppTranslation();
   const { displayHydration } = useUnits();
@@ -170,6 +173,10 @@ export function GoalRingsSection({
           {hydrationProgressLabel}
         </Text>
       </View>
+
+      <View style={styles.staleIndicatorAnchor}>
+        <StaleDataIndicator dataUpdatedAt={dataUpdatedAt} />
+      </View>
     </View>
   );
 }
@@ -177,6 +184,7 @@ export function GoalRingsSection({
 const styles = StyleSheet.create({
   section: {
     width: '100%',
+    position: 'relative',
   },
   ringsRow: {
     flexDirection: 'row',
@@ -220,5 +228,12 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.regular,
     opacity: HYDRATION_TEXT_OPACITY,
+  },
+  staleIndicatorAnchor: {
+    position: 'relative',
+    alignSelf: 'center',
+    width: '100%',
+    minHeight: spacing.xl,
+    marginTop: spacing.sm,
   },
 });

@@ -136,7 +136,11 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       staleTime: CACHE_CONFIG.USER_PROFILE_TTL,
     });
 
-  const { data: logsResponse, isLoading: isLoadingLogs } =
+  const {
+    data: logsResponse,
+    isLoading: isLoadingLogs,
+    dataUpdatedAt: blendLogsUpdatedAt,
+  } =
     useQuery<BlendLogsTodayData>({
       queryKey: QUERY_KEYS.blendLogsToday,
       queryFn: getTodayLogs,
@@ -265,6 +269,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                 calorieTarget={profile?.dailyCalorieTarget ?? 0}
                 hydrationCurrent={hydrationData?.totalMl ?? 0}
                 hydrationTarget={HYDRATION_TARGET_ML}
+                dataUpdatedAt={blendLogsUpdatedAt}
               />
             </View>
 

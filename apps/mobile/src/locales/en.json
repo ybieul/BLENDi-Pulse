@@ -1,5 +1,10 @@
 {
   "common": {
+    "noConnection": "No internet connection",
+    "backOnline": "Back online — syncing...",
+    "actionRequiresConnection": "This action requires an internet connection",
+    "lastUpdated": "Updated {{hours}}h ago",
+    "lastUpdatedYesterday": "Updated yesterday",
     "or": "or",
     "actions": {
       "confirm": "Confirm",
@@ -258,6 +263,8 @@
       "complete": "Blend complete",
       "logged": "Logged to your history"
     },
+    "savedLocally": "Blend saved locally — will sync when connected",
+    "syncFailed": "Couldn't sync blend after 3 attempts",
     "clean_reminder": {
       "title": "Clean your BLENDi",
       "message": "Add water and a drop of soap, then blend for 10 seconds.",
@@ -403,6 +410,7 @@
   },
 
   "pulseAi": {
+    "offlineMessage": "Connect to the internet to use Pulse AI",
     "ingredients": "Ingredients",
     "howToBlend": "How to blend",
     "smartSubstitutes": "Smart Substitutes",
@@ -551,6 +559,8 @@
     "supplement_not_found": "This supplement was not found.",
     "supplement_log_not_found": "This supplement check could not be found.",
     "supplement_check_failed": "Couldn't update supplement check. Please try again.",
+    "blend_sync_failed_named": "Couldn't sync {{recipeName}} after 3 attempts.",
+    "blend_sync_failed_generic": "Couldn't sync an offline blend after 3 attempts.",
     "network_internal_server_error": "Server error. We're on it — try again shortly.",
     "resource_not_found": "The requested resource was not found."
   },

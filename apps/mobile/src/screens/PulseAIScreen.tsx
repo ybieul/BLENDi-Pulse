@@ -34,6 +34,7 @@ import {
 import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useAuthStore } from '../store/auth.store';
+import { useNetworkStore } from '../store/network.store';
 import { usePulseAIStore } from '../store/pulseAi.store';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ChatMessage } from '../components/pulseAi/ChatMessage';
@@ -152,6 +153,7 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
   const pendingProtocol = usePulseAIStore((state) => state.pendingProtocol);
   const clearPendingProtocol = usePulseAIStore((state) => state.clearPendingProtocol);
   const userGoal = useAuthStore((state) => state.user?.goal ?? 'Wellness');
+  const isConnected = useNetworkStore((state) => state.isConnected);
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
@@ -430,7 +432,7 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
       />
 
       {/* ── Indicador de uso (acima do ChatInput) ── */}
-      <UsageIndicator usageRemaining={usageRemaining} />
+      {isConnected ? <UsageIndicator usageRemaining={usageRemaining} /> : null}
 
       {/* ── Campo de input fixado no bottom ── */}
       <ChatInput

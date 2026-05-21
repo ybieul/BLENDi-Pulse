@@ -8,6 +8,7 @@ export const pulseAiChatSchema = z.object({
     .trim()
     .min(1, 'errors.validation.required')
     .max(PULSE_AI_MESSAGE_MAX, 'errors.validation.too_long'),
+  language: z.enum(['en', 'pt-BR']).optional(),
 });
 
 export type PulseAiChatInput = z.infer<typeof pulseAiChatSchema>;

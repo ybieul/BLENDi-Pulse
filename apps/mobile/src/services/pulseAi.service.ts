@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { PulseAiChatInput, PulseAiRecipe } from '@blendi/shared';
 
 import { api } from '../config/api';
+import i18n from '../locales/i18n';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 
 const PULSE_AI_ERROR_TRANSLATION_KEYS = {
@@ -88,7 +89,13 @@ function toPulseAiServiceError(error: unknown): PulseAiServiceError {
 export async function sendMessage(
   message: PulseAiChatInput['message']
 ): Promise<PulseAiChatResult> {
-  const payload: PulseAiChatInput = { message };
+  const currentLanguage = i18n.language;
+  const payload: PulseAiChatInput = {
+    message,
+    ...(currentLanguage === 'en' || currentLanguage === 'pt-BR'
+      ? { language: currentLanguage }
+      : {}),
+  };
 
   try {
     const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload);

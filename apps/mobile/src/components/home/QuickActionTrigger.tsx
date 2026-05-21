@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -20,6 +20,8 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useUnits } from '../../hooks/useUnits';
 import type { AppTabNavigationProp } from '../../navigation/types';
 import { useBlendStore } from '../../store/blend.store';
+import { useNetworkStore } from '../../store/network.store';
+import { showToast } from '../../utils/toast.utils';
 
 const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
@@ -31,6 +33,8 @@ const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
+const WATER_OFFLINE_ICON_COLOR = 'rgba(255,255,255,0.82)';
+const WATER_OFFLINE_ICON_SIZE = 10;
 
 export interface QuickActionTriggerProps {
   onLogWater: () => void | Promise<void>;
@@ -43,26 +47,38 @@ export function QuickActionTrigger({
   const { displayVolume } = useUnits();
   const navigation = useNavigation<AppTabNavigationProp<'Home'>>();
   const lastBlend = useBlendStore((state) => state.lastBlend);
+  const isConnected = useNetworkStore((state) => state.isConnected);
   const waterScale = useRef(new Animated.Value(1)).current;
   const waterConfirmationOpacity = useRef(new Animated.Value(0)).current;
   const waterConfirmationTranslateY = useRef(new Animated.Value(0)).current;
+  const offlineIndicatorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showOfflineIndicator, setShowOfflineIndicator] = useState(false);
 
   useEffect(() => {
     return () => {
+      if (offlineIndicatorTimeoutRef.current) {
+        clearTimeout(offlineIndicatorTimeoutRef.current);
+      }
+
       waterScale.stopAnimation();
       waterConfirmationOpacity.stopAnimation();
       waterConfirmationTranslateY.stopAnimation();
     };
   }, [waterConfirmationOpacity, waterConfirmationTranslateY, waterScale]);
 
-  const animateWaterConfirmation = () => {
+  const animateWaterConfirmation = (offlineFeedback: boolean) => {
     waterScale.stopAnimation();
     waterConfirmationOpacity.stopAnimation();
     waterConfirmationTranslateY.stopAnimation();
 
+    if (offlineIndicatorTimeoutRef.current) {
+      clearTimeout(offlineIndicatorTimeoutRef.current);
+    }
+
     waterScale.setValue(1);
     waterConfirmationOpacity.setValue(1);
     waterConfirmationTranslateY.setValue(0);
+    setShowOfflineIndicator(offlineFeedback);
 
     Animated.sequence([
       Animated.spring(waterScale, {
@@ -93,10 +109,23 @@ export function QuickActionTrigger({
         useNativeDriver: true,
       }),
     ]).start();
+
+    offlineIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowOfflineIndicator(false);
+      offlineIndicatorTimeoutRef.current = null;
+    }, WATER_CONFIRMATION_DURATION);
   };
 
   const handleLogWaterPress = () => {
-    animateWaterConfirmation();
+    const isOffline = !isConnected;
+
+    animateWaterConfirmation(isOffline);
+
+    if (isOffline) {
+      showToast(t('common.actionRequiresConnection'));
+      return;
+    }
+
     void onLogWater();
   };
 
@@ -118,7 +147,7 @@ export function QuickActionTrigger({
         accessibilityRole="button"
         style={styles.button}
       >
-        <Animated.Text
+        <Animated.View
           pointerEvents="none"
           style={[
             styles.waterConfirmation,
@@ -128,8 +157,17 @@ export function QuickActionTrigger({
             },
           ]}
         >
-          {waterConfirmationText === '—' ? waterConfirmationText : `+${waterConfirmationText}`}
-        </Animated.Text>
+          <Text style={styles.waterConfirmationText}>
+            {waterConfirmationText === '—' ? waterConfirmationText : `+${waterConfirmationText}`}
+          </Text>
+          {showOfflineIndicator ? (
+            <Ionicons
+              name="cloud-offline-outline"
+              size={WATER_OFFLINE_ICON_SIZE}
+              color={WATER_OFFLINE_ICON_COLOR}
+            />
+          ) : null}
+        </Animated.View>
 
         <View style={styles.buttonContent}>
           <Animated.View style={{ transform: [{ scale: waterScale }] }}>
@@ -188,6 +226,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -spacing.lg,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  waterConfirmationText: {
     color: WATER_ICON_COLOR,
     fontFamily: fonts.body,
     fontSize: fontSizes.xs,

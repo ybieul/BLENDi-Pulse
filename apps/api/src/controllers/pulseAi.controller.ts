@@ -300,7 +300,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
-    const normalizedMessage = normalizeMessageForCache(parsed.data.message);
+    const { message, language: requestedLanguage } = parsed.data;
+    const normalizedMessage = normalizeMessageForCache(message);
 
     if (!normalizedMessage) {
       sendErrorResponse(res, {
@@ -326,11 +327,13 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
+    const effectiveLanguage = requestedLanguage ?? currentUser.locale;
+
     const cacheKey = generateCacheKey({
       userId: currentUser.id,
       model: currentUser.blendiModel,
       goal: currentUser.goal,
-      language: currentUser.locale,
+      language: effectiveLanguage,
       unitSystem: currentUser.unitSystem,
       aiProvider: env.AI_PROVIDER,
       aiModel: env.AI_MODEL,
@@ -378,6 +381,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     const prompt = buildPulseAiPrompt({
       blendiModel: currentUser.blendiModel,
       goal: currentUser.goal,
+      language: requestedLanguage,
       locale: currentUser.locale,
       unitSystem: currentUser.unitSystem,
       dailyProteinTarget: currentUser.dailyProteinTarget,
@@ -386,7 +390,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       recentBlendRecipeNames: recentBlendLogs.flatMap(log => (
         log.recipeName ? [log.recipeName] : []
       )),
-      message: parsed.data.message,
+      message,
     });
 
     const usageReservation = await reservePulseAiUsage(currentUser);
@@ -465,7 +469,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
         userId: currentUser.id,
         model: currentUser.blendiModel,
         goal: currentUser.goal,
-        language: currentUser.locale,
+        language: effectiveLanguage,
         unitSystem: currentUser.unitSystem,
         aiProvider: aiResponse.provider,
         aiModel: aiResponse.model,

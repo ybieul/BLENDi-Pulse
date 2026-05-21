@@ -142,6 +142,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     isLoading: isLoadingHydration,
     isError: isErrorHydration,
     refetch: refetchHydration,
+    dataUpdatedAt: hydrationTodayUpdatedAt,
   } = useQuery<
     HydrationTodayResponse,
     Error,
@@ -395,6 +396,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 dailyTarget={hydrationTarget}
                 onLogWater={handleLogWater}
                 history7Days={history7Days}
+                dataUpdatedAt={hydrationTodayUpdatedAt}
               />
             </View>
 
