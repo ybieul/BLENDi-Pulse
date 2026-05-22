@@ -41,6 +41,7 @@ export interface BlendLogEntry {
 export interface CreateBlendLogResult {
   log: BlendLogEntry;
   currentStreak: number;
+  longestStreak: number;
   blendCount: number;
   totalBlends: number;
 }

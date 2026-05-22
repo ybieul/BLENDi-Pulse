@@ -1,6 +1,6 @@
 import { Router, type IRouter } from 'express';
 
-import { chat, getUsage } from '../controllers/pulseAi.controller';
+import { chat, getUsage, invalidateCache } from '../controllers/pulseAi.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const pulseAiRouter: IRouter = Router();
@@ -16,3 +16,9 @@ pulseAiRouter.post('/chat', authenticate, chat);
  * Retorna o uso diário atual do Pulse AI para o usuário autenticado.
  */
 pulseAiRouter.get('/usage', authenticate, getUsage);
+
+/**
+ * DELETE /pulse-ai/cache  🔒 autenticado
+ * Invalida todas as entradas de cache do Pulse AI do usuário autenticado.
+ */
+pulseAiRouter.delete('/cache', authenticate, invalidateCache);

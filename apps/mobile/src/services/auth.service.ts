@@ -34,6 +34,7 @@ export interface AuthUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget: number;
+  longestStreak: number;
   createdAt: string;
 }
 

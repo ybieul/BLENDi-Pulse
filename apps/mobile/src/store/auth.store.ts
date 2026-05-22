@@ -74,6 +74,7 @@ interface CurrentUserProfileResponse {
       dailyProteinTarget: number;
       dailyCalorieTarget: number;
       dailyCarbTarget: number;
+      longestStreak: number;
       createdAt: string;
     };
   };
@@ -97,6 +98,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
     dailyCarbTarget: user.dailyCarbTarget,
+    longestStreak: user.longestStreak,
     createdAt: user.createdAt,
   };
 }
@@ -239,7 +241,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       await setRefreshToken(data.refreshToken);
 
       set({
-        user: data.user,
+        user: {
+          ...data.user,
+          longestStreak: data.user.longestStreak,
+        },
         accessToken: data.accessToken,
         isAuthenticated: true,
         isNewUser: hasPendingOnboarding(),

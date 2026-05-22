@@ -205,6 +205,7 @@ export async function handleGoogleCallback(
         dailyProteinTarget: user.dailyProteinTarget,
         dailyCalorieTarget: user.dailyCalorieTarget,
         dailyCarbTarget: user.dailyCarbTarget ?? 200,
+        longestStreak: user.longestStreak ?? 0,
         createdAt: user.createdAt,
       })
     ).toString('base64');

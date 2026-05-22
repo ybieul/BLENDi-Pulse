@@ -407,6 +407,41 @@
     },
     "badges": {
       "title": "Conquistas",
+      "bronze": "Bronze",
+      "silver": "Prata",
+      "gold": "Ouro",
+      "locked": "Bloqueado",
+      "blendJourneyTitle": "Jornada do Blend",
+      "blendJourneyDescription": "Acompanhe seus marcos de blends enquanto constrói sua rotina.",
+      "streakMasterTitle": "Mestre da Sequência",
+      "streakMasterDescription": "Mantenha a consistência viva e transforme sequências longas em status.",
+      "earlyAdopterTitle": "Early Adopter",
+      "earlyAdopterDesc": "Concedido a todos os usuários fundadores.",
+      "blendiLiteTitle": "BLENDi Lite",
+      "blendiLiteDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Lite.",
+      "blendiProPlusTitle": "BLENDi Pro+",
+      "blendiProPlusDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Pro+.",
+      "blendiSteelTitle": "BLENDi Steel",
+      "blendiSteelDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Steel.",
+      "progressLabel": "Faltam {{requirement}} para {{stage}}",
+      "requirements": {
+        "blendJourneyBronze_one": "{{count}} blend",
+        "blendJourneyBronze_other": "{{count}} blends",
+        "blendJourneySilver_one": "{{count}} blend",
+        "blendJourneySilver_other": "{{count}} blends",
+        "blendJourneyGold_one": "{{count}} blend",
+        "blendJourneyGold_other": "{{count}} blends",
+        "streakMasterBronze_one": "{{count}} dia",
+        "streakMasterBronze_other": "{{count}} dias",
+        "streakMasterSilver_one": "{{count}} dia",
+        "streakMasterSilver_other": "{{count}} dias",
+        "streakMasterGold_one": "{{count}} dia",
+        "streakMasterGold_other": "{{count}} dias",
+        "earlyAdopter": "Acesso fundador",
+        "blendiLite": "Usuário BLENDi Lite",
+        "blendiProPlus": "Usuário BLENDi Pro+",
+        "blendiSteel": "Usuário BLENDi Steel"
+      },
       "first_blend": {
         "name": "Primeiro Blend",
         "description": "Conclua sua primeira sessão de blend"
@@ -423,6 +458,17 @@
         "name": "Mestre da Proteína",
         "description": "Atinja sua meta de proteína por 5 dias seguidos"
       }
+    },
+    "edit": {
+      "modelTitle": "Alterar meu BLENDi",
+      "goalTitle": "Alterar objetivo",
+      "proteinTitle": "Editar meta de proteína",
+      "carbsTitle": "Editar meta de carboidratos",
+      "caloriesTitle": "Editar meta de calorias",
+      "hydrationTitle": "Editar meta de hidratação",
+      "unitSystemTitle": "Alterar sistema de unidades",
+      "languageTitle": "Alterar idioma",
+      "confirm": "Confirmar"
     },
     "subscription": {
       "free_label": "Plano gratuito",
@@ -606,6 +652,84 @@
       "reminder_body": "Você ainda não blendou hoje. Mantenha sua sequência de {{count}} dias.",
       "lost_title": "Sequência reiniciada 😔",
       "lost_body": "Sua sequência acabou. Comece de novo hoje!"
+    }
+  },
+
+  "me": {
+    "currentStreak": "Streak Atual",
+    "totalBlends": "Total de Blends",
+    "longestStreak": "Melhor Streak",
+    "settings": "Configurações",
+    "memberSince": "Membro desde {{date}}",
+    "metric": "Métrico",
+    "imperial": "Imperial",
+    "settingCarbs": "Meta de carboidratos",
+    "badges": {
+      "title": "Conquistas",
+      "subtitle": "Toque em um badge para ver detalhes",
+      "bronze": "Bronze",
+      "silver": "Prata",
+      "gold": "Ouro",
+      "locked": "Bloqueado",
+      "blendJourneyTitle": "Jornada Blend",
+      "blendJourneyDescription": "Acompanhe seus marcos de blend ao construir sua rotina.",
+      "streakMasterTitle": "Mestre do Streak",
+      "streakMasterDescription": "Mantenha sua consistência e transforme longas sequências em status.",
+      "earlyAdopterTitle": "Adotante Inicial",
+      "earlyAdopterDesc": "Concedido a usuários fundadores",
+      "blendiLiteTitle": "BLENDi Lite",
+      "blendiLiteDescription": "Desbloqueado para usuários com o BLENDi Lite.",
+      "blendiProPlusTitle": "BLENDi Pro+",
+      "blendiProPlusDescription": "Desbloqueado para usuários com o BLENDi Pro+.",
+      "blendiSteelTitle": "BLENDi Steel",
+      "blendiSteelDescription": "Desbloqueado para usuários com o BLENDi Steel.",
+      "progressLabel": "Faltam {{count}} para {{stage}}",
+      "requirements": {
+        "blendJourneyBronze_one": "{{count}} blend",
+        "blendJourneyBronze_other": "{{count}} blends",
+        "blendJourneySilver_one": "{{count}} blend",
+        "blendJourneySilver_other": "{{count}} blends",
+        "blendJourneyGold_one": "{{count}} blend",
+        "blendJourneyGold_other": "{{count}} blends",
+        "streakMasterBronze_one": "{{count}} dia",
+        "streakMasterBronze_other": "{{count}} dias",
+        "streakMasterSilver_one": "{{count}} dia",
+        "streakMasterSilver_other": "{{count}} dias",
+        "streakMasterGold_one": "{{count}} dia",
+        "streakMasterGold_other": "{{count}} dias",
+        "earlyAdopter": "Acesso fundador",
+        "blendiLite": "Dono do BLENDi Lite",
+        "blendiProPlus": "Dono do BLENDi Pro+",
+        "blendiSteel": "Dono do BLENDi Steel"
+      }
+    },
+    "edit": {
+      "modelTitle": "Seu Modelo BLENDi",
+      "goalTitle": "Seu Objetivo",
+      "proteinTitle": "Meta de Proteína Diária",
+      "carbsTitle": "Meta de Carboidratos Diária",
+      "caloriesTitle": "Meta de Calorias Diária",
+      "hydrationTitle": "Meta de Hidratação Diária",
+      "unitSystemTitle": "Unidades",
+      "languageTitle": "Idioma",
+      "confirm": "Salvar"
+    },
+    "upgrade": {
+      "title": "Assinar Pulse Pro",
+      "benefit1": "Consultas ilimitadas ao Pulse AI",
+      "benefit2": "Personalização avançada de receitas",
+      "benefit3": "Acesso prioritário a novidades",
+      "price": "$4.99/month or $49/year",
+      "button": "Assinar Agora",
+      "soonTitle": "Em Breve",
+      "soonMessage": "Os pagamentos estarão disponíveis na próxima atualização"
+    },
+    "isPro": "Você está no Pulse Pro ✓",
+    "isProDescription": "Aproveite o Pulse AI ilimitado e todos os recursos premium",
+    "signOut": {
+      "title": "Sair?",
+      "message": "Você precisará entrar novamente para acessar sua conta",
+      "confirm": "Sair"
     }
   }
 }

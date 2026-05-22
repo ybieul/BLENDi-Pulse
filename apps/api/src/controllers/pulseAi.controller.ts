@@ -25,7 +25,12 @@ import {
   callAi,
   type AiProviderResponse,
 } from '../services/aiProvider.service';
-import { generateCacheKey, getFromCache, setInCache } from '../services/cache.service';
+import {
+  generateCacheKey,
+  getFromCache,
+  invalidateUserCache,
+  setInCache,
+} from '../services/cache.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 
@@ -538,6 +543,32 @@ export async function getUsage(
       data: {
         dailyAiUsage: currentUser.dailyAiUsage,
         isPro: currentUser.isPro,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function invalidateCache(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const deletedCount = await invalidateUserCache(userId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        deletedCount,
       },
     });
   } catch (error) {

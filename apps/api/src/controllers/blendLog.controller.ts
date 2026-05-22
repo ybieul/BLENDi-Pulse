@@ -19,6 +19,7 @@ import {
 interface BlendUserContext {
   timezone: string;
   currentStreak: number;
+  longestStreak: number;
   blendCount: number;
 }
 
@@ -146,7 +147,7 @@ function isPreviousDayInTimezone(previousDate: Date, currentDate: Date, timezone
 
 async function getBlendUserContext(userId: string): Promise<BlendUserContext | null> {
   const user = await UserModel.findById(userId)
-    .select({ timezone: 1, currentStreak: 1, blendCount: 1 })
+    .select({ timezone: 1, currentStreak: 1, longestStreak: 1, blendCount: 1 })
     .lean();
 
   if (!user) {
@@ -156,6 +157,7 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
   return {
     timezone: user.timezone,
     currentStreak: user.currentStreak ?? 0,
+    longestStreak: user.longestStreak ?? 0,
     blendCount: user.blendCount ?? 0,
   };
 }
@@ -165,7 +167,7 @@ async function updateCurrentStreak(
   currentCreatedAt: Date,
   timezone: string,
   currentStreak: number
-): Promise<number> {
+): Promise<{ currentStreak: number; longestStreak: number }> {
   const previousLog = await BlendLogModel.findOne({
     userId,
     createdAt: { $lt: currentCreatedAt },
@@ -190,15 +192,21 @@ async function updateCurrentStreak(
       $set: {
         currentStreak: nextStreak,
       },
+      $max: {
+        longestStreak: nextStreak,
+      },
     },
     {
       new: true,
     }
   )
-    .select({ currentStreak: 1 })
+    .select({ currentStreak: 1, longestStreak: 1 })
     .lean();
 
-  return updatedUser?.currentStreak ?? nextStreak;
+  return {
+    currentStreak: updatedUser?.currentStreak ?? nextStreak,
+    longestStreak: updatedUser?.longestStreak ?? nextStreak,
+  };
 }
 
 export async function createBlendLog(
@@ -234,7 +242,7 @@ export async function createBlendLog(
       ...parsed.data,
     });
 
-    const [updatedUser, updatedCurrentStreak] = await Promise.all([
+    const [updatedUser, updatedStreaks] = await Promise.all([
       UserModel.findByIdAndUpdate(
         userId,
         {
@@ -268,7 +276,8 @@ export async function createBlendLog(
           rating: log.rating,
           createdAt: log.createdAt,
         },
-        currentStreak: updatedCurrentStreak,
+        currentStreak: updatedStreaks.currentStreak,
+        longestStreak: updatedStreaks.longestStreak,
         blendCount: updatedBlendCount,
         totalBlends: updatedBlendCount,
       },

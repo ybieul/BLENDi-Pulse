@@ -54,6 +54,15 @@ export const updateUserSchema = z
       .min(50, 'errors.validation.number_range')
       .max(800, 'errors.validation.number_range'),
 
+    dailyHydrationTarget: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(500, 'errors.validation.number_range')
+      .max(8000, 'errors.validation.number_range'),
+
     weight: z
       .number({
         required_error: 'errors.validation.required',

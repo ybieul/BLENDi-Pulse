@@ -407,6 +407,41 @@
     },
     "badges": {
       "title": "Badges",
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "locked": "Locked",
+      "blendJourneyTitle": "Blend Journey",
+      "blendJourneyDescription": "Track your blend milestones as you build your routine.",
+      "streakMasterTitle": "Streak Master",
+      "streakMasterDescription": "Keep your consistency alive and turn long streaks into status.",
+      "earlyAdopterTitle": "Early Adopter",
+      "earlyAdopterDesc": "Granted to all founding users.",
+      "blendiLiteTitle": "BLENDi Lite",
+      "blendiLiteDescription": "Unlocked for users currently blending with BLENDi Lite.",
+      "blendiProPlusTitle": "BLENDi Pro+",
+      "blendiProPlusDescription": "Unlocked for users currently blending with BLENDi Pro+.",
+      "blendiSteelTitle": "BLENDi Steel",
+      "blendiSteelDescription": "Unlocked for users currently blending with BLENDi Steel.",
+      "progressLabel": "{{requirement}} more for {{stage}}",
+      "requirements": {
+        "blendJourneyBronze_one": "{{count}} blend",
+        "blendJourneyBronze_other": "{{count}} blends",
+        "blendJourneySilver_one": "{{count}} blend",
+        "blendJourneySilver_other": "{{count}} blends",
+        "blendJourneyGold_one": "{{count}} blend",
+        "blendJourneyGold_other": "{{count}} blends",
+        "streakMasterBronze_one": "{{count}} day",
+        "streakMasterBronze_other": "{{count}} days",
+        "streakMasterSilver_one": "{{count}} day",
+        "streakMasterSilver_other": "{{count}} days",
+        "streakMasterGold_one": "{{count}} day",
+        "streakMasterGold_other": "{{count}} days",
+        "earlyAdopter": "Founding access",
+        "blendiLite": "BLENDi Lite owner",
+        "blendiProPlus": "BLENDi Pro+ owner",
+        "blendiSteel": "BLENDi Steel owner"
+      },
       "first_blend": {
         "name": "First Blend",
         "description": "Complete your first blend session"
@@ -423,6 +458,17 @@
         "name": "Protein Pro",
         "description": "Hit your protein goal 5 days in a row"
       }
+    },
+    "edit": {
+      "modelTitle": "Change your BLENDi",
+      "goalTitle": "Change your goal",
+      "proteinTitle": "Edit protein target",
+      "carbsTitle": "Edit carb target",
+      "caloriesTitle": "Edit calorie target",
+      "hydrationTitle": "Edit hydration target",
+      "unitSystemTitle": "Change unit system",
+      "languageTitle": "Change language",
+      "confirm": "Confirm"
     },
     "subscription": {
       "free_label": "Free plan",
@@ -606,6 +652,84 @@
       "reminder_body": "You haven't blended yet today. Keep your {{count}}-day streak alive.",
       "lost_title": "Streak reset 😔",
       "lost_body": "Your streak ended. Start fresh today!"
+    }
+  },
+
+  "me": {
+    "currentStreak": "Current Streak",
+    "totalBlends": "Total Blends",
+    "longestStreak": "Best Streak",
+    "settings": "Settings",
+    "memberSince": "Member since {{date}}",
+    "metric": "Metric",
+    "imperial": "Imperial",
+    "settingCarbs": "Carbs target",
+    "badges": {
+      "title": "Achievements",
+      "subtitle": "Tap a badge to see details",
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "locked": "Locked",
+      "blendJourneyTitle": "Blend Journey",
+      "blendJourneyDescription": "Track your blend milestones as you build your routine.",
+      "streakMasterTitle": "Streak Master",
+      "streakMasterDescription": "Keep your consistency alive and turn long streaks into status.",
+      "earlyAdopterTitle": "Early Adopter",
+      "earlyAdopterDesc": "Awarded to founding users",
+      "blendiLiteTitle": "BLENDi Lite",
+      "blendiLiteDescription": "Unlocked for users currently blending with BLENDi Lite.",
+      "blendiProPlusTitle": "BLENDi Pro+",
+      "blendiProPlusDescription": "Unlocked for users currently blending with BLENDi Pro+.",
+      "blendiSteelTitle": "BLENDi Steel",
+      "blendiSteelDescription": "Unlocked for users currently blending with BLENDi Steel.",
+      "progressLabel": "{{count}} more for {{stage}}",
+      "requirements": {
+        "blendJourneyBronze_one": "{{count}} blend",
+        "blendJourneyBronze_other": "{{count}} blends",
+        "blendJourneySilver_one": "{{count}} blend",
+        "blendJourneySilver_other": "{{count}} blends",
+        "blendJourneyGold_one": "{{count}} blend",
+        "blendJourneyGold_other": "{{count}} blends",
+        "streakMasterBronze_one": "{{count}} day",
+        "streakMasterBronze_other": "{{count}} days",
+        "streakMasterSilver_one": "{{count}} day",
+        "streakMasterSilver_other": "{{count}} days",
+        "streakMasterGold_one": "{{count}} day",
+        "streakMasterGold_other": "{{count}} days",
+        "earlyAdopter": "Founding access",
+        "blendiLite": "BLENDi Lite owner",
+        "blendiProPlus": "BLENDi Pro+ owner",
+        "blendiSteel": "BLENDi Steel owner"
+      }
+    },
+    "edit": {
+      "modelTitle": "Your BLENDi Model",
+      "goalTitle": "Your Goal",
+      "proteinTitle": "Daily Protein Target",
+      "carbsTitle": "Daily Carbs Target",
+      "caloriesTitle": "Daily Calorie Target",
+      "hydrationTitle": "Daily Hydration Target",
+      "unitSystemTitle": "Units",
+      "languageTitle": "Language",
+      "confirm": "Save"
+    },
+    "upgrade": {
+      "title": "Upgrade to Pulse Pro",
+      "benefit1": "Unlimited Pulse AI queries",
+      "benefit2": "Advanced recipe customization",
+      "benefit3": "Priority feature access",
+      "price": "$4.99/month or $49/year",
+      "button": "Upgrade Now",
+      "soonTitle": "Coming Soon",
+      "soonMessage": "Payments will be available in the next update"
+    },
+    "isPro": "You're on Pulse Pro ✓",
+    "isProDescription": "Enjoy unlimited Pulse AI and all premium features",
+    "signOut": {
+      "title": "Sign Out?",
+      "message": "You'll need to sign in again to access your account",
+      "confirm": "Sign Out"
     }
   }
 }

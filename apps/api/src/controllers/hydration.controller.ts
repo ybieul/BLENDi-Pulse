@@ -12,7 +12,7 @@ import {
 import { getMidnightUTC, toUTC } from '../utils/timezone.utils';
 
 const DEFAULT_HYDRATION_AMOUNT_ML = 250;
-const DEFAULT_HYDRATION_GOAL_ML = 2000;
+const DEFAULT_HYDRATION_GOAL_ML = 2500;
 
 interface HydrationContext {
   timezone: string;
@@ -154,7 +154,9 @@ function getAmountMl(body: Request['body']): number | null {
 }
 
 async function getHydrationContext(userId: string): Promise<HydrationContext | null> {
-  const user = await UserModel.findById(userId).select({ timezone: 1 }).lean();
+  const user = await UserModel.findById(userId)
+    .select({ timezone: 1, dailyHydrationTarget: 1 })
+    .lean();
 
   if (!user) {
     return null;
@@ -162,7 +164,7 @@ async function getHydrationContext(userId: string): Promise<HydrationContext | n
 
   return {
     timezone: user.timezone,
-    goalMl: DEFAULT_HYDRATION_GOAL_ML,
+    goalMl: user.dailyHydrationTarget ?? DEFAULT_HYDRATION_GOAL_ML,
   };
 }
 

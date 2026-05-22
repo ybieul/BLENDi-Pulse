@@ -56,8 +56,10 @@ export interface IUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget?: number;
+  dailyHydrationTarget: number;
   supplementStack: IUserSupplement[];
   currentStreak: number;
+  longestStreak: number;
   blendCount: number;
   lastCleanedAt?: Date;
   /** Peso corporal em quilogramas. Opcional até o onboarding coletar o valor. */
@@ -259,11 +261,30 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       min: [50, 'errors.validation.number_range'],
       max: [800, 'errors.validation.number_range'],
     },
+    dailyHydrationTarget: {
+      type: Number,
+      default: 2500,
+      min: [500, 'errors.validation.number_range'],
+      max: [8000, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
     supplementStack: {
       type: [userSupplementSchema],
       default: [],
     },
     currentStreak: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    longestStreak: {
       type: Number,
       default: 0,
       min: [0, 'errors.validation.number_range'],

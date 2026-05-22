@@ -8,6 +8,8 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 
+const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
+
 const ASSUMED_AGE = 30;
 
 const ACTIVITY_MULTIPLIERS = {
@@ -94,6 +96,7 @@ export async function getMe(
           id: String(user._id),
           name: user.name,
           email: user.email,
+          profilePhoto: user.profilePhoto,
           blendiModel: user.blendiModel,
           goal: user.goal,
           preferredLanguage: user.locale,
@@ -102,9 +105,13 @@ export async function getMe(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
           dailyCalorieTarget: user.dailyCalorieTarget,
-          profilePhoto: user.profilePhoto,
+          dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
+          isPro: user.isPro ?? false,
           createdAt: user.createdAt,
+          currentStreak: user.currentStreak,
           streakDays: user.currentStreak,
+          longestStreak: user.longestStreak ?? 0,
+          blendCount: user.blendCount,
           totalBlends: user.blendCount,
           lastCleanedAt: user.lastCleanedAt ?? null,
         },
@@ -187,6 +194,7 @@ export async function updateMe(
       dailyProteinTarget,
       dailyCalorieTarget,
       dailyCarbTarget,
+      dailyHydrationTarget,
       weight,
       height,
       preferredLanguage,
@@ -199,6 +207,7 @@ export async function updateMe(
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
       ...(dailyCalorieTarget !== undefined && { dailyCalorieTarget }),
       ...(dailyCarbTarget !== undefined && { dailyCarbTarget }),
+      ...(dailyHydrationTarget !== undefined && { dailyHydrationTarget }),
       ...(weight !== undefined && { weight }),
       ...(height !== undefined && { height }),
       ...(preferredLanguage !== undefined && { locale: preferredLanguage }),
@@ -235,6 +244,9 @@ export async function updateMe(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
+          dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
+          isPro: user.isPro ?? false,
+          longestStreak: user.longestStreak ?? 0,
           weight: user.weight,
           height: user.height,
           createdAt: user.createdAt,
