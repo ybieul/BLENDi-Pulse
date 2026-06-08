@@ -542,6 +542,27 @@
     }
   },
 
+  "pantryScanner": {
+    "permissionTitle": "Scan Your Pantry",
+    "permissionDescription": "Allow camera access to identify ingredients and get personalized blend recipes",
+    "grantPermission": "Enable Camera",
+    "permissionDenied": "Camera access was denied. Enable it in your device Settings to use this feature.",
+    "scansRemaining": "{{count}} scans remaining this month",
+    "renewsIn": "Renews in {{days}} days",
+    "proUnlimited": "Unlimited scans with Pro",
+    "analyzing": "Analyzing your ingredients...",
+    "ingredientsFound": "Ingredients Found",
+    "confirmIngredients": "Uncheck any items that aren't correct",
+    "addIngredient": "Add an ingredient...",
+    "generateRecipes": "Generate Recipes",
+    "recipesGenerated": "Recipes For You",
+    "basedOnIngredients": "Based on {{ingredients}}",
+    "additionalIngredients": "+{{count}} more",
+    "noFoodDetected": "No food items detected. Try pointing at your pantry or fridge.",
+    "noUsableIngredients": "Couldn't identify usable ingredients. Try better lighting or a closer shot.",
+    "scanAgain": "Scan Again"
+  },
+
   "auth": {
     "brandWordmark": "BLENDi",
     "loginTitle": "Welcome back.",
@@ -630,6 +651,11 @@
     "pulseai_daily_limit": "You've reached today's free Pulse AI limit.",
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
+    "scanner_monthly_limit_reached": "You've reached this month's free Pantry Scanner limit.",
+    "scanner_invalid_image": "This image couldn't be analyzed. Try another photo.",
+    "scanner_vision_parse_error": "We couldn't understand the pantry scan result. Please try again.",
+    "scanner_vision_unavailable": "Pantry Scanner is temporarily unavailable. Please try again shortly.",
+    "scanner_image_processing_failed": "We couldn't prepare this image for analysis. Try another photo.",
     "favorites_invalid_data": "This recipe couldn't be saved. Please review the data and try again.",
     "favorites_not_found": "This favorite no longer exists.",
     "favorites_forbidden": "You don't have permission to change this favorite.",

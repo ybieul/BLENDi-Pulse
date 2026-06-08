@@ -79,6 +79,19 @@ export const updateUserSchema = z
       .min(100, 'errors.validation.number_range')
       .max(250, 'errors.validation.number_range'),
 
+    scanCount: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.number_range',
+      })
+      .int('errors.validation.integer')
+      .min(0, 'errors.validation.number_range'),
+
+    scanResetDate: z.date({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.invalid_option',
+    }),
+
     preferredLanguage: z.enum(['en', 'pt-BR'], {
       required_error: 'errors.validation.required',
       message: 'errors.validation.invalid_option',

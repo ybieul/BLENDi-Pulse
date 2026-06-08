@@ -5,9 +5,12 @@ import OpenAI from 'openai';
 import { env } from '../config/env';
 
 const AI_PROVIDER_TIMEOUT_MS = 30_000;
+const VISION_PROVIDER_TIMEOUT_MS = 45_000;
 const DEFAULT_MAX_TOKENS = 800;
+const DEFAULT_VISION_MAX_TOKENS = 1000;
 const ANTHROPIC_JSON_INSTRUCTION =
   'You must respond with valid JSON only, no additional text.';
+const ANTHROPIC_VISION_JSON_INSTRUCTION = 'Respond with valid JSON only.';
 
 type AiProviderMessageRole = 'user' | 'assistant';
 
@@ -27,6 +30,22 @@ export interface AiProviderResponse {
   fromFallback: boolean;
 }
 
+export interface VisionProviderRequest {
+  imageBase64: string;
+  mimeType: string;
+  prompt: string;
+  maxTokens?: number;
+}
+
+export interface VisionProviderResponse {
+  content: string;
+  model: string;
+  provider: string;
+  processingTimeMs: number;
+}
+
+type VisionProviderResult = Omit<VisionProviderResponse, 'processingTimeMs'>;
+
 export class AiProviderRequestError extends Error {
   constructor(message = 'AI provider request failed.') {
     super(message);
@@ -34,12 +53,23 @@ export class AiProviderRequestError extends Error {
   }
 }
 
-function getMaxTokens(maxTokens?: number): number {
+function getMaxTokens(maxTokens?: number, defaultMaxTokens = DEFAULT_MAX_TOKENS): number {
   if (Number.isInteger(maxTokens) && typeof maxTokens === 'number' && maxTokens > 0) {
     return maxTokens;
   }
 
-  return DEFAULT_MAX_TOKENS;
+  return defaultMaxTokens;
+}
+
+function getBase64SizeBytes(base64: string): number {
+  const normalizedBase64 = base64.replace(/\s+/g, '');
+  const padding = normalizedBase64.endsWith('==') ? 2 : normalizedBase64.endsWith('=') ? 1 : 0;
+
+  return Math.max(0, Math.floor((normalizedBase64.length * 3) / 4) - padding);
+}
+
+function getImageSizeKb(imageBase64: string): number {
+  return Number((getBase64SizeBytes(imageBase64) / 1024).toFixed(1));
 }
 
 function ensureTextContent(content: string | null | undefined, provider: string): string {
@@ -132,7 +162,122 @@ async function callGoogle(request: AiProviderRequest): Promise<AiProviderRespons
   };
 }
 
-async function withTimeout<T>(operation: Promise<T>, provider: string, model: string): Promise<T> {
+async function callOpenAIVision(request: VisionProviderRequest): Promise<VisionProviderResult> {
+  const client = new OpenAI({ apiKey: env.VISION_API_KEY });
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:${request.mimeType};base64,${request.imageBase64}`,
+          },
+        },
+        {
+          type: 'text',
+          text: request.prompt,
+        },
+      ],
+    },
+  ];
+
+  const response = await client.chat.completions.create({
+    model: env.VISION_MODEL,
+    max_tokens: getMaxTokens(request.maxTokens, DEFAULT_VISION_MAX_TOKENS),
+    response_format: { type: 'json_object' },
+    messages,
+  });
+
+  return {
+    content: ensureTextContent(response.choices[0]?.message?.content, 'openai vision'),
+    model: env.VISION_MODEL,
+    provider: env.VISION_PROVIDER,
+  };
+}
+
+async function callAnthropicVision(request: VisionProviderRequest): Promise<VisionProviderResult> {
+  const client = new Anthropic({ apiKey: env.VISION_API_KEY });
+  const response = await client.messages.create({
+    model: env.VISION_MODEL,
+    max_tokens: getMaxTokens(request.maxTokens, DEFAULT_VISION_MAX_TOKENS),
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: request.mimeType as 'image/jpeg' | 'image/png',
+              data: request.imageBase64,
+            },
+          },
+          {
+            type: 'text',
+            text: `${request.prompt}\n\n${ANTHROPIC_VISION_JSON_INSTRUCTION}`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const firstTextBlock = response.content.find(contentBlock => contentBlock.type === 'text');
+
+  if (!firstTextBlock) {
+    throw new Error('[aiProvider] anthropic vision returned non-text content.');
+  }
+
+  return {
+    content: ensureTextContent(firstTextBlock.text, 'anthropic vision'),
+    model: env.VISION_MODEL,
+    provider: env.VISION_PROVIDER,
+  };
+}
+
+async function callGoogleVision(request: VisionProviderRequest): Promise<VisionProviderResult> {
+  const client = new GoogleGenerativeAI(env.VISION_API_KEY);
+  const model = client.getGenerativeModel({
+    model: env.VISION_MODEL,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      maxOutputTokens: getMaxTokens(request.maxTokens, DEFAULT_VISION_MAX_TOKENS),
+    },
+  });
+
+  const response = await model.generateContent({
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            inlineData: {
+              mimeType: request.mimeType,
+              data: request.imageBase64,
+            },
+          },
+          {
+            text: request.prompt,
+          },
+        ],
+      },
+    ],
+  });
+
+  return {
+    content: ensureTextContent(response.response.text(), 'google vision'),
+    model: env.VISION_MODEL,
+    provider: env.VISION_PROVIDER,
+  };
+}
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  provider: string,
+  model: string,
+  timeoutMs = AI_PROVIDER_TIMEOUT_MS,
+  requestType = 'request'
+): Promise<T> {
   let timeoutId: NodeJS.Timeout | undefined;
 
   try {
@@ -140,14 +285,88 @@ async function withTimeout<T>(operation: Promise<T>, provider: string, model: st
       operation,
       new Promise<never>((_resolve, reject) => {
         timeoutId = setTimeout(() => {
-          reject(new Error(`[aiProvider] ${provider} request timed out after ${AI_PROVIDER_TIMEOUT_MS}ms for model ${model}.`));
-        }, AI_PROVIDER_TIMEOUT_MS);
+          reject(
+            new Error(
+              `[aiProvider] ${provider} ${requestType} timed out after ${timeoutMs}ms for model ${model}.`
+            )
+          );
+        }, timeoutMs);
       }),
     ]);
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
+  }
+}
+
+export async function callVisionAi(
+  request: VisionProviderRequest
+): Promise<VisionProviderResponse> {
+  const provider = env.VISION_PROVIDER;
+  const model = env.VISION_MODEL;
+  const imageSizeKb = getImageSizeKb(request.imageBase64);
+  const startedAt = Date.now();
+
+  try {
+    let response: VisionProviderResult;
+
+    switch (provider) {
+      case 'openai':
+        response = await withTimeout(
+          callOpenAIVision(request),
+          provider,
+          model,
+          VISION_PROVIDER_TIMEOUT_MS,
+          'vision request'
+        );
+        break;
+      case 'anthropic':
+        response = await withTimeout(
+          callAnthropicVision(request),
+          provider,
+          model,
+          VISION_PROVIDER_TIMEOUT_MS,
+          'vision request'
+        );
+        break;
+      case 'google':
+        response = await withTimeout(
+          callGoogleVision(request),
+          provider,
+          model,
+          VISION_PROVIDER_TIMEOUT_MS,
+          'vision request'
+        );
+        break;
+      default:
+        throw new Error(`[aiProvider] Unsupported vision provider: ${provider}`);
+    }
+
+    const processingTimeMs = Date.now() - startedAt;
+
+    console.info('[aiProvider] vision request completed', {
+      provider,
+      model,
+      imageSizeKb,
+      processingTimeMs,
+    });
+
+    return {
+      ...response,
+      processingTimeMs,
+    };
+  } catch (error) {
+    console.error('[aiProvider] vision request failed', {
+      provider,
+      model,
+      imageSizeKb,
+      processingTimeMs: Date.now() - startedAt,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    throw new AiProviderRequestError();
   }
 }
 

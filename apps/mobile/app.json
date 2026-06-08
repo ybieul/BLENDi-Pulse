@@ -19,8 +19,8 @@
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "BLENDi Pulse usa a câmera para o Pantry Scanner.",
-        "NSPhotoLibraryUsageDescription": "BLENDi Pulse acessa a galeria para fotos de receitas."
+        "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
+        "NSPhotoLibraryUsageDescription": "BLENDi Pulse needs photo access to analyze your pantry ingredients"
       }
     },
     "android": {
@@ -30,6 +30,7 @@
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES"
       ]
     },

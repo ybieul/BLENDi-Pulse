@@ -28,6 +28,7 @@ export type RootStackParamList = {
 export type PulseAIStackParamList = {
   PulseAIChat: undefined;
   Favorites: undefined;
+  PantryScanner: undefined;
 };
 
 export type TrackStackParamList = {

@@ -6,6 +6,7 @@
 //   Erro    → { success: false, code: 'dominio/erro', message: 'English message', errors?: [...] }
 
 import type { Request, Response, NextFunction } from 'express';
+import { addMonths } from 'date-fns';
 import { ZodError } from 'zod';
 import {
   registerSchema,
@@ -105,6 +106,10 @@ export async function register(
       dailyProteinTarget,
       dailyCalorieTarget,
     });
+
+    user.scanCount = 0;
+    user.scanResetDate = addMonths(user.createdAt ?? new Date(), 1);
+    await user.save();
 
     // 4. Gerar par de tokens
     const accessToken = generateAccessToken(user.id as string, user.email);

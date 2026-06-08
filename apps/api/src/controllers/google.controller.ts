@@ -20,6 +20,7 @@
 //      e executa login, vinculação ou registro automático
 
 import type { Request, Response, NextFunction } from 'express';
+import { addMonths } from 'date-fns';
 import jwt from 'jsonwebtoken';
 import { googleCallbackSchema } from '@blendi/shared';
 import { UserModel } from '../models/User';
@@ -175,6 +176,8 @@ export async function handleGoogleCallback(
           goal: 'Wellness',
           dailyProteinTarget: 150,
           dailyCalorieTarget: 2000,
+          scanCount: 0,
+          scanResetDate: addMonths(new Date(), 1),
         });
 
         isNewUser = true;

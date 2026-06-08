@@ -20,6 +20,7 @@ import { usersRouter } from './routes/users';
 import { blendLogsRouter } from './routes/blendLogs';
 import { hydrationLogsRouter } from './routes/hydrationLogs';
 import { favoritesRouter } from './routes/favorites';
+import { pantryScannerRouter } from './routes/pantryScanner';
 import { pulseAiRouter } from './routes/pulseAi';
 import { supplementLogsRouter } from './routes/supplementLogs';
 import { supplementStackRouter } from './routes/supplementStack';
@@ -57,11 +58,11 @@ app.use(
   })
 );
 
-// 2. Parsing de JSON com limite de 1 MB
-app.use(express.json({ limit: '1mb' }));
+// 2. Parsing de JSON com limite de 4 MB para acomodar imagens base64 do Pantry Scanner
+app.use(express.json({ limit: '4mb' }));
 
 // 3. Parsing de URL encoded
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
 // 4. Logger de requisições (apenas em development)
 app.use(requestLogger);
@@ -76,6 +77,7 @@ app.use('/hydration-logs', hydrationLogsRouter);
 app.use('/supplement-stack', supplementStackRouter);
 app.use('/supplement-logs', supplementLogsRouter);
 app.use('/favorites', favoritesRouter);
+app.use('/pantry-scanner', pantryScannerRouter);
 app.use('/pulse-ai', pulseAiRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);

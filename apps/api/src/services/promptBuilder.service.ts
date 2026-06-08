@@ -3,6 +3,7 @@ import type { PulseAiChatInput } from '@blendi/shared';
 import type { BlendiModel, UserGoal, UserLocale, UserUnitSystem } from '../models/User';
 
 type PulseAiApiMessageRole = 'user' | 'assistant';
+type PulseAiResponseMode = 'single-recipe' | 'recipe-array';
 
 interface PulseAiModelContext {
   displayName: string;
@@ -48,6 +49,16 @@ export interface BuildPulseAiPromptInput extends PulseAiPromptUserContext {
   language?: PulseAiChatInput['language'];
 }
 
+export interface PantryAvailableIngredient {
+  name: string;
+  estimatedQuantity?: string;
+}
+
+export interface BuildPantryRecipePromptInput extends PulseAiPromptUserContext {
+  language?: PulseAiChatInput['language'];
+  availableIngredients: PantryAvailableIngredient[];
+}
+
 export interface PulseAiApiMessage {
   role: PulseAiApiMessageRole;
   content: string;
@@ -57,6 +68,12 @@ export interface BuildPulseAiPromptResult {
   systemPrompt: string;
   messages: PulseAiApiMessage[];
 }
+
+const PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE =
+  '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}';
+
+const PANTRY_RECIPES_JSON_ARRAY_STRUCTURE =
+  '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}]';
 
 const MODEL_CONTEXT: Record<BlendiModel, PulseAiModelContext> = {
   Lite: {
@@ -126,6 +143,40 @@ function buildRecentRecipesSection(recipeNames: string[]): string {
   ].join('\n');
 }
 
+function buildAvailableIngredientsSection(
+  availableIngredients: PantryAvailableIngredient[]
+): string {
+  return [
+    'Available ingredients:',
+    ...availableIngredients.map(ingredient => {
+      const estimatedQuantity = ingredient.estimatedQuantity?.trim();
+
+      return estimatedQuantity
+        ? `- ${ingredient.name} (${estimatedQuantity})`
+        : `- ${ingredient.name}`;
+    }),
+  ].join('\n');
+}
+
+function buildResponseFormatRequirements(
+  responseMode: PulseAiResponseMode,
+  recipeCount: number
+): string[] {
+  if (responseMode === 'recipe-array') {
+    return [
+      '- Always return a valid JSON array and nothing else. Do not include markdown, code fences, explanations, or text before or after the JSON.',
+      `- Return exactly ${recipeCount} recipe objects in the array.`,
+      `- Each recipe object in the array must follow this exact structure: ${PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE}.`,
+      `- The full response must match this exact array shape: ${PANTRY_RECIPES_JSON_ARRAY_STRUCTURE}.`,
+    ];
+  }
+
+  return [
+    '- Always return a valid JSON object and nothing else. Do not include markdown, code fences, explanations, or text before or after the JSON.',
+    `- The JSON must follow this exact structure: ${PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE}.`,
+  ];
+}
+
 function buildSystemPrompt({
   blendiModel,
   goal,
@@ -136,8 +187,16 @@ function buildSystemPrompt({
   dailyCarbTarget,
   dailyCalorieTarget,
   recentBlendRecipeNames,
+  responseMode = 'single-recipe',
+  recipeCount = 1,
+  additionalBehaviorRequirements = [],
+  additionalContextSections = [],
 }: PulseAiPromptUserContext & {
   language?: PulseAiChatInput['language'];
+  responseMode?: PulseAiResponseMode;
+  recipeCount?: number;
+  additionalBehaviorRequirements?: string[];
+  additionalContextSections?: string[];
 }): string {
   const modelContext = MODEL_CONTEXT[blendiModel];
   // Priority: explicit request language from the active app session, then the
@@ -154,16 +213,20 @@ function buildSystemPrompt({
     '',
     'Behavior requirements:',
     `- Always respond in ${responseLanguage}.`,
-    '- Always return a valid JSON object and nothing else. Do not include markdown, code fences, explanations, or text before or after the JSON.',
-    '- The JSON must follow this exact structure: {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}.',
+    ...buildResponseFormatRequirements(responseMode, recipeCount),
     '- All macro fields must be numeric values, not strings.',
     '- Personalize the blendInstruction for the user hardware and ingredient difficulty.',
     '- Calibrate the recipe macros so the suggestion fits the user daily targets and goal context. Keep the serving practical instead of arbitrarily oversized.',
     '- Prioritize common, accessible, supermarket-friendly ingredients.',
     `- ${unitSystemContext.instruction}`,
     `- ${unitSystemContext.example}`,
-    "- If the user says they are missing an ingredient using phrases like 'sem', 'without', 'don't have', 'nao tenho', 'não tenho', or equivalent, you must include substitution suggestions inside the optional tip field and set hasSubstitutes to true.",
-    '- If no substitutions are needed, set hasSubstitutes to false and omit the tip field unless it adds useful nutritional value.',
+    ...(responseMode === 'single-recipe'
+      ? [
+          "- If the user says they are missing an ingredient using phrases like 'sem', 'without', 'don't have', 'nao tenho', 'não tenho', or equivalent, you must include substitution suggestions inside the optional tip field and set hasSubstitutes to true.",
+          '- If no substitutions are needed, set hasSubstitutes to false and omit the tip field unless it adds useful nutritional value.',
+        ]
+      : []),
+    ...additionalBehaviorRequirements,
     '',
     'User context:',
     `- BLENDi model: ${modelContext.displayName} (${modelContext.wattage}W).`,
@@ -180,6 +243,10 @@ function buildSystemPrompt({
     sections.push('', recentRecipesSection);
   }
 
+  if (additionalContextSections.length > 0) {
+    sections.push('', ...additionalContextSections);
+  }
+
   return sections.join('\n');
 }
 
@@ -193,6 +260,34 @@ export function buildPulseAiPrompt({
       {
         role: 'user',
         content: message.trim(),
+      },
+    ],
+  };
+}
+
+export function buildPantryRecipePrompt({
+  availableIngredients,
+  ...userContext
+}: BuildPantryRecipePromptInput): BuildPulseAiPromptResult {
+  return {
+    systemPrompt: buildSystemPrompt({
+      ...userContext,
+      responseMode: 'recipe-array',
+      recipeCount: 2,
+      additionalBehaviorRequirements: [
+        '- Generate exactly 2 distinct blend or smoothie recipes.',
+        '- Use only the ingredients listed in the Available ingredients section.',
+        '- Do not invent, substitute, or recommend ingredients that are not listed as available.',
+        '- Set hasSubstitutes to false for every recipe.',
+        '- If you cannot produce exactly 2 valid recipes using only the available ingredients, return an empty JSON array.',
+      ],
+      additionalContextSections: [buildAvailableIngredientsSection(availableIngredients)],
+    }),
+    messages: [
+      {
+        role: 'user',
+        content:
+          'Generate exactly 2 distinct blend recipes using only the available ingredients list. Do not use ingredients outside the list.',
       },
     ],
   };

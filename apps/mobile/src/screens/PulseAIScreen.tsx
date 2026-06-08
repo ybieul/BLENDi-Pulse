@@ -21,7 +21,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { FavoriteItem, PulseAiRecipe } from '@blendi/shared';
+import type { FavoriteItem, PantryAnalysisResult, PulseAiRecipe } from '@blendi/shared';
 
 import {
   borderRadius,
@@ -45,7 +45,7 @@ import { imagePlaceholderStyles } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { PulseAiServiceError } from '../services/pulseAi.service';
-import { QUERY_KEYS } from '../config/cache.config';
+import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
 import type { AppTabParamList, PulseAIStackScreenProps } from '../navigation/types';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
@@ -64,6 +64,8 @@ const ESTIMATED_CHAT_INPUT_HEIGHT = 172;
 const BADGE_SIZE = 16;
 const BADGE_FONT_SIZE_NORMAL = 10;
 const BADGE_FONT_SIZE_OVERFLOW = 8;
+const HEADER_SIDE_WIDTH = 96;
+const SCANNER_BADGE_BACKGROUND = 'rgba(245,158,11,0.90)';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +80,8 @@ interface ChatMessageItem {
   isError?: boolean;
   isFromCache?: boolean;
 }
+
+type PantryScanStatus = Pick<PantryAnalysisResult, 'scansUsed' | 'scansLimit' | 'resetDate'>;
 
 const GOAL_I18N_KEYS: Record<UserGoal, PulseAiGoalKey> = {
   Muscle: 'muscle',
@@ -107,6 +111,13 @@ function favoriteItemToRecipe(favorite: FavoriteItem): PulseAiRecipe {
     tip: favorite.tip,
     hasSubstitutes: favorite.hasSubstitutes,
   };
+}
+
+function getRemainingPantryScans(scanStatus: PantryScanStatus | null): number {
+  const scansUsed = scanStatus?.scansUsed ?? 0;
+  const scansLimit = scanStatus?.scansLimit ?? PANTRY_SCAN_LIMIT_FREE;
+
+  return Math.max(0, scansLimit - scansUsed);
 }
 
 // ─── WelcomeState ─────────────────────────────────────────────────────────────
@@ -152,13 +163,16 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
   const { favorites } = useFavorites();
   const pendingProtocol = usePulseAIStore((state) => state.pendingProtocol);
   const clearPendingProtocol = usePulseAIStore((state) => state.clearPendingProtocol);
-  const userGoal = useAuthStore((state) => state.user?.goal ?? 'Wellness');
+  const authUser = useAuthStore((state) => state.user);
+  const userGoal = authUser?.goal ?? 'Wellness';
+  const isPro = (authUser?.blendiModel ?? 'Lite') !== 'Lite';
   const isConnected = useNetworkStore((state) => state.isConnected);
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
+  const [pantryScanStatus, setPantryScanStatus] = useState<PantryScanStatus | null>(null);
 
   const flatListRef = useRef<FlatList<ChatMessageItem>>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -189,6 +203,10 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
   const suggestions = GOAL_SUGGESTION_FIELDS.map((field) =>
     t(`pulseAi.goals.${goalKey}.${field}`),
   ) as [string, string, string];
+  const remainingPantryScans = useMemo(
+    () => getRemainingPantryScans(pantryScanStatus),
+    [pantryScanStatus],
+  );
   const favoriteIdsByRecipeKey = useMemo<Record<string, string>>(() => {
     const nextFavoriteIdsByRecipeKey: Record<string, string> = {};
 
@@ -198,6 +216,20 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
 
     return nextFavoriteIdsByRecipeKey;
   }, [favorites]);
+
+  useEffect(() => {
+    const syncPantryScanStatus = () => {
+      setPantryScanStatus(
+        queryClient.getQueryData<PantryScanStatus>(QUERY_KEYS.pantryScans) ?? null,
+      );
+    };
+
+    syncPantryScanStatus();
+
+    const unsubscribe = navigation.addListener('focus', syncPantryScanStatus);
+
+    return unsubscribe;
+  }, [navigation, queryClient]);
 
   // ── Auto-scroll ao final quando uma nova mensagem chega ──────────────────
   useEffect(() => {
@@ -323,6 +355,10 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
     navigation.push('Favorites');
   }, [navigation]);
 
+  const handlePantryScannerPress = useCallback(() => {
+    navigation.push('PantryScanner');
+  }, [navigation]);
+
   // ── FlatList render ───────────────────────────────────────────────────────
   const renderItem: ListRenderItem<ChatMessageItem> = useCallback(({ item }) => {
     if (item.role === 'user') {
@@ -379,37 +415,60 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
 
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
-        <Pressable
-          style={styles.headerButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('pulseAi.historyButton')}
-          // Placeholder para Fase 3 — histórico persistido
-        >
-          <Ionicons name="time-outline" size={24} color={colors.text.secondary} />
-        </Pressable>
+        <View style={styles.headerSide}>
+          <Pressable
+            style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('pulseAi.historyButton')}
+            // Placeholder para Fase 3 — histórico persistido
+          >
+            <Ionicons name="time-outline" size={24} color={colors.text.secondary} />
+          </Pressable>
+        </View>
 
         <Text style={styles.headerTitle}>{t('navigation.pulseAI')}</Text>
 
-        <Pressable
-          style={styles.headerButton}
-          onPress={handleFavoritesPress}
-          accessibilityRole="button"
-          accessibilityLabel={t('favorites.title')}
-        >
-          <Ionicons name="heart-outline" size={24} color={colors.text.secondary} />
-          {favoritesCount > 0 && (
-            <Animated.View
-              style={[styles.badge, { transform: [{ scale: badgeScale }] }]}
+        <View style={[styles.headerSide, styles.headerRightActions]}>
+          <View style={styles.headerActionWithBadge}>
+            <Pressable
+              style={styles.headerButton}
+              onPress={handlePantryScannerPress}
+              accessibilityRole="button"
+              accessibilityLabel={t('pantryScanner.permissionTitle')}
             >
-              <Text style={[
-                styles.badgeText,
-                favoritesCount > 9 && styles.badgeTextOverflow,
-              ]}>
-                {favoritesCount > 9 ? '9+' : String(favoritesCount)}
-              </Text>
-            </Animated.View>
-          )}
-        </Pressable>
+              <Ionicons name="scan-outline" size={22} color={colors.text.primary} />
+            </Pressable>
+
+            {!isPro ? (
+              <View style={styles.scanBadge}>
+                <Text style={styles.badgeText}>{String(remainingPantryScans)}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.headerActionWithBadge}>
+            <Pressable
+              style={styles.headerButton}
+              onPress={handleFavoritesPress}
+              accessibilityRole="button"
+              accessibilityLabel={t('favorites.title')}
+            >
+              <Ionicons name="heart-outline" size={24} color={colors.text.secondary} />
+              {favoritesCount > 0 && (
+                <Animated.View
+                  style={[styles.badge, { transform: [{ scale: badgeScale }] }]}
+                >
+                  <Text style={[
+                    styles.badgeText,
+                    favoritesCount > 9 && styles.badgeTextOverflow,
+                  ]}>
+                    {favoritesCount > 9 ? '9+' : String(favoritesCount)}
+                  </Text>
+                </Animated.View>
+              )}
+            </Pressable>
+          </View>
+        </View>
       </View>
 
       {/* ── Histórico de mensagens ── */}
@@ -457,9 +516,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.lg,
+  },
+  headerSide: {
+    width: HEADER_SIDE_WIDTH,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerRightActions: {
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+  },
+  headerActionWithBadge: {
+    alignItems: 'center',
   },
   headerButton: {
     width: 44,
@@ -480,6 +550,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  scanBadge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    marginTop: -8,
+    borderRadius: BADGE_SIZE / 2,
+    backgroundColor: SCANNER_BADGE_BACKGROUND,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badgeText: {
     color: colors.text.primary,
     fontFamily: fonts.body,
@@ -493,9 +572,11 @@ const styles = StyleSheet.create({
     lineHeight: BADGE_FONT_SIZE_OVERFLOW + 2,
   },
   headerTitle: {
+    flex: 1,
     color: colors.text.primary,
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
+    textAlign: 'center',
     lineHeight: 20,
   },
 

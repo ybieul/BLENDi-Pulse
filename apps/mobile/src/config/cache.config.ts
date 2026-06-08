@@ -49,6 +49,8 @@ export const CACHE_CONFIG = {
 
 export type CacheConfig = typeof CACHE_CONFIG;
 
+export const PANTRY_SCAN_LIMIT_FREE = 3;
+
 export const QUERY_KEYS = {
   user: ['user'],
   userProfile: ['userProfile'],
@@ -60,8 +62,11 @@ export const QUERY_KEYS = {
   supplementHistory: ['supplementHistory'],
   supplementStack: ['supplementStack'],
   pulseAiHistory: ['pulseAiHistory'],
+  pantryScans: ['pantryScans'],
 } as const;
 
+// `pantryScans` fica fora da persistência em MMKV por representar quota sensível
+// que deve ser recalculada pela sessão atual, não reidratada de disco.
 export const PERSISTABLE_QUERY_KEYS = [
   'user',
   'userProfile',

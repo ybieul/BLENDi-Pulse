@@ -9,6 +9,7 @@ export * from './tokens';
 export * from './schemas/auth';
 export * from './schemas/blendLog';
 export * from './schemas/favorite';
+export * from './schemas/pantryScanner';
 export * from './schemas/pulseAi';
 export * from './schemas/supplementStack';
 export * from './schemas/user';

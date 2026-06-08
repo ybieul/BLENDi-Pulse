@@ -19,6 +19,26 @@ const requiredString = (name: string) =>
       .min(1, `${name} é obrigatória`)
   );
 
+const providerEnum = (name: string) =>
+  requiredString(name).pipe(
+    z.enum(AI_PROVIDER_VALUES, {
+      errorMap: () => ({
+        message: `${name} deve ser openai, anthropic ou google`,
+      }),
+    })
+  );
+
+const requiredApiKey = (name: string) =>
+  z.preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z
+      .string({
+        required_error: `${name} é obrigatória`,
+        invalid_type_error: `${name} deve ser uma string válida`,
+      })
+      .min(10, `${name} deve ter pelo menos 10 caracteres`)
+  );
+
 const envSchema = z.object({
   // Servidor
   PORT: z
@@ -74,23 +94,14 @@ const envSchema = z.object({
     ),
 
   // AI Provider
-  AI_PROVIDER: z.preprocess(
-    value => (typeof value === 'string' ? value.trim() : value),
-    z.enum(AI_PROVIDER_VALUES, {
-      required_error: 'AI_PROVIDER é obrigatória',
-      invalid_type_error: 'AI_PROVIDER deve ser openai, anthropic ou google',
-    })
-  ),
+  AI_PROVIDER: providerEnum('AI_PROVIDER'),
   AI_MODEL: requiredString('AI_MODEL'),
-  AI_API_KEY: z.preprocess(
-    value => (typeof value === 'string' ? value.trim() : value),
-    z
-      .string({
-        required_error: 'AI_API_KEY é obrigatória',
-        invalid_type_error: 'AI_API_KEY deve ser uma string válida',
-      })
-      .min(10, 'AI_API_KEY deve ter pelo menos 10 caracteres')
-  ),
+  AI_API_KEY: requiredApiKey('AI_API_KEY'),
+
+  // Vision AI Provider
+  VISION_PROVIDER: providerEnum('VISION_PROVIDER'),
+  VISION_MODEL: requiredString('VISION_MODEL'),
+  VISION_API_KEY: requiredApiKey('VISION_API_KEY'),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo
