@@ -22,6 +22,19 @@ export interface IUserSupplement {
   order: number;
 }
 
+export interface IUserNotificationPreferences {
+  dailyPulse: boolean;
+  streakReminder: boolean;
+  supplementReminder: boolean;
+  hydrationReminder: boolean;
+  levelUp: boolean;
+}
+
+export interface IUserDailyPulseTime {
+  hour: number;
+  minute: number;
+}
+
 export interface IUser {
   email: string;
   /**
@@ -53,6 +66,9 @@ export interface IUser {
    * que o app detectar divergência com o timezone do dispositivo.
    */
   timezone: string;
+  pushToken?: string;
+  notificationPreferences: IUserNotificationPreferences;
+  dailyPulseTime: IUserDailyPulseTime;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget?: number;
@@ -173,6 +189,62 @@ const userSupplementSchema = new mongoose.Schema<IUserSupplement>(
   }
 );
 
+const userNotificationPreferencesSchema = new mongoose.Schema<IUserNotificationPreferences>(
+  {
+    dailyPulse: {
+      type: Boolean,
+      default: true,
+    },
+    streakReminder: {
+      type: Boolean,
+      default: true,
+    },
+    supplementReminder: {
+      type: Boolean,
+      default: true,
+    },
+    hydrationReminder: {
+      type: Boolean,
+      default: true,
+    },
+    levelUp: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+const userDailyPulseTimeSchema = new mongoose.Schema<IUserDailyPulseTime>(
+  {
+    hour: {
+      type: Number,
+      default: 7,
+      min: [0, 'errors.validation.number_range'],
+      max: [23, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    minute: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      max: [59, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
@@ -241,6 +313,18 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: String,
       required: [true, 'errors.validation.required'],
       default: 'America/New_York',
+    },
+    pushToken: {
+      type: String,
+      required: false,
+    },
+    notificationPreferences: {
+      type: userNotificationPreferencesSchema,
+      default: () => ({}),
+    },
+    dailyPulseTime: {
+      type: userDailyPulseTimeSchema,
+      default: () => ({}),
     },
     dailyProteinTarget: {
       type: Number,

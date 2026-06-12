@@ -1,6 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ZodError } from 'zod';
-import { calculateMacrosSchema, updateUserSchema } from '@blendi/shared';
+import { ZodError, z } from 'zod';
+import {
+  calculateMacrosSchema,
+  dailyPulseTimeSchema,
+  notificationPreferencesSchema,
+  updateUserSchema,
+} from '@blendi/shared';
 import { UserModel } from '../models/User';
 import {
   sendErrorResponse,
@@ -35,9 +40,72 @@ const PROTEIN_MULTIPLIERS = {
 
 const POUNDS_PER_KILOGRAM = 2.205;
 const CENTIMETERS_PER_INCH = 2.54;
+type NotificationPreferencesState = {
+  dailyPulse: boolean;
+  streakReminder: boolean;
+  supplementReminder: boolean;
+  hydrationReminder: boolean;
+  levelUp: boolean;
+};
+type DailyPulseTimeState = {
+  hour: number;
+  minute: number;
+};
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesState = {
+  dailyPulse: true,
+  streakReminder: true,
+  supplementReminder: true,
+  hydrationReminder: true,
+  levelUp: true,
+};
+const DEFAULT_DAILY_PULSE_TIME: DailyPulseTimeState = {
+  hour: 7,
+  minute: 0,
+};
+const NOTIFICATION_PREFERENCE_KEYS = [
+  'dailyPulse',
+  'streakReminder',
+  'supplementReminder',
+  'hydrationReminder',
+  'levelUp',
+] as const;
+const expoPushTokenPattern = /^ExponentPushToken\[[^\]]+\]$/;
+const nativePushTokenPattern = /^\S{20,}$/;
+const pushTokenSchema = z.object({
+  pushToken: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.required',
+    })
+    .trim()
+    .min(1, 'errors.validation.required')
+    .refine(
+      token =>
+        token.startsWith('ExponentPushToken[')
+          ? expoPushTokenPattern.test(token)
+          : nativePushTokenPattern.test(token),
+      'errors.validation.invalid_option'
+    ),
+});
 
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function normalizeNotificationPreferences(
+  preferences: Partial<NotificationPreferencesState> | null | undefined
+) {
+  return {
+    ...DEFAULT_NOTIFICATION_PREFERENCES,
+    ...preferences,
+  };
+}
+
+function normalizeDailyPulseTime(dailyPulseTime: Partial<DailyPulseTimeState> | null | undefined) {
+  return {
+    ...DEFAULT_DAILY_PULSE_TIME,
+    ...dailyPulseTime,
+  };
 }
 
 function formatZodErrors(err: ZodError) {
@@ -102,6 +170,9 @@ export async function getMe(
           preferredLanguage: user.locale,
           unitSystem: user.unitSystem,
           timezone: user.timezone,
+          pushToken: user.pushToken ?? null,
+          notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences),
+          dailyPulseTime: normalizeDailyPulseTime(user.dailyPulseTime),
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
           dailyCalorieTarget: user.dailyCalorieTarget,
@@ -114,6 +185,228 @@ export async function getMe(
           blendCount: user.blendCount,
           totalBlends: user.blendCount,
           lastCleanedAt: user.lastCleanedAt ?? null,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updatePushToken(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = pushTokenSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const currentUser = await UserModel.findById(userId).lean();
+
+    if (!currentUser) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    if (currentUser.pushToken === parsed.data.pushToken) {
+      res.status(200).json({
+        success: true,
+        data: {
+          user: {
+            id: String(currentUser._id),
+            pushToken: currentUser.pushToken ?? null,
+            updatedAt: currentUser.updatedAt,
+          },
+        },
+      });
+      return;
+    }
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          pushToken: parsed.data.pushToken,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: String(user._id),
+          pushToken: user.pushToken ?? null,
+          updatedAt: user.updatedAt,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateNotificationPreferences(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = notificationPreferencesSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const currentUser = await UserModel.findById(userId).lean();
+
+    if (!currentUser) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    const preferenceUpdates: Record<string, boolean> = {};
+
+    for (const key of NOTIFICATION_PREFERENCE_KEYS) {
+      const value = parsed.data[key];
+      if (value !== undefined) {
+        preferenceUpdates[`notificationPreferences.${key}`] = value;
+      }
+    }
+
+    if (Object.keys(preferenceUpdates).length === 0) {
+      res.status(200).json({
+        success: true,
+        data: {
+          user: {
+            id: String(currentUser._id),
+            notificationPreferences: normalizeNotificationPreferences(currentUser.notificationPreferences),
+            updatedAt: currentUser.updatedAt,
+          },
+        },
+      });
+      return;
+    }
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: preferenceUpdates,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: String(user._id),
+          notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences),
+          updatedAt: user.updatedAt,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateDailyPulseTime(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = dailyPulseTimeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          dailyPulseTime: parsed.data,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: String(user._id),
+          dailyPulseTime: normalizeDailyPulseTime(user.dailyPulseTime),
+          updatedAt: user.updatedAt,
         },
       },
     });

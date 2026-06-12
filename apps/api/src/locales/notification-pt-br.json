@@ -1,0 +1,39 @@
+{
+  "dailyPulse": {
+    "title": "Hora do blend! 🎯",
+    "goals": {
+      "Muscle": {
+        "withRecipe": "Pronto para ganhar massa? Seu shake {recipeName} está te esperando 💪",
+        "generic": "Pronto para ganhar massa? Seu próximo shake está te esperando 💪"
+      },
+      "Wellness": {
+        "withRecipe": "Comece o dia bem! Faça seu {recipeName} agora 🌿",
+        "generic": "Comece o dia bem com um blend leve e nutritivo 🌿"
+      },
+      "Energy": {
+        "withRecipe": "Hora do boost! {recipeName} vai turbinar seu dia ⚡",
+        "generic": "Hora do boost! Um blend vai turbinar seu dia ⚡"
+      },
+      "Recovery": {
+        "withRecipe": "Hora de recuperar! Seu blend {recipeName} é perfeito para hoje 🔄",
+        "generic": "Hora de recuperar! Um blend nutritivo é perfeito para hoje 🔄"
+      }
+    }
+  },
+  "streakReminder": {
+    "title": "Seu streak está esperando!",
+    "short": "Não deixe hoje quebrar seu ritmo. Um blend mantém sua sequência 🔥",
+    "medium": "Sua sequência de {count} dias precisa de você hoje à noite! 🔥",
+    "long": "{count} dias seguidos — não pare agora. Mantenha sua sequência hoje 🔥"
+  },
+  "supplementReminder": {
+    "title": "Hora dos suplementos 💊",
+    "empty": "Ainda faltam suplementos na sua rotina de hoje 💊",
+    "withSummary": "Você ainda precisa tomar {supplementSummary} hoje 💊",
+    "summaryMoreSuffix": ", +{count} a mais"
+  },
+  "hydrationReminder": {
+    "title": "Mantenha-se hidratado! 💧",
+    "body": "Você está em {currentValue} de {goalValue} hoje. Hora de beber mais água 💧"
+  }
+}

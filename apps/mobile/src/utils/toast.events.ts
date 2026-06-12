@@ -7,11 +7,22 @@ export interface ToastAction {
   onPress: () => void;
 }
 
+export interface ToastOptions {
+  title?: string;
+  message: string;
+  duration?: number | null;
+  action?: ToastAction;
+  dismissOnPress?: boolean;
+  forceCustom?: boolean;
+}
+
 export interface ToastPayload {
   id: number;
+  title?: string;
   message: string;
   duration: number | null;
   action?: ToastAction;
+  dismissOnPress?: boolean;
 }
 
 type ToastListener = (payload: ToastPayload) => void;
@@ -32,16 +43,36 @@ export function subscribeToToasts(listener: ToastListener): () => void {
   };
 }
 
-export function showToast(message: string, duration = IOS_TOAST_DURATION_MS): void {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(message, duration >= 3500 ? ToastAndroid.LONG : ToastAndroid.SHORT);
+function normalizeToastOptions(
+  input: string | ToastOptions,
+  duration?: number
+): ToastOptions {
+  if (typeof input === 'string') {
+    return {
+      message: input,
+      duration,
+    };
+  }
+
+  return input;
+}
+
+export function showToast(input: string | ToastOptions, duration = IOS_TOAST_DURATION_MS): void {
+  const options = normalizeToastOptions(input, duration);
+  const toastDuration = options.duration ?? IOS_TOAST_DURATION_MS;
+
+  if (Platform.OS === 'android' && options.forceCustom !== true) {
+    ToastAndroid.show(options.message, toastDuration >= 3500 ? ToastAndroid.LONG : ToastAndroid.SHORT);
     return;
   }
 
   emitToast({
     id: Date.now(),
-    message,
-    duration,
+    title: options.title,
+    message: options.message,
+    duration: toastDuration,
+    action: options.action,
+    dismissOnPress: options.dismissOnPress,
   });
 }
 

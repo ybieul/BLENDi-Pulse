@@ -22,7 +22,9 @@ import {
   Linking,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TouchableHighlight,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -59,12 +61,21 @@ import {
   type EditSettingValue,
 } from "../components/me/EditSettingSheet";
 import { calculateUserBadges, type UserBadge } from "../utils/badges.utils";
+import {
+  useNotificationPreferences,
+  type NotificationPrefKey,
+} from "../hooks/useNotificationPreferences";
+import { DailyPulseTimeSheet } from "../components/me/DailyPulseTimeSheet";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CARD_BACKGROUND = "rgba(255,255,255,0.07)";
 const CARD_BORDER = "rgba(255,255,255,0.10)";
 const DIVIDER_COLOR = "rgba(255,255,255,0.06)";
+const SWITCH_TRACK_FALSE = "rgba(154,72,147,0.30)";
+const SWITCH_UNDERLAY = "rgba(255,255,255,0.04)";
+const VALUE_COLOR = "rgba(255,255,255,0.55)";
+const CHEVRON_COLOR = "rgba(255,255,255,0.30)";
 const PLAN_BADGE_FREE_BG = "rgba(255,255,255,0.08)";
 const PLAN_BADGE_FREE_BORDER = "rgba(255,255,255,0.12)";
 const PLAN_BADGE_PRO_BG = "rgba(154,72,147,0.25)";
@@ -82,6 +93,80 @@ const ONBOARDING_KEY = "onboarding_completed";
 
 // Namespace de storage compartilhado com auth.store — mesma instância MMKV.
 const appStorage = createAppStorage("blendi-pulse");
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatDailyPulseTime(
+  hour: number,
+  minute: number,
+  unitSystem: "metric" | "imperial",
+): string {
+  const mm = String(minute).padStart(2, "0");
+  if (unitSystem === "metric") {
+    return `${String(hour).padStart(2, "0")}:${mm}`;
+  }
+  const period = hour < 12 ? "AM" : "PM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${mm} ${period}`;
+}
+
+// ─── SwitchRow ────────────────────────────────────────────────────────────────
+
+interface SwitchRowProps {
+  label: string;
+  description?: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}
+
+function SwitchRow({ label, description, value, onValueChange }: SwitchRowProps) {
+  return (
+    <View style={switchRowStyles.row}>
+      <View style={switchRowStyles.content}>
+        <Text style={switchRowStyles.label}>{label}</Text>
+        {description ? (
+          <Text style={switchRowStyles.description}>{description}</Text>
+        ) : null}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: SWITCH_TRACK_FALSE, true: colors.brand.pulse }}
+        thumbColor={colors.text.primary}
+      />
+    </View>
+  );
+}
+
+const switchRowStyles = StyleSheet.create({
+  row: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  content: {
+    flex: 1,
+    gap: 2,
+  },
+  label: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.medium,
+    lineHeight: 20,
+  },
+  description: {
+    color: VALUE_COLOR,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: fontWeights.regular,
+    lineHeight: 18,
+  },
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,6 +259,40 @@ export function MeScreen() {
 
   const [editingType, setEditingType] = useState<EditSettingType | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<UserBadge | null>(null);
+  const [editingTime, setEditingTime] = useState(false);
+
+  const { preferences, dailyPulseTime, togglePreference, updateDailyPulseTime } =
+    useNotificationPreferences();
+
+  const notificationPreferenceRows = useMemo(
+    () => [
+      {
+        key: "dailyPulse" as NotificationPrefKey,
+        label: t("me.notifications.dailyPulse"),
+        description: t("me.notifications.dailyPulseDesc"),
+        value: preferences.dailyPulse,
+      },
+      {
+        key: "streakReminder" as NotificationPrefKey,
+        label: t("me.notifications.streakReminder"),
+        description: t("me.notifications.streakReminderDesc"),
+        value: preferences.streakReminder,
+      },
+      {
+        key: "supplementReminder" as NotificationPrefKey,
+        label: t("me.notifications.supplementReminder"),
+        description: t("me.notifications.supplementReminderDesc"),
+        value: preferences.supplementReminder,
+      },
+      {
+        key: "hydrationReminder" as NotificationPrefKey,
+        label: t("me.notifications.hydrationReminder"),
+        description: t("me.notifications.hydrationReminderDesc"),
+        value: preferences.hydrationReminder,
+      },
+    ],
+    [preferences.dailyPulse, preferences.hydrationReminder, preferences.streakReminder, preferences.supplementReminder, t],
+  );
 
   // ── Profile query ────────────────────────────────────────────────────────
 
@@ -526,6 +645,64 @@ export function MeScreen() {
           </View>
         </View>
 
+        {/* ── Notification Preferences ────────────────────────────────────── */}
+        <View style={styles.notificationsSection}>
+          <View style={styles.notificationsSectionHeader}>
+            <Ionicons
+              name="notifications-outline"
+              size={16}
+              color={colors.brand.pulse}
+            />
+            <Text style={styles.notificationsSectionTitle}>
+              {t("me.notifications.title")}
+            </Text>
+          </View>
+
+          <View style={styles.settingsCard}>
+            {notificationPreferenceRows.map((row, index) => (
+              <View key={row.key}>
+                <SwitchRow
+                  label={row.label}
+                  description={row.description}
+                  value={row.value}
+                  onValueChange={(value) => { togglePreference(row.key, value); }}
+                />
+                {index < notificationPreferenceRows.length - 1 ? (
+                  <View style={styles.divider} />
+                ) : null}
+              </View>
+            ))}
+            <View style={styles.divider} />
+
+            <TouchableHighlight
+              accessibilityRole="button"
+              onPress={() => { setEditingTime(true); }}
+              style={styles.timeRowTouchable}
+              underlayColor={SWITCH_UNDERLAY}
+            >
+              <View style={styles.timeRow}>
+                <Text style={styles.timeRowLabel}>
+                  {t("me.notifications.dailyPulseTime")}
+                </Text>
+                <View style={styles.timeRowValue}>
+                  <Text style={styles.timeRowValueText}>
+                    {formatDailyPulseTime(
+                      dailyPulseTime.hour,
+                      dailyPulseTime.minute,
+                      displayUnitSystem,
+                    )}
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={CHEVRON_COLOR}
+                  />
+                </View>
+              </View>
+            </TouchableHighlight>
+          </View>
+        </View>
+
         {/* ── Upgrade / Pro ───────────────────────────────────────────────── */}
         {isPro ? (
           <View style={styles.proSection}>
@@ -634,6 +811,14 @@ export function MeScreen() {
         onClose={() => {
           setSelectedBadge(null);
         }}
+      />
+
+      <DailyPulseTimeSheet
+        visible={editingTime}
+        initialHour={dailyPulseTime.hour}
+        initialMinute={dailyPulseTime.minute}
+        onConfirm={updateDailyPulseTime}
+        onClose={() => { setEditingTime(false); }}
       />
 
       {editingType !== null ? (
@@ -775,6 +960,57 @@ const styles = StyleSheet.create({
   badgeColumnWrapper: {
     gap: 10,
     marginBottom: 10,
+  },
+
+  // ── Notification preferences
+  notificationsSection: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  notificationsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  notificationsSectionTitle: {
+    color: colors.text.primary,
+    fontFamily: fonts.display,
+    fontSize: 16,
+    fontWeight: fontWeights.bold,
+  },
+  timeRowTouchable: {
+    borderRadius: 12,
+  },
+  timeRow: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 12,
+  },
+  timeRowLabel: {
+    flex: 1,
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.medium,
+    lineHeight: 20,
+  },
+  timeRowValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: "52%",
+  },
+  timeRowValueText: {
+    color: VALUE_COLOR,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.regular,
+    lineHeight: 20,
+    textAlign: "right",
   },
 
   // ── Settings

@@ -14,4 +14,10 @@ export * from './schemas/pulseAi';
 export * from './schemas/supplementStack';
 export * from './schemas/user';
 export type { HistoryQuery, SupplementItem, UpdateSupplementStackInput } from './schemas/supplementStack';
-export type { CalculateMacrosInput, CalculateMacrosResponse, UpdateUserInput } from './schemas/user';
+export type {
+  CalculateMacrosInput,
+  CalculateMacrosResponse,
+  DailyPulseTimeInput,
+  NotificationPreferencesInput,
+  UpdateUserInput,
+} from './schemas/user';

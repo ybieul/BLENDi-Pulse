@@ -28,6 +28,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#2b1429"
       },
+      "useNextNotificationsApi": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -45,6 +46,14 @@
           "backgroundColor": "#2b1429",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#9a4893",
+          "sounds": []
         }
       ],
       "expo-secure-store"

@@ -66,6 +66,7 @@ interface CurrentUserProfileResponse {
       name: string;
       profilePhoto?: string;
       lastCleanedAt?: string | null;
+      pushToken?: string | null;
       blendiModel: AuthUser['blendiModel'];
       goal: AuthUser['goal'];
       preferredLanguage: AuthUser['locale'];
@@ -76,6 +77,17 @@ interface CurrentUserProfileResponse {
       dailyCarbTarget: number;
       longestStreak: number;
       createdAt: string;
+      notificationPreferences?: {
+        dailyPulse: boolean;
+        streakReminder: boolean;
+        supplementReminder: boolean;
+        hydrationReminder: boolean;
+        levelUp: boolean;
+      };
+      dailyPulseTime?: {
+        hour: number;
+        minute: number;
+      };
     };
   };
 }
@@ -90,6 +102,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     name: user.name,
     profilePhoto: user.profilePhoto,
     lastCleanedAt: user.lastCleanedAt ?? null,
+    pushToken: user.pushToken ?? null,
     blendiModel: user.blendiModel,
     goal: user.goal,
     locale: user.preferredLanguage,
@@ -100,6 +113,8 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     dailyCarbTarget: user.dailyCarbTarget,
     longestStreak: user.longestStreak,
     createdAt: user.createdAt,
+    notificationPreferences: user.notificationPreferences,
+    dailyPulseTime: user.dailyPulseTime,
   };
 }
 

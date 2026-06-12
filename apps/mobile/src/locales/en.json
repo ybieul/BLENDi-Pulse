@@ -678,7 +678,11 @@
       "reminder_body": "You haven't blended yet today. Keep your {{count}}-day streak alive.",
       "lost_title": "Streak reset 😔",
       "lost_body": "Your streak ended. Start fresh today!"
-    }
+    },
+    "dailyPulseTitle": "Time to blend! 🎯",
+    "streakReminderTitle": "Your streak is waiting!",
+    "supplementReminderTitle": "Supplement check-in 💊",
+    "hydrationReminderTitle": "Stay hydrated! 💧"
   },
 
   "me": {
@@ -756,6 +760,24 @@
       "title": "Sign Out?",
       "message": "You'll need to sign in again to access your account",
       "confirm": "Sign Out"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "dailyPulse": "Daily Pulse",
+      "dailyPulseDesc": "Morning recipe suggestion",
+      "streakReminder": "Streak Reminder",
+      "streakReminderDesc": "Evening reminder if you haven't blended today",
+      "supplementReminder": "Supplement Reminder",
+      "supplementReminderDesc": "Evening reminder for your supplement checklist",
+      "hydrationReminder": "Hydration Reminder",
+      "hydrationReminderDesc": "Afternoon reminder if you're behind on water intake",
+      "dailyPulseTime": "Daily Pulse Time",
+      "channelName": "BLENDi Pulse",
+      "dailyPulsePrompt": "Tell me more about the {{recipeTitle}} recipe",
+      "timePicker": {
+        "title": "Daily Pulse Time",
+        "done": "Done"
+      }
     }
   }
 }

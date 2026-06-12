@@ -7,6 +7,9 @@
       "DOM"
     ],
     "strict": true,
+    "types": [
+      "node"
+    ],
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "noEmit": true,

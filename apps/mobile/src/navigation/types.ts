@@ -21,12 +21,12 @@ export type AuthStackParamList = {
 export type RootStackParamList = {
   AuthFlow: undefined;
   OnboardingFlow: undefined;
-  AppFlow: undefined;
+  AppFlow: NavigatorScreenParams<AppTabParamList> | undefined;
   Upgrade: undefined;
 };
 
 export type PulseAIStackParamList = {
-  PulseAIChat: undefined;
+  PulseAIChat: { prefilledMessage: string | null } | undefined;
   Favorites: undefined;
   PantryScanner: undefined;
 };

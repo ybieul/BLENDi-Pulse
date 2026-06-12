@@ -73,6 +73,7 @@ const envSchema = z.object({
 
   // CORS
   ALLOWED_ORIGINS: z.string().default('http://localhost:8081'),
+  EXPO_ACCESS_TOKEN: requiredString('EXPO_ACCESS_TOKEN'),
 
   // Google OAuth 2.0
   // Obtenha em: console.cloud.google.com → Credenciais → OAuth 2.0 Client IDs

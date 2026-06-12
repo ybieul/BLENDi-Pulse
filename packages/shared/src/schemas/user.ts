@@ -13,6 +13,33 @@ const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
 const unitSystemValues = ['metric', 'imperial'] as const;
 
+export const notificationPreferencesSchema = z.object({
+  dailyPulse: z.boolean().optional(),
+  streakReminder: z.boolean().optional(),
+  supplementReminder: z.boolean().optional(),
+  hydrationReminder: z.boolean().optional(),
+  levelUp: z.boolean().optional(),
+});
+
+export const dailyPulseTimeSchema = z.object({
+  hour: z
+    .number({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.number_range',
+    })
+    .int('errors.validation.integer')
+    .min(0, 'errors.validation.number_range')
+    .max(23, 'errors.validation.number_range'),
+  minute: z
+    .number({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.number_range',
+    })
+    .int('errors.validation.integer')
+    .min(0, 'errors.validation.number_range')
+    .max(59, 'errors.validation.number_range'),
+});
+
 // ─── Schema: atualização parcial do perfil do usuário ───────────────────────
 
 export const updateUserSchema = z
@@ -100,6 +127,15 @@ export const updateUserSchema = z
     unitSystem: z.enum(unitSystemValues, {
       required_error: 'errors.validation.required',
       message: 'errors.validation.invalid_option',
+    }),
+
+    notificationPreferences: notificationPreferencesSchema,
+
+    dailyPulseTime: dailyPulseTimeSchema,
+
+    pushToken: z.string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.required',
     }),
   })
   .partial();
@@ -214,6 +250,8 @@ export const calculateMacrosResponseSchema = z.object({
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
 export type MacroTargetInput = z.infer<typeof macroTargetSchema>;
+export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
+export type DailyPulseTimeInput = z.infer<typeof dailyPulseTimeSchema>;
 export type TimezoneInput = z.infer<typeof timezoneSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CalculateMacrosInput = z.infer<typeof calculateMacrosSchema>;

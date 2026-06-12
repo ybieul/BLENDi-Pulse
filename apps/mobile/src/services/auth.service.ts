@@ -25,6 +25,7 @@ export interface AuthUser {
   name: string;
   profilePhoto?: string;
   lastCleanedAt?: string | null;
+  pushToken?: string | null;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
@@ -36,6 +37,17 @@ export interface AuthUser {
   dailyCarbTarget: number;
   longestStreak: number;
   createdAt: string;
+  notificationPreferences?: {
+    dailyPulse: boolean;
+    streakReminder: boolean;
+    supplementReminder: boolean;
+    hydrationReminder: boolean;
+    levelUp: boolean;
+  };
+  dailyPulseTime?: {
+    hour: number;
+    minute: number;
+  };
 }
 
 export interface AuthTokens {

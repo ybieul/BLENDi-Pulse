@@ -4,6 +4,7 @@
 import './src/locales/i18n';
 
 import NetInfo from '@react-native-community/netinfo';
+import * as Notifications from 'expo-notifications';
 import { enableScreens } from 'react-native-screens';
 
 // Ativa telas nativas do React Navigation para reduzir custo de memória e
@@ -28,11 +29,19 @@ import { persistOptions, queryClient } from './src/config/queryClient';
 
 // Navigation — root switch entre auth e app
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
 import { OfflineBanner } from './src/components/ui/OfflineBanner';
-import { ToastViewport } from './src/utils/toast.utils';
+import { showToast, ToastViewport } from './src/utils/toast.utils';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 
 // Timezone — sincronização silenciosa ao voltar ao foreground
+import {
+  processDeepLink,
+  requestPermissionsAndGetToken,
+  setupNotificationChannel,
+  updatePushToken,
+  type NotificationData,
+} from './src/services/notifications.service';
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
 
 // Fontes da marca — carregadas antes de qualquer render
@@ -59,6 +68,10 @@ import { colors } from '@blendi/shared';
 // Mantém a splash screen visível enquanto as fontes carregam
 // preventAutoHideAsync é fire-and-forget intencional — sem await no módulo
 void SplashScreen.preventAutoHideAsync();
+
+function buildHandledNotificationResponseKey(response: Notifications.NotificationResponse): string {
+  return `${response.notification.request.identifier}:${response.actionIdentifier}`;
+}
 
 const navigationTheme: Theme = {
   ...DefaultTheme,
@@ -92,10 +105,14 @@ function AppShell() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isRestoringSession = useAuthStore((s) => s.isRestoringSession);
+  const userPushToken = useAuthStore((s) => s.user?.pushToken ?? null);
+  const updateUserProfile = useAuthStore((s) => s.updateUserProfile);
 
   // Rastreia o AppState anterior para filtrar apenas transições para 'active'
   // vindas de background/inactive — evita disparar na montagem inicial.
   const appStatePrevious = useRef<AppStateStatus>(AppState.currentState);
+  const lastKnownPushToken = useRef<string | null>(null);
+  const lastHandledNotificationResponseKey = useRef<string | null>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     Syne_400Regular,
@@ -139,6 +156,144 @@ function AppShell() {
     void syncTimezoneIfNeeded().catch(() => undefined);
   }, [isAuthenticated, isRestoringSession]);
 
+  useEffect(() => {
+    lastKnownPushToken.current = userPushToken;
+  }, [userPushToken]);
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+
+    return () => {
+      Notifications.setNotificationHandler(null);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      lastKnownPushToken.current = null;
+      return;
+    }
+
+    let isCancelled = false;
+    let pushTokenTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let navigationTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const navigateFromNotificationResponse = (
+      response: Notifications.NotificationResponse,
+      options?: { clearLastResponse?: boolean }
+    ) => {
+      const responseKey = buildHandledNotificationResponseKey(response);
+
+      if (lastHandledNotificationResponseKey.current === responseKey) {
+        return;
+      }
+
+      lastHandledNotificationResponseKey.current = responseKey;
+
+      const notificationData = (response.notification.request.content.data ?? {}) as NotificationData;
+      const route = processDeepLink(notificationData);
+
+      if (navigationTimeoutId) {
+        clearTimeout(navigationTimeoutId);
+      }
+
+      navigationTimeoutId = setTimeout(() => {
+        if (!navigationRef.isReady()) {
+          return;
+        }
+
+        navigationRef.current?.navigate('AppFlow', {
+          screen: route.screen as never,
+          params: route.params as never,
+        } as never);
+
+        if (options?.clearLastResponse === true) {
+          void Notifications.clearLastNotificationResponseAsync();
+        }
+      }, 500);
+    };
+
+    const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
+      const notificationTitle = notification.request.content.title?.trim();
+      const notificationBody = notification.request.content.body?.trim();
+      const toastMessage = notificationBody ?? notificationTitle;
+
+      if (!toastMessage) {
+        return;
+      }
+
+      showToast({
+        title: notificationTitle && notificationBody ? notificationTitle : undefined,
+        message: notificationBody ?? notificationTitle ?? '',
+        duration: 4000,
+        dismissOnPress: true,
+        forceCustom: true,
+      });
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      navigateFromNotificationResponse(response);
+    });
+
+    void setupNotificationChannel().catch(() => undefined);
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (isCancelled || !response) {
+        return;
+      }
+
+      navigateFromNotificationResponse(response, { clearLastResponse: true });
+    });
+
+    pushTokenTimeoutId = setTimeout(() => {
+      void (async () => {
+        try {
+          const nextPushToken = await requestPermissionsAndGetToken();
+
+          if (isCancelled || !nextPushToken) {
+            return;
+          }
+
+          if (nextPushToken === lastKnownPushToken.current) {
+            return;
+          }
+
+          const persistedPushToken = await updatePushToken(nextPushToken);
+
+          if (isCancelled) {
+            return;
+          }
+
+          const resolvedPushToken = persistedPushToken ?? nextPushToken;
+          lastKnownPushToken.current = resolvedPushToken;
+          updateUserProfile({ pushToken: resolvedPushToken });
+        } catch {
+        }
+      })();
+    }, 3000);
+
+    return () => {
+      isCancelled = true;
+
+      if (pushTokenTimeoutId) {
+        clearTimeout(pushTokenTimeoutId);
+      }
+
+      if (navigationTimeoutId) {
+        clearTimeout(navigationTimeoutId);
+      }
+
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, [isAuthenticated, updateUserProfile]);
+
   // ── AppState: sincronização de timezone ao voltar ao foreground ──────────────
   // Cobre o caso de uso principal: usuário viaja entre países, o SO ajusta o
   // timezone automaticamente — na próxima abertura do app o fuso é atualizado
@@ -173,7 +328,7 @@ function AppShell() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       <StatusBar style="light" backgroundColor={colors.background.primary} />
       <RootNavigator />
       <ToastViewport />

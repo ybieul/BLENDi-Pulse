@@ -678,7 +678,11 @@
       "reminder_body": "Você ainda não blendou hoje. Mantenha sua sequência de {{count}} dias.",
       "lost_title": "Sequência reiniciada 😔",
       "lost_body": "Sua sequência acabou. Comece de novo hoje!"
-    }
+    },
+    "dailyPulseTitle": "Hora do blend! 🎯",
+    "streakReminderTitle": "Seu streak está esperando!",
+    "supplementReminderTitle": "Hora dos suplementos 💊",
+    "hydrationReminderTitle": "Mantenha-se hidratado! 💧"
   },
 
   "me": {
@@ -756,6 +760,24 @@
       "title": "Sair?",
       "message": "Você precisará entrar novamente para acessar sua conta",
       "confirm": "Sair"
+    },
+    "notifications": {
+      "title": "Notificações",
+      "dailyPulse": "Daily Pulse",
+      "dailyPulseDesc": "Sugestão de receita matinal",
+      "streakReminder": "Lembrete de Streak",
+      "streakReminderDesc": "Lembrete noturno se você não fez blend hoje",
+      "supplementReminder": "Lembrete de Suplementos",
+      "supplementReminderDesc": "Lembrete noturno para seu checklist de suplementos",
+      "hydrationReminder": "Lembrete de Hidratação",
+      "hydrationReminderDesc": "Lembrete da tarde se você está atrás na ingestão de água",
+      "dailyPulseTime": "Horário do Pulse Diário",
+      "channelName": "BLENDi Pulse",
+      "dailyPulsePrompt": "Me conte mais sobre a receita {{recipeTitle}}",
+      "timePicker": {
+        "title": "Horário do Pulse Diário",
+        "done": "Confirmar"
+      }
     }
   }
 }

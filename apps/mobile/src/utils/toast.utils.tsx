@@ -24,6 +24,25 @@ export function ToastViewport() {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(IOS_TOAST_ENTRY_OFFSET)).current;
 
+  const dismissToast = (toastId: number) => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: IOS_TOAST_ENTRY_OFFSET,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setToast((currentToast) => (currentToast?.id === toastId ? null : currentToast));
+      }
+    });
+  };
+
   useEffect(() => {
     return subscribeToToasts((payload) => {
       setToast(payload);
@@ -56,22 +75,7 @@ export function ToastViewport() {
     }
 
     const timeoutId = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: IOS_TOAST_ENTRY_OFFSET,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        if (finished) {
-          setToast((currentToast) => (currentToast?.id === toast.id ? null : currentToast));
-        }
-      });
+      dismissToast(toast.id);
     }, toast.duration);
 
     return () => {
@@ -85,13 +89,22 @@ export function ToastViewport() {
 
   const handleActionPress = () => {
     toast.action?.onPress();
-    setToast((currentToast) => (currentToast?.id === toast.id ? null : currentToast));
+    dismissToast(toast.id);
+  };
+
+  const handleToastPress = () => {
+    if (toast.dismissOnPress !== true) {
+      return;
+    }
+
+    dismissToast(toast.id);
   };
 
   return (
     <View pointerEvents="box-none" style={[styles.viewport, { top: insets.top + spacing.lg }]}>
-      <Animated.View
-        pointerEvents={toast.action ? 'auto' : 'none'}
+      <Pressable onPress={handleToastPress}>
+        <Animated.View
+          pointerEvents={toast.action || toast.dismissOnPress ? 'auto' : 'none'}
         style={[
           styles.toast,
           {
@@ -99,14 +112,16 @@ export function ToastViewport() {
             transform: [{ translateY }],
           },
         ]}
-      >
-        <Text style={styles.toastText}>{toast.message}</Text>
-        {toast.action ? (
-          <Pressable onPress={handleActionPress} style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>{toast.action.label}</Text>
-          </Pressable>
-        ) : null}
-      </Animated.View>
+        >
+          {toast.title ? <Text style={styles.toastTitle}>{toast.title}</Text> : null}
+          <Text style={styles.toastText}>{toast.message}</Text>
+          {toast.action ? (
+            <Pressable onPress={handleActionPress} style={styles.actionButton}>
+              <Text style={styles.actionButtonText}>{toast.action.label}</Text>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }
@@ -132,6 +147,12 @@ const styles = StyleSheet.create({
       width: 0,
       height: 8,
     },
+  },
+  toastTitle: {
+    color: colors.text.primary,
+    fontFamily: fonts.display,
+    fontSize: fontSizes.md,
+    marginBottom: spacing.xs,
   },
   toastText: {
     color: colors.text.primary,

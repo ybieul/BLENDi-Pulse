@@ -1,0 +1,39 @@
+{
+  "dailyPulse": {
+    "title": "Time to blend! 🎯",
+    "goals": {
+      "Muscle": {
+        "withRecipe": "Ready for gains? Your {recipeName} shake is waiting 💪",
+        "generic": "Ready for gains? Your next shake is waiting 💪"
+      },
+      "Wellness": {
+        "withRecipe": "Start your day right! Make your {recipeName} now 🌿",
+        "generic": "Start your day right with a fresh blend 🌿"
+      },
+      "Energy": {
+        "withRecipe": "Boost time! {recipeName} will fuel your day ⚡",
+        "generic": "Boost time! A fresh blend will fuel your day ⚡"
+      },
+      "Recovery": {
+        "withRecipe": "Time to recover! Your {recipeName} blend is perfect for today 🔄",
+        "generic": "Time to recover! A nourishing blend is perfect for today 🔄"
+      }
+    }
+  },
+  "streakReminder": {
+    "title": "Your streak is waiting!",
+    "short": "Don’t let today break your momentum. One blend keeps the streak going 🔥",
+    "medium": "Your {count}-day streak needs you tonight! 🔥",
+    "long": "{count} days strong — don’t stop now. Keep your streak alive tonight 🔥"
+  },
+  "supplementReminder": {
+    "title": "Supplement check-in 💊",
+    "empty": "You still have supplements pending in today’s routine 💊",
+    "withSummary": "You still have {supplementSummary} pending today 💊",
+    "summaryMoreSuffix": ", +{count} more"
+  },
+  "hydrationReminder": {
+    "title": "Stay hydrated! 💧",
+    "body": "You’re at {currentValue} of {goalValue} today. Time for another glass 💧"
+  }
+}

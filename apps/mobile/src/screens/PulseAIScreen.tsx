@@ -156,7 +156,7 @@ function WelcomeState({ title, subtitle, suggestions, onSuggestionPress }: Welco
 
 // ─── PulseAIScreen ────────────────────────────────────────────────────────────
 
-export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAIChat'>) {
+export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'PulseAIChat'>) {
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -338,6 +338,17 @@ export function PulseAIScreen({ navigation }: PulseAIStackScreenProps<'PulseAICh
     clearPendingProtocol();
     void handleSend(protocol);
   }, [clearPendingProtocol, handleSend, pendingProtocol]);
+
+  useEffect(() => {
+    const prefilledMessage = route.params?.prefilledMessage?.trim();
+
+    if (!prefilledMessage) {
+      return;
+    }
+
+    chatInputRef.current?.setText(prefilledMessage);
+    navigation.setParams({ prefilledMessage: null });
+  }, [navigation, route.params?.prefilledMessage]);
 
   // ── Chip de sugestão → preenche ChatInput sem enviar ─────────────────────
   const handleSuggestionPress = useCallback((text: string) => {

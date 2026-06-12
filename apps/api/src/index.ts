@@ -25,6 +25,7 @@ import { pulseAiRouter } from './routes/pulseAi';
 import { supplementLogsRouter } from './routes/supplementLogs';
 import { supplementStackRouter } from './routes/supplementStack';
 import { sendErrorResponse } from './utils/error.utils';
+import { initializeNotificationJobs } from './jobs/notifications.jobs';
 
 const app = express();
 const configuredOrigins = new Set(env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean));
@@ -101,6 +102,7 @@ app.use(errorHandler);
 async function bootstrap(): Promise<void> {
   // Aguarda banco antes de aceitar requisições
   await connectDatabase();
+  initializeNotificationJobs();
 
   app.listen(env.PORT, () => {
     console.log(`\n🚀  BLENDi Pulse API`);
