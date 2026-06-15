@@ -13,6 +13,7 @@ export * from './schemas/pantryScanner';
 export * from './schemas/pulseAi';
 export * from './schemas/supplementStack';
 export * from './schemas/user';
+export * from './utils/level.utils';
 export type { HistoryQuery, SupplementItem, UpdateSupplementStackInput } from './schemas/supplementStack';
 export type {
   CalculateMacrosInput,

@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { ZodError } from 'zod';
-import { createFavoriteSchema, type FavoriteItem } from '@blendi/shared';
+import { XP_EVENTS, createFavoriteSchema, type FavoriteItem } from '@blendi/shared';
 import { FavoriteModel, type IFavorite } from '../models/Favorite';
 import { UserModel } from '../models/User';
+import { awardXP } from '../services/xp.service';
 import { sendErrorResponse, VALIDATION_ERROR_MESSAGE } from '../utils/error.utils';
 
 type FavoriteRecord = IFavorite & {
@@ -167,11 +168,18 @@ export async function addFavorite(
         goal: user.goal,
       });
 
+      const xpAwarded = XP_EVENTS.favoriteRecipe;
+
+      Promise.resolve()
+        .then(() => awardXP(userId, 'favoriteRecipe', user.timezone))
+        .catch(err => console.error('XP award failed:', err));
+
       res.status(201).json({
         success: true,
         data: {
           favorite: serializeFavorite(favorite.toObject() as FavoriteRecord),
           alreadyExists: false,
+          xpAwarded,
         },
       });
       return;

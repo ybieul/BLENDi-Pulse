@@ -682,7 +682,23 @@
     "dailyPulseTitle": "Time to blend! 🎯",
     "streakReminderTitle": "Your streak is waiting!",
     "supplementReminderTitle": "Supplement check-in 💊",
-    "hydrationReminderTitle": "Stay hydrated! 💧"
+    "hydrationReminderTitle": "Stay hydrated! 💧",
+    "levelUpTitle": "Level Up! 🎉",
+    "levelUpBody": "You reached {{levelName}}! Keep blending!"
+  },
+
+  "levels": {
+    "beginner": "Blend Beginner",
+    "explorer": "Nutrition Explorer",
+    "seeker": "Performance Seeker",
+    "builder": "Consistency Builder",
+    "warrior": "Wellness Warrior",
+    "champion": "Protein Champion",
+    "expert": "Blend Expert",
+    "master": "Blend Master",
+    "elite": "Elite Blender",
+    "legend": "Nutrition Legend",
+    "guru": "Blend Guru ({{level}})"
   },
 
   "me": {

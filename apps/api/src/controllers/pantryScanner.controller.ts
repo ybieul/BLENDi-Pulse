@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
+  XP_EVENTS,
   pantryAnalysisResultSchema,
   pantryIngredientSchema,
   pantryScanSchema,
@@ -24,6 +25,7 @@ import {
   callAi,
   callVisionAi,
 } from '../services/aiProvider.service';
+import { awardXP } from '../services/xp.service';
 import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.service';
 import { buildPantryRecipePrompt } from '../services/promptBuilder.service';
 import { sendErrorResponse } from '../utils/error.utils';
@@ -39,6 +41,7 @@ interface PantryScannerUserProfile {
   goal: UserGoal;
   locale: UserLocale;
   unitSystem: UserUnitSystem;
+  timezone: string;
   dailyProteinTarget: number;
   dailyCarbTarget: number;
   dailyCalorieTarget: number;
@@ -138,6 +141,14 @@ function calculateImageSizeKb(imageBase64: string): number {
   return Number((((imageBase64.length * 3) / 4) / 1024).toFixed(1));
 }
 
+function triggerPantryScannerXP(userId: string, timezone: string): number {
+  Promise.resolve()
+    .then(() => awardXP(userId, 'pantryScanner', timezone))
+    .catch(err => console.error('XP award failed:', err));
+
+  return XP_EVENTS.pantryScanner;
+}
+
 function getNextScanResetDate(scanResetDate: Date, now = new Date()): Date {
   let nextScanResetDate = new Date(scanResetDate);
 
@@ -206,6 +217,7 @@ async function findPantryScannerUserProfile(
       goal: 1,
       locale: 1,
       unitSystem: 1,
+      timezone: 1,
       dailyProteinTarget: 1,
       dailyCarbTarget: 1,
       dailyCalorieTarget: 1,
@@ -226,6 +238,7 @@ async function findPantryScannerUserProfile(
     goal: user.goal as UserGoal,
     locale: user.locale as UserLocale,
     unitSystem: user.unitSystem as UserUnitSystem,
+    timezone: user.timezone,
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCarbTarget: user.dailyCarbTarget ?? 200,
     dailyCalorieTarget: user.dailyCalorieTarget,
@@ -513,16 +526,21 @@ export async function analyzePantry(
 
     const recipes = await generatePantryRecipes(currentUser, usableIngredients);
 
+    const xpAwarded = triggerPantryScannerXP(currentUser.id, currentUser.timezone);
+
     res.status(200).json({
       success: true,
-      data: buildPantryAnalysisResult({
-        ingredients: usableIngredients,
-        recipes,
-        analysisNotes: visionAnalysis.analysisNotes,
-        noFoodDetected: false,
-        scansUsed: scanIncrement.scanCount,
-        resetDate: scanIncrement.scanResetDate,
-      }),
+      data: {
+        ...buildPantryAnalysisResult({
+          ingredients: usableIngredients,
+          recipes,
+          analysisNotes: visionAnalysis.analysisNotes,
+          noFoodDetected: false,
+          scansUsed: scanIncrement.scanCount,
+          resetDate: scanIncrement.scanResetDate,
+        }),
+        xpAwarded,
+      },
     });
   } catch (error) {
     next(error);

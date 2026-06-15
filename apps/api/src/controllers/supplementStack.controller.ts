@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { updateSupplementStackSchema } from '@blendi/shared';
+import { XP_EVENTS, updateSupplementStackSchema } from '@blendi/shared';
 import { SupplementLogModel, type ISupplementLog } from '../models/SupplementLog';
+import { XPLogModel } from '../models/XPLog';
 import { UserModel, type IUserSupplement } from '../models/User';
+import { awardXP } from '../services/xp.service';
 import {
   getSupplementConsumedCount,
   getSupplementDailyTargetCount,
@@ -353,10 +355,35 @@ export async function checkSupplement(
           consumedCount: 1,
         });
 
+        let xpAwarded = 0;
+        const activeSupplementCount = context.supplementStack.filter(item => item.isActive).length;
+
+        if (activeSupplementCount > 0) {
+          const checkedTodayCount = await SupplementLogModel.countDocuments({
+            userId,
+            logDate,
+          });
+
+          if (checkedTodayCount === activeSupplementCount) {
+            const supplementGoalAlreadyAwarded = await XPLogModel.exists({
+              userId,
+              xpType: 'supplementGoal',
+              logDate,
+            });
+
+            xpAwarded = supplementGoalAlreadyAwarded ? 0 : XP_EVENTS.supplementGoal;
+
+            Promise.resolve()
+              .then(() => awardXP(userId, 'supplementGoal', context.timezone))
+              .catch(err => console.error('XP award failed:', err));
+          }
+        }
+
         res.status(201).json({
           success: true,
           data: {
             log: serializeSupplementLog(createdLog.toObject() as SupplementLogRecord),
+            xpAwarded,
           },
         });
         return;
@@ -389,6 +416,7 @@ export async function checkSupplement(
       success: true,
       data: {
         log: serializeSupplementLog(log.toObject() as SupplementLogRecord),
+        xpAwarded: 0,
       },
     });
   } catch (err) {

@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError, z } from 'zod';
 import {
+  calculateLevel,
   calculateMacrosSchema,
   dailyPulseTimeSchema,
   notificationPreferencesSchema,
@@ -157,6 +158,9 @@ export async function getMe(
       return;
     }
 
+    const totalXP = user.totalXP ?? 0;
+    const levelInfo = calculateLevel(totalXP);
+
     res.status(200).json({
       success: true,
       data: {
@@ -183,6 +187,10 @@ export async function getMe(
           streakDays: user.currentStreak,
           longestStreak: user.longestStreak ?? 0,
           blendCount: user.blendCount,
+          totalXP,
+          lastLevelUp: user.lastLevelUp ?? null,
+          currentLevel: levelInfo.level,
+          levelProgress: levelInfo.progress,
           totalBlends: user.blendCount,
           lastCleanedAt: user.lastCleanedAt ?? null,
         },

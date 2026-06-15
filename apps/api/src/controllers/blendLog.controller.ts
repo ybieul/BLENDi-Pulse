@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { createBlendLogSchema, historyQuerySchema } from '@blendi/shared';
+import { XP_EVENTS, createBlendLogSchema, historyQuerySchema } from '@blendi/shared';
 import { BlendLogModel } from '../models/BlendLog';
 import { UserModel } from '../models/User';
+import { awardXP, type AwardXPResult } from '../services/xp.service';
 import {
   getMidnightUTC,
   isSameDayInTimezone,
@@ -21,6 +22,8 @@ interface BlendUserContext {
   currentStreak: number;
   longestStreak: number;
   blendCount: number;
+  dailyProteinTarget: number;
+  dailyCalorieTarget: number;
 }
 
 interface BlendHistorySummary {
@@ -41,7 +44,15 @@ interface BlendHistoryDailyBreakdownItem {
   calories: number;
 }
 
+interface BlendGoalAggregateResult {
+  total: number;
+}
+
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const DAILY_BLEND_GOAL_XP_AMOUNTS = {
+  proteinGoal: XP_EVENTS.proteinGoal,
+  calorieGoal: XP_EVENTS.calorieGoal,
+} as const;
 
 function sendUnauthorized(res: Response): void {
   sendErrorResponse(res, {
@@ -147,7 +158,14 @@ function isPreviousDayInTimezone(previousDate: Date, currentDate: Date, timezone
 
 async function getBlendUserContext(userId: string): Promise<BlendUserContext | null> {
   const user = await UserModel.findById(userId)
-    .select({ timezone: 1, currentStreak: 1, longestStreak: 1, blendCount: 1 })
+    .select({
+      timezone: 1,
+      currentStreak: 1,
+      longestStreak: 1,
+      blendCount: 1,
+      dailyProteinTarget: 1,
+      dailyCalorieTarget: 1,
+    })
     .lean();
 
   if (!user) {
@@ -159,7 +177,61 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
     currentStreak: user.currentStreak ?? 0,
     longestStreak: user.longestStreak ?? 0,
     blendCount: user.blendCount ?? 0,
+    dailyProteinTarget: user.dailyProteinTarget,
+    dailyCalorieTarget: user.dailyCalorieTarget,
   };
+}
+
+function createSkippedXPResult(): AwardXPResult {
+  return {
+    awarded: false,
+    amount: 0,
+    newTotalXP: 0,
+    leveledUp: false,
+    newLevel: null,
+  };
+}
+
+async function awardDailyBlendGoalXP(
+  userId: string,
+  timezone: string,
+  startOfDay: Date,
+  target: number,
+  xpType: keyof typeof DAILY_BLEND_GOAL_XP_AMOUNTS,
+  metricField: 'protein' | 'calories'
+): Promise<AwardXPResult> {
+  if (target <= 0 || DAILY_BLEND_GOAL_XP_AMOUNTS[xpType] <= 0) {
+    return createSkippedXPResult();
+  }
+
+  const [aggregate] = await BlendLogModel.aggregate<BlendGoalAggregateResult>([
+    {
+      $match: {
+        userId: new mongoose.Types.ObjectId(userId),
+        createdAt: {
+          $gte: startOfDay,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: `$${metricField}` },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        total: 1,
+      },
+    },
+  ]);
+
+  if ((aggregate?.total ?? 0) < target) {
+    return createSkippedXPResult();
+  }
+
+  return awardXP(userId, xpType, timezone);
 }
 
 async function updateCurrentStreak(
@@ -260,6 +332,40 @@ export async function createBlendLog(
     ]);
 
     const updatedBlendCount = updatedUser?.blendCount ?? user.blendCount + 1;
+    const startOfDay = getMidnightUTC(user.timezone);
+    const xpResults = await Promise.all([
+      awardXP(userId, 'blend', user.timezone),
+      awardDailyBlendGoalXP(
+        userId,
+        user.timezone,
+        startOfDay,
+        user.dailyProteinTarget,
+        'proteinGoal',
+        'protein'
+      ),
+      awardDailyBlendGoalXP(
+        userId,
+        user.timezone,
+        startOfDay,
+        user.dailyCalorieTarget,
+        'calorieGoal',
+        'calories'
+      ),
+    ]);
+    const xpAwarded = xpResults
+      .filter(result => result.awarded)
+      .reduce((sum, result) => sum + result.amount, 0);
+    const leveledUp = xpResults.some(result => result.leveledUp);
+    const newLevel = xpResults.reduce<number | null>(
+      (highestLevel, result) => {
+        if (result.newLevel === null) {
+          return highestLevel;
+        }
+
+        return highestLevel === null ? result.newLevel : Math.max(highestLevel, result.newLevel);
+      },
+      null
+    );
 
     res.status(201).json({
       success: true,
@@ -279,6 +385,9 @@ export async function createBlendLog(
         currentStreak: updatedStreaks.currentStreak,
         longestStreak: updatedStreaks.longestStreak,
         blendCount: updatedBlendCount,
+        xpAwarded,
+        leveledUp,
+        newLevel,
         totalBlends: updatedBlendCount,
       },
     });

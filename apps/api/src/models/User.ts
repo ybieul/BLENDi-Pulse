@@ -35,6 +35,11 @@ export interface IUserDailyPulseTime {
   minute: number;
 }
 
+export interface IUserLastLevelUp {
+  level: number;
+  awardedAt: Date;
+}
+
 export interface IUser {
   email: string;
   /**
@@ -77,6 +82,8 @@ export interface IUser {
   currentStreak: number;
   longestStreak: number;
   blendCount: number;
+  totalXP: number;
+  lastLevelUp?: IUserLastLevelUp;
   lastCleanedAt?: Date;
   /** Peso corporal em quilogramas. Opcional até o onboarding coletar o valor. */
   weight?: number;
@@ -245,6 +252,27 @@ const userDailyPulseTimeSchema = new mongoose.Schema<IUserDailyPulseTime>(
   }
 );
 
+const userLastLevelUpSchema = new mongoose.Schema<IUserLastLevelUp>(
+  {
+    level: {
+      type: Number,
+      required: [true, 'errors.validation.required'],
+      min: [1, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    awardedAt: {
+      type: Date,
+      required: [true, 'errors.validation.required'],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
@@ -385,6 +413,19 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
         validator: Number.isInteger,
         message: 'errors.validation.integer',
       },
+    },
+    totalXP: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
+    },
+    lastLevelUp: {
+      type: userLastLevelUpSchema,
+      required: false,
     },
     lastCleanedAt: {
       type: Date,

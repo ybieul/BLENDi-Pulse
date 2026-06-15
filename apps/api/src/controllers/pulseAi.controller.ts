@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import {
+  XP_EVENTS,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
   type PulseAiRecipe,
@@ -31,6 +32,7 @@ import {
   invalidateUserCache,
   setInCache,
 } from '../services/cache.service';
+import { awardXP } from '../services/xp.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 
@@ -101,6 +103,14 @@ function sendUserNotFound(res: Response): void {
     code: 'resource/not-found',
     message: 'User not found.',
   });
+}
+
+function triggerPulseAiXP(userId: string, timezone: string): number {
+  Promise.resolve()
+    .then(() => awardXP(userId, 'pulseAi', timezone))
+    .catch(err => console.error('XP award failed:', err));
+
+  return XP_EVENTS.pulseAi;
 }
 
 function normalizeMessageForCache(message: string): string {
@@ -362,6 +372,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
           return;
         }
 
+        const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+
         res.status(200).json({
           success: true,
           data: {
@@ -370,6 +382,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
             usageRemaining: usageReservation.usageRemaining,
             aiProvider: parsedCachedResponse.data.aiProvider,
             aiModel: parsedCachedResponse.data.aiModel,
+            xpAwarded,
           },
         });
         return;
@@ -488,6 +501,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
 
       shouldRollbackUsage = false;
 
+      const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+
       res.status(200).json({
         success: true,
         data: {
@@ -496,6 +511,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
           usageRemaining: usageReservation.usageRemaining,
           aiProvider: aiResponse.provider,
           aiModel: aiResponse.model,
+          xpAwarded,
         },
       });
     } catch (error) {

@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { historyQuerySchema } from '@blendi/shared';
+import { XP_EVENTS, historyQuerySchema } from '@blendi/shared';
 import { HydrationLogModel } from '../models/HydrationLog';
+import { XPLogModel } from '../models/XPLog';
 import { UserModel } from '../models/User';
+import { awardXP } from '../services/xp.service';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -139,6 +141,21 @@ function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
 }
 
+function formatLocalDateKey(timezone: string): string {
+  const midnightUTC = getMidnightUTC(timezone);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(midnightUTC);
+
+  const getPart = (type: 'year' | 'month' | 'day') =>
+    parts.find(part => part.type === type)?.value ?? '00';
+
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+}
+
 function getAmountMl(body: Request['body']): number | null {
   const amountMl = body?.amountMl;
 
@@ -224,6 +241,21 @@ export async function logWater(
     });
 
     const summary = await getTodayHydrationSummary(userId, hydrationContext.timezone);
+    let xpAwarded = 0;
+
+    if (summary.totalMl >= hydrationContext.goalMl) {
+      const hydrationGoalAlreadyAwarded = await XPLogModel.exists({
+        userId,
+        xpType: 'hydrationGoal',
+        logDate: formatLocalDateKey(hydrationContext.timezone),
+      });
+
+      xpAwarded = hydrationGoalAlreadyAwarded ? 0 : XP_EVENTS.hydrationGoal;
+
+      Promise.resolve()
+        .then(() => awardXP(userId, 'hydrationGoal', hydrationContext.timezone))
+        .catch(err => console.error('XP award failed:', err));
+    }
 
     res.status(201).json({
       success: true,
@@ -235,6 +267,7 @@ export async function logWater(
         },
         totalMl: summary.totalMl,
         goalMl: hydrationContext.goalMl,
+        xpAwarded,
       },
     });
   } catch (err) {
