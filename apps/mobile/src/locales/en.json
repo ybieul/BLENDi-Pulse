@@ -687,6 +687,15 @@
     "levelUpBody": "You reached {{levelName}}! Keep blending!"
   },
 
+  "gamification": {
+    "levelUpTitle": "Level Up! 🎉",
+    "levelUpSubtitle": "You're on a roll!",
+    "xpToNextLevel": "{{xp}} XP to {{levelName}}",
+    "currentXp": "{{xp}} XP total",
+    "levelPrefix": "Lv.",
+    "levelDetail": "Level {{level}}"
+  },
+
   "levels": {
     "beginner": "Blend Beginner",
     "explorer": "Nutrition Explorer",
@@ -705,6 +714,8 @@
     "currentStreak": "Current Streak",
     "totalBlends": "Total Blends",
     "longestStreak": "Best Streak",
+    "level": "Level",
+    "levelProgress": "Level Progress",
     "settings": "Settings",
     "memberSince": "Member since {{date}}",
     "metric": "Metric",

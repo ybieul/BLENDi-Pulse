@@ -1,7 +1,11 @@
 import axios, { type AxiosError } from 'axios';
+import { calculateLevel } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+ void calculateLevel;
 
 interface ApiErrorResponse {
   success: false;
@@ -20,6 +24,7 @@ interface SupplementCheckResponse {
   success: true;
   data: {
     log: SupplementCheckLog;
+    xpAwarded: number;
   };
 }
 
@@ -132,6 +137,7 @@ export async function checkSupplement(supplementId: string): Promise<SupplementC
       `/supplement-stack/${encodeURIComponent(supplementId)}/check`
     );
 
+    handleXPResponse(response.data.data);
     return response.data.data.log;
   } catch (error) {
     throw toSupplementStackServiceError(error);

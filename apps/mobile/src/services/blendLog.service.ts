@@ -1,8 +1,11 @@
 import axios, { type AxiosError } from 'axios';
-import type { CreateBlendLogInput } from '@blendi/shared';
+import { calculateLevel, type CreateBlendLogInput } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+ void calculateLevel;
 
 interface ApiErrorResponse {
   success: false;
@@ -43,6 +46,9 @@ export interface CreateBlendLogResult {
   currentStreak: number;
   longestStreak: number;
   blendCount: number;
+  xpAwarded: number;
+  leveledUp: boolean;
+  newLevel: number | null;
   totalBlends: number;
 }
 
@@ -138,7 +144,9 @@ function toBlendLogServiceError(error: unknown): BlendLogServiceError {
 export async function createBlendLog(input: CreateBlendLogInput): Promise<CreateBlendLogResult> {
   try {
     const response = await api.post<CreateBlendLogResponse>('/blend-logs', input);
-    return response.data.data;
+    const result = response.data.data;
+    handleXPResponse(result);
+    return result;
   } catch (error) {
     throw toBlendLogServiceError(error);
   }

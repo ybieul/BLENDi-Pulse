@@ -5,6 +5,7 @@ import {
   manipulateAsync,
 } from 'expo-image-manipulator';
 import {
+  calculateLevel,
   pantryAnalysisResultSchema,
   type PantryAnalysisResult,
   type PantryScanInput,
@@ -12,6 +13,9 @@ import {
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+ void calculateLevel;
 
 const MAX_IMAGE_DIMENSION = 1024;
 const IMAGE_COMPRESSION_QUALITY = 0.7;
@@ -32,7 +36,9 @@ interface ApiErrorResponse {
 
 interface PantryScannerAnalyzeResponse {
   success: true;
-  data: PantryAnalysisResult;
+  data: PantryAnalysisResult & {
+    xpAwarded: number;
+  };
 }
 
 interface LocalImageSize {
@@ -80,7 +86,7 @@ function getImageSize(uri: string): Promise<LocalImageSize> {
         resolve({ width, height });
       },
       (error) => {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     );
   });
@@ -199,6 +205,7 @@ export async function analyzePantry(
       }
     );
 
+    handleXPResponse(response.data.data);
     return pantryAnalysisResultSchema.parse(response.data.data);
   } catch (error) {
     throw toPantryScannerServiceError(error);

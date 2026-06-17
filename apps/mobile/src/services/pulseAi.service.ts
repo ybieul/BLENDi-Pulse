@@ -1,9 +1,12 @@
 import axios from 'axios';
-import type { PulseAiChatInput, PulseAiRecipe } from '@blendi/shared';
+import { calculateLevel, type PulseAiChatInput, type PulseAiRecipe } from '@blendi/shared';
 
 import { api } from '../config/api';
 import i18n from '../locales/i18n';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+ void calculateLevel;
 
 const PULSE_AI_ERROR_TRANSLATION_KEYS = {
   'pulseai/daily-limit-reached': 'errors.pulseai_daily_limit',
@@ -23,6 +26,7 @@ interface PulseAiChatResponse {
     recipe: PulseAiRecipe;
     fromCache: boolean;
     usageRemaining: number | null;
+    xpAwarded: number;
   };
 }
 
@@ -38,6 +42,7 @@ export interface PulseAiChatResult {
   recipe: PulseAiRecipe;
   fromCache: boolean;
   usageRemaining: number | null;
+  xpAwarded: number;
 }
 
 export interface PulseAiUsage {
@@ -99,7 +104,9 @@ export async function sendMessage(
 
   try {
     const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload);
-    return response.data.data;
+    const result = response.data.data;
+    handleXPResponse(result);
+    return result;
   } catch (error) {
     throw toPulseAiServiceError(error);
   }

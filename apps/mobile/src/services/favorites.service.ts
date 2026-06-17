@@ -1,8 +1,11 @@
 import axios, { type AxiosError } from 'axios';
-import type { CreateFavoriteInput, FavoriteItem, PulseAiRecipe } from '@blendi/shared';
+import { calculateLevel, type CreateFavoriteInput, type FavoriteItem, type PulseAiRecipe } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+void calculateLevel;
 
 interface ApiErrorResponse {
   success: false;
@@ -23,6 +26,7 @@ interface FavoriteMutationResponse {
   data: {
     favorite: FavoriteItem;
     alreadyExists: boolean;
+    xpAwarded?: number;
   };
 }
 
@@ -44,6 +48,7 @@ const FAVORITES_ERROR_TRANSLATION_KEYS = {
 export interface AddFavoriteResult {
   favorite: FavoriteItem;
   alreadyExists: boolean;
+  xpAwarded?: number;
 }
 
 export interface ToggleFavoriteResult {
@@ -191,9 +196,15 @@ export async function addFavorite(recipe: PulseAiRecipe): Promise<AddFavoriteRes
       mapRecipeToFavoriteInput(recipe),
     );
 
-    favoriteIdsByRecipeKey.set(getRecipeFavoriteKey(recipe), response.data.data.favorite.id);
+    const result = response.data.data;
 
-    return response.data.data;
+    favoriteIdsByRecipeKey.set(getRecipeFavoriteKey(recipe), result.favorite.id);
+
+    if (result.alreadyExists === false) {
+      handleXPResponse(result);
+    }
+
+    return result;
   } catch (error) {
     throw toFavoritesServiceError(error);
   }

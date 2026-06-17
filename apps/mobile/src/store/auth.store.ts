@@ -35,6 +35,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { api } from '../config/api';
 import { createAppStorage } from '../config/storage';
+import { useGamificationStore } from './gamification.store';
 import * as AuthService from '../services/auth.service';
 import type { AuthResponse, AuthUser } from '../services/auth.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
@@ -76,6 +77,7 @@ interface CurrentUserProfileResponse {
       dailyCalorieTarget: number;
       dailyCarbTarget: number;
       longestStreak: number;
+      totalXP: number;
       createdAt: string;
       notificationPreferences?: {
         dailyPulse: boolean;
@@ -112,6 +114,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     dailyCalorieTarget: user.dailyCalorieTarget,
     dailyCarbTarget: user.dailyCarbTarget,
     longestStreak: user.longestStreak,
+    totalXP: user.totalXP ?? 0,
     createdAt: user.createdAt,
     notificationPreferences: user.notificationPreferences,
     dailyPulseTime: user.dailyPulseTime,
@@ -158,6 +161,10 @@ async function deleteRefreshToken(): Promise<void> {
   }
 }
 
+function syncGamificationTotalXP(user: AuthUser | null): void {
+  useGamificationStore.getState().setTotalXP(user?.totalXP ?? 0);
+}
+
 // ─── Tipos do store ───────────────────────────────────────────────────────────
 
 interface AuthState {
@@ -194,6 +201,7 @@ interface AuthActions {
     * perfil pode ser recarregado mais tarde por outras queries da aplicação.
    */
   restoreSession: () => Promise<void>;
+  setUser: (user: AuthUser | null) => void;
   /** @internal Usado pelo interceptor do Axios. Não chamar diretamente em componentes. */
   _setAccessToken: (token: string | null) => void;
   /**
@@ -225,6 +233,11 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isLoading: false,
   isRestoringSession: true,
 
+  setUser: (user) => {
+    syncGamificationTotalXP(user);
+    set({ user });
+  },
+
   // ── register ─────────────────────────────────────────────────────────────
 
   register: async (input) => {
@@ -234,8 +247,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       await setRefreshToken(data.refreshToken);
 
+      get().setUser(data.user);
+
       set({
-        user: data.user,
         accessToken: data.accessToken,
         isAuthenticated: true,
         isNewUser: true,
@@ -253,13 +267,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       const data = await AuthService.login(input);
 
+      const user = {
+        ...data.user,
+        longestStreak: data.user.longestStreak,
+      };
+
       await setRefreshToken(data.refreshToken);
 
+      get().setUser(user);
+
       set({
-        user: {
-          ...data.user,
-          longestStreak: data.user.longestStreak,
-        },
         accessToken: data.accessToken,
         isAuthenticated: true,
         isNewUser: hasPendingOnboarding(),
@@ -275,8 +292,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // Remove do Secure Store (melhor esforço — não bloqueia o logout se falhar)
     await deleteRefreshToken();
 
+    get().setUser(null);
+
     set({
-      user: null,
       accessToken: null,
       isAuthenticated: false,
       isNewUser: false,
@@ -301,8 +319,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       // Persiste o novo refresh token (rotação)
       await setRefreshToken(tokens.refreshToken);
 
+      get().setUser(null);
+
       set({
-        user: null,
         accessToken: tokens.accessToken,
         isAuthenticated: true,
         isNewUser: hasPendingOnboarding(),
@@ -310,7 +329,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       try {
         const user = await fetchCurrentUserProfile();
-        set({ user });
+        get().setUser(user);
       } catch {
         // Preserva a sessão restaurada mesmo se o perfil não puder ser hidratado agora.
       }
@@ -342,8 +361,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       persistOnboardingCompletion(false);
     }
 
+    get().setUser(data.user);
+
     set({
-      user: data.user,
       accessToken: data.accessToken,
       isAuthenticated: true,
       isNewUser: shouldShowOnboarding,
@@ -358,7 +378,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // Se a hidratação do perfil ainda não tiver acontecido, a atualização
     // local é ignorada e o valor correto será buscado depois no backend.
     if (user === null) return;
-    set({ user: { ...user, timezone } });
+    get().setUser({ ...user, timezone });
   },
 
   updateUserProfile: (updates) => {
@@ -368,7 +388,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       return;
     }
 
-    set({ user: { ...user, ...updates } });
+    get().setUser({ ...user, ...updates });
   },
 
   // ── completeOnboarding ───────────────────────────────────────────────────

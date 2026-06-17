@@ -14,9 +14,11 @@
 //   24                 →  upgrade/pro (paddingHorizontal 16): upgrade card ou pro card
 //   32                 →  footer (paddingHorizontal 24): sign out + versão + links
 
-import { useMemo, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Linking,
@@ -35,6 +37,7 @@ import Constants from "expo-constants";
 
 import {
   borderRadius,
+  calculateLevel,
   colors,
   fontSizes,
   fonts,
@@ -47,6 +50,7 @@ import { createAppStorage } from "../config/storage";
 import { useAppTranslation } from "../hooks/useAppTranslation";
 import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
+import { useGamificationStore } from "../store/gamification.store";
 import type { SupportedLocale } from "../locales/i18n";
 
 import { AuroraBackground } from "../components/ui/AuroraBackground";
@@ -84,6 +88,8 @@ const INITIALS_BG = "rgba(154,72,147,0.30)";
 const UPGRADE_CARD_BG = "rgba(154,72,147,0.12)";
 const UPGRADE_CARD_BORDER = "rgba(154,72,147,0.35)";
 const LONGEST_STREAK_COLOR = "rgba(245,158,11,0.90)";
+const LEVEL_PROGRESS_TRACK_COLOR = "rgba(255,255,255,0.08)";
+const LEVEL_NEXT_COPY_OPACITY = 0.6;
 const LABEL_OPACITY = 0.55;
 const VERSION_OPACITY = 0.35;
 const PRICE_OPACITY = 0.60;
@@ -190,6 +196,7 @@ interface UserProfileData {
   currentStreak: number;
   longestStreak: number;
   blendCount: number;
+  totalXP: number;
   isPro: boolean;
   createdAt: string;
 }
@@ -254,6 +261,14 @@ export function MeScreen() {
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const queryClient = useQueryClient();
   const { displayVolume } = useUnits();
+  const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
+  const totalXP = useGamificationStore((state) => state.totalXP);
+  const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
+  const nextLevelInfo = useMemo(
+    () => calculateLevel(levelInfo.xpForNextLevel),
+    [levelInfo.xpForNextLevel],
+  );
+  const levelProgressAnim = useRef(new Animated.Value(levelInfo.progress)).current;
 
   // ── Local state ──────────────────────────────────────────────────────────
 
@@ -302,6 +317,16 @@ export function MeScreen() {
     staleTime: CACHE_CONFIG.USER_PROFILE_TTL,
   });
 
+  useEffect(() => {
+    const fetchedTotalXP = profileResponse?.data.user.totalXP;
+
+    if (typeof fetchedTotalXP !== 'number') {
+      return;
+    }
+
+    setGamificationTotalXP(fetchedTotalXP);
+  }, [profileResponse?.data.user.totalXP, setGamificationTotalXP]);
+
   const profile = profileResponse?.data.user;
 
   // ── Derived data ─────────────────────────────────────────────────────────
@@ -344,6 +369,21 @@ export function MeScreen() {
       blendiModel: displayModel,
     });
   }, [profile?.blendCount, profile?.longestStreak, displayModel]);
+
+  useEffect(() => {
+    const animation = Animated.timing(levelProgressAnim, {
+      toValue: levelInfo.progress,
+      duration: 600,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [levelInfo.progress, levelProgressAnim]);
 
   const languageDisplayName = t(getLanguageKey(displayLanguage));
 
@@ -528,25 +568,67 @@ export function MeScreen() {
 
         {/* ── Stats ───────────────────────────────────────────────────────── */}
         <View style={styles.statsSection}>
-          <View style={styles.statsRow}>
-            <StatCard
-              icon="flash-outline"
-              iconColor={colors.brand.pulse}
-              value={String(profile?.currentStreak ?? 0)}
-              label={t("me.currentStreak")}
-            />
-            <StatCard
-              icon="cafe-outline"
-              iconColor={colors.text.primary}
-              value={String(profile?.blendCount ?? 0)}
-              label={t("me.totalBlends")}
-            />
-            <StatCard
-              icon="trophy-outline"
-              iconColor={LONGEST_STREAK_COLOR}
-              value={String(profile?.longestStreak ?? 0)}
-              label={t("me.longestStreak")}
-            />
+          <View style={styles.statsGrid}>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="flash-outline"
+                iconColor={colors.brand.pulse}
+                value={String(profile?.currentStreak ?? 0)}
+                label={t("me.currentStreak")}
+              />
+              <StatCard
+                icon="cafe-outline"
+                iconColor={colors.text.primary}
+                value={String(profile?.blendCount ?? 0)}
+                label={t("me.totalBlends")}
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="trophy-outline"
+                iconColor={LONGEST_STREAK_COLOR}
+                value={String(profile?.longestStreak ?? 0)}
+                label={t("me.longestStreak")}
+              />
+              <StatCard
+                icon="star"
+                iconColor={LONGEST_STREAK_COLOR}
+                value={String(levelInfo.level)}
+                label={t("me.level")}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* ── Level progress ──────────────────────────────────────────────── */}
+        <View style={styles.levelSection}>
+          <View style={styles.levelCard}>
+            <Text style={styles.levelCardName}>
+              {t(levelInfo.levelNameKey as TranslationKey, { level: levelInfo.level })}
+            </Text>
+
+            <View style={styles.levelProgressTrack}>
+              <Animated.View
+                style={[
+                  styles.levelProgressFill,
+                  {
+                    width: levelProgressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.levelNextCopy}>
+              {t('gamification.xpToNextLevel', {
+                xp: levelInfo.xpToNextLevel.toLocaleString(),
+                levelName: t(nextLevelInfo.levelNameKey as TranslationKey, {
+                  level: nextLevelInfo.level,
+                }),
+              })}
+            </Text>
           </View>
         </View>
 
@@ -931,9 +1013,52 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 16,
   },
+  statsGrid: {
+    gap: 10,
+  },
   statsRow: {
     flexDirection: "row",
     gap: 8,
+  },
+
+  // ── Level progress
+  levelSection: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  levelCard: {
+    backgroundColor: CARD_BACKGROUND,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 16,
+    padding: 16,
+  },
+  levelCardName: {
+    color: colors.text.primary,
+    fontFamily: fonts.display,
+    fontSize: 16,
+    fontWeight: fontWeights.bold,
+  },
+  levelProgressTrack: {
+    marginTop: 10,
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
+    overflow: 'hidden',
+  },
+  levelProgressFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.brand.pulse,
+  },
+  levelNextCopy: {
+    marginTop: 6,
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: 13,
+    fontWeight: fontWeights.regular,
+    opacity: LEVEL_NEXT_COPY_OPACITY,
   },
 
   // ── Badges

@@ -23,6 +23,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Auth — interceptors Axios e restauração de sessão
 import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
+import { useGamificationStore } from './src/store/gamification.store';
 
 // Query cache — client persistido em MMKV
 import { persistOptions, queryClient } from './src/config/queryClient';
@@ -30,6 +31,7 @@ import { persistOptions, queryClient } from './src/config/queryClient';
 // Navigation — root switch entre auth e app
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
+import { LevelUpCelebration } from './src/components/gamification/LevelUpCelebration';
 import { OfflineBanner } from './src/components/ui/OfflineBanner';
 import { showToast, ToastViewport } from './src/utils/toast.utils';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
@@ -93,6 +95,7 @@ export default function App() {
         <AppShell />
       </PersistQueryClientProvider>
       <OfflineBanner />
+      <LevelUpCelebration />
     </SafeAreaProvider>
   );
 }
@@ -105,8 +108,10 @@ function AppShell() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isRestoringSession = useAuthStore((s) => s.isRestoringSession);
+  const restoredUserTotalXP = useAuthStore((s) => s.user?.totalXP);
   const userPushToken = useAuthStore((s) => s.user?.pushToken ?? null);
   const updateUserProfile = useAuthStore((s) => s.updateUserProfile);
+  const setGamificationTotalXP = useGamificationStore((s) => s.setTotalXP);
 
   // Rastreia o AppState anterior para filtrar apenas transições para 'active'
   // vindas de background/inactive — evita disparar na montagem inicial.
@@ -155,6 +160,21 @@ function AppShell() {
 
     void syncTimezoneIfNeeded().catch(() => undefined);
   }, [isAuthenticated, isRestoringSession]);
+
+  useEffect(() => {
+    if (isRestoringSession) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setGamificationTotalXP(0);
+      return;
+    }
+
+    if (typeof restoredUserTotalXP === 'number') {
+      setGamificationTotalXP(restoredUserTotalXP);
+    }
+  }, [isAuthenticated, isRestoringSession, restoredUserTotalXP, setGamificationTotalXP]);
 
   useEffect(() => {
     lastKnownPushToken.current = userPushToken;

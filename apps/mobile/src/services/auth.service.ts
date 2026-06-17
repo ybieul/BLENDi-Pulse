@@ -36,6 +36,7 @@ export interface AuthUser {
   dailyCalorieTarget: number;
   dailyCarbTarget: number;
   longestStreak: number;
+  totalXP?: number;
   createdAt: string;
   notificationPreferences?: {
     dailyPulse: boolean;

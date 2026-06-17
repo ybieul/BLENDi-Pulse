@@ -20,18 +20,22 @@
 //   24                  →  DailyRecipeCard (px 24)
 //   8
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Easing,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  calculateLevel,
   colors,
   fonts,
   fontSizes,
@@ -39,9 +43,11 @@ import {
 } from '@blendi/shared';
 import { api } from '../config/api';
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
+import { LevelDetailSheet } from '../components/gamification/LevelDetailSheet';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useAuthStore } from '../store/auth.store';
+import { useGamificationStore } from '../store/gamification.store';
 import { usePulseAIStore } from '../store/pulseAi.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
 import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
@@ -67,6 +73,8 @@ const BADGE_FREE_BACKGROUND = 'rgba(255,255,255,0.08)';
 const BADGE_FREE_BORDER = 'rgba(255,255,255,0.12)';
 const BADGE_PRO_BACKGROUND = 'rgba(154,72,147,0.25)';
 const BADGE_PRO_BORDER = 'rgba(154,72,147,0.40)';
+const LEVEL_PROGRESS_TRACK_COLOR = 'rgba(255,255,255,0.10)';
+const LEVEL_PROGRESS_BAR_WIDTH = 40;
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
@@ -87,6 +95,7 @@ interface UserProfileData {
   profilePhoto?: string;
   streakDays: number;
   totalBlends: number;
+  totalXP: number;
 }
 
 interface UserProfileResponse {
@@ -123,13 +132,20 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const { formatDate } = useDateFormat();
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
+  const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
+  const totalXP = useGamificationStore((state) => state.totalXP);
   const setPendingProtocol = usePulseAIStore((state) => state.setPendingProtocol);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLevelDetail, setShowLevelDetail] = useState(false);
+  const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
+  const initialLevelProgressWidth = useRef(levelInfo.progress * LEVEL_PROGRESS_BAR_WIDTH).current;
+  const levelProgressWidth = useRef(new Animated.Value(initialLevelProgressWidth)).current;
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
-  const { data: profileResponse, isLoading: isLoadingProfile } =
+  const { data: profileResponse, isLoading: isLoadingProfile, refetch: refetchProfile } =
     useQuery<UserProfileResponse, Error, UserProfileResponse, typeof QUERY_KEYS.userProfile>({
       queryKey: QUERY_KEYS.userProfile,
       queryFn: fetchUserProfile,
@@ -140,6 +156,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     data: logsResponse,
     isLoading: isLoadingLogs,
     dataUpdatedAt: blendLogsUpdatedAt,
+    refetch: refetchBlendLogs,
   } =
     useQuery<BlendLogsTodayData>({
       queryKey: QUERY_KEYS.blendLogsToday,
@@ -148,7 +165,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     });
 
   // hydrationToday — retry: 0 porque o endpoint será implementado em uma parte futura
-  const { data: hydrationResponse } = useQuery({
+  const { data: hydrationResponse, refetch: refetchHydration } = useQuery({
     queryKey: QUERY_KEYS.hydrationToday,
     queryFn: getHydrationToday,
     staleTime: CACHE_CONFIG.HYDRATION_TODAY_TTL,
@@ -168,6 +185,31 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       }).start();
     }
   }, [isLoading, fadeAnim]);
+
+  useEffect(() => {
+    const animation = Animated.timing(levelProgressWidth, {
+      toValue: levelInfo.progress * LEVEL_PROGRESS_BAR_WIDTH,
+      duration: 400,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [levelInfo.progress, levelProgressWidth]);
+
+  useEffect(() => {
+    const fetchedTotalXP = profileResponse?.data.user.totalXP;
+
+    if (typeof fetchedTotalXP !== 'number') {
+      return;
+    }
+
+    setGamificationTotalXP(fetchedTotalXP);
+  }, [profileResponse?.data.user.totalXP, setGamificationTotalXP]);
 
   // ── Dados derivados ───────────────────────────────────────────────────────
 
@@ -192,6 +234,24 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     ]);
   }, [queryClient]);
 
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) {
+      return;
+    }
+
+    setIsRefreshing(true);
+
+    try {
+      await Promise.allSettled([
+        refetchProfile(),
+        refetchBlendLogs(),
+        refetchHydration(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing, refetchBlendLogs, refetchHydration, refetchProfile]);
+
   const handleProtocolSelect = useCallback(
     (protocol: QuickProtocol) => {
       setPendingProtocol(protocol.prompt);
@@ -215,6 +275,15 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
         removeClippedSubviews={true}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              void handleRefresh();
+            }}
+            tintColor={colors.brand.pulse}
+          />
+        }
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + 16 },
@@ -239,16 +308,37 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
               <Text style={styles.greetingText}>{greeting}</Text>
               <Text style={styles.greetingDate}>{formattedDate}</Text>
 
-              {/* Badge Free/Pro — absolutamente posicionado no canto direito */}
-              <View
-                style={[
-                  styles.badge,
-                  isPro ? styles.badgePro : styles.badgeFree,
-                ]}
-              >
-                <Text style={styles.badgeText}>
-                  {isPro ? t('home.proPlan') : t('home.freePlan')}
-                </Text>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setShowLevelDetail(true);
+                  }}
+                  style={styles.levelIndicatorButton}
+                >
+                  <View style={styles.levelIndicatorContent}>
+                    <Text style={styles.levelIndicatorText}>
+                      {`${t('gamification.levelPrefix')} ${levelInfo.level}`}
+                    </Text>
+                    <View style={styles.levelIndicatorTrack}>
+                      <Animated.View
+                        style={[styles.levelIndicatorFill, { width: levelProgressWidth }]}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.badge,
+                    isPro ? styles.badgePro : styles.badgeFree,
+                  ]}
+                >
+                  <Text style={styles.badgeText}>
+                    {isPro ? t('home.proPlan') : t('home.freePlan')}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -310,6 +400,8 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
           </Animated.View>
         )}
       </ScrollView>
+
+      <LevelDetailSheet visible={showLevelDetail} onClose={() => setShowLevelDetail(false)} />
     </View>
   );
 }
@@ -340,6 +432,13 @@ const styles = StyleSheet.create({
   greetingContainer: {
     paddingHorizontal: 24,
   },
+  headerActions: {
+    position: 'absolute',
+    top: 0,
+    right: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   greetingText: {
     color: colors.text.primary,
     fontFamily: fonts.display,
@@ -352,12 +451,34 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
   },
+  levelIndicatorButton: {
+    marginRight: 8,
+  },
+  levelIndicatorContent: {
+    alignItems: 'center',
+  },
+  levelIndicatorText: {
+    color: colors.brand.pulse,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: fontWeights.bold,
+  },
+  levelIndicatorTrack: {
+    marginTop: 3,
+    width: LEVEL_PROGRESS_BAR_WIDTH,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
+    overflow: 'hidden',
+  },
+  levelIndicatorFill: {
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.brand.pulse,
+  },
 
   // ── Badge Free / Pro ─────────────────────────────────────────────────────────
   badge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
     height: BADGE_HEIGHT,
     paddingHorizontal: BADGE_PADDING_H,
     borderRadius: BADGE_HEIGHT / 2,

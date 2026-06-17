@@ -5,9 +5,13 @@
 // arquivo por domínio adotado no resto da camada de serviços.
 
 import axios, { type AxiosError } from 'axios';
+import { calculateLevel } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { handleXPResponse } from '../utils/xp.utils';
+
+ void calculateLevel;
 
 interface ApiErrorResponse {
   success: false;
@@ -29,6 +33,7 @@ export interface LogWaterResponse {
     log: HydrationLogEntry;
     totalMl: number;
     goalMl: number;
+    xpAwarded: number;
   };
 }
 
@@ -128,6 +133,7 @@ function toHydrationServiceError(error: unknown): HydrationServiceError {
 export async function logWater(amountMl: number = 250): Promise<LogWaterResponse> {
   try {
     const response = await api.post<LogWaterResponse>('/hydration-logs', { amountMl });
+    handleXPResponse(response.data.data);
     return response.data;
   } catch (error) {
     throw toHydrationServiceError(error);

@@ -687,6 +687,15 @@
     "levelUpBody": "Você atingiu {{levelName}}! Continue blendando!"
   },
 
+  "gamification": {
+    "levelUpTitle": "Subiu de Nível! 🎉",
+    "levelUpSubtitle": "Você está arrasando!",
+    "xpToNextLevel": "{{xp}} XP para {{levelName}}",
+    "currentXp": "{{xp}} XP total",
+    "levelPrefix": "Nv.",
+    "levelDetail": "Nível {{level}}"
+  },
+
   "levels": {
     "beginner": "Iniciante no Blend",
     "explorer": "Explorador Nutricional",
@@ -705,6 +714,8 @@
     "currentStreak": "Streak Atual",
     "totalBlends": "Total de Blends",
     "longestStreak": "Melhor Streak",
+    "level": "Nível",
+    "levelProgress": "Progresso de Nível",
     "settings": "Configurações",
     "memberSince": "Membro desde {{date}}",
     "metric": "Métrico",
