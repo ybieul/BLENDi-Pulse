@@ -20,7 +20,7 @@
 //   24                  →  DailyRecipeCard (px 24)
 //   8
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -32,6 +32,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -54,13 +55,17 @@ import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.serv
 import type { AppTabScreenProps } from '../navigation/types';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
-import { ProfileSkeleton, RecipeCardSkeleton } from '../components/ui';
+import { ProfileSkeleton, RecipeCardSkeleton, SkeletonLoader } from '../components/ui';
 import { GoalRingsSection } from '../components/home/GoalRingsSection';
 import { QuickActionTrigger } from '../components/home/QuickActionTrigger';
 import { StreakBadge } from '../components/home/StreakBadge';
 import { QuickProtocolCards } from '../components/home/QuickProtocolCards';
 import type { QuickProtocol } from '../components/home/QuickProtocolCards';
 import { DailyRecipeCard } from '../components/home/DailyRecipeCard';
+import { MissionCard } from '../components/missions/MissionCard';
+import { MissionCompletionToast } from '../components/missions/MissionCompletionToast';
+import { getDailyMissions } from '../services/dailyMission.service';
+import type { DailyMissionItem } from '../services/dailyMission.service';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -75,6 +80,19 @@ const BADGE_PRO_BACKGROUND = 'rgba(154,72,147,0.25)';
 const BADGE_PRO_BORDER = 'rgba(154,72,147,0.40)';
 const LEVEL_PROGRESS_TRACK_COLOR = 'rgba(255,255,255,0.10)';
 const LEVEL_PROGRESS_BAR_WIDTH = 40;
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+const MISSION_ICON_MAP: Record<string, IoniconName> = {
+  makeBlend: 'nutrition-outline',
+  makeBlendFromFavorite: 'heart-outline',
+  favoriteRecipe: 'heart-outline',
+  hitProteinGoal: 'barbell-outline',
+  hitCalorieGoal: 'flame-outline',
+  hitHydrationGoal: 'water-outline',
+  completeSuppStack: 'checkmark-circle-outline',
+};
+const DEFAULT_MISSION_ICON: IoniconName = 'trophy-outline';
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
@@ -135,15 +153,27 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
   const totalXP = useGamificationStore((state) => state.totalXP);
   const setPendingProtocol = usePulseAIStore((state) => state.setPendingProtocol);
+  const triggerLevelUp = useGamificationStore((state) => state.triggerLevelUp);
+  const pendingLevelUp = useGamificationStore((state) => state.pendingLevelUp);
+  const clearPendingLevelUp = useGamificationStore((state) => state.clearPendingLevelUp);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLevelDetail, setShowLevelDetail] = useState(false);
+  const [pendingMissionXP, setPendingMissionXP] = useState<number | null>(null);
+  const [showMissionToast, setShowMissionToast] = useState(false);
+  const prevMissionsRef = useRef<DailyMissionItem[] | null>(null);
   const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
   const initialLevelProgressWidth = useRef(levelInfo.progress * LEVEL_PROGRESS_BAR_WIDTH).current;
   const levelProgressWidth = useRef(new Animated.Value(initialLevelProgressWidth)).current;
 
   // ── Queries ───────────────────────────────────────────────────────────────
+
+  const { data: missionsData, isLoading: isLoadingMissions } = useQuery({
+    queryKey: QUERY_KEYS.dailyMissions,
+    queryFn: getDailyMissions,
+    staleTime: CACHE_CONFIG.DAILY_MISSIONS_TTL,
+  });
 
   const { data: profileResponse, isLoading: isLoadingProfile, refetch: refetchProfile } =
     useQuery<UserProfileResponse, Error, UserProfileResponse, typeof QUERY_KEYS.userProfile>({
@@ -200,6 +230,44 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       animation.stop();
     };
   }, [levelInfo.progress, levelProgressWidth]);
+
+  useEffect(() => {
+    if (pendingLevelUp === null || showMissionToast) {
+      return;
+    }
+
+    triggerLevelUp(pendingLevelUp);
+    clearPendingLevelUp();
+  }, [clearPendingLevelUp, pendingLevelUp, showMissionToast, triggerLevelUp]);
+
+  useEffect(() => {
+    const missions = missionsData?.missions;
+
+    if (!missions) {
+      prevMissionsRef.current = null;
+      return;
+    }
+
+    const prev = prevMissionsRef.current;
+    prevMissionsRef.current = missions;
+
+    if (!prev) {
+      return;
+    }
+
+    const newlyCompleted = missions.filter((m) => {
+      const prevMission = prev.find((p) => p.missionId === m.missionId);
+      return prevMission !== undefined && !prevMission.completed && m.completed;
+    });
+
+    if (newlyCompleted.length === 0) {
+      return;
+    }
+
+    const totalXP = newlyCompleted.reduce((sum, m) => sum + m.xpReward, 0);
+    setPendingMissionXP(totalXP);
+    setShowMissionToast(true);
+  }, [missionsData?.missions]);
 
   useEffect(() => {
     const fetchedTotalXP = profileResponse?.data.user.totalXP;
@@ -263,6 +331,19 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const handleStartBlend = useCallback(() => {
     navigation.navigate('Blend');
   }, [navigation]);
+
+  const handleMissionToastDismiss = useCallback(() => {
+    setShowMissionToast(false);
+    setPendingMissionXP(null);
+
+    if (pendingLevelUp !== null) {
+      const levelUpToTrigger = pendingLevelUp;
+      clearPendingLevelUp();
+      setTimeout(() => {
+        triggerLevelUp(levelUpToTrigger);
+      }, 500);
+    }
+  }, [clearPendingLevelUp, pendingLevelUp, triggerLevelUp]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -375,6 +456,41 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
 
             <View style={styles.spacer20} />
 
+            {/* ── Daily Missions ──────────────────────────────────────────── */}
+            <View style={styles.rowPad}>
+              <View style={styles.missionsHeader}>
+                <Ionicons name="trophy-outline" size={18} color={colors.brand.pulse} />
+                <Text style={styles.missionsHeaderTitle}>{t('home.dailyMissions')}</Text>
+                {missionsData ? (
+                  <Text style={styles.missionsHeaderBadge}>
+                    {missionsData.completedCount > 0
+                      ? `${missionsData.completedCount}/3`
+                      : t('home.xpAvailable', { xp: missionsData.xpAvailable })}
+                  </Text>
+                ) : null}
+              </View>
+
+              {isLoadingMissions ? (
+                <View style={styles.missionsRow}>
+                  <SkeletonLoader variant="card" style={styles.missionCardSkeleton} />
+                  <SkeletonLoader variant="card" style={styles.missionCardSkeleton} />
+                  <SkeletonLoader variant="card" style={styles.missionCardSkeleton} />
+                </View>
+              ) : missionsData ? (
+                <View style={styles.missionsRow}>
+                  {missionsData.missions.map((mission) => (
+                    <MissionCard
+                      key={mission.missionId}
+                      mission={mission}
+                      icon={MISSION_ICON_MAP[mission.type] ?? DEFAULT_MISSION_ICON}
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.spacer20} />
+
             {/* ── Título "Quick Start" ────────────────────────────────────── */}
             <Text style={styles.sectionTitle}>{t('home.quickStart')}</Text>
 
@@ -402,6 +518,13 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       </ScrollView>
 
       <LevelDetailSheet visible={showLevelDetail} onClose={() => setShowLevelDetail(false)} />
+      {showMissionToast && pendingMissionXP !== null ? (
+        <MissionCompletionToast
+          xpAmount={pendingMissionXP}
+          visible={showMissionToast}
+          onDismiss={handleMissionToastDismiss}
+        />
+      ) : null}
     </View>
   );
 }
@@ -523,4 +646,33 @@ const styles = StyleSheet.create({
   spacer12: { height: 12 },
   spacer20: { height: 20 },
   spacer24: { height: 24 },
+
+  // ── Missions ─────────────────────────────────────────────────────────────────
+  missionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  missionsHeaderTitle: {
+    flex: 1,
+    marginLeft: 8,
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.medium,
+  },
+  missionsHeaderBadge: {
+    color: colors.text.secondary,
+    fontFamily: fonts.body,
+    fontSize: 11,
+    fontWeight: fontWeights.bold,
+  },
+  missionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  missionCardSkeleton: {
+    flex: 1,
+    height: 80,
+  },
 });

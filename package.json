@@ -12,6 +12,7 @@
     "clean": "pnpm --recursive exec rm -rf node_modules dist .expo"
   },
   "devDependencies": {
+    "tsx": "^4.19.2",
     "typescript": "^5.4.5"
   },
   "engines": {

@@ -13,7 +13,7 @@ import {
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { handleXPResponse } from '../utils/xp.utils';
+import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
  void calculateLevel;
 
@@ -38,6 +38,7 @@ interface PantryScannerAnalyzeResponse {
   success: true;
   data: PantryAnalysisResult & {
     xpAwarded: number;
+    missionsUpdated?: string[];
   };
 }
 
@@ -206,6 +207,7 @@ export async function analyzePantry(
     );
 
     handleXPResponse(response.data.data);
+    handleMissionResponse(response.data.data);
     return pantryAnalysisResultSchema.parse(response.data.data);
   } catch (error) {
     throw toPantryScannerServiceError(error);

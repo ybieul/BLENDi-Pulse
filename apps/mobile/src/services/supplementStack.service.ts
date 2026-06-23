@@ -3,7 +3,7 @@ import { calculateLevel } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { handleXPResponse } from '../utils/xp.utils';
+import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
  void calculateLevel;
 
@@ -25,6 +25,7 @@ interface SupplementCheckResponse {
   data: {
     log: SupplementCheckLog;
     xpAwarded: number;
+    missionsUpdated?: string[];
   };
 }
 
@@ -138,6 +139,7 @@ export async function checkSupplement(supplementId: string): Promise<SupplementC
     );
 
     handleXPResponse(response.data.data);
+    handleMissionResponse(response.data.data);
     return response.data.data.log;
   } catch (error) {
     throw toSupplementStackServiceError(error);

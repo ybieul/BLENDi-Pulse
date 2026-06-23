@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 import { XP_EVENTS, createFavoriteSchema, type FavoriteItem } from '@blendi/shared';
 import { FavoriteModel, type IFavorite } from '../models/Favorite';
 import { UserModel } from '../models/User';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { sendErrorResponse, VALIDATION_ERROR_MESSAGE } from '../utils/error.utils';
 
@@ -173,6 +174,10 @@ export async function addFavorite(
       Promise.resolve()
         .then(() => awardXP(userId, 'favoriteRecipe', user.timezone))
         .catch(err => console.error('XP award failed:', err));
+
+      Promise.resolve()
+        .then(() => updateMissionProgress(userId, 'favoriteRecipe', user.timezone))
+        .catch(err => console.error('Mission update failed:', err));
 
       res.status(201).json({
         success: true,

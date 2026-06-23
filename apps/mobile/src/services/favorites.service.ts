@@ -3,7 +3,7 @@ import { calculateLevel, type CreateFavoriteInput, type FavoriteItem, type Pulse
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { handleXPResponse } from '../utils/xp.utils';
+import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
 void calculateLevel;
 
@@ -27,6 +27,7 @@ interface FavoriteMutationResponse {
     favorite: FavoriteItem;
     alreadyExists: boolean;
     xpAwarded?: number;
+    missionsUpdated?: string[];
   };
 }
 
@@ -49,6 +50,7 @@ export interface AddFavoriteResult {
   favorite: FavoriteItem;
   alreadyExists: boolean;
   xpAwarded?: number;
+  missionsUpdated?: string[];
 }
 
 export interface ToggleFavoriteResult {
@@ -202,6 +204,7 @@ export async function addFavorite(recipe: PulseAiRecipe): Promise<AddFavoriteRes
 
     if (result.alreadyExists === false) {
       handleXPResponse(result);
+      handleMissionResponse(result);
     }
 
     return result;

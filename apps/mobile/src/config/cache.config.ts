@@ -41,6 +41,12 @@ export const CACHE_CONFIG = {
   USER_PROFILE_TTL: 15 * 60 * 1000,
 
   /**
+   * 60 segundos. Missões diárias precisam refletir progresso recente sem causar
+   * refetches desnecessários ao alternar entre abas ou voltar à Home.
+   */
+  DAILY_MISSIONS_TTL: 60 * 1000,
+
+  /**
    * Limite de receitas persistidas localmente para modo offline.
    * Aumentar melhora cobertura offline, mas consome mais armazenamento no dispositivo.
    */
@@ -54,6 +60,7 @@ export const PANTRY_SCAN_LIMIT_FREE = 3;
 export const QUERY_KEYS = {
   user: ['user'],
   userProfile: ['userProfile'],
+  dailyMissions: ['dailyMissions'],
   blendHistory: ['blendHistory'],
   blendLogsToday: ['blendLogsToday'],
   favorites: ['favorites'],

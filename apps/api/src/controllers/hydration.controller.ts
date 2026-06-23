@@ -5,6 +5,7 @@ import { XP_EVENTS, historyQuerySchema } from '@blendi/shared';
 import { HydrationLogModel } from '../models/HydrationLog';
 import { XPLogModel } from '../models/XPLog';
 import { UserModel } from '../models/User';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import {
   sendErrorResponse,
@@ -255,6 +256,10 @@ export async function logWater(
       Promise.resolve()
         .then(() => awardXP(userId, 'hydrationGoal', hydrationContext.timezone))
         .catch(err => console.error('XP award failed:', err));
+
+      Promise.resolve()
+        .then(() => updateMissionProgress(userId, 'hitHydrationGoal', hydrationContext.timezone))
+        .catch(err => console.error('Mission update failed:', err));
     }
 
     res.status(201).json({

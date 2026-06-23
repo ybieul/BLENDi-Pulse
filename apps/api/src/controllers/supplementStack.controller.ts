@@ -5,6 +5,7 @@ import { XP_EVENTS, updateSupplementStackSchema } from '@blendi/shared';
 import { SupplementLogModel, type ISupplementLog } from '../models/SupplementLog';
 import { XPLogModel } from '../models/XPLog';
 import { UserModel, type IUserSupplement } from '../models/User';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import {
   getSupplementConsumedCount,
@@ -359,12 +360,27 @@ export async function checkSupplement(
         const activeSupplementCount = context.supplementStack.filter(item => item.isActive).length;
 
         if (activeSupplementCount > 0) {
-          const checkedTodayCount = await SupplementLogModel.countDocuments({
+          const todayLogs = await SupplementLogModel.find({
             userId,
             logDate,
-          });
+          })
+            .select({ supplementId: 1, consumedCount: 1 })
+            .lean();
 
-          if (checkedTodayCount === activeSupplementCount) {
+          const todayLogsBySupplementId = new Map(
+            todayLogs.map(item => [item.supplementId, item])
+          );
+          const allActiveSupplementsChecked = context.supplementStack
+            .filter(item => item.isActive)
+            .every(item => {
+              const todayLog = todayLogsBySupplementId.get(item.supplementId);
+              const consumedCount = getSupplementConsumedCount(todayLog);
+              const targetCount = getSupplementDailyTargetCount(item.dosage, item.dailyTargetCount);
+
+              return consumedCount >= targetCount;
+            });
+
+          if (allActiveSupplementsChecked) {
             const supplementGoalAlreadyAwarded = await XPLogModel.exists({
               userId,
               xpType: 'supplementGoal',
@@ -376,6 +392,10 @@ export async function checkSupplement(
             Promise.resolve()
               .then(() => awardXP(userId, 'supplementGoal', context.timezone))
               .catch(err => console.error('XP award failed:', err));
+
+            Promise.resolve()
+              .then(() => updateMissionProgress(userId, 'completeSuppStack', context.timezone))
+              .catch(err => console.error('Mission update failed:', err));
           }
         }
 

@@ -40,7 +40,7 @@ export type TrackStackParamList = {
 export type AppTabParamList = {
   Home: undefined;
   PulseAI: NavigatorScreenParams<PulseAIStackParamList> | undefined;
-  Blend: { recipe?: PulseAiRecipe } | undefined;
+  Blend: { recipe?: PulseAiRecipe; favoriteId?: string } | undefined;
   Track: NavigatorScreenParams<TrackStackParamList> | undefined;
   Me: undefined;
 };

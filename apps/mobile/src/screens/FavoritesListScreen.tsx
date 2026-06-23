@@ -101,7 +101,7 @@ export function FavoritesListScreen({ navigation }: Props) {
       const recipe = favoriteItemToRecipe(item);
       navigation
         .getParent<BottomTabNavigationProp<AppTabParamList>>()
-        ?.navigate('Blend', { recipe });
+        ?.navigate('Blend', { recipe, favoriteId: item.id });
     },
     [navigation],
   );

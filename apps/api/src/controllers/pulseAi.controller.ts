@@ -32,6 +32,7 @@ import {
   invalidateUserCache,
   setInCache,
 } from '../services/cache.service';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
@@ -111,6 +112,12 @@ function triggerPulseAiXP(userId: string, timezone: string): number {
     .catch(err => console.error('XP award failed:', err));
 
   return XP_EVENTS.pulseAi;
+}
+
+function triggerPulseAiMissionProgress(userId: string, timezone: string): void {
+  Promise.resolve()
+    .then(() => updateMissionProgress(userId, 'usePulseAI', timezone))
+    .catch(err => console.error('Mission update failed:', err));
 }
 
 function normalizeMessageForCache(message: string): string {
@@ -373,6 +380,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
         }
 
         const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+        triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
         res.status(200).json({
           success: true,
@@ -502,6 +510,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       shouldRollbackUsage = false;
 
       const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+      triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
       res.status(200).json({
         success: true,

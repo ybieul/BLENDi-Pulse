@@ -57,6 +57,8 @@ export const createBlendLogSchema = z.object({
     .min(5, 'errors.validation.number_range')
     .max(300, 'errors.validation.number_range'),
 
+  fromFavoriteId: z.string().trim().min(1, 'errors.validation.required').optional(),
+
   rating: z
     .number({
       required_error: 'errors.validation.required',

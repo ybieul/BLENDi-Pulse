@@ -24,7 +24,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { CreateBlendLogInput, PulseAiRecipe } from '@blendi/shared';
 
 import type { AppTabScreenProps } from '../navigation/types';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
@@ -148,6 +148,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   // ── Blend store ──────────────────────────────────────────────────────────
 
   const activeRecipe = useBlendStore((s) => s.activeRecipe);
+  const activeFavoriteId = useBlendStore((s) => s.activeFavoriteId);
   const timerDuration = useBlendStore((s) => s.timerDuration);
   const isTimerRunning = useBlendStore((s) => s.isTimerRunning);
   const timerStartedAt = useBlendStore((s) => s.timerStartedAt);
@@ -155,6 +156,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   const stopTimer = useBlendStore((s) => s.stopTimer);
   const completeBlend = useBlendStore((s) => s.completeBlend);
   const setActiveRecipe = useBlendStore((s) => s.setActiveRecipe);
+  const setActiveFavoriteId = useBlendStore((s) => s.setActiveFavoriteId);
   const setTimerDuration = useBlendStore((s) => s.setTimerDuration);
 
   // ── Auth store ───────────────────────────────────────────────────────────
@@ -230,7 +232,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       setIsLogging(true);
 
       try {
-        const blendLogInput = {
+        const blendLogInput: CreateBlendLogInput = {
           recipeName: activeRecipe?.title,
           protein: activeRecipe?.macros.protein ?? 0,
           carbs: activeRecipe?.macros.carbs ?? 0,
@@ -238,6 +240,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
           calories: activeRecipe?.macros.calories ?? 0,
           blendiModel: blendiModel ?? 'Lite',
           durationSeconds: timerDuration,
+          ...(activeFavoriteId !== null ? { fromFavoriteId: activeFavoriteId } : {}),
           ...(rating !== undefined ? { rating } : {}),
         };
 
@@ -275,6 +278,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
     [
       isLogging,
       activeRecipe,
+      activeFavoriteId,
       blendiModel,
       isConnected,
       timerDuration,
@@ -332,6 +336,14 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params]);
+
+  useEffect(() => {
+    const favoriteId = route.params?.favoriteId;
+
+    if (typeof favoriteId === 'string' && favoriteId.length > 0) {
+      setActiveFavoriteId(favoriteId);
+    }
+  }, [route.params?.favoriteId, setActiveFavoriteId]);
 
   // ── Derivados ─────────────────────────────────────────────────────────────
   // remainingSeconds é passado ao TimerCircle como `duration`.

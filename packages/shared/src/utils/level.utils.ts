@@ -66,6 +66,15 @@ export const XP_EVENTS = {
   pulseAi: 3,
   pantryScanner: 5,
   favoriteRecipe: 2,
+  missionMakeBlend: 15,
+  missionHitProteinGoal: 20,
+  missionHitCalorieGoal: 15,
+  missionHitHydrationGoal: 15,
+  missionCompleteSuppStack: 20,
+  missionUsePulseAI: 10,
+  missionFavoriteRecipe: 10,
+  missionScanPantry: 15,
+  missionMakeBlendFromFavorite: 15,
   missionBonus: 20,
 } as const;
 

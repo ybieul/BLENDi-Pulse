@@ -174,6 +174,9 @@
     "days": "days",
     "todaysBlend": "Today's Blend",
     "quickStart": "Quick Start",
+    "dailyMissions": "Daily Missions",
+    "missionComplete": "+{{xp}} XP — Mission Complete!",
+    "xpAvailable": "up to {{xp}} XP",
     "proteinRing": "Protein",
     "carbsRing": "Carbs",
     "caloriesRing": "Calories",
@@ -231,6 +234,63 @@
       "beach_cocktails": "Create a BLENDi Pulse beach cocktail protocol with tropical mocktail-style blends focused on hydration and fresh flavors.",
       "travel": "Create a BLENDi Pulse travel protocol with portable blends that are quick to prepare and easy to repeat on the go."
     }
+  },
+
+  "missions": {
+    "makeBlend": {
+      "title": "Make a blend",
+      "description": "Make 1 blend today to progress your daily mission."
+    },
+    "makeBlendTitle": "Make a blend",
+    "makeBlendDesc": "Make 1 blend today to progress your daily mission.",
+    "hitProteinGoal": {
+      "title": "Hit protein goal",
+      "description": "Reach your protein target today to complete this mission."
+    },
+    "hitProteinGoalTitle": "Hit protein goal",
+    "hitProteinGoalDesc": "Reach your protein target today to complete this mission.",
+    "hitCalorieGoal": {
+      "title": "Hit calorie goal",
+      "description": "Reach your calorie target today to complete this mission."
+    },
+    "hitCalorieGoalTitle": "Hit calorie goal",
+    "hitCalorieGoalDesc": "Reach your calorie target today to complete this mission.",
+    "hitHydrationGoal": {
+      "title": "Hit hydration goal",
+      "description": "Reach your hydration target today to complete this mission."
+    },
+    "hitHydrationGoalTitle": "Hit hydration goal",
+    "hitHydrationGoalDesc": "Reach your hydration target today to complete this mission.",
+    "completeSuppStack": {
+      "title": "Complete supplements",
+      "description": "Complete all scheduled supplements for today to finish this mission."
+    },
+    "completeSuppStackTitle": "Complete supplements",
+    "completeSuppStackDesc": "Complete all scheduled supplements for today to finish this mission.",
+    "usePulseAI": {
+      "title": "Use Pulse AI",
+      "description": "Open Pulse AI and use it once today to complete this mission."
+    },
+    "usePulseAITitle": "Use Pulse AI",
+    "usePulseAIDesc": "Open Pulse AI and use it once today to complete this mission.",
+    "favoriteRecipe": {
+      "title": "Save a recipe",
+      "description": "Save any recipe to your favorites to complete this mission."
+    },
+    "favoriteRecipeTitle": "Save a recipe",
+    "favoriteRecipeDesc": "Save any recipe to your favorites to complete this mission.",
+    "scanPantry": {
+      "title": "Scan your pantry",
+      "description": "Scan your pantry once today to complete this mission."
+    },
+    "scanPantryTitle": "Scan your pantry",
+    "scanPantryDesc": "Scan your pantry once today to complete this mission.",
+    "makeBlendFromFavorite": {
+      "title": "Blend a saved recipe",
+      "description": "Blend one of your saved recipes today to complete this mission."
+    },
+    "makeBlendFromFavoriteTitle": "Blend a saved recipe",
+    "makeBlendFromFavoriteDesc": "Blend one of your saved recipes today to complete this mission."
   },
 
   "blend": {
@@ -693,7 +753,8 @@
     "xpToNextLevel": "{{xp}} XP to {{levelName}}",
     "currentXp": "{{xp}} XP total",
     "levelPrefix": "Lv.",
-    "levelDetail": "Level {{level}}"
+    "levelDetail": "Level {{level}}",
+    "pendingLevelUp": "Internal documentation key for deferred level-up sequencing."
   },
 
   "levels": {

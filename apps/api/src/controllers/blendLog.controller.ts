@@ -5,6 +5,7 @@ import { XP_EVENTS, createBlendLogSchema, historyQuerySchema } from '@blendi/sha
 import { BlendLogModel } from '../models/BlendLog';
 import { UserModel } from '../models/User';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import {
   getMidnightUTC,
   isSameDayInTimezone,
@@ -46,6 +47,11 @@ interface BlendHistoryDailyBreakdownItem {
 
 interface BlendGoalAggregateResult {
   total: number;
+}
+
+interface BlendGoalXPOutcome {
+  goalHit: boolean;
+  xpResult: AwardXPResult;
 }
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -199,9 +205,12 @@ async function awardDailyBlendGoalXP(
   target: number,
   xpType: keyof typeof DAILY_BLEND_GOAL_XP_AMOUNTS,
   metricField: 'protein' | 'calories'
-): Promise<AwardXPResult> {
+): Promise<BlendGoalXPOutcome> {
   if (target <= 0 || DAILY_BLEND_GOAL_XP_AMOUNTS[xpType] <= 0) {
-    return createSkippedXPResult();
+    return {
+      goalHit: false,
+      xpResult: createSkippedXPResult(),
+    };
   }
 
   const [aggregate] = await BlendLogModel.aggregate<BlendGoalAggregateResult>([
@@ -228,10 +237,16 @@ async function awardDailyBlendGoalXP(
   ]);
 
   if ((aggregate?.total ?? 0) < target) {
-    return createSkippedXPResult();
+    return {
+      goalHit: false,
+      xpResult: createSkippedXPResult(),
+    };
   }
 
-  return awardXP(userId, xpType, timezone);
+  return {
+    goalHit: true,
+    xpResult: await awardXP(userId, xpType, timezone),
+  };
 }
 
 async function updateCurrentStreak(
@@ -333,7 +348,7 @@ export async function createBlendLog(
 
     const updatedBlendCount = updatedUser?.blendCount ?? user.blendCount + 1;
     const startOfDay = getMidnightUTC(user.timezone);
-    const xpResults = await Promise.all([
+    const [blendXPResult, proteinGoalXPOutcome, calorieGoalXPOutcome] = await Promise.all([
       awardXP(userId, 'blend', user.timezone),
       awardDailyBlendGoalXP(
         userId,
@@ -352,9 +367,46 @@ export async function createBlendLog(
         'calories'
       ),
     ]);
+    const xpResults = [blendXPResult, proteinGoalXPOutcome.xpResult, calorieGoalXPOutcome.xpResult];
+    const fromFavoriteId =
+      typeof req.body?.fromFavoriteId === 'string' && req.body.fromFavoriteId.trim().length > 0
+        ? req.body.fromFavoriteId
+        : undefined;
+    const missionProgressUpdates = [
+      {
+        type: 'makeBlend',
+        promise: updateMissionProgress(userId, 'makeBlend', user.timezone),
+      },
+      ...(proteinGoalXPOutcome.goalHit
+        ? [
+            {
+              type: 'hitProteinGoal',
+              promise: updateMissionProgress(userId, 'hitProteinGoal', user.timezone),
+            },
+          ]
+        : []),
+      ...(calorieGoalXPOutcome.goalHit
+        ? [
+            {
+              type: 'hitCalorieGoal',
+              promise: updateMissionProgress(userId, 'hitCalorieGoal', user.timezone),
+            },
+          ]
+        : []),
+      ...(fromFavoriteId !== undefined
+        ? [
+            {
+              type: 'makeBlendFromFavorite',
+              promise: updateMissionProgress(userId, 'makeBlendFromFavorite', user.timezone),
+            },
+          ]
+        : []),
+    ];
+    const missionResults = await Promise.all(missionProgressUpdates.map(update => update.promise));
     const xpAwarded = xpResults
       .filter(result => result.awarded)
       .reduce((sum, result) => sum + result.amount, 0);
+    const missionXPAwarded = missionResults.reduce((sum, result) => sum + result.totalXPAwarded, 0);
     const leveledUp = xpResults.some(result => result.leveledUp);
     const newLevel = xpResults.reduce<number | null>(
       (highestLevel, result) => {
@@ -366,6 +418,9 @@ export async function createBlendLog(
       },
       null
     );
+    const missionsUpdated = missionProgressUpdates
+      .filter((_, index) => missionResults[index]?.missionUpdated)
+      .map(update => update.type);
 
     res.status(201).json({
       success: true,
@@ -385,9 +440,10 @@ export async function createBlendLog(
         currentStreak: updatedStreaks.currentStreak,
         longestStreak: updatedStreaks.longestStreak,
         blendCount: updatedBlendCount,
-        xpAwarded,
+        xpAwarded: xpAwarded + missionXPAwarded,
         leveledUp,
         newLevel,
+        missionsUpdated,
         totalBlends: updatedBlendCount,
       },
     });

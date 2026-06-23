@@ -1,4 +1,6 @@
 import { LEVEL_NAMES } from '@blendi/shared';
+import { QUERY_KEYS } from '../config/cache.config';
+import { queryClient } from '../config/queryClient';
 import { useGamificationStore } from '../store/gamification.store';
 
 interface XPResponsePayload {
@@ -6,6 +8,10 @@ interface XPResponsePayload {
   leveledUp?: boolean;
   newLevel?: number | null;
   newLevelNameKey?: string;
+}
+
+interface MissionResponsePayload {
+  missionsUpdated?: string[];
 }
 
 function resolveLevelNameKey(newLevel: number): string {
@@ -36,10 +42,22 @@ export function handleXPResponse({
       return;
     }
 
-    useGamificationStore.getState().triggerLevelUp({
+    useGamificationStore.getState().setPendingLevelUp({
       newLevel: normalizedLevel,
       newLevelNameKey: resolveLevelNameKey(normalizedLevel),
     });
+  } catch {
+    return;
+  }
+}
+
+export function handleMissionResponse({ missionsUpdated }: MissionResponsePayload): void {
+  try {
+    if (!Array.isArray(missionsUpdated) || missionsUpdated.length === 0) {
+      return;
+    }
+
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dailyMissions });
   } catch {
     return;
   }

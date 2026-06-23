@@ -25,6 +25,7 @@ import {
   callAi,
   callVisionAi,
 } from '../services/aiProvider.service';
+import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.service';
 import { buildPantryRecipePrompt } from '../services/promptBuilder.service';
@@ -147,6 +148,12 @@ function triggerPantryScannerXP(userId: string, timezone: string): number {
     .catch(err => console.error('XP award failed:', err));
 
   return XP_EVENTS.pantryScanner;
+}
+
+function triggerPantryScannerMissionProgress(userId: string, timezone: string): void {
+  Promise.resolve()
+    .then(() => updateMissionProgress(userId, 'scanPantry', timezone))
+    .catch(err => console.error('Mission update failed:', err));
 }
 
 function getNextScanResetDate(scanResetDate: Date, now = new Date()): Date {
@@ -527,6 +534,7 @@ export async function analyzePantry(
     const recipes = await generatePantryRecipes(currentUser, usableIngredients);
 
     const xpAwarded = triggerPantryScannerXP(currentUser.id, currentUser.timezone);
+    triggerPantryScannerMissionProgress(currentUser.id, currentUser.timezone);
 
     res.status(200).json({
       success: true,

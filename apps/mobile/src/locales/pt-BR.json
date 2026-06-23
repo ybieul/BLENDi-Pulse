@@ -174,6 +174,9 @@
     "days": "dias",
     "todaysBlend": "Blend de hoje",
     "quickStart": "Início Rápido",
+    "dailyMissions": "Missões Diárias",
+    "missionComplete": "+{{xp}} XP — Missão Completa!",
+    "xpAvailable": "até {{xp}} XP",
     "proteinRing": "Proteína",
     "carbsRing": "Carboidratos",
     "caloriesRing": "Calorias",
@@ -231,6 +234,63 @@
       "beach_cocktails": "Crie um protocolo BLENDi Pulse de praia e drinks com blends tropicais estilo mocktail focados em hidratação e sabores frescos.",
       "travel": "Crie um protocolo BLENDi Pulse para viagens com blends portáteis, rápidos de preparar e fáceis de repetir no dia a dia."
     }
+  },
+
+  "missions": {
+    "makeBlend": {
+      "title": "Faça um blend",
+      "description": "Faça 1 blend hoje para avançar no progresso da sua missão diária."
+    },
+    "makeBlendTitle": "Faça um blend",
+    "makeBlendDesc": "Faça 1 blend hoje para avançar no progresso da sua missão diária.",
+    "hitProteinGoal": {
+      "title": "Bata a meta de proteína",
+      "description": "Alcance sua meta de proteína hoje para completar esta missão."
+    },
+    "hitProteinGoalTitle": "Bata a meta de proteína",
+    "hitProteinGoalDesc": "Alcance sua meta de proteína hoje para completar esta missão.",
+    "hitCalorieGoal": {
+      "title": "Bata a meta de calorias",
+      "description": "Alcance sua meta de calorias hoje para completar esta missão."
+    },
+    "hitCalorieGoalTitle": "Bata a meta de calorias",
+    "hitCalorieGoalDesc": "Alcance sua meta de calorias hoje para completar esta missão.",
+    "hitHydrationGoal": {
+      "title": "Bata a meta de hidratação",
+      "description": "Alcance sua meta de hidratação hoje para completar esta missão."
+    },
+    "hitHydrationGoalTitle": "Bata a meta de hidratação",
+    "hitHydrationGoalDesc": "Alcance sua meta de hidratação hoje para completar esta missão.",
+    "completeSuppStack": {
+      "title": "Complete os suplementos",
+      "description": "Complete todos os suplementos programados para hoje para concluir esta missão."
+    },
+    "completeSuppStackTitle": "Complete os suplementos",
+    "completeSuppStackDesc": "Complete todos os suplementos programados para hoje para concluir esta missão.",
+    "usePulseAI": {
+      "title": "Use o Pulse AI",
+      "description": "Abra o Pulse AI e use-o uma vez hoje para completar esta missão."
+    },
+    "usePulseAITitle": "Use o Pulse AI",
+    "usePulseAIDesc": "Abra o Pulse AI e use-o uma vez hoje para completar esta missão.",
+    "favoriteRecipe": {
+      "title": "Salve uma receita",
+      "description": "Salve qualquer receita nos seus favoritos para completar esta missão."
+    },
+    "favoriteRecipeTitle": "Salve uma receita",
+    "favoriteRecipeDesc": "Salve qualquer receita nos seus favoritos para completar esta missão.",
+    "scanPantry": {
+      "title": "Escaneie sua despensa",
+      "description": "Escaneie sua despensa uma vez hoje para completar esta missão."
+    },
+    "scanPantryTitle": "Escaneie sua despensa",
+    "scanPantryDesc": "Escaneie sua despensa uma vez hoje para completar esta missão.",
+    "makeBlendFromFavorite": {
+      "title": "Bata uma receita salva",
+      "description": "Bata hoje uma das suas receitas salvas para completar esta missão."
+    },
+    "makeBlendFromFavoriteTitle": "Bata uma receita salva",
+    "makeBlendFromFavoriteDesc": "Bata hoje uma das suas receitas salvas para completar esta missão."
   },
 
   "blend": {
@@ -693,7 +753,8 @@
     "xpToNextLevel": "{{xp}} XP para {{levelName}}",
     "currentXp": "{{xp}} XP total",
     "levelPrefix": "Nv.",
-    "levelDetail": "Nível {{level}}"
+    "levelDetail": "Nível {{level}}",
+    "pendingLevelUp": "Chave de documentação interna para o sequenciamento adiado de subida de nível."
   },
 
   "levels": {

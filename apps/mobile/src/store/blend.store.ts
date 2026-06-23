@@ -24,6 +24,7 @@ const blendTimerStorage: StateStorage = {
 
 interface BlendState {
   activeRecipe: PulseAiRecipe | null;
+  activeFavoriteId: string | null;
   timerDuration: number;
   timerStartedAt: Date | null;
   isTimerRunning: boolean;
@@ -32,6 +33,7 @@ interface BlendState {
 
 interface BlendActions {
   setActiveRecipe: (recipe: PulseAiRecipe | null) => void;
+  setActiveFavoriteId: (favoriteId: string | null) => void;
   setTimerDuration: (durationSeconds: number) => void;
   startTimer: () => void;
   stopTimer: () => void;
@@ -41,6 +43,7 @@ interface BlendActions {
 
 const initialState: BlendState = {
   activeRecipe: null,
+  activeFavoriteId: null,
   timerDuration: DEFAULT_TIMER_DURATION_SECONDS,
   timerStartedAt: null,
   isTimerRunning: false,
@@ -62,6 +65,10 @@ export const useBlendStore = create<BlendState & BlendActions>()(
 
       setActiveRecipe: (activeRecipe) => {
         set({ activeRecipe });
+      },
+
+      setActiveFavoriteId: (activeFavoriteId) => {
+        set({ activeFavoriteId });
       },
 
       setTimerDuration: (timerDuration) => {
@@ -94,11 +101,12 @@ export const useBlendStore = create<BlendState & BlendActions>()(
           timerStartedAt: null,
           lastBlend: activeRecipe ?? lastBlend,
           activeRecipe: null,
+          activeFavoriteId: null,
         });
       },
 
       resetToFree: () => {
-        set({ activeRecipe: null });
+        set({ activeRecipe: null, activeFavoriteId: null });
       },
     }),
     {

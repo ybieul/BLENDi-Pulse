@@ -4,7 +4,7 @@ import { calculateLevel, type PulseAiChatInput, type PulseAiRecipe } from '@blen
 import { api } from '../config/api';
 import i18n from '../locales/i18n';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { handleXPResponse } from '../utils/xp.utils';
+import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
  void calculateLevel;
 
@@ -27,6 +27,7 @@ interface PulseAiChatResponse {
     fromCache: boolean;
     usageRemaining: number | null;
     xpAwarded: number;
+    missionsUpdated?: string[];
   };
 }
 
@@ -43,6 +44,7 @@ export interface PulseAiChatResult {
   fromCache: boolean;
   usageRemaining: number | null;
   xpAwarded: number;
+  missionsUpdated?: string[];
 }
 
 export interface PulseAiUsage {
@@ -106,6 +108,7 @@ export async function sendMessage(
     const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload);
     const result = response.data.data;
     handleXPResponse(result);
+    handleMissionResponse(result);
     return result;
   } catch (error) {
     throw toPulseAiServiceError(error);

@@ -9,7 +9,7 @@ import { calculateLevel } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { handleXPResponse } from '../utils/xp.utils';
+import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
  void calculateLevel;
 
@@ -34,6 +34,7 @@ export interface LogWaterResponse {
     totalMl: number;
     goalMl: number;
     xpAwarded: number;
+    missionsUpdated?: string[];
   };
 }
 
@@ -134,6 +135,7 @@ export async function logWater(amountMl: number = 250): Promise<LogWaterResponse
   try {
     const response = await api.post<LogWaterResponse>('/hydration-logs', { amountMl });
     handleXPResponse(response.data.data);
+    handleMissionResponse(response.data.data);
     return response.data;
   } catch (error) {
     throw toHydrationServiceError(error);
