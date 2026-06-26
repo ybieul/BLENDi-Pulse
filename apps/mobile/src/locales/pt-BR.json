@@ -407,6 +407,8 @@
     "sectionToBuy": "Comprar",
     "sectionInCart": "No Carrinho",
     "allBought": "Tudo comprado! 🎉",
+    "emptyListTitle": "Sua lista está vazia",
+    "emptyListSubtitle": "Adicione itens usando o campo abaixo",
     "pendingItem_one": "{{count}} item",
     "pendingItem_other": "{{count}} itens",
     "addItemPlaceholder": "Adicionar item...",
