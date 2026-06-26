@@ -20,6 +20,7 @@ import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useNetworkStore } from '../../store/network.store';
 import { showToast } from '../../utils/toast.utils';
+import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
 const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
@@ -38,6 +39,8 @@ const SUBSTITUTES_BORDER = 'rgba(245,158,11,0.15)';
 const TIP_BACKGROUND = 'rgba(59,130,246,0.08)';
 const TIP_BORDER = 'rgba(59,130,246,0.15)';
 const GHOST_BUTTON_BORDER = 'rgba(255,255,255,0.15)';
+const CART_BUTTON_BACKGROUND = 'rgba(154,72,147,0.10)';
+const CART_BUTTON_BORDER = 'rgba(154,72,147,0.20)';
 const UNIT_OPACITY = 0.7;
 const HEART_SCALE_DEFAULT = 1;
 const HEART_SCALE_ACTIVE = 1.3;
@@ -100,6 +103,7 @@ export function RecipeCard({
   const removeFavoriteMutation = useRemoveFavorite();
   const [optimisticIsFavorited, setOptimisticIsFavorited] = useState(isFavorited);
   const [optimisticFavoriteId, setOptimisticFavoriteId] = useState(favoriteId);
+  const [isAddToListVisible, setIsAddToListVisible] = useState(false);
 
   useEffect(() => {
     setOptimisticIsFavorited(isFavorited);
@@ -138,6 +142,13 @@ export function RecipeCard({
 
   const substitutesText = recipe.tip?.trim();
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
+  const shoppingListIngredients = useMemo(
+    () => recipe.ingredients.map((ingredient) => ({
+      name: ingredient.name,
+      quantity: ingredient.amount,
+    })),
+    [recipe.ingredients],
+  );
 
   const handleFavoritePress = () => {
     if (isFavoriteMutationPending) {
@@ -286,6 +297,15 @@ export function RecipeCard({
         </AuthButton>
 
         <Pressable
+          accessibilityLabel={t('shoppingList.addToShoppingList')}
+          accessibilityRole="button"
+          onPress={() => setIsAddToListVisible(true)}
+          style={styles.cartButton}
+        >
+          <Ionicons color={colors.brand.pulse} name="cart-outline" size={18} />
+        </Pressable>
+
+        <Pressable
           accessibilityRole="button"
           onPress={handleFavoritePress}
           disabled={isFavoriteMutationPending}
@@ -294,6 +314,12 @@ export function RecipeCard({
           <Text style={styles.saveButtonLabel}>{t('common.actions.save')}</Text>
         </Pressable>
       </View>
+
+      <AddToListSheet
+        ingredients={shoppingListIngredients}
+        onClose={() => setIsAddToListVisible(false)}
+        visible={isAddToListVisible}
+      />
     </View>
   );
 }
@@ -466,9 +492,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   startBlendButton: {
-    width: '60%',
+    flex: 1,
     height: 42,
     borderRadius: 14,
+    minWidth: 0,
   },
   startBlendLabel: {
     color: colors.text.primary,
@@ -476,8 +503,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: fontWeights.medium,
   },
+  cartButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: CART_BUTTON_BORDER,
+    backgroundColor: CART_BUTTON_BACKGROUND,
+  },
   saveButton: {
-    width: '38%',
+    width: 92,
     height: 42,
     alignItems: 'center',
     justifyContent: 'center',

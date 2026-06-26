@@ -23,6 +23,12 @@ export const CACHE_CONFIG = {
   BLEND_HISTORY_TTL: 7 * 24 * 60 * 60 * 1000,
 
   /**
+   * 7 dias. Listas de compras precisam sobreviver a reinícios do app para uso
+   * offline completo, mas não devem ficar persistidas por tempo indeterminado.
+   */
+  SHOPPING_LISTS_TTL: 7 * 24 * 60 * 60 * 1000,
+
+  /**
    * 1 hora. Dados do dia atual devem ser frescos, mas podem ser servidos do cache
    * por períodos curtos para evitar recargas excessivas durante o uso contínuo.
    */
@@ -66,6 +72,9 @@ export const QUERY_KEYS = {
   favorites: ['favorites'],
   hydrationHistory: ['hydrationHistory'],
   hydrationToday: ['hydrationToday'],
+  shoppingLists: ['shoppingLists'],
+  shoppingListDetail: ['shoppingListDetail'],
+  shoppingListsArchived: ['shoppingListsArchived'],
   supplementHistory: ['supplementHistory'],
   supplementStack: ['supplementStack'],
   pulseAiHistory: ['pulseAiHistory'],
@@ -80,9 +89,16 @@ export const PERSISTABLE_QUERY_KEYS = [
   'blendLogsToday',
   'favorites',
   'hydrationToday',
+  'shoppingLists',
+  'shoppingListDetail',
   'supplementStack',
   'pulseAiHistory',
 ] as const satisfies ReadonlyArray<keyof typeof QUERY_KEYS>;
+
+export const PERSISTED_QUERY_MAX_AGES: Partial<Record<keyof typeof QUERY_KEYS, number>> = {
+  shoppingLists: CACHE_CONFIG.SHOPPING_LISTS_TTL,
+  shoppingListDetail: CACHE_CONFIG.SHOPPING_LISTS_TTL,
+};
 
 export const HOME_INTERACTION_DELAY = 100;
 export const GOAL_RING_ANIMATION_DURATION = 1200;

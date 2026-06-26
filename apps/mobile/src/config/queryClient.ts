@@ -3,10 +3,18 @@ import {
   defaultShouldDehydrateQuery,
   type QueryKey,
 } from '@tanstack/react-query';
-import type { PersistQueryClientOptions } from '@tanstack/query-persist-client-core';
+import type {
+  PersistedClient,
+  PersistQueryClientOptions,
+} from '@tanstack/query-persist-client-core';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
-import { CACHE_CONFIG, PERSISTABLE_QUERY_KEYS, QUERY_KEYS } from './cache.config';
+import {
+  CACHE_CONFIG,
+  PERSISTABLE_QUERY_KEYS,
+  PERSISTED_QUERY_MAX_AGES,
+  QUERY_KEYS,
+} from './cache.config';
 import { createAppStorage } from './storage';
 
 const QUERY_CACHE_STORAGE_ID = 'blendi-pulse';
@@ -34,6 +42,48 @@ function shouldPersistQuery(queryKey: QueryKey): boolean {
   return rootKey !== null && persistableQueryRoots.has(rootKey);
 }
 
+function getPersistedQueryMaxAge(queryKey: QueryKey): number {
+  const rootKey = getQueryRoot(queryKey);
+
+  if (rootKey === null) {
+    return MAX_PERSISTED_QUERY_AGE;
+  }
+
+  return PERSISTED_QUERY_MAX_AGES[rootKey] ?? MAX_PERSISTED_QUERY_AGE;
+}
+
+function isWithinPersistedQueryMaxAge(
+  queryKey: QueryKey,
+  dataUpdatedAt: number,
+  now = Date.now()
+): boolean {
+  if (!Number.isFinite(dataUpdatedAt) || dataUpdatedAt <= 0) {
+    return true;
+  }
+
+  return now - dataUpdatedAt <= getPersistedQueryMaxAge(queryKey);
+}
+
+function pruneExpiredPersistedQueries(persistedClient: PersistedClient): PersistedClient {
+  const queries = persistedClient.clientState?.queries;
+
+  if (!queries) {
+    return persistedClient;
+  }
+
+  const now = Date.now();
+
+  return {
+    ...persistedClient,
+    clientState: {
+      ...persistedClient.clientState,
+      queries: queries.filter((query) =>
+        isWithinPersistedQueryMaxAge(query.queryKey, query.state.dataUpdatedAt, now)
+      ),
+    },
+  };
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -57,8 +107,8 @@ export function createMMKVPersister() {
       },
     },
     key: QUERY_CACHE_STORAGE_KEY,
-    serialize: JSON.stringify,
-    deserialize: JSON.parse,
+    serialize: persistedClient => JSON.stringify(pruneExpiredPersistedQueries(persistedClient)),
+    deserialize: value => pruneExpiredPersistedQueries(JSON.parse(value) as PersistedClient),
   });
 }
 
@@ -69,6 +119,8 @@ export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   maxAge: MAX_PERSISTED_QUERY_AGE,
   dehydrateOptions: {
     shouldDehydrateQuery: query =>
-      defaultShouldDehydrateQuery(query) && shouldPersistQuery(query.queryKey),
+      defaultShouldDehydrateQuery(query)
+      && shouldPersistQuery(query.queryKey)
+      && isWithinPersistedQueryMaxAge(query.queryKey, query.state.dataUpdatedAt),
   },
 };

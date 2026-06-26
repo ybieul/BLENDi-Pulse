@@ -35,6 +35,11 @@ export type TrackStackParamList = {
   TrackMain: undefined;
   ManageStack: undefined;
   History: undefined;
+  ShoppingLists: undefined;
+  ShoppingListDetail: {
+    listId: string;
+    listName: string;
+  };
 };
 
 export type AppTabParamList = {

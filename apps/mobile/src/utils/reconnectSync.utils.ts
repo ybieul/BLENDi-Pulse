@@ -1,9 +1,11 @@
 import type { CreateBlendLogInput } from '@blendi/shared';
+import type { ShoppingListDetail } from '@blendi/shared';
 import type { QueryClient } from '@tanstack/react-query';
 
 import i18n from '../locales/i18n';
 import { QUERY_KEYS } from '../config/cache.config';
 import { createBlendLog } from '../services/blendLog.service';
+import { updateItems } from '../services/shoppingList.service';
 import { useNetworkStore } from '../store/network.store';
 import {
   addPendingBlend,
@@ -11,6 +13,7 @@ import {
   removePendingBlend,
   type PendingBlendLog,
 } from './pendingBlends.utils';
+import { getDirtyLists, markListClean } from './shoppingListSync.utils';
 import { showPersistentToast } from './toast.events';
 
 function toCreateBlendLogInput(pendingBlend: PendingBlendLog): CreateBlendLogInput {
@@ -89,6 +92,34 @@ async function invalidateCriticalQueries(queryClient: QueryClient): Promise<void
   ]);
 }
 
+async function syncDirtyShoppingLists(queryClient: QueryClient): Promise<void> {
+  const dirtyListIds = getDirtyLists();
+
+  for (const listId of dirtyListIds) {
+    const shoppingList = queryClient.getQueryData<ShoppingListDetail>([
+      ...QUERY_KEYS.shoppingListDetail,
+      listId,
+    ]);
+
+    if (!shoppingList) {
+      continue;
+    }
+
+    try {
+      const updatedShoppingList = await updateItems(listId, shoppingList.items);
+
+      queryClient.setQueryData(
+        [...QUERY_KEYS.shoppingListDetail, listId],
+        updatedShoppingList,
+      );
+
+      markListClean(listId);
+    } catch {
+      // Mantém a flag dirty para nova tentativa no próximo reconnect.
+    }
+  }
+}
+
 export async function triggerReconnectSync(queryClient: QueryClient): Promise<void> {
   try {
     await processPendingBlendQueue();
@@ -108,5 +139,11 @@ export async function triggerReconnectSync(queryClient: QueryClient): Promise<vo
     useNetworkStore.getState().markSyncCompleted();
   } catch {
     // A limpeza da flag local não deve propagar erro para a camada de hook.
+  }
+
+  try {
+    await syncDirtyShoppingLists(queryClient);
+  } catch {
+    // A sincronização de listas também é best-effort e não deve quebrar o fluxo.
   }
 }

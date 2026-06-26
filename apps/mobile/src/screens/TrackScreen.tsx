@@ -48,6 +48,10 @@ import {
   uncheckSupplement,
 } from '../services/supplementStack.service';
 import type { SupplementStackItem } from '../services/supplementStack.service';
+import {
+  getLists,
+  type ShoppingListsResult,
+} from '../services/shoppingList.service';
 
 import type { TrackStackScreenProps } from '../navigation/types';
 import { getDeviceTimezone } from '../services/timezone.service';
@@ -61,6 +65,9 @@ import { MyStackSection } from '../components/track/MyStackSection';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_HYDRATION_TARGET_ML = 2000;
+const SHOPPING_LIST_BADGE_SIZE = 16;
+const SHOPPING_LIST_BADGE_FONT_SIZE = 10;
+const SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW = 8;
 const RETRY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.15)';
 const HISTORY_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
 const HISTORY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.12)';
@@ -187,6 +194,18 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     queryKey: QUERY_KEYS.supplementStack,
     queryFn: getStack,
     staleTime: CACHE_CONFIG.SUPPLEMENT_STACK_TTL,
+    retry: 1,
+  });
+
+  const shoppingListsQuery = useQuery<
+    ShoppingListsResult,
+    Error,
+    ShoppingListsResult,
+    typeof QUERY_KEYS.shoppingLists
+  >({
+    queryKey: QUERY_KEYS.shoppingLists,
+    queryFn: getLists,
+    staleTime: CACHE_CONFIG.SHOPPING_LISTS_TTL,
     retry: 1,
   });
 
@@ -348,6 +367,10 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     navigation.navigate('History');
   }, [navigation]);
 
+  const handleViewShoppingLists = useCallback(() => {
+    navigation.navigate('ShoppingLists');
+  }, [navigation]);
+
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const rawHydrationTodayTotalMl = (hydrationTodayResponse as { data?: { totalMl?: unknown } } | undefined)
@@ -369,6 +392,10 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     ? rawHistoryDailyBreakdown.filter(isHydrationHistoryDailyBreakdownItem)
     : [];
   const activeStack: SupplementStackItem[] = (supplementStack ?? []).filter((item) => item.isActive);
+  const pendingShoppingListItemsTotal = useMemo(
+    () => shoppingListsQuery.data?.lists.reduce((total, list) => total + list.pendingItems, 0) ?? 0,
+    [shoppingListsQuery.data],
+  );
 
   // ── Retry all ─────────────────────────────────────────────────────────────
 
@@ -396,6 +423,39 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>{t('track.title')}</Text>
+
+          <View style={styles.headerRightActions}>
+            <View style={styles.headerActionWithBadge}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={String(t('shoppingList.title'))}
+                onPress={handleViewShoppingLists}
+                style={styles.headerButton}
+              >
+                <Ionicons name="cart-outline" size={22} color={colors.text.secondary} />
+              </Pressable>
+
+              {pendingShoppingListItemsTotal > 0 ? (
+                <View style={styles.shoppingListBadge}>
+                  <Text style={[
+                    styles.shoppingListBadgeText,
+                    pendingShoppingListItemsTotal > 9 && styles.shoppingListBadgeTextOverflow,
+                  ]}>
+                    {pendingShoppingListItemsTotal > 9 ? '9+' : String(pendingShoppingListItemsTotal)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={String(t('history.title'))}
+              onPress={handleViewHistory}
+              style={styles.headerButton}
+            >
+              <Ionicons name="time-outline" size={22} color={colors.text.secondary} />
+            </Pressable>
+          </View>
         </View>
 
         {isLoading ? (
@@ -470,12 +530,54 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   title: {
+    flex: 1,
     color: colors.text.primary,
     fontFamily: fonts.display,
     fontSize: 24,
     fontWeight: fontWeights.bold,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerActionWithBadge: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shoppingListBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: SHOPPING_LIST_BADGE_SIZE,
+    height: SHOPPING_LIST_BADGE_SIZE,
+    borderRadius: SHOPPING_LIST_BADGE_SIZE / 2,
+    backgroundColor: colors.brand.pulse,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shoppingListBadgeText: {
+    color: colors.text.primary,
+    fontFamily: fonts.body,
+    fontSize: SHOPPING_LIST_BADGE_FONT_SIZE,
+    fontWeight: fontWeights.bold,
+    lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE + 2,
+    includeFontPadding: false,
+  },
+  shoppingListBadgeTextOverflow: {
+    fontSize: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW,
+    lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW + 2,
   },
 
   // Sections

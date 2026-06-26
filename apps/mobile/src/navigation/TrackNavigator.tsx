@@ -14,6 +14,8 @@ import type { SupplementStackItem } from '../services/supplementStack.service';
 import { TrackScreen } from '../screens/TrackScreen';
 import { ManageStackScreen } from '../screens/ManageStackScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
+import { ShoppingListsScreen } from '../screens/ShoppingListsScreen';
+import { ShoppingListDetailScreen } from '../screens/ShoppingListDetailScreen';
 import type { NewSupplementFormData } from '../screens/ManageStackScreen';
 import type { TrackStackParamList } from './types';
 
@@ -92,6 +94,8 @@ export function TrackNavigator() {
       <Stack.Screen name="TrackMain" component={TrackScreen} />
       <Stack.Screen name="ManageStack" component={ManageStackRoute} />
       <Stack.Screen name="History" component={HistoryScreen} />
+      <Stack.Screen name="ShoppingLists" component={ShoppingListsScreen} />
+      <Stack.Screen name="ShoppingListDetail" component={ShoppingListDetailScreen} />
     </Stack.Navigator>
   );
 }

@@ -1,11 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const appJson = JSON.parse(readFileSync(path.join(__dirname, 'app.json'), 'utf8')) as {
+const appJson = JSON.parse(readFileSync(path.join(process.cwd(), 'app.json'), 'utf8')) as {
   expo: {
     extra?: {
       eas?: {

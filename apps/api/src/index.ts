@@ -25,6 +25,7 @@ import { pulseAiRouter } from './routes/pulseAi';
 import { supplementLogsRouter } from './routes/supplementLogs';
 import { supplementStackRouter } from './routes/supplementStack';
 import { dailyMissionsRouter } from './routes/dailyMissions';
+import { shoppingListRouter } from './routes/shoppingList';
 import { sendErrorResponse } from './utils/error.utils';
 import { initializeNotificationJobs } from './jobs/notifications.jobs';
 
@@ -82,6 +83,7 @@ app.use('/favorites', favoritesRouter);
 app.use('/pantry-scanner', pantryScannerRouter);
 app.use('/pulse-ai', pulseAiRouter);
 app.use('/daily-missions', dailyMissionsRouter);
+app.use('/shopping-lists', shoppingListRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);
 
