@@ -59,9 +59,17 @@ BLENDi Pulse is the companion app for the BLENDi hardware platform, built in Rea
 | CP1.10 | [phase-1/cp1.10-history.md](phase-1/cp1.10-history.md) | Complete history dashboard with custom nutrition and hydration SVG charts, supplement heatmap, and paginated blend history |
 | CP1.11 | [phase-1/cp1.11-profile.md](phase-1/cp1.11-profile.md) | Complete profile screen with badges, editable settings, upgrade flow, and full sign-out cleanup |
 
-### Phase 2 — Hardware Integration
+### Phase 2 — Hábito
 
-To be documented as phases are implemented.
+| Checkpoint | Document | Description |
+|---|---|---|
+| CP2.1 | [phase-2/cp2.1-pantry-scanner.md](phase-2/cp2.1-pantry-scanner.md) | Pantry Scanner with configurable Vision AI provider via VISION_* env vars, billing cycle rate limiting anchored to account creation date, and ingredient confidence filtering |
+| CP2.2 | [phase-2/cp2.2-push-notifications.md](phase-2/cp2.2-push-notifications.md) | Push Notifications with four cron job types, Expo Push API batching, and Daily Pulse personalized with user's Pulse AI recipe cache |
+| CP2.3-A | [phase-2/cp2.3-a-xp-system.md](phase-2/cp2.3-a-xp-system.md) | XP system with MongoDB persistence, XPLog idempotency via unique index, and integration across six existing controllers |
+| CP2.3-B | [phase-2/cp2.3-b-level-ui.md](phase-2/cp2.3-b-level-ui.md) | Level UI with global LevelUpCelebration overlay, compact HomeScreen indicator, LevelDetailSheet, and MeScreen 2x2 StatCard grid |
+| CP2.3-C | [phase-2/cp2.3-c-daily-missions.md](phase-2/cp2.3-c-daily-missions.md) | Daily Missions with goal-based weighted random pool, dynamic pool filtering, and missionProgress.service.ts with strict unidirectional dependency hierarchy |
+| CP2.4 | [phase-2/cp2.4-shopping-list.md](phase-2/cp2.4-shopping-list.md) | Shopping List with multiple lists per user, free tier limit of one active list, favorites import, and offline state-final sync |
+| CP2.4.1 | [phase-2/cp2.4.1-shopping-list-detail-screen.md](phase-2/cp2.4.1-shopping-list-detail-screen.md) | Complete reimplementation of ShoppingListDetailScreen which was blank after CP2.4, including SectionList, optimistic UI handlers, and fixed bottom input field |
 
 ### Phase 3 — Social & Community
 
@@ -93,6 +101,12 @@ To be documented as phases are implemented.
 - Dual-unit system standardized on metric storage with `useUnits` converting values for display: keeps persisted calculations consistent while supporting imperial and metric UX.
 - Pending blend queue stored locally in MMKV with automatic sync after reconnection: protects user actions during offline usage without requiring server-side draft state.
 - Profile badges derived on the frontend from existing profile data instead of a dedicated endpoint: avoids expanding the API for presentation-only computed state.
+- Vision environment variables split from Pulse AI chat variables: `VISION_PROVIDER`, `VISION_MODEL`, and `VISION_API_KEY` stay independent from the `AI_*` chat settings, allowing different providers and models for chat and image analysis at the same time without code changes.
+- Pantry Scanner billing cycle anchored to the account creation date: the reset advances with `addMonths(previousScanResetDate, 1)` from `date-fns` instead of `addMonths(Date.now(), 1)`, preserving each user's cycle regardless of when they open the app.
+- `totalXP` persisted in MongoDB while level remains computed: XP is stored against the user account so it survives reinstalls, and the level is always derived through the pure `calculateLevel` function in the shared package instead of an extra database field.
+- Daily mission dependency hierarchy kept strictly unidirectional: `missionProgress.service.ts` imports `xp.service.ts` but never the inverse, and controllers are the only layer that knows both services simultaneously, preventing circular dependencies.
+- Shopping lists stored in a dedicated `shopping_lists` collection instead of embedding arrays in `User`: this scales better for historical list volume and supports granular per-list operations without inflating the user document.
+- Free tier shopping list limit enforced on creation and restoration: the free tier supports only one active list, checked in both `createList` and `updateList` when archived lists are restored, with `canCreateMore` returned by `getLists` for mobile-side gating.
 
 ---
 
@@ -121,7 +135,7 @@ pnpm --filter @blendi/mobile start
 
 Fill in the values required by each `.env` file before running the stack locally.
 
-The current `.env.example` files are fully documented below, including the Phase 1 AI provider settings. The backend is currently configured to use `AI_PROVIDER=google` with `AI_MODEL=gemini-2.5-flash-lite`.
+The current `.env.example` files are fully documented below, including the Phase 1 AI provider settings and the Phase 2 vision and push-notification additions. The backend is currently configured to use `AI_PROVIDER=google` with `AI_MODEL=gemini-2.5-flash-lite`.
 
 ### API Environment Variables
 
@@ -143,6 +157,10 @@ The current `.env.example` files are fully documented below, including the Phase
 | `AI_PROVIDER` | Active Pulse AI provider (`openai`, `anthropic`, or `google`); the current setup uses `google` |
 | `AI_MODEL` | Model name used for the selected provider; the current setup uses `gemini-2.5-flash-lite` |
 | `AI_API_KEY` | API key for the selected AI provider |
+| `VISION_PROVIDER` | Vision AI provider used by Pantry Scanner (`openai`, `anthropic`, or `google`) |
+| `VISION_MODEL` | Vision model identifier used by the selected provider, for example `gemini-2.5-flash` |
+| `VISION_API_KEY` | API key for the selected vision provider; it can match `AI_API_KEY` when the same provider is used for both |
+| `EXPO_ACCESS_TOKEN` | Expo access token used to authenticate calls to the Expo Push API without rate limits; generate it in `expo.dev/settings/access-tokens` |
 
 ### Mobile Environment Variables
 
@@ -154,12 +172,16 @@ The current `.env.example` files are fully documented below, including the Phase
 
 ## Open Questions
 
-The unresolved items carried over from Phase 0 remain open and continue blocking the same downstream phases listed below. Phase 1 is closed, and the current app version is tracked as `0.2.0`.
+The unresolved items carried over from Phase 0 remain open as critical questions for Jon and continue blocking the same downstream phases listed below.
+
+Phase 2 is closed, the current app version is tracked as `0.3.0`, and Phase 3 is planned.
+
+These questions still block specific checkpoints across Phase 3 and Phase 4.
 
 | Question | Impact |
 |---|---|
 | Is the Apple Developer Account registered under the BLENDi company name? | Blocks Phase 5 distribution planning and the final App Store publishing path under the company brand |
-| Will the Golden Ticket QR code be unique per unit or shared per production batch? | Blocks Phase 2 hardware pairing and ownership validation rules |
+| Will the Golden Ticket QR code be unique per unit or shared per production batch? | Blocks Phase 4 Golden Ticket activation and ownership validation rules |
 | Does the e-commerce stack use Shopify, and is API access available? | Blocks Phase 3 purchase verification and commerce integration planning |
 | Is there a target launch date? | Blocks Phase 5 prioritization, release sequencing, and scope tradeoff decisions |
 

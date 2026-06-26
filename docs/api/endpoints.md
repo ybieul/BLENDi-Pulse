@@ -610,6 +610,149 @@ Updates the authenticated user's stored IANA timezone. This endpoint is still us
 
 ---
 
+## Push Notifications Configuration
+
+### PATCH /users/push-token
+
+Stores or updates the authenticated user's push token used by Expo notifications.
+
+**JWT required:** Yes
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `pushToken` | string | Yes | Expo Push token in the `ExponentPushToken[...]` format |
+
+If the incoming token is identical to the token already stored on the user document, the endpoint returns the current value without performing a database update.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "string",
+      "pushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "updatedAt": "2026-06-26T14:20:00.000Z"
+    }
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Push token stored or confirmed successfully |
+| `400` | Request body failed validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### PATCH /users/notification-preferences
+
+Partially updates the authenticated user's notification preference flags.
+
+**JWT required:** Yes
+
+**Request body**
+
+All fields are optional. Any combination can be sent in the same request.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `dailyPulse` | boolean | No | Enables the Daily Pulse notification |
+| `streakReminder` | boolean | No | Enables streak reminder notifications |
+| `supplementReminder` | boolean | No | Enables supplement reminder notifications |
+| `hydrationReminder` | boolean | No | Enables hydration reminder notifications |
+| `levelUp` | boolean | No | Enables level-up notifications |
+
+The controller uses `$set` with dot notation such as `notificationPreferences.dailyPulse`, so omitted fields are preserved instead of overwritten.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "string",
+      "notificationPreferences": {
+        "dailyPulse": true,
+        "streakReminder": true,
+        "supplementReminder": false,
+        "hydrationReminder": true,
+        "levelUp": true
+      },
+      "updatedAt": "2026-06-26T14:20:00.000Z"
+    }
+  }
+}
+```
+
+If the request body contains no recognized preference fields, the endpoint returns the current stored preferences unchanged.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Notification preferences merged successfully |
+| `400` | Request body failed validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### PATCH /users/daily-pulse-time
+
+Updates the preferred local delivery time for Daily Pulse notifications.
+
+**JWT required:** Yes
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `hour` | number | Yes | Integer between `0` and `23` |
+| `minute` | number | Yes | Integer between `0` and `59` |
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "string",
+      "dailyPulseTime": {
+        "hour": 7,
+        "minute": 30
+      },
+      "updatedAt": "2026-06-26T14:20:00.000Z"
+    }
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Daily Pulse time updated successfully |
+| `400` | Request body failed validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+---
+
 ## Blend Logs
 
 All Blend Log history ranges interpret `from` and `to` in the authenticated user's timezone rather than raw UTC midnight.
@@ -631,6 +774,7 @@ Creates a new blend log and updates the user's derived streak and blend counters
 | `calories` | number | Yes | Integer, minimum 0; defaults to `0` when omitted |
 | `blendiModel` | string | Yes | One of `Lite`, `ProPlus`, `Steel` |
 | `durationSeconds` | number | Yes | Integer between 5 and 300 |
+| `fromFavoriteId` | string | No | Present only when the blend was started from a `FavoriteCard`; used to trigger the `makeBlendFromFavorite` mission |
 | `rating` | number | No | Integer between 1 and 5 |
 
 **Success response**
@@ -656,10 +800,15 @@ Creates a new blend log and updates the user's derived streak and blend counters
     "currentStreak": 5,
     "longestStreak": 12,
     "blendCount": 28,
+    "xpAwarded": 38,
+    "leveledUp": false,
+    "newLevel": null,
     "totalBlends": 28
   }
 }
 ```
+
+`xpAwarded` is the sum of direct blend XP, any protein or calorie goal XP unlocked by this blend, and any mission XP completed by the same action. `leveledUp` and `newLevel` are derived by comparing the level before and after all XP operations executed in parallel.
 
 **Status codes**
 
@@ -826,12 +975,13 @@ Registers a hydration entry and returns the updated total for the current local 
       "createdAt": "2026-05-26T14:20:00.000Z"
     },
     "totalMl": 750,
-    "goalMl": 2500
+    "goalMl": 2500,
+    "xpAwarded": 5
   }
 }
 ```
 
-The current response field for the user's daily hydration target is `goalMl`.
+The current response field for the user's daily hydration target is `goalMl`. `xpAwarded` is the hydration-goal XP for the current local day and is awarded only once per day when the updated total reaches or exceeds the user's target; otherwise it is `0`.
 
 **Status codes**
 
@@ -1076,10 +1226,13 @@ Creates or increments the current local-day `SupplementLog` for a supplement.
       "logDate": "2026-05-26",
       "consumedCount": 1,
       "createdAt": "2026-05-26T14:20:00.000Z"
-    }
+    },
+    "xpAwarded": 5
   }
 }
 ```
+
+`xpAwarded` is the supplement-goal XP for the day. It is awarded only once per local day, and only when this check causes all active supplements to meet their respective daily target counts; subsequent checks return `0`.
 
 **Status codes**
 
@@ -1341,10 +1494,13 @@ The backend checks duplicates by `recipeName` within the authenticated user's fa
       "goal": "Muscle",
       "createdAt": "2026-05-26T14:20:00.000Z"
     },
-    "alreadyExists": false
+    "alreadyExists": false,
+    "xpAwarded": 2
   }
 }
 ```
+
+`xpAwarded` is the multi-occurrence favorite-save XP granted only when a new favorite is created. When the endpoint returns `alreadyExists: true`, no XP is awarded and the field is omitted.
 
 **Status codes**
 
@@ -1457,10 +1613,13 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
     "fromCache": false,
     "usageRemaining": 2,
     "aiProvider": "google",
-    "aiModel": "gemini-2.5-flash-lite"
+    "aiModel": "gemini-2.5-flash-lite",
+    "xpAwarded": 3
   }
 }
 ```
+
+`xpAwarded` is the multi-occurrence Pulse AI usage XP. It is returned for both cache hits and fresh generations after a successful request.
 
 **Status codes**
 
@@ -1538,6 +1697,644 @@ None.
 |---|---|
 | `200` | User cache invalidated successfully |
 | `401` | Missing, invalid, or expired Bearer token |
+| `500` | Unexpected server error |
+
+---
+
+## Pantry Scanner
+
+### POST /pantry-scanner/analyze
+
+Analyzes a pantry image, filters low-confidence ingredients, and generates up to two Pulse AI recipes from the usable ingredients.
+
+**JWT required:** Yes
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `imageBase64` | string | Yes | Base64 image payload with an effective maximum size of approximately 2 MB |
+| `mimeType` | string | Yes | One of `image/jpeg` or `image/png` |
+
+**Processing pipeline**
+
+1. Validates the request body with `pantryScanSchema` and calculates the image size in KB for structured logging.
+2. Loads the authenticated user and checks `isPro`; Pro users skip the free-tier monthly limit gate.
+3. For free-tier users, if `Date.now() > scanResetDate`, resets `scanCount` to `0` and recalculates `scanResetDate` with `addMonths(previousScanResetDate, 1)`, preserving the original billing cycle anchor.
+4. If the current free-tier `scanCount >= 3`, returns `429 Too Many Requests` with code `scanner/monthly-limit-reached` plus `scansUsed`, `scansLimit`, and `resetDate`.
+5. Calls `callVisionAi` with the pantry-analysis prompt built by `pantryPromptBuilder.service.ts`.
+6. Parses and validates the returned JSON; if `noFoodDetected: true`, returns `200 OK` with empty arrays and does not increment the scanner.
+7. Filters the detected ingredients to confidence levels `high` and `medium`; if the filtered array becomes empty, returns `200 OK` with `noUsableIngredients: true` and does not increment the scanner.
+8. Only after valid ingredients are confirmed, increments `scanCount` atomically with `$inc`, then generates recipes through `promptBuilder.service.ts` and returns the Pantry Scanner XP payload.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "ingredients": [
+      {
+        "name": "Banana",
+        "estimatedQuantity": "2 units",
+        "confidence": "high"
+      },
+      {
+        "name": "Greek yogurt",
+        "estimatedQuantity": "1 pot",
+        "confidence": "medium"
+      }
+    ],
+    "analysisNotes": "Detected fruit and dairy items suitable for smoothies.",
+    "noFoodDetected": false,
+    "recipes": [
+      {
+        "title": "Banana Yogurt Boost",
+        "ingredients": [
+          {
+            "name": "Banana",
+            "amount": "2 units"
+          },
+          {
+            "name": "Greek yogurt",
+            "amount": "1 pot"
+          }
+        ],
+        "macros": {
+          "protein": 24,
+          "carbs": 36,
+          "fat": 4,
+          "calories": 260
+        },
+        "prepTimeSeconds": 60,
+        "blendInstruction": "Blend for 45 seconds until smooth.",
+        "tip": "Add ice for a thicker texture.",
+        "hasSubstitutes": false
+      }
+    ],
+    "scansUsed": 2,
+    "scansLimit": 3,
+    "resetDate": "2026-07-10T12:00:00.000Z",
+    "xpAwarded": 5
+  }
+}
+```
+
+When `noFoodDetected` or `noUsableIngredients` is returned, the response still uses `200 OK` with empty `ingredients` and `recipes`, keeps `scansUsed` unchanged, and does not award XP.
+
+`xpAwarded` is the multi-occurrence Pantry Scanner XP granted only after a successful scan with at least one usable ingredient.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Pantry image analyzed successfully, or no food / no usable ingredients was confirmed |
+| `400` | Request body failed validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `429` | Free-tier monthly Pantry Scanner limit reached |
+| `500` | Vision provider returned invalid JSON after parsing |
+| `503` | Vision provider is temporarily unavailable |
+
+---
+
+## Daily Missions
+
+### GET /daily-missions
+
+Returns the authenticated user's daily missions for the current local day, generating the document on demand when it does not exist yet.
+
+**JWT required:** Yes
+
+**Request parameters**
+
+None.
+
+Mission generation uses a goal-based weighted pool with dynamic filtering so impossible missions are removed before selection, while fallback mission types ensure that exactly three unique missions are always returned.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "dailyMission": {
+      "missionDate": "2026-06-26",
+      "missions": [
+        {
+          "missionId": "string",
+          "type": "makeBlend",
+          "titleKey": "missions.makeBlend.title",
+          "descriptionKey": "missions.makeBlend.description",
+          "requirement": 1,
+          "progress": 0,
+          "completed": false,
+          "xpReward": 15
+        },
+        {
+          "missionId": "string",
+          "type": "usePulseAI",
+          "titleKey": "missions.usePulseAI.title",
+          "descriptionKey": "missions.usePulseAI.description",
+          "requirement": 1,
+          "progress": 0,
+          "completed": false,
+          "xpReward": 10
+        },
+        {
+          "missionId": "string",
+          "type": "scanPantry",
+          "titleKey": "missions.scanPantry.title",
+          "descriptionKey": "missions.scanPantry.description",
+          "requirement": 1,
+          "progress": 0,
+          "completed": false,
+          "xpReward": 15
+        }
+      ],
+      "bonusAwarded": false,
+      "xpAvailable": 60,
+      "completedCount": 0
+    }
+  }
+}
+```
+
+`xpAvailable` is calculated as the sum of all incomplete mission `xpReward` values plus `20` more when `bonusAwarded` is still `false`.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Daily missions returned successfully |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+---
+
+## Shopping Lists
+
+### GET /shopping-lists
+
+Returns the authenticated user's active shopping lists as `ShoppingListSummary` items.
+
+**JWT required:** Yes
+
+**Request parameters**
+
+None.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "lists": [
+      {
+        "id": "string",
+        "name": "Weekly groceries",
+        "isArchived": false,
+        "createdAt": "2026-06-20T10:00:00.000Z",
+        "updatedAt": "2026-06-26T09:15:00.000Z",
+        "totalItems": 6,
+        "pendingItems": 4
+      }
+    ],
+    "canCreateMore": false
+  }
+}
+```
+
+`canCreateMore` is `true` when the user is Pro or when a free-tier user has fewer than one active list.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Active shopping lists returned successfully |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### GET /shopping-lists/archived
+
+Returns the authenticated user's archived shopping lists.
+
+**JWT required:** Yes
+
+**Request parameters**
+
+None.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "lists": [
+      {
+        "id": "string",
+        "name": "Trip supplies",
+        "isArchived": true,
+        "createdAt": "2026-06-10T10:00:00.000Z",
+        "updatedAt": "2026-06-18T12:30:00.000Z",
+        "totalItems": 3,
+        "pendingItems": 0
+      }
+    ]
+  }
+}
+```
+
+All returned lists have `isArchived: true`.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Archived shopping lists returned successfully |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### GET /shopping-lists/:listId
+
+Returns a full `ShoppingListDetail` payload for a single list.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "shoppingList": {
+      "id": "string",
+      "name": "Weekly groceries",
+      "isArchived": false,
+      "createdAt": "2026-06-20T10:00:00.000Z",
+      "updatedAt": "2026-06-26T09:15:00.000Z",
+      "totalItems": 2,
+      "pendingItems": 1,
+      "items": [
+        {
+          "itemId": "string",
+          "name": "Bananas",
+          "quantity": "6",
+          "checked": false,
+          "addedAt": "2026-06-26T09:10:00.000Z",
+          "source": "manual"
+        }
+      ]
+    }
+  }
+}
+```
+
+Items are returned sorted by `addedAt` descending.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Shopping list returned successfully |
+| `400` | Shopping list id is not a valid MongoDB ObjectId |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list exists but does not belong to the authenticated user |
+| `404` | Shopping list not found |
+| `500` | Unexpected server error |
+
+### POST /shopping-lists
+
+Creates a new active shopping list.
+
+**JWT required:** Yes
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | Yes | 1 to 80 characters |
+
+Before creating the document, the backend checks the free-tier active-list limit. Free-tier users can keep only one active list at a time.
+
+**Success response**
+
+**Status:** `201 Created`
+
+```json
+{
+  "success": true,
+  "data": {
+    "shoppingList": {
+      "id": "string",
+      "name": "Weekly groceries",
+      "isArchived": false,
+      "createdAt": "2026-06-26T09:15:00.000Z",
+      "updatedAt": "2026-06-26T09:15:00.000Z",
+      "totalItems": 0,
+      "pendingItems": 0,
+      "items": []
+    }
+  }
+}
+```
+
+If a free-tier user already has one active list, the endpoint returns `403 Forbidden` with code `shoppingList/free-tier-limit` and `upgradeRequired: true`.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `201` | Shopping list created successfully |
+| `400` | Request body failed validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Free-tier active-list limit reached |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### PATCH /shopping-lists/:listId
+
+Partially updates a shopping list.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+
+**Request body**
+
+All fields are optional.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | No | 1 to 80 characters |
+| `isArchived` | boolean | No | Set to `true` to archive or `false` to restore |
+
+When restoring an archived list with `isArchived: false`, the backend re-checks the free-tier active-list limit before allowing the change.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "shoppingList": {
+      "id": "string",
+      "name": "Weekly groceries",
+      "isArchived": true,
+      "createdAt": "2026-06-20T10:00:00.000Z",
+      "updatedAt": "2026-06-26T09:40:00.000Z",
+      "totalItems": 6,
+      "pendingItems": 2,
+      "items": []
+    }
+  }
+}
+```
+
+If no supported fields are sent, the current shopping list is returned unchanged.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Shopping list updated successfully |
+| `400` | Request body failed validation or shopping list id is invalid |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list does not belong to the authenticated user, or free-tier restore limit was reached |
+| `404` | Shopping list or authenticated user not found |
+| `500` | Unexpected server error |
+
+### DELETE /shopping-lists/:listId
+
+Deletes a shopping list permanently.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Shopping list deleted successfully."
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Shopping list deleted successfully |
+| `400` | Shopping list id is not a valid MongoDB ObjectId |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list exists but does not belong to the authenticated user |
+| `404` | Shopping list not found |
+| `500` | Unexpected server error |
+
+### PUT /shopping-lists/:listId/items
+
+Replaces the entire items array of a shopping list.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+
+**Request body**
+
+Root payload: array of shopping list items, maximum 100 entries.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `itemId` | string | No | Existing id to preserve, or temporary id such as `temp_...` |
+| `name` | string | Yes | 1 to 100 characters |
+| `quantity` | string | No | Maximum 50 characters |
+| `checked` | boolean | No | Defaults to `false` |
+| `source` | string | No | `manual` or `recipe`; defaults to `manual` |
+
+For items with an existing non-temporary `itemId`, the backend preserves both `itemId` and `addedAt`. For items without `itemId` or with an id starting with `temp_`, the backend generates a fresh `crypto.randomUUID()` and a new `addedAt` timestamp.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "shoppingList": {
+      "id": "string",
+      "name": "Weekly groceries",
+      "isArchived": false,
+      "createdAt": "2026-06-20T10:00:00.000Z",
+      "updatedAt": "2026-06-26T09:50:00.000Z",
+      "totalItems": 2,
+      "pendingItems": 1,
+      "items": [
+        {
+          "itemId": "string",
+          "name": "Bananas",
+          "quantity": "6",
+          "checked": false,
+          "addedAt": "2026-06-26T09:10:00.000Z",
+          "source": "manual"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Shopping list items replaced successfully |
+| `400` | Request body failed validation or shopping list id is invalid |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list exists but does not belong to the authenticated user |
+| `404` | Shopping list not found |
+| `500` | Unexpected server error |
+
+### PATCH /shopping-lists/:listId/items/:itemId/check
+
+Atomically toggles the `checked` state of a single shopping list item.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+| `itemId` | string | Yes | Existing shopping list item id |
+
+The controller resolves the current item state first, then applies the inverse value with MongoDB's positional update operator.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "item": {
+      "itemId": "string",
+      "name": "Bananas",
+      "quantity": "6",
+      "checked": true,
+      "addedAt": "2026-06-26T09:10:00.000Z",
+      "source": "manual"
+    }
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Shopping list item toggled successfully |
+| `400` | Shopping list id is not a valid MongoDB ObjectId |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list exists but does not belong to the authenticated user |
+| `404` | Shopping list or shopping list item not found |
+| `500` | Unexpected server error |
+
+### DELETE /shopping-lists/:listId/items/checked
+
+Removes all checked items from a shopping list.
+
+**JWT required:** Yes
+
+**Path parameters**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `listId` | string | Yes | MongoDB ObjectId of the shopping list |
+
+The controller computes `removedCount` before applying an atomic `$pull` that removes every item with `checked: true`.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "removedCount": 2,
+    "shoppingList": {
+      "id": "string",
+      "name": "Weekly groceries",
+      "isArchived": false,
+      "createdAt": "2026-06-20T10:00:00.000Z",
+      "updatedAt": "2026-06-26T10:05:00.000Z",
+      "totalItems": 1,
+      "pendingItems": 1,
+      "items": [
+        {
+          "itemId": "string",
+          "name": "Peanut butter",
+          "checked": false,
+          "addedAt": "2026-06-26T10:00:00.000Z",
+          "source": "recipe"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Checked shopping list items removed successfully |
+| `400` | Shopping list id is not a valid MongoDB ObjectId |
+| `401` | Missing, invalid, or expired Bearer token |
+| `403` | Shopping list exists but does not belong to the authenticated user |
+| `404` | Shopping list not found |
 | `500` | Unexpected server error |
 
 ---
@@ -1651,7 +2448,7 @@ The following endpoint groups are planned for later phases and are not implement
 
 | Phase | Planned group |
 |---|---|
-| Phase 2 | Golden Ticket QR endpoints |
+| Phase 4 | Golden Ticket QR endpoints |
 | Phase 3 | Biometric Sync endpoints |
 | Phase 3 | RevenueCat paywall endpoints |
 | Phase 3 | Seamless Refill endpoints |
