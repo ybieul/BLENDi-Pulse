@@ -8,7 +8,7 @@
 //   5. Registrar handler de erros (SEMPRE por último)
 //   6. Começar a escutar requisições
 
-import { env } from './config/env';
+import { env, paymentsConfig } from './config/env';
 import { connectDatabase } from './config/database';
 import express from 'express';
 import cors from 'cors';
@@ -26,6 +26,8 @@ import { supplementLogsRouter } from './routes/supplementLogs';
 import { supplementStackRouter } from './routes/supplementStack';
 import { dailyMissionsRouter } from './routes/dailyMissions';
 import { shoppingListRouter } from './routes/shoppingList';
+import { purchasesRouter } from './routes/purchases';
+import { webhooksRouter } from './routes/webhooks';
 import { sendErrorResponse } from './utils/error.utils';
 import { initializeNotificationJobs } from './jobs/notifications.jobs';
 
@@ -61,6 +63,9 @@ app.use(
   })
 );
 
+// Webhooks do RevenueCat precisam do corpo bruto para verificar o HMAC recebido.
+app.use('/webhooks', express.raw({ type: 'application/json', limit: '1mb' }), webhooksRouter);
+
 // 2. Parsing de JSON com limite de 4 MB para acomodar imagens base64 do Pantry Scanner
 app.use(express.json({ limit: '4mb' }));
 
@@ -84,6 +89,7 @@ app.use('/pantry-scanner', pantryScannerRouter);
 app.use('/pulse-ai', pulseAiRouter);
 app.use('/daily-missions', dailyMissionsRouter);
 app.use('/shopping-lists', shoppingListRouter);
+app.use('/purchases', purchasesRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);
 
@@ -114,6 +120,12 @@ async function bootstrap(): Promise<void> {
     console.log(`   Versão   : v${env.API_VERSION}`);
     console.log(`   Porta    : ${env.PORT}`);
     console.log(`   Health   : http://localhost:${env.PORT}/ping\n`);
+
+    if (!paymentsConfig.isConfigured) {
+      console.warn(
+        '⚠️  Sistema de pagamento ainda nao configurado — funcionalidades de assinatura estarao indisponiveis ate que as chaves sejam preenchidas.'
+      );
+    }
   });
 }
 

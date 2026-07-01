@@ -211,7 +211,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   };
 
   const handleUpgradePress = () => {
-    navigation.getParent<NavigationProp<RootStackParamList>>()?.navigate('Upgrade');
+    const rootNavigation =
+      navigation.getParent()?.getParent<NavigationProp<RootStackParamList>>();
+    rootNavigation?.navigate('Upgrade');
   };
 
   return (

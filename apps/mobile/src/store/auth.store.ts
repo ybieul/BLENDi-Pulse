@@ -38,6 +38,7 @@ import { createAppStorage } from '../config/storage';
 import { useGamificationStore } from './gamification.store';
 import * as AuthService from '../services/auth.service';
 import type { AuthResponse, AuthUser } from '../services/auth.service';
+import { identifyPurchasesUser, logoutPurchasesUser } from '../services/purchase.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -76,9 +77,17 @@ interface CurrentUserProfileResponse {
       dailyProteinTarget: number;
       dailyCalorieTarget: number;
       dailyCarbTarget: number;
+      dailyHydrationTarget?: number;
+      isPro: boolean;
+      subscriptionId?: string | null;
+      subscriptionPlan?: 'monthly' | 'annual' | null;
+      subscriptionExpiresAt?: string | null;
+      subscriptionCancelRequestedAt?: string | null;
+      revenueCatCustomerId?: string | null;
       longestStreak: number;
       totalXP: number;
       createdAt: string;
+      updatedAt?: string;
       notificationPreferences?: {
         dailyPulse: boolean;
         streakReminder: boolean;
@@ -113,12 +122,45 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
     dailyCarbTarget: user.dailyCarbTarget,
+    dailyHydrationTarget: user.dailyHydrationTarget,
+    isPro: user.isPro,
+    subscriptionId: user.subscriptionId ?? null,
+    subscriptionPlan: user.subscriptionPlan ?? null,
+    subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
+    subscriptionCancelRequestedAt: user.subscriptionCancelRequestedAt ?? null,
+    revenueCatCustomerId: user.revenueCatCustomerId ?? null,
     longestStreak: user.longestStreak,
     totalXP: user.totalXP ?? 0,
     createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     notificationPreferences: user.notificationPreferences,
     dailyPulseTime: user.dailyPulseTime,
   };
+}
+
+function normalizeAuthUser(user: AuthUser): AuthUser {
+  return {
+    ...user,
+    isPro: user.isPro ?? false,
+    subscriptionId: user.subscriptionId ?? null,
+    subscriptionPlan: user.subscriptionPlan ?? null,
+    subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
+    subscriptionCancelRequestedAt: user.subscriptionCancelRequestedAt ?? null,
+    revenueCatCustomerId: user.revenueCatCustomerId ?? null,
+  };
+}
+
+async function hydrateAuthenticatedUserAndPayments(fallbackUser: AuthUser): Promise<AuthUser> {
+  let nextUser = normalizeAuthUser(fallbackUser);
+
+  try {
+    nextUser = normalizeAuthUser(await fetchCurrentUserProfile());
+  } catch {
+    // Mantem os dados imediatos do login se a hidratacao falhar temporariamente.
+  }
+
+  await identifyPurchasesUser(nextUser.id);
+  return nextUser;
 }
 
 function hasPendingOnboarding(): boolean {
@@ -247,13 +289,15 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       await setRefreshToken(data.refreshToken);
 
-      get().setUser(data.user);
-
       set({
         accessToken: data.accessToken,
         isAuthenticated: true,
         isNewUser: true,
       });
+
+      const hydratedUser = await hydrateAuthenticatedUserAndPayments(data.user);
+      get().setUser(hydratedUser);
+
       persistOnboardingCompletion(false);
     } finally {
       set({ isLoading: false });
@@ -267,20 +311,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     try {
       const data = await AuthService.login(input);
 
-      const user = {
-        ...data.user,
-        longestStreak: data.user.longestStreak,
-      };
-
       await setRefreshToken(data.refreshToken);
-
-      get().setUser(user);
 
       set({
         accessToken: data.accessToken,
         isAuthenticated: true,
         isNewUser: hasPendingOnboarding(),
       });
+
+      const hydratedUser = await hydrateAuthenticatedUserAndPayments(data.user);
+      get().setUser(hydratedUser);
     } finally {
       set({ isLoading: false });
     }
@@ -299,6 +339,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       isAuthenticated: false,
       isNewUser: false,
     });
+
+    await logoutPurchasesUser();
   },
 
   // ── restoreSession ────────────────────────────────────────────────────────
@@ -329,7 +371,9 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       try {
         const user = await fetchCurrentUserProfile();
-        get().setUser(user);
+        const normalizedUser = normalizeAuthUser(user);
+        get().setUser(normalizedUser);
+        await identifyPurchasesUser(normalizedUser.id);
       } catch {
         // Preserva a sessão restaurada mesmo se o perfil não puder ser hidratado agora.
       }
@@ -361,13 +405,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       persistOnboardingCompletion(false);
     }
 
-    get().setUser(data.user);
-
     set({
       accessToken: data.accessToken,
       isAuthenticated: true,
       isNewUser: shouldShowOnboarding,
     });
+
+    const hydratedUser = await hydrateAuthenticatedUserAndPayments(data.user);
+    get().setUser(hydratedUser);
   },
 
   // ── updateTimezone ────────────────────────────────────────────────────────

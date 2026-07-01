@@ -11,6 +11,7 @@ export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 export type UserLocale = 'en' | 'pt-BR';
 export type UserUnitSystem = 'metric' | 'imperial';
 export type SupplementTiming = 'morning' | 'preWorkout' | 'postWorkout' | 'evening' | 'withMeal';
+export type UserSubscriptionPlan = 'monthly' | 'annual';
 
 export interface IUserSupplement {
   supplementId: string;
@@ -105,6 +106,16 @@ export interface IUser {
   aiUsageResetDate: Date;
   /** Flag de assinatura Pro; usuários Pro terão limite ilimitado no Pulse AI. */
   isPro: boolean;
+  /** ID unico da assinatura ativa no provedor de pagamentos. */
+  subscriptionId?: string;
+  /** Tipo do plano contratado no momento. */
+  subscriptionPlan?: UserSubscriptionPlan;
+  /** Momento em que a assinatura atual perde validade. */
+  subscriptionExpiresAt?: Date;
+  /** ID do usuario no sistema externo de pagamentos. */
+  revenueCatCustomerId?: string;
+  /** Momento em que o cancelamento da renovacao automatica foi detectado. */
+  subscriptionCancelRequestedAt?: Date;
   isActive: boolean;
   /**
    * Timestamp da última troca de senha via fluxo de reset.
@@ -141,6 +152,8 @@ const supplementTimingValues = [
   'evening',
   'withMeal',
 ] as const satisfies readonly SupplementTiming[];
+
+const userSubscriptionPlanValues = ['monthly', 'annual'] as const satisfies readonly UserSubscriptionPlan[];
 
 const userSupplementSchema = new mongoose.Schema<IUserSupplement>(
   {
@@ -468,6 +481,29 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     isPro: {
       type: Boolean,
       default: false,
+    },
+    subscriptionId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    subscriptionPlan: {
+      type: String,
+      required: false,
+      enum: userSubscriptionPlanValues,
+    },
+    subscriptionExpiresAt: {
+      type: Date,
+      required: false,
+    },
+    revenueCatCustomerId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    subscriptionCancelRequestedAt: {
+      type: Date,
+      required: false,
     },
     isActive: {
       type: Boolean,

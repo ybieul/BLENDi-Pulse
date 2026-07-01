@@ -39,6 +39,16 @@ const requiredApiKey = (name: string) =>
       .min(10, `${name} deve ter pelo menos 10 caracteres`)
   );
 
+const optionalString = () =>
+  z.preprocess(value => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }, z.string().optional());
+
 const envSchema = z.object({
   // Servidor
   PORT: z
@@ -103,6 +113,11 @@ const envSchema = z.object({
   VISION_PROVIDER: providerEnum('VISION_PROVIDER'),
   VISION_MODEL: requiredString('VISION_MODEL'),
   VISION_API_KEY: requiredApiKey('VISION_API_KEY'),
+
+  // RevenueCat
+  REVENUECAT_API_KEY: optionalString(),
+  REVENUECAT_WEBHOOK_SECRET: optionalString(),
+  REVENUECAT_APP_ID: optionalString(),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo
@@ -120,6 +135,14 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+export const paymentsConfig = {
+  isConfigured: Boolean(
+    env.REVENUECAT_API_KEY &&
+      env.REVENUECAT_WEBHOOK_SECRET &&
+      env.REVENUECAT_APP_ID
+  ),
+} as const;
 
 // Tipos inferidos
 export type Env = typeof env;

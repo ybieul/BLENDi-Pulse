@@ -44,6 +44,7 @@ import {
   updatePushToken,
   type NotificationData,
 } from './src/services/notifications.service';
+import { initializePurchases } from './src/services/purchase.service';
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
 
 // Fontes da marca — carregadas antes de qualquer render
@@ -140,6 +141,8 @@ function AppShell() {
       // RootNavigator reage ao logout pelo store e troca automaticamente
       // para o fluxo público sem navegação imperativa aqui.
     });
+
+    void initializePurchases().catch(() => undefined);
 
     // Dispara imediatamente após a montagem, sem delay intermediário.
     void restoreSession();

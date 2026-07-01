@@ -35,9 +35,17 @@ export interface AuthUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget: number;
+  dailyHydrationTarget?: number;
+  isPro?: boolean;
+  subscriptionId?: string | null;
+  subscriptionPlan?: 'monthly' | 'annual' | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionCancelRequestedAt?: string | null;
+  revenueCatCustomerId?: string | null;
   longestStreak: number;
   totalXP?: number;
   createdAt: string;
+  updatedAt?: string;
   notificationPreferences?: {
     dailyPulse: boolean;
     streakReminder: boolean;

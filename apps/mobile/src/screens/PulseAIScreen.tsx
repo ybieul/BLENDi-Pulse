@@ -165,7 +165,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   const clearPendingProtocol = usePulseAIStore((state) => state.clearPendingProtocol);
   const authUser = useAuthStore((state) => state.user);
   const userGoal = authUser?.goal ?? 'Wellness';
-  const isPro = (authUser?.blendiModel ?? 'Lite') !== 'Lite';
+  const isPro = authUser?.isPro ?? false;
   const isConnected = useNetworkStore((state) => state.isConnected);
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
@@ -255,6 +255,12 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (isPro) {
+      setUsageRemaining(null);
+    }
+  }, [isPro]);
 
   // ── Envio de mensagem ─────────────────────────────────────────────────────
   const handleSend = useCallback(

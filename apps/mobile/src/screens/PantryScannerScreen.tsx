@@ -13,10 +13,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Camera, CameraView } from 'expo-camera';
+import { Camera, CameraView, PermissionStatus } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
@@ -47,7 +48,11 @@ import {
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { showToast } from '../utils/toast.events';
-import type { AppTabParamList, PulseAIStackScreenProps } from '../navigation/types';
+import type {
+  AppTabParamList,
+  PulseAIStackScreenProps,
+  RootStackParamList,
+} from '../navigation/types';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -91,8 +96,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const { favorites } = useFavorites();
-  const blendiModel = useAuthStore((state) => state.user?.blendiModel ?? 'Lite');
-  const isFreeTier = blendiModel === 'Lite';
+  const isPro = useAuthStore((state) => state.user?.isPro ?? false);
+  const isFreeTier = !isPro;
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('permission');
@@ -113,12 +118,21 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
   // ── Check permission on mount ──────────────────────────────────────────────
   useEffect(() => {
-    Camera.getCameraPermissionsAsync().then(({ status }) => {
-      if (status === 'granted') {
-        setStep('capture');
-      }
-    });
+    void Camera.getCameraPermissionsAsync()
+      .then(({ status }) => {
+        if (status === PermissionStatus.GRANTED) {
+          setStep('capture');
+        }
+      })
+      .catch(() => undefined);
   }, []);
+
+  const handleUpgradePress = useCallback(() => {
+    navigation
+      .getParent()
+      ?.getParent<NavigationProp<RootStackParamList>>()
+      ?.navigate('Upgrade');
+  }, [navigation]);
 
   // ── Analyzing: call API when step transitions to 'analyzing' ───────────────
   useEffect(() => {
@@ -179,6 +193,16 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           err instanceof PantryScannerServiceError
             ? t(err.translationKey as Parameters<typeof t>[0])
             : t('errors.network_internal_server_error');
+
+        if (
+          err instanceof PantryScannerServiceError
+          && err.apiCode?.trim().toLowerCase() === 'scanner/monthly-limit-reached'
+        ) {
+          setStep('capture');
+          handleUpgradePress();
+          return;
+        }
+
         setStep('capture');
         showToast(message);
       });
@@ -186,7 +210,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     return () => {
       cancelled = true;
     };
-  }, [queryClient, step, capturedBase64, t]);
+  }, [handleUpgradePress, queryClient, step, capturedBase64, t]);
 
   // ── Dismiss isGeneratingRecipes when recipes step is active ───────────────
   useEffect(() => {
@@ -237,7 +261,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleRequestPermission = useCallback(async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
-    if (status === 'granted') {
+    if (status === PermissionStatus.GRANTED) {
       setPermissionDenied(false);
       setStep('capture');
     } else {
@@ -337,7 +361,12 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
                 {t('pantryScanner.permissionDenied')}
               </Text>
             ) : (
-              <AuthButton onPress={handleRequestPermission} style={styles.permissionButton}>
+              <AuthButton
+                onPress={() => {
+                  void handleRequestPermission();
+                }}
+                style={styles.permissionButton}
+              >
                 {t('pantryScanner.grantPermission')}
               </AuthButton>
             )}
@@ -393,7 +422,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             {/* Gallery */}
             <Pressable
               accessibilityRole="button"
-              onPress={handleGallery}
+              onPress={() => {
+                void handleGallery();
+              }}
               style={styles.galleryButton}
             >
               <Ionicons name="images-outline" size={28} color={colors.text.primary} />
@@ -402,7 +433,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             {/* Capture */}
             <Pressable
               accessibilityRole="button"
-              onPress={handleCapture}
+              onPress={() => {
+                void handleCapture();
+              }}
               style={styles.captureButton}
             >
               <Ionicons name="camera" size={32} color={colors.text.primary} />

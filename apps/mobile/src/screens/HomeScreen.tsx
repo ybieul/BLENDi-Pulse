@@ -114,6 +114,7 @@ interface UserProfileData {
   streakDays: number;
   totalBlends: number;
   totalXP: number;
+  isPro: boolean;
 }
 
 interface UserProfileResponse {
@@ -290,7 +291,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const formattedDate = formatDate(new Date());
 
   // Pro se o modelo for ProPlus ou Steel; Free se for Lite ou indefinido
-  const isPro = (profile?.blendiModel ?? authUser?.blendiModel) !== 'Lite';
+  const isPro = profile?.isPro ?? authUser?.isPro ?? false;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 

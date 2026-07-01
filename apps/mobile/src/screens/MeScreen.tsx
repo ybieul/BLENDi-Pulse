@@ -46,12 +46,14 @@ import {
 
 import { api } from "../config/api";
 import { CACHE_CONFIG, QUERY_KEYS } from "../config/cache.config";
+import { PRICING_CONFIG } from "../config/pricing.config";
 import { createAppStorage } from "../config/storage";
 import { useAppTranslation } from "../hooks/useAppTranslation";
 import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
 import { useGamificationStore } from "../store/gamification.store";
 import type { SupportedLocale } from "../locales/i18n";
+import type { AppTabScreenProps, RootNavigationProp } from "../navigation/types";
 
 import { AuroraBackground } from "../components/ui/AuroraBackground";
 import { AuthButton } from "../components/ui";
@@ -69,7 +71,9 @@ import {
   useNotificationPreferences,
   type NotificationPrefKey,
 } from "../hooks/useNotificationPreferences";
+import { usePulseProPurchase } from "../hooks/usePulseProPurchase";
 import { DailyPulseTimeSheet } from "../components/me/DailyPulseTimeSheet";
+import { formatUsdCurrency } from "../utils/pricing.utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -253,7 +257,7 @@ function formatMemberSince(createdAt: string, locale: string): string {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function MeScreen() {
+export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const insets = useSafeAreaInsets();
   const { t, locale, changeLocale } = useAppTranslation();
   const authUser = useAuthStore((state) => state.user);
@@ -261,6 +265,7 @@ export function MeScreen() {
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const queryClient = useQueryClient();
   const { displayVolume } = useUnits();
+  const { isBusy: isPurchaseBusy, restoreProAccess } = usePulseProPurchase();
   const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
   const totalXP = useGamificationStore((state) => state.totalXP);
   const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
@@ -280,27 +285,32 @@ export function MeScreen() {
     useNotificationPreferences();
 
   const notificationPreferenceRows = useMemo(
-    () => [
+    (): Array<{
+      key: NotificationPrefKey;
+      label: string;
+      description: string;
+      value: boolean;
+    }> => [
       {
-        key: "dailyPulse" as NotificationPrefKey,
+        key: "dailyPulse",
         label: t("me.notifications.dailyPulse"),
         description: t("me.notifications.dailyPulseDesc"),
         value: preferences.dailyPulse,
       },
       {
-        key: "streakReminder" as NotificationPrefKey,
+        key: "streakReminder",
         label: t("me.notifications.streakReminder"),
         description: t("me.notifications.streakReminderDesc"),
         value: preferences.streakReminder,
       },
       {
-        key: "supplementReminder" as NotificationPrefKey,
+        key: "supplementReminder",
         label: t("me.notifications.supplementReminder"),
         description: t("me.notifications.supplementReminderDesc"),
         value: preferences.supplementReminder,
       },
       {
-        key: "hydrationReminder" as NotificationPrefKey,
+        key: "hydrationReminder",
         label: t("me.notifications.hydrationReminder"),
         description: t("me.notifications.hydrationReminderDesc"),
         value: preferences.hydrationReminder,
@@ -344,7 +354,7 @@ export function MeScreen() {
 
   // isPro: campo direto da API (Part 2) ou derivado do modelo local
   const isPro: boolean =
-    profile?.isPro ?? authUser?.blendiModel !== "Lite";
+    profile?.isPro ?? authUser?.isPro ?? false;
 
   const createdAt = profile?.createdAt ?? authUser?.createdAt ?? "";
 
@@ -352,6 +362,13 @@ export function MeScreen() {
     if (!createdAt) return "";
     return formatMemberSince(createdAt, locale);
   }, [createdAt, locale]);
+
+  const upgradePriceSummary = useMemo(() => {
+    return t("me.upgrade.price", {
+      monthlyPrice: formatUsdCurrency(locale, PRICING_CONFIG.PRO_MONTHLY_PRICE_USD),
+      annualPrice: formatUsdCurrency(locale, PRICING_CONFIG.PRO_ANNUAL_PRICE_USD),
+    });
+  }, [locale, t]);
 
   const initials = useMemo(() => {
     return displayName
@@ -827,19 +844,28 @@ export function MeScreen() {
               ))}
 
               <Text style={styles.upgradePrice}>
-                {t("me.upgrade.price")}
+                {upgradePriceSummary}
               </Text>
 
               <AuthButton
+                loading={false}
                 onPress={() => {
-                  Alert.alert(
-                    t("me.upgrade.soonTitle"),
-                    t("me.upgrade.soonMessage"),
-                  );
+                  navigation.getParent<RootNavigationProp<"Upgrade">>()?.navigate("Upgrade");
                 }}
               >
                 {t("me.upgrade.button")}
               </AuthButton>
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={isPurchaseBusy}
+                onPress={() => {
+                  void restoreProAccess();
+                }}
+                style={styles.restoreButton}
+              >
+                <Text style={styles.restoreButtonText}>{t("common.actions.restore")}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -1200,6 +1226,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 13,
     opacity: PRICE_OPACITY,
+  },
+  restoreButton: {
+    alignSelf: "center",
+    paddingTop: 2,
+    paddingBottom: 4,
+    paddingHorizontal: 8,
+  },
+  restoreButtonText: {
+    color: colors.brand.pulse,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.medium,
   },
 
   // ── Pro card

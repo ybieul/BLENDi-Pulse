@@ -17,6 +17,7 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
+      "bundleIdentifier": "com.blendiblender.pulse",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
@@ -24,6 +25,7 @@
       }
     },
     "android": {
+      "package": "com.blendiblender.pulse",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#2b1429"

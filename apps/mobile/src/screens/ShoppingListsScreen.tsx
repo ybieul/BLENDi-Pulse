@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { NavigationProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ShoppingListSummary, UpdateShoppingListInput } from '@blendi/shared';
 import {
@@ -52,7 +53,7 @@ import {
   ShoppingListServiceError,
   type ShoppingListsResult,
 } from '../services/shoppingList.service';
-import type { TrackStackScreenProps } from '../navigation/types';
+import type { RootStackParamList, TrackStackScreenProps } from '../navigation/types';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton, AuthInput } from '../components/ui';
 import { showToast } from '../utils/toast.utils';
@@ -67,15 +68,11 @@ const SHEET_RADIUS = 24;
 const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
 const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
 const BACKDROP_COLOR = 'rgba(0,0,0,0.55)';
-const UPGRADE_CARD_BG = 'rgba(154,72,147,0.12)';
-const UPGRADE_CARD_BORDER = 'rgba(154,72,147,0.35)';
 const ARCHIVED_OPACITY = 0.65;
 const SKELETON_BG = 'rgba(255,255,255,0.05)';
 const ARCHIVED_TOGGLE_BORDER = 'rgba(255,255,255,0.08)';
-const UPGRADE_DIVIDER_BG = 'rgba(154,72,147,0.20)';
 const UPDATED_AT_OPACITY = 0.55;
 const CHEVRON_COLOR = 'rgba(255,255,255,0.45)';
-const PRICE_OPACITY = 0.60;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -346,130 +343,6 @@ function ListNameSheet({
   );
 }
 
-// ─── UpgradeSheet ─────────────────────────────────────────────────────────────
-
-interface UpgradeSheetProps {
-  visible: boolean;
-  onClose: () => void;
-}
-
-function UpgradeSheet({ visible, onClose }: UpgradeSheetProps) {
-  const { t } = useAppTranslation();
-  const { height } = useWindowDimensions();
-
-  const translateY = useRef(new Animated.Value(height)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const [isMounted, setIsMounted] = useState(visible);
-
-  useEffect(() => {
-    translateY.setValue(height);
-  }, [height, translateY]);
-
-  useEffect(() => {
-    if (visible) {
-      setIsMounted(true);
-
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          stiffness: 220,
-          damping: 26,
-          mass: 0.9,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      return undefined;
-    }
-
-    const animation = Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: height,
-        duration: 220,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-
-    animation.start(({ finished }) => {
-      if (finished) {
-        setIsMounted(false);
-      }
-    });
-
-    return () => {
-      animation.stop();
-    };
-  }, [backdropOpacity, height, translateY, visible]);
-
-  if (!isMounted) {
-    return null;
-  }
-
-  return (
-    <Modal animationType="none" statusBarTranslucent transparent visible={isMounted}>
-      <View style={styles.sheetModalRoot}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onClose}
-          style={StyleSheet.absoluteFillObject}
-        >
-          <Animated.View style={[styles.sheetBackdrop, { opacity: backdropOpacity }]} />
-        </Pressable>
-
-        <Animated.View style={[styles.sheetContainer, { transform: [{ translateY }] }]}>
-          <View style={styles.sheetHandle} />
-
-          <View style={styles.upgradeCard}>
-            <Text style={styles.upgradeCardTitle}>
-              {t('shoppingList.upgradeTitle')}
-            </Text>
-            <Text style={styles.upgradeCardDescription}>
-              {t('shoppingList.freeTierLimit')}
-            </Text>
-
-            <View style={styles.upgradeDivider} />
-
-            {(['benefit1', 'benefit2', 'benefit3'] as const).map((key) => (
-              <View key={key} style={styles.upgradeBenefitRow}>
-                <Ionicons color={colors.brand.pulse} name="checkmark-circle" size={16} />
-                <Text style={styles.upgradeBenefitText}>
-                  {t(`me.upgrade.${key}`)}
-                </Text>
-              </View>
-            ))}
-
-            <Text style={styles.upgradePrice}>{t('me.upgrade.price')}</Text>
-
-            <AuthButton
-              onPress={() => {
-                Alert.alert(
-                  t('me.upgrade.soonTitle'),
-                  t('me.upgrade.soonMessage'),
-                );
-              }}
-            >
-              {t('me.upgrade.button')}
-            </AuthButton>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-}
-
 // ─── ShoppingListsScreen ──────────────────────────────────────────────────────
 
 export function ShoppingListsScreen({
@@ -484,7 +357,6 @@ export function ShoppingListsScreen({
 
   const [createSheetVisible, setCreateSheetVisible] = useState(false);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
-  const [upgradeSheetVisible, setUpgradeSheetVisible] = useState(false);
   const [isArchivedExpanded, setIsArchivedExpanded] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
@@ -527,6 +399,13 @@ export function ShoppingListsScreen({
   const canCreateMore = shoppingListsData?.canCreateMore ?? true;
   const archivedLists = useMemo(() => archivedData ?? [], [archivedData]);
 
+  const navigateToUpgrade = useCallback(() => {
+    navigation
+      .getParent()
+      ?.getParent<NavigationProp<RootStackParamList>>()
+      ?.navigate('Upgrade');
+  }, [navigation]);
+
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const { mutate: mutateCreate, isPending: isCreating } = useMutation({
@@ -543,7 +422,7 @@ export function ShoppingListsScreen({
       if (error instanceof ShoppingListServiceError) {
         if (error.upgradeRequired) {
           setCreateSheetVisible(false);
-          setUpgradeSheetVisible(true);
+          navigateToUpgrade();
           return;
         }
         showToast(t(error.translationKey));
@@ -563,7 +442,7 @@ export function ShoppingListsScreen({
     },
     onError: (error: unknown) => {
       if (error instanceof ShoppingListServiceError && error.upgradeRequired) {
-        setUpgradeSheetVisible(true);
+        navigateToUpgrade();
         return;
       }
       showToast(t('common.states.error'));
@@ -585,11 +464,11 @@ export function ShoppingListsScreen({
 
   const handlePressAdd = useCallback(() => {
     if (!canCreateMore) {
-      setUpgradeSheetVisible(true);
+      navigateToUpgrade();
       return;
     }
     setCreateSheetVisible(true);
-  }, [canCreateMore]);
+  }, [canCreateMore, navigateToUpgrade]);
 
   const handlePressCard = useCallback(
     (list: ShoppingListSummary) => {
@@ -899,10 +778,6 @@ export function ShoppingListsScreen({
         visible={nameSheetVisible}
       />
 
-      <UpgradeSheet
-        onClose={() => setUpgradeSheetVisible(false)}
-        visible={upgradeSheetVisible}
-      />
     </View>
   );
 }
@@ -1132,47 +1007,4 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
 
-  // Upgrade sheet card
-  upgradeCard: {
-    backgroundColor: UPGRADE_CARD_BG,
-    borderWidth: 1,
-    borderColor: UPGRADE_CARD_BORDER,
-    borderRadius: borderRadius.lg,
-    padding: spacing['2xl'],
-    gap: 12,
-  },
-  upgradeCardTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  upgradeCardDescription: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    lineHeight: 20,
-  },
-  upgradeDivider: {
-    height: 1,
-    backgroundColor: UPGRADE_DIVIDER_BG,
-    marginVertical: spacing.xs,
-  },
-  upgradeBenefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  upgradeBenefitText: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  upgradePrice: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    opacity: PRICE_OPACITY,
-  },
 });
