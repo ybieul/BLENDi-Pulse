@@ -24,6 +24,8 @@ export interface AuthUser {
   email: string;
   name: string;
   profilePhoto?: string;
+  hasProfilePhoto?: boolean;
+  profilePhotoUpdatedAt?: string | null;
   lastCleanedAt?: string | null;
   pushToken?: string | null;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';

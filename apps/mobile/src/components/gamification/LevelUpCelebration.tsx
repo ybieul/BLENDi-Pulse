@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Pressable,
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
@@ -14,8 +15,14 @@ import {
   fontWeights,
 } from '@blendi/shared';
 
+import { useAuthStore } from '../../store/auth.store';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
-import { useGamificationStore } from '../../store/gamification.store';
+import { type LevelUpData, useGamificationStore } from '../../store/gamification.store';
+import { generateAndShare } from '../../utils/shareCard.utils';
+import {
+  AchievementShareCard,
+  type AchievementShareCardHandle,
+} from '../shareCards/AchievementShareCard';
 
 const PARTICLE_COUNT = 15;
 const PARTICLE_DISTANCE_Y = -120;
@@ -25,6 +32,7 @@ const PARTICLE_STAGGER = 30;
 const SETTLE_DELAY = 100;
 const PARTICLE_START_DELAY = 150;
 const AUTO_CLOSE_DELAY = 3000;
+const SHARE_START_DELAY = 300;
 const OVERLAY_COLOR = 'rgba(0,0,0,0.84)';
 const CARD_BACKGROUND_COLOR = 'rgba(28,12,26,0.98)';
 const CARD_BORDER_COLOR = 'rgba(211,120,203,0.92)';
@@ -59,12 +67,14 @@ function getParticleColor(index: number): string {
 
 export function LevelUpCelebration() {
   const { t } = useAppTranslation();
+  const authUser = useAuthStore((state) => state.user);
   const levelUpData = useGamificationStore((state) => state.levelUpData);
   const dismissLevelUp = useGamificationStore((state) => state.dismissLevelUp);
 
   const overlayOpacity = useRef(new Animated.Value(0));
   const cardScale = useRef(new Animated.Value(0));
   const cardOpacity = useRef(new Animated.Value(0));
+  const shareCardRef = useRef<AchievementShareCardHandle | null>(null);
   const particles = useRef(
     Array.from({ length: PARTICLE_COUNT }, () => createParticleAnimationValues())
   );
@@ -73,9 +83,13 @@ export function LevelUpCelebration() {
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const particlesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosingRef = useRef(false);
+  const isShareQueuedRef = useRef(false);
+  const closeCompletionActionRef = useRef<(() => void) | null>(null);
+  const [pendingShareData, setPendingShareData] = useState<LevelUpData | null>(null);
 
-  const clearTimers = useCallback(() => {
+  const clearOverlayTimers = useCallback(() => {
     if (settleTimeoutRef.current) {
       clearTimeout(settleTimeoutRef.current);
       settleTimeoutRef.current = null;
@@ -89,6 +103,14 @@ export function LevelUpCelebration() {
     if (autoCloseTimeoutRef.current) {
       clearTimeout(autoCloseTimeoutRef.current);
       autoCloseTimeoutRef.current = null;
+    }
+
+  }, []);
+
+  const clearShareTimer = useCallback(() => {
+    if (shareTimeoutRef.current) {
+      clearTimeout(shareTimeoutRef.current);
+      shareTimeoutRef.current = null;
     }
   }, []);
 
@@ -133,15 +155,19 @@ export function LevelUpCelebration() {
     resetAnimatedValues();
     isClosingRef.current = false;
     dismissLevelUp();
+    const completionAction = closeCompletionActionRef.current;
+    closeCompletionActionRef.current = null;
+    completionAction?.();
   }, [dismissLevelUp, resetAnimatedValues, stopAnimations]);
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback((onComplete?: () => void) => {
     if (levelUpData === null || isClosingRef.current) {
       return;
     }
 
     isClosingRef.current = true;
-    clearTimers();
+    closeCompletionActionRef.current = onComplete ?? null;
+    clearOverlayTimers();
     stopAnimations();
 
     startTrackedAnimation(
@@ -163,23 +189,54 @@ export function LevelUpCelebration() {
           return;
         }
 
+        closeCompletionActionRef.current = null;
         isClosingRef.current = false;
         resetAnimatedValues();
       }
     );
-  }, [clearTimers, finishClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+  }, [clearOverlayTimers, finishClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+
+  const handleShareMoment = useCallback(() => {
+    if (levelUpData === null || isClosingRef.current) {
+      return;
+    }
+
+    isShareQueuedRef.current = true;
+    setPendingShareData({
+      newLevel: levelUpData.newLevel,
+      newLevelNameKey: levelUpData.newLevelNameKey,
+    });
+
+    handleClose(() => {
+      shareTimeoutRef.current = setTimeout(() => {
+        shareTimeoutRef.current = null;
+
+        void (async () => {
+          await generateAndShare(shareCardRef);
+          isShareQueuedRef.current = false;
+          setPendingShareData(null);
+        })();
+      }, SHARE_START_DELAY);
+    });
+  }, [handleClose, levelUpData]);
 
   useEffect(() => {
     if (levelUpData === null) {
-      clearTimers();
+      clearOverlayTimers();
       stopAnimations();
       resetAnimatedValues();
       isClosingRef.current = false;
+
+      if (!isShareQueuedRef.current && closeCompletionActionRef.current === null) {
+        clearShareTimer();
+        setPendingShareData(null);
+      }
+
       return undefined;
     }
 
     isClosingRef.current = false;
-    clearTimers();
+    clearOverlayTimers();
     stopAnimations();
     resetAnimatedValues();
 
@@ -272,57 +329,87 @@ export function LevelUpCelebration() {
     }, AUTO_CLOSE_DELAY);
 
     return () => {
-      clearTimers();
+      clearOverlayTimers();
+      if (!isShareQueuedRef.current) {
+        clearShareTimer();
+      }
       stopAnimations();
       isClosingRef.current = false;
     };
-  }, [clearTimers, handleClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+  }, [clearOverlayTimers, clearShareTimer, handleClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
 
-  if (levelUpData === null) {
+  if (levelUpData === null && pendingShareData === null) {
     return null;
   }
 
   return (
-    <TouchableWithoutFeedback onPress={handleClose}>
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.backdrop, { opacity: overlayOpacity.current }]} />
-        <View style={styles.centerContent}>
-          {particles.current.map((particle, index) => (
-            <Animated.View
-              key={`level-up-particle-${index}`}
-              style={[
-                styles.particle,
-                {
-                  backgroundColor: getParticleColor(index),
-                  opacity: particle.opacity,
-                  transform: [
-                    { translateY: particle.translateY },
-                    { translateX: particle.translateX },
-                    { scale: particle.scale },
-                  ],
-                },
-              ]}
-            />
-          ))}
+    <>
+      {levelUpData ? (
+        <TouchableWithoutFeedback onPress={() => handleClose()}>
+          <View style={styles.overlay}>
+            <Animated.View style={[styles.backdrop, { opacity: overlayOpacity.current }]} />
+            <View style={styles.centerContent}>
+              {particles.current.map((particle, index) => (
+                <Animated.View
+                  key={`level-up-particle-${index}`}
+                  style={[
+                    styles.particle,
+                    {
+                      backgroundColor: getParticleColor(index),
+                      opacity: particle.opacity,
+                      transform: [
+                        { translateY: particle.translateY },
+                        { translateX: particle.translateX },
+                        { scale: particle.scale },
+                      ],
+                    },
+                  ]}
+                />
+              ))}
 
-          <Animated.View
-            style={[
-              styles.card,
-              {
-                opacity: cardOpacity.current,
-                transform: [{ scale: cardScale.current }],
-              },
-            ]}
-          >
-            <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
-            <Text style={styles.levelName}>
-              {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
-            </Text>
-            <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
-          </Animated.View>
-        </View>
-      </View>
-    </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <Animated.View
+                  style={[
+                    styles.card,
+                    {
+                      opacity: cardOpacity.current,
+                      transform: [{ scale: cardScale.current }],
+                    },
+                  ]}
+                >
+                  <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
+                  <Text style={styles.levelName}>
+                    {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
+                  </Text>
+                  <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleShareMoment}
+                    style={styles.shareButton}
+                  >
+                    <Text style={styles.shareButtonText}>{t('share.shareMoment')}</Text>
+                  </Pressable>
+                </Animated.View>
+              </TouchableWithoutFeedback>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      ) : null}
+
+      {pendingShareData ? (
+        <AchievementShareCard
+          ref={shareCardRef}
+          level={pendingShareData.newLevel}
+          levelNameKey={pendingShareData.newLevelNameKey}
+          user={{
+            userId: authUser?.id,
+            name: authUser?.name ?? '',
+            hasProfilePhoto: authUser?.hasProfilePhoto ?? false,
+            profilePhotoUpdatedAt: authUser?.profilePhotoUpdatedAt ?? null,
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -390,6 +477,18 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.medium,
     textAlign: 'center',
     opacity: 0.92,
+  },
+  shareButton: {
+    marginTop: 18,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  shareButtonText: {
+    color: colors.brand.pulse,
+    fontFamily: fonts.body,
+    fontSize: 14,
+    fontWeight: fontWeights.medium,
+    textAlign: 'center',
   },
   particle: {
     position: 'absolute',

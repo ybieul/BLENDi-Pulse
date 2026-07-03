@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,8 +19,16 @@ import {
 } from '@blendi/shared';
 import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
+import { generateAndShare } from '../../utils/shareCard.utils';
 import { showToast } from '../../utils/toast.utils';
+import {
+  RecipeShareCard,
+  type RecipeShareCardHandle,
+  type ShareCardFormat,
+} from '../shareCards/RecipeShareCard';
+import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
@@ -39,6 +48,7 @@ const SUBSTITUTES_BORDER = 'rgba(245,158,11,0.15)';
 const TIP_BACKGROUND = 'rgba(59,130,246,0.08)';
 const TIP_BORDER = 'rgba(59,130,246,0.15)';
 const GHOST_BUTTON_BORDER = 'rgba(255,255,255,0.15)';
+const GHOST_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
 const CART_BUTTON_BACKGROUND = 'rgba(154,72,147,0.10)';
 const CART_BUTTON_BORDER = 'rgba(154,72,147,0.20)';
 const UNIT_OPACITY = 0.7;
@@ -97,13 +107,17 @@ export function RecipeCard({
   isFromCache = false,
 }: RecipeCardProps) {
   const { t } = useAppTranslation();
+  const authUser = useAuthStore((state) => state.user);
   const isConnected = useNetworkStore((state) => state.isConnected);
   const favoriteScale = useRef(new Animated.Value(HEART_SCALE_DEFAULT)).current;
+  const shareCardRef = useRef<RecipeShareCardHandle | null>(null);
   const addFavoriteMutation = useAddFavorite();
   const removeFavoriteMutation = useRemoveFavorite();
   const [optimisticIsFavorited, setOptimisticIsFavorited] = useState(isFavorited);
   const [optimisticFavoriteId, setOptimisticFavoriteId] = useState(favoriteId);
   const [isAddToListVisible, setIsAddToListVisible] = useState(false);
+  const [isShareFormatVisible, setIsShareFormatVisible] = useState(false);
+  const [pendingShareFormat, setPendingShareFormat] = useState<ShareCardFormat | null>(null);
 
   useEffect(() => {
     setOptimisticIsFavorited(isFavorited);
@@ -112,6 +126,23 @@ export function RecipeCard({
   useEffect(() => {
     setOptimisticFavoriteId(favoriteId);
   }, [favoriteId]);
+
+  useEffect(() => {
+    if (!pendingShareFormat) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        await generateAndShare(shareCardRef);
+        setPendingShareFormat(null);
+      })();
+    }, 240);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [pendingShareFormat]);
 
   const macroPills = useMemo<MacroPillData[]>(() => [
     {
@@ -217,7 +248,8 @@ export function RecipeCard({
   };
 
   return (
-    <View style={styles.card}>
+    <View style={styles.cardContainer}>
+      <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
           <View style={styles.badgePill}>
@@ -305,6 +337,16 @@ export function RecipeCard({
           <Ionicons color={colors.brand.pulse} name="cart-outline" size={18} />
         </Pressable>
 
+        <TouchableOpacity
+          accessibilityLabel={t('share.shareRecipe')}
+          accessibilityRole="button"
+          activeOpacity={0.82}
+          onPress={() => setIsShareFormatVisible(true)}
+          style={styles.shareButton}
+        >
+          <Ionicons color={colors.text.primary} name="share-outline" size={20} />
+        </TouchableOpacity>
+
         <Pressable
           accessibilityRole="button"
           onPress={handleFavoritePress}
@@ -315,16 +357,41 @@ export function RecipeCard({
         </Pressable>
       </View>
 
+      </View>
+
       <AddToListSheet
         ingredients={shoppingListIngredients}
         onClose={() => setIsAddToListVisible(false)}
         visible={isAddToListVisible}
       />
+
+      <ShareFormatSheet
+        onClose={() => setIsShareFormatVisible(false)}
+        onSelect={setPendingShareFormat}
+        visible={isShareFormatVisible}
+      />
+
+      {pendingShareFormat ? (
+        <RecipeShareCard
+          ref={shareCardRef}
+          format={pendingShareFormat}
+          recipe={recipe}
+          user={{
+            userId: authUser?.id,
+            name: authUser?.name ?? '',
+            hasProfilePhoto: authUser?.hasProfilePhoto ?? false,
+            profilePhotoUpdatedAt: authUser?.profilePhotoUpdatedAt ?? null,
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  cardContainer: {
+    position: 'relative',
+  },
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -512,6 +579,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: CART_BUTTON_BORDER,
     backgroundColor: CART_BUTTON_BACKGROUND,
+  },
+  shareButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: GHOST_BUTTON_BORDER,
+    backgroundColor: GHOST_BUTTON_BACKGROUND,
   },
   saveButton: {
     width: 92,

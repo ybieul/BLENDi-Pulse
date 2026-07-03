@@ -824,11 +824,30 @@
   "gamification": {
     "levelUpTitle": "Level Up! 🎉",
     "levelUpSubtitle": "You're on a roll!",
+    "shareCard": {
+      "cta": "Share this moment",
+      "unlocked": "Level unlocked"
+    },
     "xpToNextLevel": "{{xp}} XP to {{levelName}}",
     "currentXp": "{{xp}} XP total",
     "levelPrefix": "Lv.",
     "levelDetail": "Level {{level}}",
     "pendingLevelUp": "Internal documentation key for deferred level-up sequencing."
+  },
+
+  "share": {
+    "shareRecipe": "Share recipe",
+    "shareAchievement": "Share achievement",
+    "shareWeek": "Share my week",
+    "chooseFormat": "Choose format",
+    "formatStories": "Stories (9:16)",
+    "formatFeed": "Feed (1:1)",
+    "shareMoment": "Share this moment",
+    "sharingNotAvailable": "Sharing not available on this device.",
+    "shareError": "Error generating card. Please try again.",
+    "levelUnlocked": "Level unlocked",
+    "defaultUser": "BLENDi User",
+    "brandName": "BLENDi Pulse"
   },
 
   "levels": {
@@ -848,6 +867,21 @@
   "me": {
     "currentStreak": "Current Streak",
     "totalBlends": "Total Blends",
+    "profilePhotoTitle": "Profile photo",
+    "takePhoto": "Take photo",
+    "chooseFromGallery": "Choose from gallery",
+    "removePhoto": "Remove photo",
+    "removePhotoConfirm": "Remove your profile photo?",
+    "uploadingPhoto": "Uploading photo...",
+    "photoUpdated": "Photo updated!",
+    "photoRemoved": "Photo removed",
+    "photoTooLarge": "Photo too large. Try a smaller image.",
+    "photoError": "Error saving photo. Please try again.",
+    "weeklyShare": {
+      "averageDailyProtein": "Avg protein/day",
+      "supplementAdherence": "Supplement adherence",
+      "error": "We couldn't prepare your weekly share card right now."
+    },
     "longestStreak": "Best Streak",
     "level": "Level",
     "levelProgress": "Level Progress",

@@ -8,6 +8,7 @@ import {
   updateUserSchema,
 } from '@blendi/shared';
 import { UserModel } from '../models/User';
+import { UserPhotoModel } from '../models/UserPhoto';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -15,6 +16,7 @@ import {
 } from '../utils/error.utils';
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
+const MAX_PROFILE_PHOTO_BASE64_LENGTH = 530_000;
 
 const ASSUMED_AGE = 30;
 
@@ -88,6 +90,34 @@ const pushTokenSchema = z.object({
       'errors.validation.invalid_option'
     ),
 });
+const profilePhotoBodySchema = z.object({
+  imageBase64: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.required',
+    })
+    .trim()
+    .min(1, 'errors.validation.required'),
+  fileType: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.required',
+    })
+    .trim()
+    .transform(value => value.toLowerCase())
+    .pipe(z.enum(['jpeg', 'png'])),
+});
+
+type ProfilePhotoFileType = z.infer<typeof profilePhotoBodySchema>['fileType'];
+type UserPhotoProfileResponse = {
+  _id: unknown;
+  email: string;
+  name: string;
+  profilePhoto?: string | null;
+  hasProfilePhoto?: boolean | null;
+  profilePhotoUpdatedAt?: Date | null;
+  updatedAt?: Date | null;
+};
 
 function roundToOneDecimal(value: number): number {
   return Math.round(value * 10) / 10;
@@ -135,6 +165,22 @@ function sendUnauthorized(res: Response): void {
   });
 }
 
+function getProfilePhotoMimeType(fileType: ProfilePhotoFileType): string {
+  return fileType === 'png' ? 'image/png' : 'image/jpeg';
+}
+
+function buildUserPhotoProfileResponse(user: UserPhotoProfileResponse) {
+  return {
+    id: String(user._id),
+    email: user.email,
+    name: user.name,
+    profilePhoto: user.profilePhoto ?? null,
+    hasProfilePhoto: user.hasProfilePhoto ?? false,
+    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
+    updatedAt: user.updatedAt ?? null,
+  };
+}
+
 export async function getMe(
   req: Request,
   res: Response,
@@ -169,6 +215,8 @@ export async function getMe(
           name: user.name,
           email: user.email,
           profilePhoto: user.profilePhoto,
+          hasProfilePhoto: user.hasProfilePhoto ?? false,
+          profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
           blendiModel: user.blendiModel,
           goal: user.goal,
           preferredLanguage: user.locale,
@@ -199,6 +247,233 @@ export async function getMe(
           totalBlends: user.blendCount,
           lastCleanedAt: user.lastCleanedAt ?? null,
         },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadProfilePhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = profilePhotoBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
+      return;
+    }
+
+    if (parsed.data.imageBase64.length > MAX_PROFILE_PHOTO_BASE64_LENGTH) {
+      sendErrorResponse(res, {
+        statusCode: 413,
+        code: 'profilePhoto/file-too-large',
+        message: 'Profile photo exceeds the maximum allowed size.',
+      });
+      return;
+    }
+
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const session = await UserModel.db.startSession();
+    let user: UserPhotoProfileResponse | null = null;
+
+    try {
+      const operationTimestamp = new Date();
+
+      await session.withTransaction(async () => {
+        await UserPhotoModel.findOneAndUpdate(
+          { userId },
+          {
+            $set: {
+              imageBase64: parsed.data.imageBase64,
+              fileType: parsed.data.fileType,
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+            runValidators: true,
+            session,
+          }
+        ).lean();
+
+        user = await UserModel.findByIdAndUpdate(
+          userId,
+          {
+            $set: {
+              hasProfilePhoto: true,
+              profilePhotoUpdatedAt: operationTimestamp,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+            session,
+          }
+        ).lean<UserPhotoProfileResponse>();
+
+        if (!user) {
+          throw new Error('USER_NOT_FOUND');
+        }
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'USER_NOT_FOUND') {
+        sendErrorResponse(res, {
+          statusCode: 404,
+          code: 'resource/not-found',
+          message: 'User not found.',
+        });
+        return;
+      }
+
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: buildUserPhotoProfileResponse(user),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getMyProfilePhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findById(userId).select({ _id: 1 }).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    const profilePhoto = await UserPhotoModel.findOne({ userId })
+      .select({ imageBase64: 1, fileType: 1 })
+      .lean();
+
+    if (!profilePhoto) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'profilePhoto/not-found',
+        message: 'Profile photo not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        imageBase64: profilePhoto.imageBase64,
+        mimeType: getProfilePhotoMimeType(profilePhoto.fileType),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteProfilePhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const session = await UserModel.db.startSession();
+    let user: UserPhotoProfileResponse | null = null;
+
+    try {
+      const operationTimestamp = new Date();
+
+      await session.withTransaction(async () => {
+        await UserPhotoModel.deleteOne({ userId }, { session });
+
+        user = await UserModel.findByIdAndUpdate(
+          userId,
+          {
+            $set: {
+              hasProfilePhoto: false,
+              profilePhotoUpdatedAt: operationTimestamp,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+            session,
+          }
+        ).lean<UserPhotoProfileResponse>();
+
+        if (!user) {
+          throw new Error('USER_NOT_FOUND');
+        }
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'USER_NOT_FOUND') {
+        sendErrorResponse(res, {
+          statusCode: 404,
+          code: 'resource/not-found',
+          message: 'User not found.',
+        });
+        return;
+      }
+
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: buildUserPhotoProfileResponse(user),
       },
     });
   } catch (err) {

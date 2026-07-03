@@ -16,12 +16,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   Animated,
   Easing,
   FlatList,
   Image,
   Linking,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -34,6 +38,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import * as FileSystem from "expo-file-system";
+import {
+  SaveFormat,
+  manipulateAsync,
+} from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 
 import {
   borderRadius,
@@ -49,6 +59,7 @@ import { CACHE_CONFIG, QUERY_KEYS } from "../config/cache.config";
 import { PRICING_CONFIG } from "../config/pricing.config";
 import { createAppStorage } from "../config/storage";
 import { useAppTranslation } from "../hooks/useAppTranslation";
+import { buildHistoryRange } from "../utils/historyRange.utils";
 import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
 import { useGamificationStore } from "../store/gamification.store";
@@ -74,6 +85,19 @@ import {
 import { usePulseProPurchase } from "../hooks/usePulseProPurchase";
 import { DailyPulseTimeSheet } from "../components/me/DailyPulseTimeSheet";
 import { formatUsdCurrency } from "../utils/pricing.utils";
+import {
+  cacheProfilePhoto,
+  clearProfilePhotoCache,
+  ProfilePhoto,
+} from "../components/profile/ProfilePhoto";
+import {
+  WeeklyShareCard,
+  type WeeklyShareCardHandle,
+} from "../components/shareCards/WeeklyShareCard";
+import { getBlendHistory, type BlendHistoryData } from "../services/blendLog.service";
+import { getSupplementHistory, type SupplementHistoryData } from "../services/supplementLog.service";
+import { generateAndShare } from "../utils/shareCard.utils";
+import { showToast } from "../utils/toast.utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -88,7 +112,6 @@ const PLAN_BADGE_FREE_BG = "rgba(255,255,255,0.08)";
 const PLAN_BADGE_FREE_BORDER = "rgba(255,255,255,0.12)";
 const PLAN_BADGE_PRO_BG = "rgba(154,72,147,0.25)";
 const PLAN_BADGE_PRO_BORDER = "rgba(154,72,147,0.40)";
-const INITIALS_BG = "rgba(154,72,147,0.30)";
 const UPGRADE_CARD_BG = "rgba(154,72,147,0.12)";
 const UPGRADE_CARD_BORDER = "rgba(154,72,147,0.35)";
 const LONGEST_STREAK_COLOR = "rgba(245,158,11,0.90)";
@@ -98,6 +121,19 @@ const LABEL_OPACITY = 0.55;
 const VERSION_OPACITY = 0.35;
 const PRICE_OPACITY = 0.60;
 const TERMS_OPACITY = 0.45;
+const PROFILE_PHOTO_SIZE = 80;
+const PROFILE_PHOTO_CAMERA_BADGE_SIZE = 28;
+const PROFILE_PHOTO_CAMERA_ICON_SIZE = 14;
+const PROFILE_PHOTO_MAX_DIMENSION = 400;
+const PROFILE_PHOTO_COMPRESSION = 0.7;
+const PROFILE_PHOTO_MAX_FILE_BYTES = 300 * 1024;
+const PROFILE_PHOTO_FILE_TYPE = "jpeg" as const;
+const PROFILE_PHOTO_MIME_TYPE = "image/jpeg";
+const HEADER_ACTION_BACKGROUND = "rgba(255,255,255,0.06)";
+const HEADER_ACTION_BORDER = "rgba(255,255,255,0.12)";
+const HEADER_ACTION_ICON_COLOR = "rgba(255,255,255,0.92)";
+const PROFILE_PHOTO_LOADING_OVERLAY = "rgba(43,20,41,0.28)";
+const WEEKLY_SHARE_DELAY = 240;
 
 const ONBOARDING_KEY = "onboarding_completed";
 
@@ -197,6 +233,8 @@ interface UserProfileData {
   dailyCalorieTarget: number;
   dailyHydrationTarget: number;
   profilePhoto?: string;
+  hasProfilePhoto?: boolean;
+  profilePhotoUpdatedAt?: string | null;
   currentStreak: number;
   longestStreak: number;
   blendCount: number;
@@ -205,11 +243,55 @@ interface UserProfileData {
   createdAt: string;
 }
 
+interface LocalImageSize {
+  width: number;
+  height: number;
+}
+
+interface ProfilePhotoMutationUser {
+  id: string;
+  email: string;
+  name: string;
+  hasProfilePhoto: boolean;
+  profilePhotoUpdatedAt?: string | null;
+}
+
+interface ProfilePhotoMutationResponse {
+  success: true;
+  data: {
+    user: ProfilePhotoMutationUser;
+  };
+}
+
+interface ProfilePhotoActionCopy {
+  title: string;
+  takePhoto: string;
+  chooseFromGallery: string;
+  removePhoto: string;
+  removePhotoConfirm: string;
+  uploadingPhoto: string;
+  photoUpdated: string;
+  photoRemoved: string;
+  photoTooLarge: string;
+  photoError: string;
+  cameraPermissionDenied: string;
+  galleryPermissionDenied: string;
+}
+
 interface UserProfileResponse {
   success: true;
   data: {
     user: UserProfileData;
   };
+}
+
+interface WeeklySharePayload {
+  weekStart: string;
+  weekEnd: string;
+  totalBlends: number;
+  averageDailyProtein: number;
+  currentStreak: number;
+  supplementAdherenceRate: number;
 }
 
 // ─── Translation key type ─────────────────────────────────────────────────────
@@ -255,6 +337,127 @@ function formatMemberSince(createdAt: string, locale: string): string {
   });
 }
 
+function getLocalDateKey(value: Date | string, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(new Date(value));
+}
+
+function getImageSize(uri: string): Promise<LocalImageSize> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => {
+        resolve({ width, height });
+      },
+      (error) => {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
+function getResizeDimensions({ width, height }: LocalImageSize): LocalImageSize {
+  const largestDimension = Math.max(width, height);
+
+  if (largestDimension <= PROFILE_PHOTO_MAX_DIMENSION) {
+    return { width, height };
+  }
+
+  const scale = PROFILE_PHOTO_MAX_DIMENSION / largestDimension;
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+async function processProfilePhoto(uri: string): Promise<{
+  previewUri: string;
+  imageBase64: string;
+}> {
+  const imageSize = await getImageSize(uri);
+  const targetSize = getResizeDimensions(imageSize);
+  const manipulatedImage = await manipulateAsync(
+    uri,
+    [
+      {
+        resize: {
+          width: targetSize.width,
+          height: targetSize.height,
+        },
+      },
+    ],
+    {
+      compress: PROFILE_PHOTO_COMPRESSION,
+      format: SaveFormat.JPEG,
+    },
+  );
+
+  const fileInfo = await FileSystem.getInfoAsync(manipulatedImage.uri, { size: true });
+
+  if (fileInfo.exists && typeof fileInfo.size === "number" && fileInfo.size > PROFILE_PHOTO_MAX_FILE_BYTES) {
+    throw new Error("PROFILE_PHOTO_TOO_LARGE");
+  }
+
+  const imageBase64 = (
+    await FileSystem.readAsStringAsync(manipulatedImage.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    })
+  ).trim();
+
+  if (!imageBase64) {
+    throw new Error("PROFILE_PHOTO_EMPTY_BASE64");
+  }
+
+  return {
+    previewUri: manipulatedImage.uri,
+    imageBase64,
+  };
+}
+
+function getProfilePhotoActionCopy(
+  t: ReturnType<typeof useAppTranslation>["t"],
+  locale: string,
+): ProfilePhotoActionCopy {
+  if (locale === "pt-BR") {
+    return {
+      title: t("me.profilePhotoTitle"),
+      takePhoto: t("me.takePhoto"),
+      chooseFromGallery: t("me.chooseFromGallery"),
+      removePhoto: t("me.removePhoto"),
+      removePhotoConfirm: t("me.removePhotoConfirm"),
+      uploadingPhoto: t("me.uploadingPhoto"),
+      photoUpdated: t("me.photoUpdated"),
+      photoRemoved: t("me.photoRemoved"),
+      photoTooLarge: t("me.photoTooLarge"),
+      photoError: t("me.photoError"),
+      cameraPermissionDenied: "Permita o acesso à câmera para tirar uma foto.",
+      galleryPermissionDenied: "Permita o acesso à galeria para escolher uma foto.",
+    };
+  }
+
+  return {
+    title: t("me.profilePhotoTitle"),
+    takePhoto: t("me.takePhoto"),
+    chooseFromGallery: t("me.chooseFromGallery"),
+    removePhoto: t("me.removePhoto"),
+    removePhotoConfirm: t("me.removePhotoConfirm"),
+    uploadingPhoto: t("me.uploadingPhoto"),
+    photoUpdated: t("me.photoUpdated"),
+    photoRemoved: t("me.photoRemoved"),
+    photoTooLarge: t("me.photoTooLarge"),
+    photoError: t("me.photoError"),
+    cameraPermissionDenied: "Allow camera access to take a photo.",
+    galleryPermissionDenied: "Allow photo library access to choose a photo.",
+  };
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
@@ -280,6 +483,11 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const [editingType, setEditingType] = useState<EditSettingType | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<UserBadge | null>(null);
   const [editingTime, setEditingTime] = useState(false);
+  const [profilePhotoPreviewUri, setProfilePhotoPreviewUri] = useState<string | null>(null);
+  const [isProfilePhotoLoading, setIsProfilePhotoLoading] = useState(false);
+  const [isWeeklyShareLoading, setIsWeeklyShareLoading] = useState(false);
+  const [pendingWeeklyShare, setPendingWeeklyShare] = useState<WeeklySharePayload | null>(null);
+  const weeklyShareCardRef = useRef<WeeklyShareCardHandle | null>(null);
 
   const { preferences, dailyPulseTime, togglePreference, updateDailyPulseTime } =
     useNotificationPreferences();
@@ -341,6 +549,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
+  const profilePhotoActionCopy = useMemo(() => getProfilePhotoActionCopy(t, locale), [locale, t]);
+  const displayUserId = authUser?.id ?? profile?.id ?? null;
   const displayName = profile?.name ?? authUser?.name ?? "";
   const displayEmail = profile?.email ?? authUser?.email ?? "";
   const displayModel: BlendiModel =
@@ -351,17 +561,37 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     (profile?.unitSystem ?? authUser?.unitSystem) ?? "metric";
   const displayLanguage =
     profile?.preferredLanguage ?? authUser?.locale ?? "en";
+  const historyTimezone = profile?.timezone ?? authUser?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // isPro: campo direto da API (Part 2) ou derivado do modelo local
   const isPro: boolean =
     profile?.isPro ?? authUser?.isPro ?? false;
 
   const createdAt = profile?.createdAt ?? authUser?.createdAt ?? "";
+  const displayHasProfilePhoto = authUser?.hasProfilePhoto ?? profile?.hasProfilePhoto ?? false;
+  const displayProfilePhotoUpdatedAt =
+    authUser?.profilePhotoUpdatedAt ?? profile?.profilePhotoUpdatedAt ?? null;
 
   const memberSinceStr = useMemo(() => {
     if (!createdAt) return "";
     return formatMemberSince(createdAt, locale);
   }, [createdAt, locale]);
+  const weeklyHistoryRange = useMemo(() => buildHistoryRange(7, historyTimezone), [historyTimezone]);
+  const canShareWeekly = useMemo(() => {
+    if (!createdAt) {
+      return false;
+    }
+
+    return getLocalDateKey(createdAt, historyTimezone) <= getLocalDateKey(weeklyHistoryRange.from, historyTimezone);
+  }, [createdAt, historyTimezone, weeklyHistoryRange.from]);
+  const weeklyBlendQueryKey = useMemo(
+    () => [...QUERY_KEYS.blendHistory, historyTimezone, 7] as const,
+    [historyTimezone],
+  );
+  const weeklySupplementQueryKey = useMemo(
+    () => [...QUERY_KEYS.supplementHistory, historyTimezone, 7] as const,
+    [historyTimezone],
+  );
 
   const upgradePriceSummary = useMemo(() => {
     return t("me.upgrade.price", {
@@ -369,15 +599,6 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       annualPrice: formatUsdCurrency(locale, PRICING_CONFIG.PRO_ANNUAL_PRICE_USD),
     });
   }, [locale, t]);
-
-  const initials = useMemo(() => {
-    return displayName
-      .split(" ")
-      .map((w) => w[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join("");
-  }, [displayName]);
 
   const userBadges = useMemo(() => {
     return calculateUserBadges({
@@ -401,6 +622,24 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       animation.stop();
     };
   }, [levelInfo.progress, levelProgressAnim]);
+
+  useEffect(() => {
+    if (!pendingWeeklyShare) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        await generateAndShare(weeklyShareCardRef);
+        setPendingWeeklyShare(null);
+        setIsWeeklyShareLoading(false);
+      })();
+    }, WEEKLY_SHARE_DELAY);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [pendingWeeklyShare]);
 
   const languageDisplayName = t(getLanguageKey(displayLanguage));
 
@@ -508,6 +747,221 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     [editingType, queryClient, updateUserProfile, changeLocale],
   );
 
+  const handleUploadProcessedProfilePhoto = useCallback(
+    async (sourceUri: string) => {
+      if (!displayUserId) {
+        showToast(profilePhotoActionCopy.photoError);
+        return;
+      }
+
+      let processedPhoto: {
+        previewUri: string;
+        imageBase64: string;
+      };
+
+      try {
+        processedPhoto = await processProfilePhoto(sourceUri);
+      } catch (error) {
+        if (error instanceof Error && error.message === "PROFILE_PHOTO_TOO_LARGE") {
+          showToast(profilePhotoActionCopy.photoTooLarge);
+          return;
+        }
+
+        showToast(profilePhotoActionCopy.photoError);
+        return;
+      }
+
+      showToast(profilePhotoActionCopy.uploadingPhoto);
+      setProfilePhotoPreviewUri(processedPhoto.previewUri);
+      setIsProfilePhotoLoading(true);
+
+      try {
+        const response = await api.post<ProfilePhotoMutationResponse>("/users/profile-photo", {
+          imageBase64: processedPhoto.imageBase64,
+          fileType: PROFILE_PHOTO_FILE_TYPE,
+        });
+
+        const nextUpdatedAt = response.data.data.user.profilePhotoUpdatedAt ?? new Date().toISOString();
+
+        cacheProfilePhoto(displayUserId, {
+          imageBase64: processedPhoto.imageBase64,
+          mimeType: PROFILE_PHOTO_MIME_TYPE,
+          profilePhotoUpdatedAt: nextUpdatedAt,
+        });
+
+        updateUserProfile({
+          hasProfilePhoto: response.data.data.user.hasProfilePhoto,
+          profilePhotoUpdatedAt: nextUpdatedAt,
+          profilePhoto: undefined,
+        });
+
+        setProfilePhotoPreviewUri(null);
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+        showToast(profilePhotoActionCopy.photoUpdated);
+      } catch {
+        setProfilePhotoPreviewUri(null);
+        showToast(profilePhotoActionCopy.photoError);
+      } finally {
+        setIsProfilePhotoLoading(false);
+      }
+    },
+    [displayUserId, profilePhotoActionCopy.photoError, profilePhotoActionCopy.photoTooLarge, profilePhotoActionCopy.photoUpdated, profilePhotoActionCopy.uploadingPhoto, queryClient, updateUserProfile],
+  );
+
+  const handleTakePhoto = useCallback(async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      showToast(profilePhotoActionCopy.cameraPermissionDenied);
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      await handleUploadProcessedProfilePhoto(result.assets[0].uri);
+    }
+  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.cameraPermissionDenied]);
+
+  const handleChooseFromGallery = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      showToast(profilePhotoActionCopy.galleryPermissionDenied);
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+      allowsEditing: false,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      await handleUploadProcessedProfilePhoto(result.assets[0].uri);
+    }
+  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.galleryPermissionDenied]);
+
+  const handleRemovePhoto = useCallback(() => {
+    Alert.alert(
+      profilePhotoActionCopy.removePhotoConfirm,
+      undefined,
+      [
+        {
+          text: t("common.actions.cancel"),
+          style: "cancel",
+        },
+        {
+          text: profilePhotoActionCopy.removePhoto,
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              if (!displayUserId) {
+                showToast(profilePhotoActionCopy.photoError);
+                return;
+              }
+
+              setProfilePhotoPreviewUri(null);
+              setIsProfilePhotoLoading(true);
+
+              try {
+                const response = await api.delete<ProfilePhotoMutationResponse>("/users/profile-photo");
+                clearProfilePhotoCache(displayUserId);
+                updateUserProfile({
+                  hasProfilePhoto: false,
+                  profilePhotoUpdatedAt: response.data.data.user.profilePhotoUpdatedAt ?? null,
+                  profilePhoto: undefined,
+                });
+                await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+                showToast(profilePhotoActionCopy.photoRemoved);
+              } catch {
+                showToast(profilePhotoActionCopy.photoError);
+              } finally {
+                setIsProfilePhotoLoading(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [displayUserId, profilePhotoActionCopy.photoError, profilePhotoActionCopy.photoRemoved, profilePhotoActionCopy.removePhoto, profilePhotoActionCopy.removePhotoConfirm, queryClient, t, updateUserProfile]);
+
+  const openProfilePhotoOptions = useCallback(() => {
+    const options = [
+      profilePhotoActionCopy.takePhoto,
+      profilePhotoActionCopy.chooseFromGallery,
+    ];
+
+    if (displayHasProfilePhoto) {
+      options.push(profilePhotoActionCopy.removePhoto);
+    }
+
+    options.push(t("common.actions.cancel"));
+
+    const cancelButtonIndex = options.length - 1;
+    const destructiveButtonIndex = displayHasProfilePhoto ? options.indexOf(profilePhotoActionCopy.removePhoto) : undefined;
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: profilePhotoActionCopy.title,
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) {
+            void handleTakePhoto();
+            return;
+          }
+
+          if (buttonIndex === 1) {
+            void handleChooseFromGallery();
+            return;
+          }
+
+          if (displayHasProfilePhoto && buttonIndex === destructiveButtonIndex) {
+            handleRemovePhoto();
+          }
+        },
+      );
+
+      return;
+    }
+
+    Alert.alert(profilePhotoActionCopy.title, undefined, [
+      {
+        text: profilePhotoActionCopy.takePhoto,
+        onPress: () => {
+          void handleTakePhoto();
+        },
+      },
+      {
+        text: profilePhotoActionCopy.chooseFromGallery,
+        onPress: () => {
+          void handleChooseFromGallery();
+        },
+      },
+      ...(displayHasProfilePhoto
+        ? [
+            {
+              text: profilePhotoActionCopy.removePhoto,
+              style: "destructive" as const,
+              onPress: handleRemovePhoto,
+            },
+          ]
+        : []),
+      {
+        text: t("common.actions.cancel"),
+        style: "cancel",
+      },
+    ]);
+  }, [displayHasProfilePhoto, handleChooseFromGallery, handleRemovePhoto, handleTakePhoto, profilePhotoActionCopy, t]);
+
   const handleSignOut = useCallback(() => {
     Alert.alert(
       t("me.signOut.title"),
@@ -532,6 +986,53 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     );
   }, [t, logout, queryClient]);
 
+  const handleShareWeekly = useCallback(async () => {
+    if (!canShareWeekly || isWeeklyShareLoading) {
+      return;
+    }
+
+    setIsWeeklyShareLoading(true);
+
+    try {
+      const [blendHistory, supplementHistory] = await Promise.all([
+        queryClient.ensureQueryData<BlendHistoryData>({
+          queryKey: weeklyBlendQueryKey,
+          queryFn: () => getBlendHistory(weeklyHistoryRange.from, weeklyHistoryRange.to, 1, 7),
+          staleTime: CACHE_CONFIG.BLEND_HISTORY_TTL,
+          retry: 1,
+        }),
+        queryClient.ensureQueryData<SupplementHistoryData>({
+          queryKey: weeklySupplementQueryKey,
+          queryFn: () => getSupplementHistory(weeklyHistoryRange.from, weeklyHistoryRange.to),
+          staleTime: CACHE_CONFIG.BLEND_HISTORY_TTL,
+          retry: 1,
+        }),
+      ]);
+
+      setPendingWeeklyShare({
+        weekStart: weeklyHistoryRange.from,
+        weekEnd: weeklyHistoryRange.to,
+        totalBlends: blendHistory.summary.blendCount,
+        averageDailyProtein: blendHistory.summary.averageDailyProtein,
+        currentStreak: profile?.currentStreak ?? 0,
+        supplementAdherenceRate: supplementHistory.summary.averageAdherence * 100,
+      });
+    } catch {
+      setIsWeeklyShareLoading(false);
+      showToast(t("me.weeklyShare.error"));
+    }
+  }, [
+    canShareWeekly,
+    isWeeklyShareLoading,
+    profile?.currentStreak,
+    queryClient,
+    t,
+    weeklyBlendQueryKey,
+    weeklyHistoryRange.from,
+    weeklyHistoryRange.to,
+    weeklySupplementQueryKey,
+  ]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -549,17 +1050,76 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.header}>
+          <View style={styles.headerActionsRow}>
+            <View style={styles.headerActionsLeft}>
+              {navigation.canGoBack() ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    navigation.goBack();
+                  }}
+                  style={styles.headerActionButton}
+                >
+                  <Ionicons color={HEADER_ACTION_ICON_COLOR} name="chevron-back" size={20} />
+                </Pressable>
+              ) : null}
+
+              {canShareWeekly ? (
+                <Pressable
+                  accessibilityLabel={t("share.shareWeek")}
+                  accessibilityRole="button"
+                  disabled={isWeeklyShareLoading}
+                  onPress={() => {
+                    void handleShareWeekly();
+                  }}
+                  style={({ pressed }) => [
+                    styles.headerActionButton,
+                    pressed ? styles.headerActionButtonPressed : null,
+                    isWeeklyShareLoading ? styles.headerActionButtonDisabled : null,
+                  ]}
+                >
+                  {isWeeklyShareLoading ? (
+                    <ActivityIndicator color={HEADER_ACTION_ICON_COLOR} size="small" />
+                  ) : (
+                    <Ionicons color={HEADER_ACTION_ICON_COLOR} name="share-social-outline" size={18} />
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
           <View style={styles.photoWrapper}>
-            {profile?.profilePhoto ? (
-              <Image
-                source={{ uri: profile.profilePhoto }}
-                style={styles.photo}
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.9}
+              onPress={openProfilePhotoOptions}
+              style={styles.photoTouchable}
+            >
+              <ProfilePhoto
+                userId={displayUserId ?? undefined}
+                fullName={displayName}
+                hasProfilePhoto={displayHasProfilePhoto}
+                profilePhotoUpdatedAt={displayProfilePhotoUpdatedAt}
+                size={PROFILE_PHOTO_SIZE}
+                previewImageUri={profilePhotoPreviewUri}
+                imageStyle={styles.photo}
               />
-            ) : (
-              <View style={styles.initialsCircle}>
-                <Text style={styles.initialsText}>{initials}</Text>
+
+              {isProfilePhotoLoading ? (
+                <View style={styles.photoLoadingOverlay}>
+                  <ActivityIndicator color={colors.text.primary} size="small" />
+                </View>
+              ) : null}
+
+              <View style={styles.photoCameraBadge}>
+                <Ionicons
+                  color={colors.text.primary}
+                  name="camera"
+                  size={PROFILE_PHOTO_CAMERA_ICON_SIZE}
+                />
               </View>
-            )}
+            </TouchableOpacity>
+
             <View
               style={[
                 styles.planBadge,
@@ -941,6 +1501,24 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           }}
         />
       ) : null}
+
+      {pendingWeeklyShare ? (
+        <WeeklyShareCard
+          ref={weeklyShareCardRef}
+          weekStart={pendingWeeklyShare.weekStart}
+          weekEnd={pendingWeeklyShare.weekEnd}
+          totalBlends={pendingWeeklyShare.totalBlends}
+          averageDailyProtein={pendingWeeklyShare.averageDailyProtein}
+          currentStreak={pendingWeeklyShare.currentStreak}
+          supplementAdherenceRate={pendingWeeklyShare.supplementAdherenceRate}
+          user={{
+            userId: displayUserId ?? undefined,
+            name: displayName,
+            hasProfilePhoto: displayHasProfilePhoto,
+            profilePhotoUpdatedAt: displayProfilePhotoUpdatedAt,
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -959,38 +1537,80 @@ const styles = StyleSheet.create({
   // ── Header
   header: {
     paddingHorizontal: 24,
+    width: "100%",
     alignItems: "center",
   },
-  photoWrapper: {
-    width: 80,
-    height: 80,
-    alignSelf: "center",
+  headerActionsRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    marginBottom: 12,
   },
-  photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: colors.brand.pulse,
+  headerActionsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  initialsCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: INITIALS_BG,
+  headerActionButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: HEADER_ACTION_BACKGROUND,
+    borderWidth: 1,
+    borderColor: HEADER_ACTION_BORDER,
     alignItems: "center",
     justifyContent: "center",
   },
-  initialsText: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
+  headerActionButtonPressed: {
+    opacity: 0.8,
+  },
+  headerActionButtonDisabled: {
+    opacity: 0.72,
+  },
+  photoWrapper: {
+    width: 116,
+    height: 96,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  photoTouchable: {
+    width: PROFILE_PHOTO_SIZE,
+    height: PROFILE_PHOTO_SIZE,
+  },
+  photo: {
+    width: PROFILE_PHOTO_SIZE,
+    height: PROFILE_PHOTO_SIZE,
+    borderRadius: PROFILE_PHOTO_SIZE / 2,
+    borderWidth: 2,
+    borderColor: colors.brand.pulse,
+  },
+  photoLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: PROFILE_PHOTO_SIZE,
+    height: PROFILE_PHOTO_SIZE,
+    borderRadius: PROFILE_PHOTO_SIZE / 2,
+    backgroundColor: PROFILE_PHOTO_LOADING_OVERLAY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoCameraBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
+    height: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
+    borderRadius: PROFILE_PHOTO_CAMERA_BADGE_SIZE / 2,
+    backgroundColor: colors.brand.pulse,
+    alignItems: "center",
+    justifyContent: "center",
   },
   planBadge: {
     position: "absolute",
     right: 0,
-    bottom: 0,
+    bottom: 4,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 3,

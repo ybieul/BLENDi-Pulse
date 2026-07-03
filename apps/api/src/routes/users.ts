@@ -1,8 +1,11 @@
 import { Router, type IRouter } from 'express';
 import {
   calculateMacros,
+  deleteProfilePhoto,
   getMe,
+  getMyProfilePhoto,
   markCleaned,
+  uploadProfilePhoto,
   updateDailyPulseTime,
   updateMe,
   updateNotificationPreferences,
@@ -19,10 +22,28 @@ export const usersRouter: IRouter = Router();
 usersRouter.get('/me', authenticate, getMe);
 
 /**
+ * GET /users/me/photo  🔒 autenticado
+ * Retorna apenas a foto de perfil pesada do usuário autenticado.
+ */
+usersRouter.get('/me/photo', authenticate, getMyProfilePhoto);
+
+/**
  * PATCH /users/me  🔒 autenticado
  * Atualiza parcialmente o perfil e as metas do usuário autenticado.
  */
 usersRouter.patch('/me', authenticate, updateMe);
+
+/**
+ * POST /users/profile-photo  🔒 autenticado
+ * Cria ou atualiza a foto de perfil do usuário autenticado.
+ */
+usersRouter.post('/profile-photo', authenticate, uploadProfilePhoto);
+
+/**
+ * DELETE /users/profile-photo  🔒 autenticado
+ * Remove a foto de perfil do usuário autenticado.
+ */
+usersRouter.delete('/profile-photo', authenticate, deleteProfilePhoto);
 
 /**
  * PATCH /users/push-token  🔒 autenticado

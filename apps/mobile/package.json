@@ -36,6 +36,7 @@
     "expo-auth-session": "^55.0.15",
     "expo-camera": "~17.0.10",
     "expo-constants": "~17.0.0",
+    "expo-file-system": "~18.1.11",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.0.1",
     "expo-image-manipulator": "~14.0.8",
@@ -45,6 +46,7 @@
     "expo-localization": "^55.0.13",
     "expo-notifications": "~0.32.17",
     "expo-secure-store": "^55.0.13",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~0.29.22",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "^55.0.14",
@@ -61,6 +63,7 @@
     "react-native-screens": "~4.10.0",
     "react-native-svg": "15.12.1",
     "react-native-url-polyfill": "^3.0.0",
+    "react-native-view-shot": "4.0.3",
     "react-native-web": "^0.21.0",
     "zustand": "^5.0.3"
   },

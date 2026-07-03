@@ -67,6 +67,8 @@ interface CurrentUserProfileResponse {
       email: string;
       name: string;
       profilePhoto?: string;
+      hasProfilePhoto?: boolean;
+      profilePhotoUpdatedAt?: string | null;
       lastCleanedAt?: string | null;
       pushToken?: string | null;
       blendiModel: AuthUser['blendiModel'];
@@ -112,6 +114,8 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     email: user.email,
     name: user.name,
     profilePhoto: user.profilePhoto,
+    hasProfilePhoto: user.hasProfilePhoto ?? false,
+    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
     lastCleanedAt: user.lastCleanedAt ?? null,
     pushToken: user.pushToken ?? null,
     blendiModel: user.blendiModel,
@@ -141,6 +145,8 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
 function normalizeAuthUser(user: AuthUser): AuthUser {
   return {
     ...user,
+    hasProfilePhoto: user.hasProfilePhoto ?? false,
+    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
     isPro: user.isPro ?? false,
     subscriptionId: user.subscriptionId ?? null,
     subscriptionPlan: user.subscriptionPlan ?? null,

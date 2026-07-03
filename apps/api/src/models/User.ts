@@ -59,6 +59,8 @@ export interface IUser {
    * Ausente em contas criadas via email/senha (sem foto padrão).
    */
   profilePhoto?: string;
+  hasProfilePhoto: boolean;
+  profilePhotoUpdatedAt?: Date;
   name: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
@@ -319,6 +321,14 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     // Opcional — usuários de email/senha não têm este campo.
     profilePhoto: {
       type: String,
+      required: false,
+    },
+    hasProfilePhoto: {
+      type: Boolean,
+      default: false,
+    },
+    profilePhotoUpdatedAt: {
+      type: Date,
       required: false,
     },
     name: {
