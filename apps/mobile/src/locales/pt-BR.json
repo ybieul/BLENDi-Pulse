@@ -5,6 +5,9 @@
     "actionRequiresConnection": "Esta ação requer conexão com a internet",
     "lastUpdated": "Atualizado há {{hours}}h",
     "lastUpdatedYesterday": "Atualizado ontem",
+    "daysAgoToday": "Hoje às {{time}}",
+    "daysAgoYesterday": "Ontem",
+    "daysAgoN": "Há {{days}} dias",
     "or": "ou",
     "actions": {
       "confirm": "Confirmar",
@@ -621,6 +624,13 @@
     "fromCache": "Do cache",
     "sendMessage": "Enviar mensagem",
     "historyButton": "Histórico de conversas",
+    "newConversation": "Nova conversa",
+    "historyTitle": "Histórico de Conversas",
+    "historyEmptyTitle": "Nenhuma conversa ainda",
+    "historyEmptySubtitle": "Suas conversas de receitas do Pulse AI aparecerão aqui",
+    "historyNoRecipe": "Conversa sem título",
+    "historyBanner": "Você está vendo uma conversa anterior",
+    "historyNewFromHere": "Nova conversa",
     "voicePlaceholder": "Entrada por voz em breve",
     "goals": {
       "muscle": {
@@ -775,6 +785,7 @@
     "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
+    "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar",
     "scanner_monthly_limit_reached": "Você atingiu o limite gratuito mensal do Pantry Scanner.",
     "scanner_invalid_image": "Não foi possível analisar esta imagem. Tente outra foto.",
     "scanner_vision_parse_error": "Não foi possível entender o resultado do scan da despensa. Tente novamente.",

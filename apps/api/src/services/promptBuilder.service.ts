@@ -1,5 +1,7 @@
 import type { PulseAiChatInput } from '@blendi/shared';
 
+import { BLENDER_LIMITS } from '../config/pricing.config';
+import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
 import type { BlendiModel, UserGoal, UserLocale, UserUnitSystem } from '../models/User';
 
 type PulseAiApiMessageRole = 'user' | 'assistant';
@@ -158,6 +160,59 @@ function buildAvailableIngredientsSection(
   ].join('\n');
 }
 
+function buildMacroCalculationSection(): string {
+  return [
+    'Macro calculation requirements:',
+    '- Calculate the macros (protein, carbs, fat, calories) from the real quantity of each ingredient in the recipe. Never estimate or guess a value.',
+    '- Total protein must equal the sum of the protein contributed by each ingredient. Apply the same rule to total carbs, total fat, and total calories.',
+  ].join('\n');
+}
+
+function buildNutritionReferenceSection(): string {
+  return [
+    'Nutrition reference table (values per 100g/100ml):',
+    ...NUTRITION_REFERENCE_TABLE.map(
+      entry =>
+        `- ${entry.name}: ${entry.proteinPer100g}g protein, ${entry.carbsPer100g}g carbs, ${entry.fatPer100g}g fat, ${entry.caloriesPer100g} kcal.`
+    ),
+    '- Consult this table to calculate the macro contribution of each ingredient that appears in it, scaled to the actual quantity used. For ingredients not listed here, use accurate real-world nutrition values.',
+  ].join('\n');
+}
+
+function buildCalorieEquationCheckSection(): string {
+  return [
+    'Calorie equation check (verify before responding):',
+    '- Before returning the JSON, verify that (protein x 4) + (carbs x 4) + (fat x 9) is approximately equal to the total calories, within a 10% tolerance.',
+    '- If the equation does not balance within that tolerance, recalculate the macros and calories before returning the JSON.',
+  ].join('\n');
+}
+
+function buildRecipeScopeSection(): string {
+  return [
+    'Recipe scope:',
+    '- This shake is one of multiple meals the user has in a day, not their entire daily nutrition by itself.',
+    "- Unless the user explicitly asks for their full daily target in a single shake, the recipe should provide between 25% and 40% of the user's daily protein target.",
+    "- Never default to putting the user's entire daily target into a single recipe.",
+  ].join('\n');
+}
+
+function buildBlenderGuardrailsSection(
+  blendiModel: BlendiModel,
+  unitSystem: UserUnitSystem
+): string {
+  const modelContext = MODEL_CONTEXT[blendiModel];
+  const limits = BLENDER_LIMITS[blendiModel];
+  const maxVolume =
+    unitSystem === 'imperial' ? `${limits.maxVolumeOz}oz` : `${limits.maxVolumeMl}ml`;
+
+  return [
+    `Physical blender guardrails (${modelContext.displayName}):`,
+    `- The combined volume of all ingredients in the recipe must not exceed ${maxVolume}.`,
+    `- Total protein in this recipe must not exceed ${limits.maxProteinGrams}g.`,
+    "- Never suggest an ingredient combination that exceeds the physical capacity of the user's blender.",
+  ].join('\n');
+}
+
 function buildResponseFormatRequirements(
   responseMode: PulseAiResponseMode,
   recipeCount: number
@@ -246,6 +301,19 @@ function buildSystemPrompt({
   if (additionalContextSections.length > 0) {
     sections.push('', ...additionalContextSections);
   }
+
+  sections.push(
+    '',
+    buildMacroCalculationSection(),
+    '',
+    buildNutritionReferenceSection(),
+    '',
+    buildCalorieEquationCheckSection(),
+    '',
+    buildRecipeScopeSection(),
+    '',
+    buildBlenderGuardrailsSection(blendiModel, unitSystem)
+  );
 
   return sections.join('\n');
 }

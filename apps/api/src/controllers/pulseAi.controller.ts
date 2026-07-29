@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import {
   XP_EVENTS,
   pulseAiChatSchema,
@@ -11,6 +12,11 @@ import { ZodError, z } from 'zod';
 import { env } from '../config/env';
 import { BlendLogModel } from '../models/BlendLog';
 import {
+  ConversationModel,
+  type IConversation,
+  type IConversationMessage,
+} from '../models/Conversation';
+import {
   UserModel,
   type BlendiModel,
   type UserGoal,
@@ -19,6 +25,7 @@ import {
 } from '../models/User';
 import {
   buildPulseAiPrompt,
+  type BuildPulseAiPromptResult,
   type PulseAiApiMessage,
 } from '../services/promptBuilder.service';
 import {
@@ -36,10 +43,30 @@ import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
+import {
+  buildMacroInconsistencyRetryMessage,
+  validateMacroConsistency,
+} from '../utils/macroValidation.utils';
+import {
+  buildProteinGuardrailRetryMessage,
+  validateProteinGuardrail,
+} from '../utils/blenderGuardrail.utils';
 
 const DAILY_FREE_LIMIT = 3;
 const INVALID_JSON_RETRY_INSTRUCTION =
   'Your previous response had an invalid format. Return only valid JSON.';
+const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
+// 6 exchanges = 6 user messages + 6 assistant messages, interleaved.
+const CONVERSATION_HISTORY_MESSAGE_LIMIT = 12;
+
+type ConversationRecord = IConversation & {
+  _id: mongoose.Types.ObjectId | string;
+};
+
+interface ConversationContext {
+  conversationId: mongoose.Types.ObjectId | string;
+  historyMessages: PulseAiApiMessage[];
+}
 
 interface PulseAiUserProfile {
   id: string;
@@ -292,13 +319,158 @@ async function generatePulseAiRecipe(
   const aiResponse = await callAi({
     systemPrompt,
     messages,
-    maxTokens: 800,
+    // gemini-2.5-flash consome parte do orçamento de saída com "thinking" interno
+    // antes do JSON visível — 800 truncava a resposta quase sempre. 2000 testado
+    // e confirmado suficiente com esse modelo (ver aiProvider.service.ts).
+    maxTokens: 2000,
   });
 
   return {
     recipe: parsePulseAiRecipe(aiResponse.content),
     aiResponse,
   };
+}
+
+async function ensureBlenderGuardrail(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  blendiModel: BlendiModel
+): Promise<PulseAiRecipe> {
+  const initialGuardrail = validateProteinGuardrail(recipe, blendiModel);
+
+  if (initialGuardrail.withinGuardrail) {
+    return recipe;
+  }
+
+  console.info('[pulseAi.controller] protein guardrail exceeded, retrying', {
+    blendiModel,
+    discrepancy: initialGuardrail.discrepancy,
+  });
+
+  try {
+    const retryMessage = buildProteinGuardrailRetryMessage(initialGuardrail.discrepancy);
+    const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+      ...prompt.messages,
+      { role: 'assistant', content: JSON.stringify(recipe) },
+      { role: 'user', content: retryMessage },
+    ]);
+
+    return retried.recipe ?? recipe;
+  } catch (error) {
+    console.error('[pulseAi.controller] protein guardrail retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return recipe;
+  }
+}
+
+async function ensureMacroConsistency(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult
+): Promise<PulseAiRecipe> {
+  const initialConsistency = validateMacroConsistency(recipe);
+
+  if (initialConsistency.macrosValidated) {
+    return { ...recipe, macrosValidated: true };
+  }
+
+  console.info('[pulseAi.controller] macro inconsistency detected, retrying', {
+    discrepancy: initialConsistency.discrepancy,
+  });
+
+  try {
+    const retryMessage = buildMacroInconsistencyRetryMessage(
+      recipe,
+      initialConsistency.discrepancy
+    );
+    const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+      ...prompt.messages,
+      { role: 'assistant', content: JSON.stringify(recipe) },
+      { role: 'user', content: retryMessage },
+    ]);
+
+    if (!retried.recipe) {
+      return { ...recipe, macrosValidated: false };
+    }
+
+    const retriedConsistency = validateMacroConsistency(retried.recipe);
+    return { ...retried.recipe, macrosValidated: retriedConsistency.macrosValidated };
+  } catch (error) {
+    console.error('[pulseAi.controller] macro consistency retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return { ...recipe, macrosValidated: false };
+  }
+}
+
+function serializeConversationMessage(message: IConversationMessage): PulseAiApiMessage {
+  if (message.role === 'user') {
+    return { role: 'user', content: message.content as string };
+  }
+
+  return { role: 'assistant', content: (message.content as PulseAiRecipe).title };
+}
+
+async function resolveConversationContext(userId: string): Promise<ConversationContext> {
+  const since = new Date(Date.now() - CONVERSATION_CONTEXT_WINDOW_MS);
+
+  const recentConversation = (await ConversationModel.findOne({
+    userId,
+    createdAt: { $gt: since },
+  })
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec()) as ConversationRecord | null;
+
+  if (recentConversation) {
+    return {
+      conversationId: recentConversation._id,
+      historyMessages: recentConversation.messages
+        .slice(-CONVERSATION_HISTORY_MESSAGE_LIMIT)
+        .map(serializeConversationMessage),
+    };
+  }
+
+  const createdConversation = await ConversationModel.insertOne({
+    userId,
+    messages: [],
+  });
+
+  return {
+    conversationId: createdConversation._id,
+    historyMessages: [],
+  };
+}
+
+async function persistConversationTurn(params: {
+  conversationId: mongoose.Types.ObjectId | string;
+  userMessage: string;
+  userSentAt: Date;
+  recipe: PulseAiRecipe;
+}): Promise<void> {
+  await ConversationModel.updateOne(
+    { _id: params.conversationId },
+    {
+      $push: {
+        messages: {
+          $each: [
+            { role: 'user', content: params.userMessage, timestamp: params.userSentAt },
+            { role: 'assistant', content: params.recipe, timestamp: new Date() },
+          ],
+        },
+      },
+      $set: {
+        lastRecipeName: params.recipe.title,
+      },
+    },
+    {
+      runValidators: true,
+    }
+  ).exec();
 }
 
 export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -350,6 +522,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     }
 
     const effectiveLanguage = requestedLanguage ?? currentUser.locale;
+    const requestReceivedAt = new Date();
+    const conversationContext = await resolveConversationContext(currentUser.id);
 
     const cacheKey = generateCacheKey({
       userId: currentUser.id,
@@ -379,6 +553,18 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
           return;
         }
 
+        try {
+          await persistConversationTurn({
+            conversationId: conversationContext.conversationId,
+            userMessage: message,
+            userSentAt: requestReceivedAt,
+            recipe: parsedCachedResponse.data.recipe,
+          });
+        } catch (error) {
+          await rollbackPulseAiUsageReservation(currentUser);
+          throw error;
+        }
+
         const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
         triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
@@ -391,6 +577,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
             aiProvider: parsedCachedResponse.data.aiProvider,
             aiModel: parsedCachedResponse.data.aiModel,
             xpAwarded,
+            conversationId: String(conversationContext.conversationId),
+            macrosValidated: parsedCachedResponse.data.recipe.macrosValidated ?? true,
           },
         });
         return;
@@ -418,6 +606,10 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       )),
       message,
     });
+
+    if (conversationContext.historyMessages.length > 0) {
+      prompt.messages = [...conversationContext.historyMessages, ...prompt.messages];
+    }
 
     const usageReservation = await reservePulseAiUsage(currentUser);
 
@@ -490,6 +682,16 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
         return;
       }
 
+      recipe = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
+      recipe = await ensureMacroConsistency(recipe, prompt);
+
+      await persistConversationTurn({
+        conversationId: conversationContext.conversationId,
+        userMessage: message,
+        userSentAt: requestReceivedAt,
+        recipe,
+      });
+
       await setInCache({
         cacheKey,
         userId: currentUser.id,
@@ -521,6 +723,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
           aiProvider: aiResponse.provider,
           aiModel: aiResponse.model,
           xpAwarded,
+          conversationId: String(conversationContext.conversationId),
+          macrosValidated: recipe.macrosValidated ?? true,
         },
       });
     } catch (error) {

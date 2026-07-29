@@ -28,6 +28,8 @@ interface PulseAiChatResponse {
     usageRemaining: number | null;
     xpAwarded: number;
     missionsUpdated?: string[];
+    conversationId: string;
+    macrosValidated: boolean;
   };
 }
 
@@ -45,6 +47,8 @@ export interface PulseAiChatResult {
   usageRemaining: number | null;
   xpAwarded: number;
   missionsUpdated?: string[];
+  conversationId: string;
+  macrosValidated: boolean;
 }
 
 export interface PulseAiUsage {

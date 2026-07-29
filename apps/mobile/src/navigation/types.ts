@@ -9,6 +9,7 @@ import type {
 } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { PulseAiRecipe } from '@blendi/shared';
+import type { ConversationDetail } from '../services/conversation.service';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -26,9 +27,13 @@ export type RootStackParamList = {
 };
 
 export type PulseAIStackParamList = {
-  PulseAIChat: { prefilledMessage: string | null } | undefined;
+  PulseAIChat:
+    | { prefilledMessage: string | null; conversation?: undefined }
+    | { prefilledMessage?: undefined; conversation: ConversationDetail }
+    | undefined;
   Favorites: undefined;
   PantryScanner: undefined;
+  ConversationHistory: undefined;
 };
 
 export type TrackStackParamList = {

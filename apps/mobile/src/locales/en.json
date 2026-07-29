@@ -5,6 +5,9 @@
     "actionRequiresConnection": "This action requires an internet connection",
     "lastUpdated": "Updated {{hours}}h ago",
     "lastUpdatedYesterday": "Updated yesterday",
+    "daysAgoToday": "Today at {{time}}",
+    "daysAgoYesterday": "Yesterday",
+    "daysAgoN": "{{days}} days ago",
     "or": "or",
     "actions": {
       "confirm": "Confirm",
@@ -621,6 +624,13 @@
     "fromCache": "From cache",
     "sendMessage": "Send message",
     "historyButton": "Conversation history",
+    "newConversation": "New chat",
+    "historyTitle": "Conversation History",
+    "historyEmptyTitle": "No conversations yet",
+    "historyEmptySubtitle": "Your Pulse AI recipe conversations will appear here",
+    "historyNoRecipe": "Untitled conversation",
+    "historyBanner": "Viewing a previous conversation",
+    "historyNewFromHere": "Start new",
     "voicePlaceholder": "Voice input coming soon",
     "goals": {
       "muscle": {
@@ -775,6 +785,7 @@
     "pulseai_daily_limit": "You've reached today's free Pulse AI limit.",
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
+    "macros_inconsistent": "Nutrition values estimated — actual macros may vary",
     "scanner_monthly_limit_reached": "You've reached this month's free Pantry Scanner limit.",
     "scanner_invalid_image": "This image couldn't be analyzed. Try another photo.",
     "scanner_vision_parse_error": "We couldn't understand the pantry scan result. Please try again.",

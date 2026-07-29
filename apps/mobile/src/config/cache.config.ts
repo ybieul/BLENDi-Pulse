@@ -79,10 +79,12 @@ export const QUERY_KEYS = {
   supplementStack: ['supplementStack'],
   pulseAiHistory: ['pulseAiHistory'],
   pantryScans: ['pantryScans'],
+  conversations: ['conversations'],
 } as const;
 
-// `pantryScans` fica fora da persistência em MMKV por representar quota sensível
-// que deve ser recalculada pela sessão atual, não reidratada de disco.
+// `pantryScans` e `conversations` ficam fora da persistência em MMKV: quota
+// sensível e histórico de conversas devem sempre refletir o servidor, nunca
+// ser reidratados de um snapshot em disco potencialmente desatualizado.
 export const PERSISTABLE_QUERY_KEYS = [
   'user',
   'userProfile',

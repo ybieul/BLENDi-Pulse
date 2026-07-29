@@ -29,6 +29,7 @@ export interface PulseAiRecipe {
   blendInstruction: string;
   tip?: string;
   hasSubstitutes: boolean;
+  macrosValidated?: boolean;
 }
 
 const pulseAiIngredientSchema = z.object({
@@ -90,4 +91,7 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
     required_error: 'errors.validation.required',
     invalid_type_error: 'errors.validation.invalid_option',
   }),
+  macrosValidated: z
+    .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
+    .default(true),
 });

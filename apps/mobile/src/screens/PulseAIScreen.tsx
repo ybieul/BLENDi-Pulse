@@ -43,6 +43,7 @@ import { ChatMessageSkeleton } from '../components/pulseAi/ChatMessageSkeleton';
 import { UsageIndicator } from '../components/pulseAi/UsageIndicator';
 import { imagePlaceholderStyles } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
+import * as conversationService from '../services/conversation.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { PulseAiServiceError } from '../services/pulseAi.service';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
@@ -120,6 +121,18 @@ function getRemainingPantryScans(scanStatus: PantryScanStatus | null): number {
   return Math.max(0, scansLimit - scansUsed);
 }
 
+function conversationMessagesToChatItems(
+  conversationId: string,
+  messages: conversationService.ConversationMessage[],
+): ChatMessageItem[] {
+  return messages.map((message, index) => ({
+    id: `${conversationId}-${index}`,
+    role: message.role,
+    content: message.content,
+    timestamp: new Date(message.timestamp),
+  }));
+}
+
 // ─── WelcomeState ─────────────────────────────────────────────────────────────
 
 interface WelcomeStateProps {
@@ -173,6 +186,10 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   const [isLoading, setIsLoading] = useState(false);
   const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
   const [pantryScanStatus, setPantryScanStatus] = useState<PantryScanStatus | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  // Rastreado para uso futuro (ex.: ações que dependem da conversa ativa) — ainda não lido nesta tela.
+  void activeConversationId;
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
 
   const flatListRef = useRef<FlatList<ChatMessageItem>>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -262,6 +279,57 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     }
   }, [isPro]);
 
+  // ── Carrega conversa vinda da ConversationHistoryScreen, se houver ────────
+  useEffect(() => {
+    const routeConversation = route.params?.conversation;
+
+    if (!routeConversation) {
+      return;
+    }
+
+    setMessages(
+      conversationMessagesToChatItems(routeConversation.id, routeConversation.messages),
+    );
+    setActiveConversationId(routeConversation.id);
+    setIsViewingHistory(true);
+    navigation.setParams({ conversation: undefined });
+  }, [navigation, route.params?.conversation]);
+
+  // ── Continua a conversa de hoje automaticamente, se existir ──────────────
+  useEffect(() => {
+    // Uma conversa específica já chegou via navegação (efeito acima) — não sobrescrever.
+    if (route.params?.conversation) {
+      return;
+    }
+
+    let cancelled = false;
+
+    conversationService
+      .getConversations()
+      .then((conversations) => {
+        if (cancelled) return;
+
+        const mostRecent = conversations[0];
+        if (!mostRecent || mostRecent.daysAgo !== 0) {
+          return;
+        }
+
+        return conversationService.getConversationById(mostRecent.id).then((conversation) => {
+          if (cancelled) return;
+
+          setMessages(conversationMessagesToChatItems(conversation.id, conversation.messages));
+          setActiveConversationId(conversation.id);
+        });
+      })
+      .catch(() => {
+        // Não-crítico: histórico é progressivo — em falha, mantém o welcome state atual.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // ── Envio de mensagem ─────────────────────────────────────────────────────
   const handleSend = useCallback(
     async (messageText: string) => {
@@ -291,7 +359,9 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
 
         setMessages((prev) => [...prev, assistantMessage].slice(-MAX_MESSAGES));
         setUsageRemaining(result.usageRemaining);
+        setActiveConversationId(result.conversationId);
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
       } catch (err) {
         const is429 =
           err instanceof PulseAiServiceError &&
@@ -376,6 +446,16 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     navigation.push('PantryScanner');
   }, [navigation]);
 
+  const handleNewConversationPress = useCallback(() => {
+    setMessages([]);
+    setActiveConversationId(null);
+    setIsViewingHistory(false);
+  }, []);
+
+  const handleHistoryPress = useCallback(() => {
+    navigation.push('ConversationHistory');
+  }, [navigation]);
+
   // ── FlatList render ───────────────────────────────────────────────────────
   const renderItem: ListRenderItem<ChatMessageItem> = useCallback(({ item }) => {
     if (item.role === 'user') {
@@ -432,12 +512,21 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
 
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
-        <View style={styles.headerSide}>
+        <View style={[styles.headerSide, styles.headerLeftActions]}>
           <Pressable
             style={styles.headerButton}
+            onPress={handleNewConversationPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('pulseAi.newConversation')}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.text.secondary} />
+          </Pressable>
+
+          <Pressable
+            style={styles.headerButton}
+            onPress={handleHistoryPress}
             accessibilityRole="button"
             accessibilityLabel={t('pulseAi.historyButton')}
-            // Placeholder para Fase 3 — histórico persistido
           >
             <Ionicons name="time-outline" size={24} color={colors.text.secondary} />
           </Pressable>
@@ -487,6 +576,22 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           </View>
         </View>
       </View>
+
+      {/* ── Banner de conversa carregada do histórico ── */}
+      {isViewingHistory ? (
+        <View style={styles.historyBanner}>
+          <Text style={styles.historyBannerText} numberOfLines={1}>
+            {t('pulseAi.historyBanner')}
+          </Text>
+          <Pressable
+            onPress={handleNewConversationPress}
+            accessibilityRole="button"
+            accessibilityLabel={t('pulseAi.historyNewFromHere')}
+          >
+            <Text style={styles.historyBannerAction}>{t('pulseAi.historyNewFromHere')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* ── Histórico de mensagens ── */}
       <FlatList
@@ -541,6 +646,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  headerLeftActions: {
+    gap: spacing.md,
+  },
   headerRightActions: {
     justifyContent: 'flex-end',
     gap: spacing.md,
@@ -553,6 +661,34 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Banner de conversa carregada do histórico
+  historyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: SUGGESTION_BORDER_COLOR,
+    backgroundColor: SUGGESTION_BACKGROUND_COLOR,
+  },
+  historyBannerText: {
+    flex: 1,
+    color: colors.text.secondary,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.xs,
+  },
+  historyBannerAction: {
+    color: colors.brand.pulse,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.xs,
+    fontWeight: fontWeights.bold,
   },
 
   // Badge de favoritos

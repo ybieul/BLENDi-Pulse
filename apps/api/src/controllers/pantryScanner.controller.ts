@@ -33,7 +33,10 @@ import { sendErrorResponse } from '../utils/error.utils';
 
 const FREE_MONTHLY_SCAN_LIMIT = 3;
 const PANTRY_RECIPE_COUNT = 2;
-const PANTRY_RECIPE_MAX_TOKENS = 1600;
+// gemini-2.5-flash consome parte do orçamento de saída com "thinking" interno
+// antes do JSON visível — 1600 truncava as 2 receitas quase sempre. Testado:
+// 4000 ainda truncava, 6000 completou de forma confiável; 7000 dá margem.
+const PANTRY_RECIPE_MAX_TOKENS = 7000;
 const USABLE_CONFIDENCE_LEVELS = new Set<PantryIngredient['confidence']>(['high', 'medium']);
 
 interface PantryScannerUserProfile {
