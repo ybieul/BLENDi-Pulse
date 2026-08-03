@@ -7,6 +7,7 @@ const notificationTypeValues = [
   'supplementReminder',
   'hydrationReminder',
   'levelUp',
+  'weeklyReport',
 ] as const;
 const notificationDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 

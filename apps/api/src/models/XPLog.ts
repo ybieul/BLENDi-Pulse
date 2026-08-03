@@ -1,7 +1,7 @@
 import mongoose, { type Document } from 'mongoose';
 import { XP_EVENTS, type XPEventType } from '@blendi/shared';
 
-const XP_LOG_TTL_SECONDS = 172_800;
+const XP_LOG_TTL_SECONDS = 7_776_000;
 const xpLogDatePattern = /^\d{4}-\d{2}-\d{2}(?:_\d+)?$/;
 const xpEventTypeValues = Object.keys(XP_EVENTS) as XPEventType[];
 

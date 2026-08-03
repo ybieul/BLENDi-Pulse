@@ -1085,6 +1085,20 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                   )}
                 </Pressable>
               ) : null}
+
+              <Pressable
+                accessibilityLabel={t("weeklyReport.title")}
+                accessibilityRole="button"
+                onPress={() => {
+                  navigation.getParent<RootNavigationProp<"WeeklyReport">>()?.navigate("WeeklyReport");
+                }}
+                style={({ pressed }) => [
+                  styles.headerActionButton,
+                  pressed ? styles.headerActionButtonPressed : null,
+                ]}
+              >
+                <Ionicons color={HEADER_ACTION_ICON_COLOR} name="bar-chart-outline" size={18} />
+              </Pressable>
             </View>
           </View>
 

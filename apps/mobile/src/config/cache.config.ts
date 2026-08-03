@@ -80,11 +80,17 @@ export const QUERY_KEYS = {
   pulseAiHistory: ['pulseAiHistory'],
   pantryScans: ['pantryScans'],
   conversations: ['conversations'],
+  weeklyReportLatest: ['weeklyReportLatest'],
+  weeklyReport: ['weeklyReport'],
+  weeklyReportDates: ['weeklyReportDates'],
 } as const;
 
 // `pantryScans` e `conversations` ficam fora da persistência em MMKV: quota
 // sensível e histórico de conversas devem sempre refletir o servidor, nunca
 // ser reidratados de um snapshot em disco potencialmente desatualizado.
+// `weeklyReportLatest`/`weeklyReport`/`weeklyReportDates` também ficam de fora
+// por decisão explícita: o servidor é a única fonte de verdade do relatório
+// semanal, o cache em memória do React Query já é suficiente.
 export const PERSISTABLE_QUERY_KEYS = [
   'user',
   'userProfile',

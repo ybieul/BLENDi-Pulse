@@ -35,5 +35,13 @@
   "hydrationReminder": {
     "title": "Mantenha-se hidratado! 💧",
     "body": "Você está em {currentValue} de {goalValue} hoje. Hora de beber mais água 💧"
+  },
+  "weeklyReport": {
+    "title": "Seu relatório semanal está pronto 📊",
+    "levelUp": "Você subiu para o Nível {level} esta semana! 🎉",
+    "perfectSupplements": "Adesão perfeita de suplementos essa semana! 💊",
+    "proteinGoal": "Você bateu a meta de proteína em {days} dias esta semana 💪",
+    "hydrationGoal": "Você bateu a meta de hidratação em {days} dias esta semana 💧",
+    "fallback": "Você fez {count} blends esta semana. Confira os detalhes."
   }
 }

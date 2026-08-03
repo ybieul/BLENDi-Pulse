@@ -123,6 +123,14 @@ export function processDeepLink(data: NotificationData): NotificationRouteResult
     return buildNestedRoute('Track', 'TrackMain');
   }
 
+  // WeeklyReport não é uma aba/tela aninhada em AppFlow — é uma rota solta no
+  // root stack (mesmo padrão de Upgrade), por isso não usa buildNestedRoute
+  // com um segundo argumento. App.tsx trata esse screen como navegação de
+  // root em vez de aninhada.
+  if (type === 'weeklyReport') {
+    return buildNestedRoute('WeeklyReport');
+  }
+
   if (!deepLink) {
     return buildNestedRoute('Home');
   }

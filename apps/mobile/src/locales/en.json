@@ -1011,5 +1011,36 @@
         "done": "Done"
       }
     }
+  },
+  "weeklyReport": {
+    "title": "Weekly Report",
+    "emptyTitle": "No report yet",
+    "emptySubtitle": "Your first weekly report will be available on Monday",
+    "sectionNutrition": "Nutrition",
+    "sectionHydration": "Hydration",
+    "sectionSupplements": "Supplements",
+    "sectionGamification": "Progress",
+    "sectionHighlight": "Recipe of the week",
+    "totalBlends": "{{count}} blends",
+    "avgProtein": "avg {{amount}}g/day",
+    "avgDaily": "avg {{amount}}/day",
+    "goalHitDays": "Goal hit {{days}}/7 days",
+    "bestDay": "Best day",
+    "totalHydration": "Total {{amount}}",
+    "adherenceRate": "{{percent}}% adherence",
+    "perfectDays": "{{days}} perfect days",
+    "topSupplement": "Most consistent: {{name}}",
+    "bottomSupplement": "Needs attention: {{name}}",
+    "xpEarned": "{{amount}} XP earned",
+    "missionsCompleted": "{{count}} missions completed",
+    "levelUpText": "You reached Level {{level}}!",
+    "streakBroken": "Streak broken on {{day}}",
+    "shareWeek": "Share my week",
+    "shareLocked": "Sharing is a Pro feature",
+    "comparisonUp": "+{{amount}} vs last week",
+    "comparisonDown": "{{amount}} vs last week",
+    "paywallTitle": "See your full report",
+    "paywallSubtitle": "Every Monday with all the details of your week",
+    "paywallButton": "Upgrade to Pro"
   }
 }

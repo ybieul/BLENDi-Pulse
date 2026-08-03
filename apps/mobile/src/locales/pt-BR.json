@@ -1011,5 +1011,36 @@
         "done": "Confirmar"
       }
     }
+  },
+  "weeklyReport": {
+    "title": "Relatório Semanal",
+    "emptyTitle": "Sem relatório ainda",
+    "emptySubtitle": "Seu primeiro relatório semanal estará disponível na segunda-feira",
+    "sectionNutrition": "Nutrição",
+    "sectionHydration": "Hidratação",
+    "sectionSupplements": "Suplementos",
+    "sectionGamification": "Progresso",
+    "sectionHighlight": "Receita da semana",
+    "totalBlends": "{{count}} blends",
+    "avgProtein": "média {{amount}}g/dia",
+    "avgDaily": "média {{amount}}/dia",
+    "goalHitDays": "Meta batida {{days}}/7 dias",
+    "bestDay": "Melhor dia",
+    "totalHydration": "Total {{amount}}",
+    "adherenceRate": "{{percent}}% de adesão",
+    "perfectDays": "{{days}} dias perfeitos",
+    "topSupplement": "Mais consistente: {{name}}",
+    "bottomSupplement": "Precisa de atenção: {{name}}",
+    "xpEarned": "{{amount}} XP ganhos",
+    "missionsCompleted": "{{count}} missões completadas",
+    "levelUpText": "Você chegou ao Nível {{level}}!",
+    "streakBroken": "Streak quebrado em {{day}}",
+    "shareWeek": "Compartilhar minha semana",
+    "shareLocked": "Compartilhamento é uma feature Pro",
+    "comparisonUp": "+{{amount}} vs semana passada",
+    "comparisonDown": "{{amount}} vs semana passada",
+    "paywallTitle": "Veja seu relatório completo",
+    "paywallSubtitle": "Cada segunda com todos os detalhes da sua semana",
+    "paywallButton": "Fazer upgrade"
   }
 }

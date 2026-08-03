@@ -24,6 +24,7 @@ export type RootStackParamList = {
   OnboardingFlow: undefined;
   AppFlow: NavigatorScreenParams<AppTabParamList> | undefined;
   Upgrade: undefined;
+  WeeklyReport: undefined;
 };
 
 export type PulseAIStackParamList = {

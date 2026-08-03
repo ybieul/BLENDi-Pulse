@@ -37,6 +37,10 @@ export interface GoalRingProps {
   size?: number;
   strokeWidth?: number;
   color?: string;
+  /** Quando false, pula a animação de preenchimento progressivo e renderiza
+   * o arco já no valor final — usado em snapshots estáticos (ex: relatório
+   * semanal) onde não há "chegada" do valor para celebrar. Padrão: true. */
+  animate?: boolean;
 }
 
 function clampProgress(current: number, target: number): number {
@@ -83,6 +87,7 @@ export function GoalRing({
   size = 110,
   strokeWidth = 8,
   color = colors.brand.pulse,
+  animate = true,
 }: GoalRingProps) {
   const progress = clampProgress(current, target);
   const isComplete = progress >= 1;
@@ -97,12 +102,18 @@ export function GoalRing({
   const celebrationScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    celebrationScale.setValue(1);
+
+    if (!animate) {
+      dashOffset.setValue(targetDashOffset);
+      return;
+    }
+
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let ringAnimation: Animated.CompositeAnimation | null = null;
     let celebrationAnimation: Animated.CompositeAnimation | null = null;
 
     dashOffset.setValue(circumference);
-    celebrationScale.setValue(1);
 
     const interactionTask = InteractionManager.runAfterInteractions(() => {
       timeoutId = setTimeout(() => {
@@ -135,6 +146,7 @@ export function GoalRing({
       celebrationScale.stopAnimation();
     };
   }, [
+    animate,
     celebrationScale,
     circumference,
     dashOffset,

@@ -1,3 +1,4 @@
+import type { WeeklyReportData } from '@blendi/shared';
 import { AiCacheModel } from '../models/AiCache';
 import { UserModel, type UserGoal, type UserLocale, type UserUnitSystem } from '../models/User';
 import notificationEn from '../locales/notification-en.json';
@@ -198,5 +199,49 @@ export function getHydrationReminderContent(
   return {
     title: content.title,
     body: interpolate(content.body, { currentValue, goalValue }),
+  };
+}
+
+// Hierarquia de prioridade do gancho: o dado mais impressionante da semana
+// vira o corpo da notificação. Cada condição é checada nessa ordem e a
+// primeira que bater vence — não são cumulativas.
+export function getWeeklyReportContent(
+  data: WeeklyReportData,
+  preferredLanguage: UserLocale
+): NotificationContent {
+  const locale = resolveLocale(preferredLanguage);
+  const content = NOTIFICATION_TEMPLATES[locale].weeklyReport;
+
+  if (data.gamification.levelUpOccurred) {
+    return {
+      title: content.title,
+      body: interpolate(content.levelUp, { level: data.gamification.currentLevel }),
+    };
+  }
+
+  if (data.supplements.perfectDays === 7) {
+    return {
+      title: content.title,
+      body: content.perfectSupplements,
+    };
+  }
+
+  if (data.nutrition.proteinGoalHitDays >= 6) {
+    return {
+      title: content.title,
+      body: interpolate(content.proteinGoal, { days: data.nutrition.proteinGoalHitDays }),
+    };
+  }
+
+  if (data.hydration.goalHitDays >= 6) {
+    return {
+      title: content.title,
+      body: interpolate(content.hydrationGoal, { days: data.hydration.goalHitDays }),
+    };
+  }
+
+  return {
+    title: content.title,
+    body: interpolate(content.fallback, { count: data.nutrition.blendCount }),
   };
 }

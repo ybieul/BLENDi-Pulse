@@ -27,6 +27,7 @@ import { supplementLogsRouter } from './routes/supplementLogs';
 import { supplementStackRouter } from './routes/supplementStack';
 import { dailyMissionsRouter } from './routes/dailyMissions';
 import { shoppingListRouter } from './routes/shoppingList';
+import { weeklyReportsRouter } from './routes/weeklyReports';
 import { purchasesRouter } from './routes/purchases';
 import { webhooksRouter } from './routes/webhooks';
 import { sendErrorResponse } from './utils/error.utils';
@@ -91,6 +92,7 @@ app.use('/pulse-ai', pulseAiRouter);
 app.use('/conversations', conversationsRouter);
 app.use('/daily-missions', dailyMissionsRouter);
 app.use('/shopping-lists', shoppingListRouter);
+app.use('/weekly-reports', weeklyReportsRouter);
 app.use('/purchases', purchasesRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);

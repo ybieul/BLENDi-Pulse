@@ -34,6 +34,7 @@
     "axios": "^1.7.9",
     "expo": "~54.0.33",
     "expo-auth-session": "^55.0.15",
+    "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~17.0.0",
     "expo-file-system": "~18.1.11",

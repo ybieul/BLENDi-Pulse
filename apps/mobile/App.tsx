@@ -72,6 +72,11 @@ import { colors } from '@blendi/shared';
 // preventAutoHideAsync é fire-and-forget intencional — sem await no módulo
 void SplashScreen.preventAutoHideAsync();
 
+// Rotas soltas do root stack (irmãs de AppFlow, não abas dentro dele) —
+// precisam de navigate direto no root em vez de aninhado via
+// navigate('AppFlow', { screen, params }).
+const ROOT_LEVEL_DEEP_LINK_SCREENS = new Set(['WeeklyReport']);
+
 function buildHandledNotificationResponseKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
@@ -232,10 +237,14 @@ function AppShell() {
           return;
         }
 
-        navigationRef.current?.navigate('AppFlow', {
-          screen: route.screen as never,
-          params: route.params as never,
-        } as never);
+        if (ROOT_LEVEL_DEEP_LINK_SCREENS.has(route.screen)) {
+          navigationRef.current?.navigate(route.screen as never);
+        } else {
+          navigationRef.current?.navigate('AppFlow', {
+            screen: route.screen as never,
+            params: route.params as never,
+          } as never);
+        }
 
         if (options?.clearLastResponse === true) {
           void Notifications.clearLastNotificationResponseAsync();

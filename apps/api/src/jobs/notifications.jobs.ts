@@ -1,8 +1,10 @@
 import cron from 'node-cron';
+import type { WeeklyReportComparison, WeeklyReportData } from '@blendi/shared';
 import { BlendLogModel } from '../models/BlendLog';
 import { HydrationLogModel } from '../models/HydrationLog';
 import { NotificationLogModel, type NotificationType } from '../models/NotificationLog';
 import { SupplementLogModel } from '../models/SupplementLog';
+import { WeeklyReportModel } from '../models/WeeklyReport';
 import {
   UserModel,
   type IUserSupplement,
@@ -15,7 +17,9 @@ import {
   getHydrationReminderContent,
   getStreakReminderContent,
   getSupplementReminderContent,
+  getWeeklyReportContent,
 } from '../services/notificationContent.service';
+import { generateWeeklyReport } from '../services/weeklyReportGenerator.service';
 import {
   cleanInvalidTokens,
   sendNotificationBatch,
@@ -25,7 +29,11 @@ import { getMidnightUTC, getNextOccurrenceUTC, toLocalDate } from '../utils/time
 
 const DAILY_PULSE_CRON_EXPRESSION = '*/5 * * * *';
 const HALF_HOUR_CRON_EXPRESSION = '*/30 * * * *';
+const WEEKLY_REPORT_CRON_EXPRESSION = '0 * * * *';
 const FIVE_MINUTES_IN_MILLISECONDS = 5 * 60 * 1000;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const WEEKLY_REPORT_LOCAL_MONDAY_HOUR = 9;
+const WEEKLY_REPORT_LOCAL_MONDAY_WEEKDAY = 1;
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 const NOTIFICATION_DEEP_LINKS: Record<NotificationType, string> = {
   dailyPulse: 'blendipulse://pulse-ai/chat',
@@ -33,6 +41,7 @@ const NOTIFICATION_DEEP_LINKS: Record<NotificationType, string> = {
   supplementReminder: 'blendipulse://track',
   hydrationReminder: 'blendipulse://track',
   levelUp: 'blendipulse://me',
+  weeklyReport: 'blendipulse://me/weekly-report',
 };
 
 interface DailyPulseUserCandidate {
@@ -69,6 +78,13 @@ interface HydrationReminderUserCandidate {
   timezone: string;
   unitSystem: UserUnitSystem;
   dailyHydrationTarget: number;
+}
+
+interface WeeklyReportUserCandidate {
+  _id: unknown;
+  pushToken?: string;
+  locale: UserLocale;
+  timezone: string;
 }
 
 function isDuplicateKeyError(err: unknown): err is { code: number } {
@@ -380,6 +396,125 @@ async function runHydrationReminderJob(): Promise<void> {
   await dispatchNotifications(notifications);
 }
 
+function percentDelta(current: number, previous: number): number {
+  if (previous === 0) {
+    return current === 0 ? 0 : 100;
+  }
+
+  return Number((((current - previous) / previous) * 100).toFixed(2));
+}
+
+async function buildPreviousWeekComparison(
+  userId: unknown,
+  currentWeekStartDate: string,
+  data: WeeklyReportData
+): Promise<WeeklyReportComparison | undefined> {
+  const previousWeekStartDate = formatLocalDateKey(
+    new Date(new Date(`${currentWeekStartDate}T00:00:00.000Z`).getTime() - 7 * MILLISECONDS_PER_DAY)
+  );
+
+  const previousReport = await WeeklyReportModel.findOne({
+    userId,
+    weekStartDate: previousWeekStartDate,
+  })
+    .select({ data: 1 })
+    .lean();
+
+  if (!previousReport) {
+    return undefined;
+  }
+
+  return {
+    avgProteinPerDayDeltaPercent: percentDelta(
+      data.nutrition.avgProteinPerDay,
+      previousReport.data.nutrition.avgProteinPerDay
+    ),
+    avgDailyMlDeltaPercent: percentDelta(
+      data.hydration.avgDailyMl,
+      previousReport.data.hydration.avgDailyMl
+    ),
+    adherenceRateDeltaPercent: percentDelta(
+      data.supplements.adherenceRate,
+      previousReport.data.supplements.adherenceRate
+    ),
+  };
+}
+
+async function runWeeklyReportJob(): Promise<void> {
+  const nowUtc = new Date();
+  const notifications: PushNotificationPayload[] = [];
+
+  const users = await UserModel.find({
+    isPro: true,
+    pushToken: { $exists: true, $type: 'string', $ne: '' },
+  })
+    .select({
+      pushToken: 1,
+      locale: 1,
+      timezone: 1,
+    })
+    .lean<WeeklyReportUserCandidate[]>()
+    .exec();
+
+  for (const user of users) {
+    if (!hasNonEmptyPushToken(user.pushToken)) {
+      continue;
+    }
+
+    const localNow = toLocalDate(nowUtc, user.timezone);
+    const isMonday = localNow.getUTCDay() === WEEKLY_REPORT_LOCAL_MONDAY_WEEKDAY;
+    const isReportHour = localNow.getUTCHours() === WEEKLY_REPORT_LOCAL_MONDAY_HOUR;
+
+    if (!isMonday || !isReportHour) {
+      continue;
+    }
+
+    // "Semana anterior": os 7 dias que terminaram ontem (domingo local).
+    const weekEndDate = formatLocalDateKey(new Date(localNow.getTime() - MILLISECONDS_PER_DAY));
+    const weekStartDate = formatLocalDateKey(new Date(localNow.getTime() - 7 * MILLISECONDS_PER_DAY));
+
+    const alreadyGenerated = await WeeklyReportModel.exists({ userId: user._id, weekStartDate });
+    if (alreadyGenerated) {
+      continue;
+    }
+
+    try {
+      const data = await generateWeeklyReport(String(user._id), weekStartDate, weekEndDate);
+      const previousWeekComparison = await buildPreviousWeekComparison(user._id, weekStartDate, data);
+
+      await WeeklyReportModel.create({
+        userId: user._id,
+        weekStartDate,
+        weekEndDate,
+        isProAtGeneration: true,
+        data,
+        ...(previousWeekComparison && { previousWeekComparison }),
+      });
+
+      const content = getWeeklyReportContent(data, user.locale);
+      const reserved = await reserveNotificationLog(user._id, 'weeklyReport', weekStartDate);
+
+      if (reserved) {
+        notifications.push(
+          buildPushPayload(user.pushToken, 'weeklyReport', content.title, content.body)
+        );
+      }
+    } catch (err) {
+      if (isDuplicateKeyError(err)) {
+        continue;
+      }
+
+      console.error(
+        '[notifications.jobs] Weekly Report generation failed for user',
+        String(user._id),
+        err
+      );
+    }
+  }
+
+  await dispatchNotifications(notifications);
+}
+
 export function initializeNotificationJobs(): void {
   cron.schedule(DAILY_PULSE_CRON_EXPRESSION, () => {
     void runDailyPulseJob().catch(err => {
@@ -402,6 +537,12 @@ export function initializeNotificationJobs(): void {
   cron.schedule(HALF_HOUR_CRON_EXPRESSION, () => {
     void runHydrationReminderJob().catch(err => {
       console.error('[notifications.jobs] Hydration Reminder job failed:', err);
+    });
+  });
+
+  cron.schedule(WEEKLY_REPORT_CRON_EXPRESSION, () => {
+    void runWeeklyReportJob().catch(err => {
+      console.error('[notifications.jobs] Weekly Report job failed:', err);
     });
   });
 

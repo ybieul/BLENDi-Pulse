@@ -1,6 +1,6 @@
 import mongoose, { type Document } from 'mongoose';
 
-const DAILY_MISSION_TTL_SECONDS = 172800;
+const DAILY_MISSION_TTL_SECONDS = 7_776_000;
 const missionDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface IDailyMissionItem {
