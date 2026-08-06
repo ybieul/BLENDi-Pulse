@@ -71,9 +71,14 @@ BLENDi Pulse is the companion app for the BLENDi hardware platform, built in Rea
 | CP2.4 | [phase-2/cp2.4-shopping-list.md](phase-2/cp2.4-shopping-list.md) | Shopping List with multiple lists per user, free tier limit of one active list, favorites import, and offline state-final sync |
 | CP2.4.1 | [phase-2/cp2.4.1-shopping-list-detail-screen.md](phase-2/cp2.4.1-shopping-list-detail-screen.md) | Complete reimplementation of ShoppingListDetailScreen which was blank after CP2.4, including SectionList, optimistic UI handlers, and fixed bottom input field |
 
-### Phase 3 — Social & Community
+### Phase 3 — Monetização e Crescimento
 
-To be documented as phases are implemented.
+| Checkpoint | Document | Description |
+|---|---|---|
+| CP3.1 | [phase-3/cp3.1-revenuecat-paywall.md](phase-3/cp3.1-revenuecat-paywall.md) | RevenueCat integration with UpgradeScreen paywall, configurable pricing constants, purchase verification endpoint, webhook handler for four subscription lifecycle events, and instant Pro unlock across all feature gates |
+| CP3.2 | [phase-3/cp3.2-profile-photo-share-cards.md](phase-3/cp3.2-profile-photo-share-cards.md) | Profile photo stored as base64 in dedicated user_photos collection with MMKV cache strategy, and three on-device Share Card types (recipe, achievement, weekly) generated via react-native-view-shot with no server involvement |
+| CP3.3 | [phase-3/cp3.3-pulse-ai-avancado.md](phase-3/cp3.3-pulse-ai-avancado.md) | Persistent conversation history in MongoDB with 90-day TTL, automatic last-6-exchange context injection into AI calls, ConversationHistoryScreen, nutrition reference table in system prompt, 15% macro validation with intelligent retry, and per-model volume guardrails (LITE/PRO+ 400ml, STEEL 600ml) |
+| CP3.4 | [phase-3/cp3.4-relatorio-semanal-pro.md](phase-3/cp3.4-relatorio-semanal-pro.md) | Pro-only weekly report generated every Monday at 9am in user timezone via cron, four aggregated data sections, dynamic push notification with priority-based hook, WeeklyReportScreen with week selector, and blurred preview paywall for free users |
 
 ### Phase 4 — Notifications & Email
 
@@ -107,6 +112,12 @@ To be documented as phases are implemented.
 - Daily mission dependency hierarchy kept strictly unidirectional: `missionProgress.service.ts` imports `xp.service.ts` but never the inverse, and controllers are the only layer that knows both services simultaneously, preventing circular dependencies.
 - Shopping lists stored in a dedicated `shopping_lists` collection instead of embedding arrays in `User`: this scales better for historical list volume and supports granular per-list operations without inflating the user document.
 - Free tier shopping list limit enforced on creation and restoration: the free tier supports only one active list, checked in both `createList` and `updateList` when archived lists are restored, with `canCreateMore` returned by `getLists` for mobile-side gating.
+- Profile photo stored as base64 in a dedicated `user_photos` collection instead of the `User` document or external cloud storage: eliminates egress cost, keeps the `User` document lightweight for the dozens of daily queries it serves, and an MMKV cache keyed by timestamp avoids unnecessary re-fetches.
+- Share Cards generated entirely on-device: all three card types are captured with `react-native-view-shot` directly on the user's phone with no server involved, eliminating network latency and infrastructure cost, and keeping sharing available offline.
+- Conversation history capped at the last 6 message exchanges injected into AI context: balances useful continuity with token cost, and each prior assistant response is represented by its recipe title rather than the full `PulseAiRecipe` object.
+- Macro validation tolerance set to 15%: accommodates real-world macro variance across brands, ingredient ripeness, and preparation method — below that threshold, the math is considered to reconcile for practical purposes.
+- `XPLog` and `DailyMission` TTL increased to 90 days: the original 48h TTL was designed only for old-log cleanup, since idempotency is guaranteed by the unique index rather than the TTL itself; the increase was required so the weekly report cron can aggregate the full previous week of data.
+- Weekly report streak data derived from `BlendLog` instead of stored snapshots: `streakAtStart` and `streakAtEnd` were replaced by `blendDaysInWeek` and `streakBrokenOnDate`, removing the need for historical streak snapshots without losing informational value.
 
 ---
 
@@ -161,12 +172,30 @@ The current `.env.example` files are fully documented below, including the Phase
 | `VISION_MODEL` | Vision model identifier used by the selected provider, for example `gemini-2.5-flash` |
 | `VISION_API_KEY` | API key for the selected vision provider; it can match `AI_API_KEY` when the same provider is used for both |
 | `EXPO_ACCESS_TOKEN` | Expo access token used to authenticate calls to the Expo Push API without rate limits; generate it in `expo.dev/settings/access-tokens` |
+| `REVENUECAT_API_KEY` | RevenueCat secret key with the `sk_` prefix, used to validate purchases via the REST API; optional at boot, the server starts with a warning if absent |
+| `REVENUECAT_WEBHOOK_SECRET` | Custom string sent by RevenueCat in each webhook request header to authenticate the payload; optional at boot |
+| `REVENUECAT_APP_ID` | Project identifier from the RevenueCat dashboard, in the format `proj_xxxxxxxx`; optional at boot |
 
 ### Mobile Environment Variables
 
 | Variable | Purpose |
 |---|---|
 | `EXPO_PUBLIC_API_URL` | Base URL used by the Expo client to reach the backend API |
+| `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY` | Public SDK key for iOS, generated in the RevenueCat dashboard when registering the Apple app |
+| `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY` | Public SDK key for Android, generated in the RevenueCat dashboard when registering the Google app |
+
+---
+
+## External Services Status
+
+| Service | Status |
+|---|---|
+| RevenueCat | Account created and backend API key available; waiting on the Apple Developer Account to complete the iOS app setup and on the Google Play Console to complete the Android app setup |
+| Expo EAS | Pending `eas init` to obtain the real Project ID; `app.json` currently holds the placeholder `PENDING_EAS_PROJECT_ID` |
+| Firebase FCM | Project created, but credentials have not been uploaded to the Expo dashboard yet |
+| Apple Developer Account | Blocked, pending the $99/year payment by Jon; unblocks RevenueCat iOS, production APNs, the App Store, and the P8 key |
+| Google Play Console | Blocked, pending the $25 payment by Jon |
+| Image assets | `swirl.png` and `blendi-logo.png` are still missing from `assets/images/` since Phase 1; `notification-icon.png` is present and in use |
 
 ---
 
@@ -174,7 +203,7 @@ The current `.env.example` files are fully documented below, including the Phase
 
 The unresolved items carried over from Phase 0 remain open as critical questions for Jon and continue blocking the same downstream phases listed below.
 
-Phase 2 is closed, the current app version is tracked as `0.3.0`, and Phase 3 is planned.
+Phase 3 is closed, the current app version is tracked as `0.4.0`, and Phase 4 — Launch is planned.
 
 These questions still block specific checkpoints across Phase 3 and Phase 4.
 
