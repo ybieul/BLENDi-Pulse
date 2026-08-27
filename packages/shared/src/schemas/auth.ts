@@ -13,6 +13,8 @@
 
 import { z } from 'zod';
 
+import { isValidIanaTimezone } from '../utils/timezone.utils';
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 // bcryptjs trunca silenciosamente após 72 bytes — limite técnico explícito
@@ -77,7 +79,8 @@ export const registerSchema = z.object({
   // nunca digitado manualmente pelo usuário.
   timezone: z
     .string({ required_error: 'errors.validation.required' })
-    .min(1, 'errors.validation.required'),
+    .min(1, 'errors.validation.required')
+    .refine(isValidIanaTimezone, 'errors.validation.timezone_invalid'),
 });
 
 // ─── Schema: login ────────────────────────────────────────────────────────────
@@ -103,7 +106,8 @@ export const loginSchema = z.object({
 export const updateTimezoneSchema = z.object({
   timezone: z
     .string({ required_error: 'errors.validation.required' })
-    .min(1, 'errors.validation.required'),
+    .min(1, 'errors.validation.required')
+    .refine(isValidIanaTimezone, 'errors.validation.timezone_invalid'),
 });
 
 // ─── Schema: refresh token ────────────────────────────────────────────────────

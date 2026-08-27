@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { QUERY_KEYS } from '../config/cache.config';
+import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import {
   getStack,
   updateStack,
@@ -30,6 +30,7 @@ function ManageStackRoute() {
   const { data: supplementStack } = useQuery({
     queryKey: QUERY_KEYS.supplementStack,
     queryFn: getStack,
+    staleTime: CACHE_CONFIG.SUPPLEMENT_STACK_TTL,
   });
 
   const { mutate: mutateUpdateStack } = useMutation({

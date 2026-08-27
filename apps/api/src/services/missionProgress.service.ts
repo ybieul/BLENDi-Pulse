@@ -80,9 +80,22 @@ async function reconcileMissionBonus(
   timezone: string,
   dailyMissionDocument: DailyMissionDocument
 ): Promise<{ allMissionsCompleted: boolean; totalXPAwarded: number }> {
-  const allMissionsCompleted = dailyMissionDocument.missions.every(item => item.completed);
+  // Leitura fresca em vez do snapshot do findOneAndUpdate que chamou esta função:
+  // sob escritas concorrentes, o snapshot pode não refletir uma missão completada
+  // por outra requisição no meio-tempo — o findById sempre reflete o estado mais
+  // recente já commitado no MongoDB.
+  const freshDocument = await DailyMissionModel.findById(dailyMissionDocument._id).lean();
 
-  if (!allMissionsCompleted || dailyMissionDocument.bonusAwarded) {
+  if (!freshDocument) {
+    return {
+      allMissionsCompleted: false,
+      totalXPAwarded: 0,
+    };
+  }
+
+  const allMissionsCompleted = freshDocument.missions.every(item => item.completed);
+
+  if (!allMissionsCompleted || freshDocument.bonusAwarded) {
     return {
       allMissionsCompleted,
       totalXPAwarded: 0,
@@ -98,7 +111,7 @@ async function reconcileMissionBonus(
 
   await DailyMissionModel.updateOne(
     {
-      _id: dailyMissionDocument._id,
+      _id: freshDocument._id,
       bonusAwarded: false,
     },
     {

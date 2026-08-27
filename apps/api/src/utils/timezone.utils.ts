@@ -16,6 +16,8 @@
 //   usa o timezone LOCAL DO PROCESSO, que pode ser qualquer coisa no servidor.
 //   Use sempre as funções deste arquivo para operações timezone-aware.
 
+import type { ApiError } from './error.utils';
+
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
 /**
@@ -101,6 +103,47 @@ function buildUTCFromLocal(
   return new Date(naive + (wantedMs - gotMs));
 }
 
+/**
+ * Constrói o erro padronizado para timezone IANA inválido ou ausente.
+ * Carrega `statusCode`/`code` no formato que `errorHandler.ts` já sabe
+ * repassar como resposta HTTP 400 — sem precisar de mapeamento adicional.
+ */
+function buildInvalidTimezoneError(timezone: unknown): ApiError {
+  const error = new Error(`Invalid IANA timezone: "${String(timezone)}"`) as ApiError;
+  error.statusCode = 400;
+  error.code = 'timezone/invalid';
+  return error;
+}
+
+/**
+ * Valida que a string recebida é um timezone IANA reconhecido pelo runtime.
+ * Lança `timezone/invalid` (400) para timezone vazio, undefined, null ou
+ * desconhecido — nunca faz fallback silencioso, porque mascarar um timezone
+ * corrompido no banco torna o problema invisível e mais difícil de diagnosticar.
+ *
+ * Usa `Intl.supportedValuesOf('timeZone')` (Node 18+) quando disponível;
+ * caso contrário, tenta construir um `Intl.DateTimeFormat` como fallback.
+ */
+function validateTimezone(timezone: string): void {
+  if (!timezone) {
+    throw buildInvalidTimezoneError(timezone);
+  }
+
+  // Intl.supportedValuesOf('timeZone') só lista os nomes canônicos da IANA —
+  // 'UTC', 'GMT' e formas como 'Etc/GMT+5' são timezones válidos aceitos pelo
+  // Intl.DateTimeFormat mas NÃO aparecem nessa lista. Por isso ela é usada só
+  // como atalho rápido; o construtor é sempre a fonte de verdade final.
+  if (typeof Intl.supportedValuesOf === 'function' && Intl.supportedValuesOf('timeZone').includes(timezone)) {
+    return;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+  } catch {
+    throw buildInvalidTimezoneError(timezone);
+  }
+}
+
 // ─── Funções públicas ─────────────────────────────────────────────────────────
 
 /**
@@ -125,6 +168,8 @@ function buildUTCFromLocal(
  *   // → new Date('2025-03-15T12:30:00Z') (BRT = UTC-3)
  */
 export function toUTC(localDate: Date, timezone: string): Date {
+  validateTimezone(timezone);
+
   // Trata os campos UTC do objeto como se fossem os componentes locais do usuário
   const y = localDate.getUTCFullYear();
   const mo = localDate.getUTCMonth() + 1;
@@ -153,6 +198,8 @@ export function toUTC(localDate: Date, timezone: string): Date {
  *   //   getUTCHours()=0, getUTCMinutes()=0 (meia-noite em SP)
  */
 export function toLocalDate(utcDate: Date, timezone: string): Date {
+  validateTimezone(timezone);
+
   const { year, month, day, hour, minute, second } = getParts(utcDate, timezone);
   return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 }
@@ -176,6 +223,8 @@ export function toLocalDate(utcDate: Date, timezone: string): Date {
  *   // → new Date('2025-03-15T03:00:00Z')
  */
 export function getMidnightUTC(timezone: string): Date {
+  validateTimezone(timezone);
+
   const now = new Date();
   const { year, month, day } = getParts(now, timezone);
   return buildUTCFromLocal(year, month, day, 0, 0, 0, timezone);
@@ -204,6 +253,8 @@ export function getMidnightUTC(timezone: string): Date {
  *   isSameDayInTimezone(c, d, 'America/Sao_Paulo') // → true
  */
 export function isSameDayInTimezone(utcA: Date, utcB: Date, timezone: string): boolean {
+  validateTimezone(timezone);
+
   const a = getParts(utcA, timezone);
   const b = getParts(utcB, timezone);
   return a.year === b.year && a.month === b.month && a.day === b.day;
@@ -233,6 +284,8 @@ export function isSameDayInTimezone(utcA: Date, utcB: Date, timezone: string): b
  *   // → new Date('2025-03-15T12:00:00Z') (09:00 de hoje em SP = 12:00 UTC)
  */
 export function getNextOccurrenceUTC(hour: number, minute: number, timezone: string): Date {
+  validateTimezone(timezone);
+
   const now = new Date();
   const { year, month, day } = getParts(now, timezone);
 

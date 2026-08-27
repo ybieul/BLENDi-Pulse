@@ -48,7 +48,11 @@ function buildLogDate(xpType: XPEventType, timezone: string): string {
   const localDateKey = formatLocalDateKey(timezone);
 
   if (MULTI_OCCURRENCE_XP_TYPES.has(xpType)) {
-    return `${localDateKey}_${Date.now()}`;
+    // Sufixo aleatório de 4 caracteres base36 reduz a colisão de dois awards no
+    // mesmo milissegundo de "provável sob carga" para astronomicamente improvável,
+    // sem precisar de crypto.randomUUID() completo.
+    const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    return `${localDateKey}_${uniqueSuffix}`;
   }
 
   return localDateKey;

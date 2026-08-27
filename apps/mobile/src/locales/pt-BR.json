@@ -754,7 +754,8 @@
       "number_range": "Insira um valor entre {{min}} e {{max}}.",
       "password_complexity": "A senha deve conter pelo menos uma letra maiúscula, uma minúscula e um número.",
       "integer": "Deve ser um número inteiro.",
-      "invalid_option": "Opção inválida selecionada."
+      "invalid_option": "Opção inválida selecionada.",
+      "timezone_invalid": "Selecione um fuso horário válido."
     },
     "auth": {
       "invalid_credentials": "E-mail ou senha incorretos.",

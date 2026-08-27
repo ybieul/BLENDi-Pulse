@@ -141,6 +141,16 @@ async function markCancellationRequested(
   userId: string,
   event: RevenueCatWebhookPayload['event']
 ): Promise<void> {
+  const currentUser = await UserModel.findById(userId).select({ isPro: 1 }).lean();
+
+  if (!currentUser || !currentUser.isPro) {
+    console.info(
+      '[revenueCatWebhook.controller] CANCELLATION received after EXPIRATION, ignoring — subscription is already inactive.',
+      { userId, eventId: event.id }
+    );
+    return;
+  }
+
   const requestedAt = new Date(event.event_timestamp_ms);
 
   await UserModel.findByIdAndUpdate(
@@ -275,13 +285,12 @@ export async function handleRevenueCatWebhook(
     }
 
     if (event.type === 'CANCELLATION') {
-      await syncActiveSubscriptionFromRevenueCat(String(user._id)).catch(async err => {
+      await syncActiveSubscriptionFromRevenueCat(String(user._id)).catch(err => {
         if (
           err instanceof RevenueCatConfigurationError ||
           err instanceof RevenueCatRequestError ||
           err instanceof RevenueCatInvalidPurchaseError
         ) {
-          await markCancellationRequested(String(user._id), event);
           return null;
         }
 

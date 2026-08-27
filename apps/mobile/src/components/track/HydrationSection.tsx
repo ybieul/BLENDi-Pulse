@@ -125,6 +125,8 @@ export function HydrationSection({
   const barAnimations = useRef(
     Array.from({ length: HISTORY_DAYS }, () => new Animated.Value(0))
   ).current;
+  const hasMounted = useRef(false);
+  const hasMountedBars = useRef(false);
 
   const progress = clampProgress(todayTotal, dailyTarget);
   const progressText = `${displayHydration(todayTotal)} / ${displayHydration(dailyTarget)}`;
@@ -142,7 +144,11 @@ export function HydrationSection({
     let progressAnimationHandle: Animated.CompositeAnimation | null = null;
 
     progressAnimation.stopAnimation();
-    progressAnimation.setValue(0);
+
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      progressAnimation.setValue(0);
+    }
 
     progressAnimationHandle = Animated.timing(progressAnimation, {
       toValue: progress,
@@ -164,8 +170,14 @@ export function HydrationSection({
 
     barAnimations.forEach((animatedValue) => {
       animatedValue.stopAnimation();
-      animatedValue.setValue(0);
     });
+
+    if (!hasMountedBars.current) {
+      hasMountedBars.current = true;
+      barAnimations.forEach((animatedValue) => {
+        animatedValue.setValue(0);
+      });
+    }
 
     animation = Animated.parallel(
       chartData.map((item, index) => {

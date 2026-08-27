@@ -754,7 +754,8 @@
       "number_range": "Enter a value between {{min}} and {{max}}.",
       "password_complexity": "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
       "integer": "Must be a whole number.",
-      "invalid_option": "Invalid option selected."
+      "invalid_option": "Invalid option selected.",
+      "timezone_invalid": "Select a valid timezone."
     },
     "auth": {
       "invalid_credentials": "Incorrect email or password.",

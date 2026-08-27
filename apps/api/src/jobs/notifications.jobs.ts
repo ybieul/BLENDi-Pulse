@@ -180,31 +180,35 @@ async function runDailyPulseJob(): Promise<void> {
     .exec();
 
   for (const user of users) {
-    if (!hasNonEmptyPushToken(user.pushToken)) {
-      continue;
+    try {
+      if (!hasNonEmptyPushToken(user.pushToken)) {
+        continue;
+      }
+
+      const nextOccurrenceUtc = getNextOccurrenceUTC(
+        user.dailyPulseTime.hour,
+        user.dailyPulseTime.minute,
+        user.timezone
+      );
+
+      if (nextOccurrenceUtc.getTime() < nowUtc.getTime() || nextOccurrenceUtc.getTime() > windowEndUtc.getTime()) {
+        continue;
+      }
+
+      const notificationDate = formatLocalDateKey(toLocalDate(nextOccurrenceUtc, user.timezone));
+      const content = await getDailyPulseContent(String(user._id), user.goal);
+      const reserved = await reserveNotificationLog(user._id, 'dailyPulse', notificationDate);
+
+      if (!reserved) {
+        continue;
+      }
+
+      notifications.push(
+        buildPushPayload(user.pushToken, 'dailyPulse', content.title, content.body)
+      );
+    } catch (err) {
+      console.error(`[NotificationJob:runDailyPulseJob] Failed to process user ${String(user._id)}`, err);
     }
-
-    const nextOccurrenceUtc = getNextOccurrenceUTC(
-      user.dailyPulseTime.hour,
-      user.dailyPulseTime.minute,
-      user.timezone
-    );
-
-    if (nextOccurrenceUtc.getTime() < nowUtc.getTime() || nextOccurrenceUtc.getTime() > windowEndUtc.getTime()) {
-      continue;
-    }
-
-    const notificationDate = formatLocalDateKey(toLocalDate(nextOccurrenceUtc, user.timezone));
-    const content = await getDailyPulseContent(String(user._id), user.goal);
-    const reserved = await reserveNotificationLog(user._id, 'dailyPulse', notificationDate);
-
-    if (!reserved) {
-      continue;
-    }
-
-    notifications.push(
-      buildPushPayload(user.pushToken, 'dailyPulse', content.title, content.body)
-    );
   }
 
   await dispatchNotifications(notifications);
@@ -229,36 +233,40 @@ async function runStreakReminderJob(): Promise<void> {
     .exec();
 
   for (const user of users) {
-    if (!hasNonEmptyPushToken(user.pushToken)) {
-      continue;
+    try {
+      if (!hasNonEmptyPushToken(user.pushToken)) {
+        continue;
+      }
+
+      const localNow = toLocalDate(nowUtc, user.timezone);
+      if (!isWithinLocalHalfHourWindow(localNow, 19)) {
+        continue;
+      }
+
+      const notificationDate = formatLocalDateKey(localNow);
+      const startOfDayUtc = getMidnightUTC(user.timezone);
+      const blendCount = await BlendLogModel.countDocuments({
+        userId: user._id,
+        createdAt: { $gte: startOfDayUtc },
+      }).exec();
+
+      if (blendCount > 0) {
+        continue;
+      }
+
+      const content = getStreakReminderContent(user.currentStreak, user.locale);
+      const reserved = await reserveNotificationLog(user._id, 'streakReminder', notificationDate);
+
+      if (!reserved) {
+        continue;
+      }
+
+      notifications.push(
+        buildPushPayload(user.pushToken, 'streakReminder', content.title, content.body)
+      );
+    } catch (err) {
+      console.error(`[NotificationJob:runStreakReminderJob] Failed to process user ${String(user._id)}`, err);
     }
-
-    const localNow = toLocalDate(nowUtc, user.timezone);
-    if (!isWithinLocalHalfHourWindow(localNow, 19)) {
-      continue;
-    }
-
-    const notificationDate = formatLocalDateKey(localNow);
-    const startOfDayUtc = getMidnightUTC(user.timezone);
-    const blendCount = await BlendLogModel.countDocuments({
-      userId: user._id,
-      createdAt: { $gte: startOfDayUtc },
-    }).exec();
-
-    if (blendCount > 0) {
-      continue;
-    }
-
-    const content = getStreakReminderContent(user.currentStreak, user.locale);
-    const reserved = await reserveNotificationLog(user._id, 'streakReminder', notificationDate);
-
-    if (!reserved) {
-      continue;
-    }
-
-    notifications.push(
-      buildPushPayload(user.pushToken, 'streakReminder', content.title, content.body)
-    );
   }
 
   await dispatchNotifications(notifications);
@@ -283,49 +291,53 @@ async function runSupplementReminderJob(): Promise<void> {
     .exec();
 
   for (const user of users) {
-    if (!hasNonEmptyPushToken(user.pushToken)) {
-      continue;
+    try {
+      if (!hasNonEmptyPushToken(user.pushToken)) {
+        continue;
+      }
+
+      const localNow = toLocalDate(nowUtc, user.timezone);
+      if (!isWithinLocalHalfHourWindow(localNow, 20)) {
+        continue;
+      }
+
+      const notificationDate = formatLocalDateKey(localNow);
+      const activeSupplements = user.supplementStack.filter(supplement => supplement.isActive);
+
+      if (activeSupplements.length === 0) {
+        continue;
+      }
+
+      const consumedLogs = await SupplementLogModel.find({
+        userId: user._id,
+        logDate: notificationDate,
+      })
+        .select({ supplementId: 1, _id: 0 })
+        .lean<Array<{ supplementId: string }>>()
+        .exec();
+
+      const consumedSupplementIds = new Set(consumedLogs.map(log => log.supplementId));
+      const pendingSupplementNames = activeSupplements
+        .filter(supplement => !consumedSupplementIds.has(supplement.supplementId))
+        .map(supplement => supplement.name);
+
+      if (pendingSupplementNames.length === 0) {
+        continue;
+      }
+
+      const content = getSupplementReminderContent(pendingSupplementNames, user.locale);
+      const reserved = await reserveNotificationLog(user._id, 'supplementReminder', notificationDate);
+
+      if (!reserved) {
+        continue;
+      }
+
+      notifications.push(
+        buildPushPayload(user.pushToken, 'supplementReminder', content.title, content.body)
+      );
+    } catch (err) {
+      console.error(`[NotificationJob:runSupplementReminderJob] Failed to process user ${String(user._id)}`, err);
     }
-
-    const localNow = toLocalDate(nowUtc, user.timezone);
-    if (!isWithinLocalHalfHourWindow(localNow, 20)) {
-      continue;
-    }
-
-    const notificationDate = formatLocalDateKey(localNow);
-    const activeSupplements = user.supplementStack.filter(supplement => supplement.isActive);
-
-    if (activeSupplements.length === 0) {
-      continue;
-    }
-
-    const consumedLogs = await SupplementLogModel.find({
-      userId: user._id,
-      logDate: notificationDate,
-    })
-      .select({ supplementId: 1, _id: 0 })
-      .lean<Array<{ supplementId: string }>>()
-      .exec();
-
-    const consumedSupplementIds = new Set(consumedLogs.map(log => log.supplementId));
-    const pendingSupplementNames = activeSupplements
-      .filter(supplement => !consumedSupplementIds.has(supplement.supplementId))
-      .map(supplement => supplement.name);
-
-    if (pendingSupplementNames.length === 0) {
-      continue;
-    }
-
-    const content = getSupplementReminderContent(pendingSupplementNames, user.locale);
-    const reserved = await reserveNotificationLog(user._id, 'supplementReminder', notificationDate);
-
-    if (!reserved) {
-      continue;
-    }
-
-    notifications.push(
-      buildPushPayload(user.pushToken, 'supplementReminder', content.title, content.body)
-    );
   }
 
   await dispatchNotifications(notifications);
@@ -350,47 +362,51 @@ async function runHydrationReminderJob(): Promise<void> {
     .exec();
 
   for (const user of users) {
-    if (!hasNonEmptyPushToken(user.pushToken)) {
-      continue;
+    try {
+      if (!hasNonEmptyPushToken(user.pushToken)) {
+        continue;
+      }
+
+      const localNow = toLocalDate(nowUtc, user.timezone);
+      if (!isWithinLocalHalfHourWindow(localNow, 15)) {
+        continue;
+      }
+
+      const notificationDate = formatLocalDateKey(localNow);
+      const startOfDayUtc = getMidnightUTC(user.timezone);
+      const hydrationLogs = await HydrationLogModel.find({
+        userId: user._id,
+        createdAt: { $gte: startOfDayUtc },
+      })
+        .select({ amountMl: 1, _id: 0 })
+        .lean<Array<{ amountMl: number }>>()
+        .exec();
+
+      const totalCurrentMl = hydrationLogs.reduce((sum, log) => sum + log.amountMl, 0);
+      const dailyHydrationTarget = user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET;
+
+      if (totalCurrentMl >= dailyHydrationTarget * 0.5) {
+        continue;
+      }
+
+      const content = getHydrationReminderContent(
+        totalCurrentMl,
+        dailyHydrationTarget,
+        user.unitSystem,
+        user.locale
+      );
+      const reserved = await reserveNotificationLog(user._id, 'hydrationReminder', notificationDate);
+
+      if (!reserved) {
+        continue;
+      }
+
+      notifications.push(
+        buildPushPayload(user.pushToken, 'hydrationReminder', content.title, content.body)
+      );
+    } catch (err) {
+      console.error(`[NotificationJob:runHydrationReminderJob] Failed to process user ${String(user._id)}`, err);
     }
-
-    const localNow = toLocalDate(nowUtc, user.timezone);
-    if (!isWithinLocalHalfHourWindow(localNow, 15)) {
-      continue;
-    }
-
-    const notificationDate = formatLocalDateKey(localNow);
-    const startOfDayUtc = getMidnightUTC(user.timezone);
-    const hydrationLogs = await HydrationLogModel.find({
-      userId: user._id,
-      createdAt: { $gte: startOfDayUtc },
-    })
-      .select({ amountMl: 1, _id: 0 })
-      .lean<Array<{ amountMl: number }>>()
-      .exec();
-
-    const totalCurrentMl = hydrationLogs.reduce((sum, log) => sum + log.amountMl, 0);
-    const dailyHydrationTarget = user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET;
-
-    if (totalCurrentMl >= dailyHydrationTarget * 0.5) {
-      continue;
-    }
-
-    const content = getHydrationReminderContent(
-      totalCurrentMl,
-      dailyHydrationTarget,
-      user.unitSystem,
-      user.locale
-    );
-    const reserved = await reserveNotificationLog(user._id, 'hydrationReminder', notificationDate);
-
-    if (!reserved) {
-      continue;
-    }
-
-    notifications.push(
-      buildPushPayload(user.pushToken, 'hydrationReminder', content.title, content.body)
-    );
   }
 
   await dispatchNotifications(notifications);

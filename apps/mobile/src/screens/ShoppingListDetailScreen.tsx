@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import type { ShoppingListItem } from '@blendi/shared';
+import type { ShoppingListDetail, ShoppingListItem } from '@blendi/shared';
 import {
   borderRadius,
   colors,
@@ -203,6 +203,10 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
   const [isAdding, setIsAdding] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImportSheetVisible, setIsImportSheetVisible] = useState(false);
+  // Marcado antes de um patch otimista no cache offline para o useEffect abaixo
+  // pular o reset de localItems a partir de `data` nesse ciclo — evita que o
+  // patch otimista seja imediatamente sobrescrito pelo próprio dado que ele gerou.
+  const isOfflinePatchRef = useRef(false);
 
   const { data, isLoading } = useQuery({
     queryKey: [...QUERY_KEYS.shoppingListDetail, listId] as const,
@@ -212,10 +216,36 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
   });
 
   useEffect(() => {
+    if (isOfflinePatchRef.current) {
+      isOfflinePatchRef.current = false;
+      return;
+    }
+
     if (data?.items) {
       setLocalItems(data.items);
     }
   }, [data]);
+
+  const patchShoppingListDetailCache = useCallback(
+    (nextItems: ShoppingListItem[]) => {
+      const detailKey = [...QUERY_KEYS.shoppingListDetail, listId] as const;
+      const currentDetail = queryClient.getQueryData<ShoppingListDetail>(detailKey);
+
+      if (!currentDetail) {
+        return;
+      }
+
+      isOfflinePatchRef.current = true;
+      queryClient.setQueryData<ShoppingListDetail>(detailKey, {
+        ...currentDetail,
+        items: nextItems,
+        totalItems: nextItems.length,
+        pendingItems: nextItems.filter((item) => !item.checked).length,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    [listId, queryClient],
+  );
 
   const pendingItems = useMemo(
     () => sortItemsByAddedAtDesc(localItems.filter((item) => !item.checked)),
@@ -249,6 +279,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
 
       if (isOffline) {
         markListDirty(listId);
+        patchShoppingListDetailCache(nextItems);
         showToast(t('shoppingList.savedLocally'));
         return;
       }
@@ -268,7 +299,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
           setIsSyncing(false);
         });
     },
-    [isOffline, listId, localItems, t],
+    [isOffline, listId, localItems, patchShoppingListDetailCache, t],
   );
 
   const handleDeleteItem = useCallback(
@@ -331,14 +362,18 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.shoppingLists });
       })
       .catch(() => {
-        setLocalItems(previousItems);
-        showToast(t('common.states.error'));
+        // Não reverte o item local — mesmo padrão de appendIngredientsToShoppingList:
+        // mantém o item otimista, marca a lista dirty, e deixa o reconnect sync
+        // reenviar o array completo (incluindo este item) para o backend.
+        markListDirty(listId);
+        patchShoppingListDetailCache(nextItems);
+        showToast(t('shoppingList.savedLocally'));
       })
       .finally(() => {
         setIsAdding(false);
         setIsSyncing(false);
       });
-  }, [isAdding, listId, localItems, newItemName, newItemQuantity, queryClient, t]);
+  }, [isAdding, listId, localItems, newItemName, newItemQuantity, patchShoppingListDetailCache, queryClient, t]);
 
   const handleClearChecked = useCallback(() => {
     if (checkedItems.length === 0 || isSyncing) {

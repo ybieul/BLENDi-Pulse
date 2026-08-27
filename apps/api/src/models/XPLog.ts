@@ -2,7 +2,7 @@ import mongoose, { type Document } from 'mongoose';
 import { XP_EVENTS, type XPEventType } from '@blendi/shared';
 
 const XP_LOG_TTL_SECONDS = 7_776_000;
-const xpLogDatePattern = /^\d{4}-\d{2}-\d{2}(?:_\d+)?$/;
+const xpLogDatePattern = /^\d{4}-\d{2}-\d{2}(?:_[a-z0-9]+)?$/;
 const xpEventTypeValues = Object.keys(XP_EVENTS) as XPEventType[];
 
 export interface IXPLog {
@@ -31,8 +31,9 @@ const xpLogSchema = new mongoose.Schema<IXPLog>(
     // Convenção de idempotência do XP:
     // - eventos únicos por dia usam `YYYY-MM-DD`
     // - eventos multi-ocorrência (`blend`, `pulseAi`, `favoriteRecipe`, `pantryScanner`)
-    //   usam `YYYY-MM-DD_<timestampEmMilissegundos>` para tornar cada ocorrência única
-    //   sem depender de índices parciais mais complexos.
+    //   usam `YYYY-MM-DD_<timestampBase36><sufixoAleatorioBase36>` para tornar cada
+    //   ocorrência única mesmo sob duas gravações no mesmo milissegundo, sem depender
+    //   de índices parciais mais complexos.
     logDate: {
       type: String,
       required: [true, 'errors.validation.required'],

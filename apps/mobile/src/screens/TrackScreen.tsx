@@ -388,9 +388,13 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   const rawHistoryDailyBreakdown = (
     hydrationHistoryQuery as { data?: { dailyBreakdown?: unknown } } | undefined
   )?.data?.dailyBreakdown;
-  const history7Days: HydrationHistoryDailyBreakdownItem[] = Array.isArray(rawHistoryDailyBreakdown)
-    ? rawHistoryDailyBreakdown.filter(isHydrationHistoryDailyBreakdownItem)
-    : [];
+  const history7Days: HydrationHistoryDailyBreakdownItem[] = useMemo(
+    () =>
+      Array.isArray(rawHistoryDailyBreakdown)
+        ? rawHistoryDailyBreakdown.filter(isHydrationHistoryDailyBreakdownItem)
+        : [],
+    [rawHistoryDailyBreakdown],
+  );
   const activeStack: SupplementStackItem[] = (supplementStack ?? []).filter((item) => item.isActive);
   const pendingShoppingListItemsTotal = useMemo(
     () => shoppingListsQuery.data?.lists.reduce((total, list) => total + list.pendingItems, 0) ?? 0,

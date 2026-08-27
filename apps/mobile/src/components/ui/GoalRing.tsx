@@ -100,20 +100,25 @@ export function GoalRing({
 
   const dashOffset = useRef(new Animated.Value(circumference)).current;
   const celebrationScale = useRef(new Animated.Value(1)).current;
+  const hasMounted = useRef(false);
 
   useEffect(() => {
     celebrationScale.setValue(1);
 
     if (!animate) {
       dashOffset.setValue(targetDashOffset);
+      hasMounted.current = true;
       return;
+    }
+
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      dashOffset.setValue(circumference);
     }
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let ringAnimation: Animated.CompositeAnimation | null = null;
     let celebrationAnimation: Animated.CompositeAnimation | null = null;
-
-    dashOffset.setValue(circumference);
 
     const interactionTask = InteractionManager.runAfterInteractions(() => {
       timeoutId = setTimeout(() => {

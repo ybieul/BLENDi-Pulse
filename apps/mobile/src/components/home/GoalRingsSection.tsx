@@ -74,12 +74,16 @@ export function GoalRingsSection({
     [hydrationCurrent, hydrationTarget]
   );
   const hydrationAnimatedProgress = useRef(new Animated.Value(0)).current;
+  const hasMounted = useRef(false);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     let hydrationAnimation: Animated.CompositeAnimation | null = null;
 
-    hydrationAnimatedProgress.setValue(0);
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      hydrationAnimatedProgress.setValue(0);
+    }
 
     const interactionTask = InteractionManager.runAfterInteractions(() => {
       timeoutId = setTimeout(() => {

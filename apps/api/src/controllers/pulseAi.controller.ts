@@ -100,14 +100,6 @@ const pulseAiCachedResponseSchema: z.ZodType<PulseAiCachedResponse> = z.object({
   aiModel: z.string().trim().min(1),
 });
 
-function sendPulseAiUnavailable(res: Response): void {
-  sendErrorResponse(res, {
-    statusCode: 503,
-    code: 'pulseai/ai-unavailable',
-    message: 'Pulse AI is temporarily unavailable.',
-  });
-}
-
 function formatZodErrors(err: ZodError) {
   return err.issues.map(issue => ({
     field: issue.path.join('.') || 'root',
@@ -172,14 +164,6 @@ type PulseAiUsageReservationResult =
   | {
       ok: false;
     };
-
-function sendDailyLimitReached(res: Response): void {
-  sendErrorResponse(res, {
-    statusCode: 429,
-    code: 'pulseai/daily-limit-reached',
-    message: 'Daily Pulse AI limit reached.',
-  });
-}
 
 async function reservePulseAiUsage(
   user: PulseAiUserProfile
@@ -446,13 +430,45 @@ async function resolveConversationContext(userId: string): Promise<ConversationC
   };
 }
 
+type PulseAiChatOutcome =
+  | { kind: 'success'; data: Record<string, unknown> }
+  | { kind: 'error'; statusCode: number; code: string; message: string; errors?: unknown };
+
+// Deduplicação de duplo-toque: mesma dimensão do cache de resposta (usuário +
+// hash da mensagem), em memória de processo — proteção de curta duração contra
+// requisições simultâneas, reinicia com o servidor sem problema.
+const inFlightRequests = new Map<string, Promise<PulseAiChatOutcome>>();
+
+function successOutcome(data: Record<string, unknown>): PulseAiChatOutcome {
+  return { kind: 'success', data };
+}
+
+function errorOutcome(statusCode: number, code: string, message: string, errors?: unknown): PulseAiChatOutcome {
+  return { kind: 'error', statusCode, code, message, errors };
+}
+
+function sendPulseAiChatOutcome(res: Response, outcome: PulseAiChatOutcome): void {
+  if (outcome.kind === 'success') {
+    res.status(200).json({ success: true, data: outcome.data });
+    return;
+  }
+
+  sendErrorResponse(res, {
+    statusCode: outcome.statusCode,
+    code: outcome.code,
+    message: outcome.message,
+    errors: outcome.errors,
+  });
+}
+
 async function persistConversationTurn(params: {
   conversationId: mongoose.Types.ObjectId | string;
+  userId: string;
   userMessage: string;
   userSentAt: Date;
   recipe: PulseAiRecipe;
 }): Promise<void> {
-  await ConversationModel.updateOne(
+  const result = await ConversationModel.updateOne(
     { _id: params.conversationId },
     {
       $push: {
@@ -471,6 +487,235 @@ async function persistConversationTurn(params: {
       runValidators: true,
     }
   ).exec();
+
+  if (result.matchedCount === 0) {
+    console.warn(
+      '[pulseAi.controller] persistConversationTurn: conversation not found (provavelmente expirada pelo TTL) — a resposta da IA já havia sido enviada ao usuário.',
+      { conversationId: String(params.conversationId), userId: params.userId }
+    );
+  }
+}
+
+async function runPulseAiChat(params: {
+  userId: string;
+  message: string;
+  normalizedMessage: string;
+  normalizedMessageHash: string;
+  requestedLanguage: UserLocale | undefined;
+}): Promise<PulseAiChatOutcome> {
+  const { userId, message, normalizedMessage, normalizedMessageHash, requestedLanguage } = params;
+
+  const initialUser = await findPulseAiUserProfile(userId);
+  if (!initialUser) {
+    return errorOutcome(404, 'resource/not-found', 'User not found.');
+  }
+
+  await resetDailyAiUsageIfNeeded(initialUser);
+  const currentUser = await findPulseAiUserProfile(userId);
+  if (!currentUser) {
+    return errorOutcome(404, 'resource/not-found', 'User not found.');
+  }
+
+  const effectiveLanguage = requestedLanguage ?? currentUser.locale;
+  const requestReceivedAt = new Date();
+  const conversationContext = await resolveConversationContext(currentUser.id);
+
+  const cacheKey = generateCacheKey({
+    userId: currentUser.id,
+    model: currentUser.blendiModel,
+    goal: currentUser.goal,
+    language: effectiveLanguage,
+    unitSystem: currentUser.unitSystem,
+    aiProvider: env.AI_PROVIDER,
+    aiModel: env.AI_MODEL,
+    rawMessage: normalizedMessage,
+  });
+
+  const cacheKeyParts = cacheKey.split(':');
+  if (cacheKeyParts[7] !== normalizedMessageHash) {
+    throw new Error('[pulseAi.controller] cacheKey hash mismatch');
+  }
+
+  const cachedResponse = await getFromCache(cacheKey);
+  if (cachedResponse) {
+    const parsedCachedResponse = pulseAiCachedResponseSchema.safeParse(cachedResponse);
+
+    if (parsedCachedResponse.success) {
+      const usageReservation = await reservePulseAiUsage(currentUser);
+
+      if (!usageReservation.ok) {
+        return errorOutcome(429, 'pulseai/daily-limit-reached', 'Daily Pulse AI limit reached.');
+      }
+
+      try {
+        await persistConversationTurn({
+          conversationId: conversationContext.conversationId,
+          userId: currentUser.id,
+          userMessage: message,
+          userSentAt: requestReceivedAt,
+          recipe: parsedCachedResponse.data.recipe,
+        });
+      } catch (error) {
+        await rollbackPulseAiUsageReservation(currentUser);
+        throw error;
+      }
+
+      const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+      triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
+
+      return successOutcome({
+        recipe: parsedCachedResponse.data.recipe,
+        fromCache: true,
+        usageRemaining: usageReservation.usageRemaining,
+        aiProvider: parsedCachedResponse.data.aiProvider,
+        aiModel: parsedCachedResponse.data.aiModel,
+        xpAwarded,
+        conversationId: String(conversationContext.conversationId),
+        macrosValidated: parsedCachedResponse.data.recipe.macrosValidated ?? true,
+      });
+    }
+  }
+
+  const recentBlendLogs = await BlendLogModel.find({ userId: currentUser.id })
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .select({ recipeName: 1, _id: 0 })
+    .lean()
+    .exec();
+
+  const prompt = buildPulseAiPrompt({
+    blendiModel: currentUser.blendiModel,
+    goal: currentUser.goal,
+    language: requestedLanguage,
+    locale: currentUser.locale,
+    unitSystem: currentUser.unitSystem,
+    dailyProteinTarget: currentUser.dailyProteinTarget,
+    dailyCarbTarget: currentUser.dailyCarbTarget,
+    dailyCalorieTarget: currentUser.dailyCalorieTarget,
+    recentBlendRecipeNames: recentBlendLogs.flatMap(log => (
+      log.recipeName ? [log.recipeName] : []
+    )),
+    message,
+  });
+
+  if (conversationContext.historyMessages.length > 0) {
+    prompt.messages = [...conversationContext.historyMessages, ...prompt.messages];
+  }
+
+  const usageReservation = await reservePulseAiUsage(currentUser);
+
+  if (!usageReservation.ok) {
+    return errorOutcome(429, 'pulseai/daily-limit-reached', 'Daily Pulse AI limit reached.');
+  }
+
+  let shouldRollbackUsage = !currentUser.isPro;
+
+  let recipe: PulseAiRecipe | null = null;
+  let aiResponse: AiProviderResponse | null = null;
+
+  try {
+    try {
+      const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
+      recipe = generatedRecipe.recipe;
+      aiResponse = generatedRecipe.aiResponse;
+    } catch (error) {
+      if (shouldRollbackUsage) {
+        await rollbackPulseAiUsageReservation(currentUser);
+        shouldRollbackUsage = false;
+      }
+
+      if (error instanceof AiProviderRequestError) {
+        return errorOutcome(503, 'pulseai/ai-unavailable', 'Pulse AI is temporarily unavailable.');
+      }
+
+      throw error;
+    }
+
+    if (!recipe) {
+      try {
+        const regeneratedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, [
+          ...prompt.messages,
+          {
+            role: 'user',
+            content: INVALID_JSON_RETRY_INSTRUCTION,
+          },
+        ]);
+        recipe = regeneratedRecipe.recipe;
+        aiResponse = regeneratedRecipe.aiResponse;
+      } catch (error) {
+        if (shouldRollbackUsage) {
+          await rollbackPulseAiUsageReservation(currentUser);
+          shouldRollbackUsage = false;
+        }
+
+        if (error instanceof AiProviderRequestError) {
+          return errorOutcome(503, 'pulseai/ai-unavailable', 'Pulse AI is temporarily unavailable.');
+        }
+
+        throw error;
+      }
+    }
+
+    if (!recipe || !aiResponse) {
+      if (shouldRollbackUsage) {
+        await rollbackPulseAiUsageReservation(currentUser);
+        shouldRollbackUsage = false;
+      }
+
+      return errorOutcome(500, 'pulseai/invalid-ai-response', 'Pulse AI returned an invalid response.');
+    }
+
+    recipe = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
+    recipe = await ensureMacroConsistency(recipe, prompt);
+
+    await persistConversationTurn({
+      conversationId: conversationContext.conversationId,
+      userId: currentUser.id,
+      userMessage: message,
+      userSentAt: requestReceivedAt,
+      recipe,
+    });
+
+    await setInCache({
+      cacheKey,
+      userId: currentUser.id,
+      model: currentUser.blendiModel,
+      goal: currentUser.goal,
+      language: effectiveLanguage,
+      unitSystem: currentUser.unitSystem,
+      aiProvider: aiResponse.provider,
+      aiModel: aiResponse.model,
+      rawMessage: normalizedMessage,
+      response: {
+        recipe,
+        aiProvider: aiResponse.provider,
+        aiModel: aiResponse.model,
+      },
+    });
+
+    shouldRollbackUsage = false;
+
+    const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+    triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
+
+    return successOutcome({
+      recipe,
+      fromCache: false,
+      usageRemaining: usageReservation.usageRemaining,
+      aiProvider: aiResponse.provider,
+      aiModel: aiResponse.model,
+      xpAwarded,
+      conversationId: String(conversationContext.conversationId),
+      macrosValidated: recipe.macrosValidated ?? true,
+    });
+  } catch (error) {
+    if (shouldRollbackUsage) {
+      await rollbackPulseAiUsageReservation(currentUser);
+      shouldRollbackUsage = false;
+    }
+
+    throw error;
+  }
 }
 
 export async function chat(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -507,234 +752,28 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     }
 
     const normalizedMessageHash = sha256(normalizedMessage);
+    // Escopo por usuário + hash: mesma dimensão do cache de resposta, evita que
+    // dois usuários diferentes enviando o mesmo texto colidam na mesma chave.
+    const inFlightKey = `${userId}:${normalizedMessageHash}`;
 
-    const initialUser = await findPulseAiUserProfile(userId);
-    if (!initialUser) {
-      sendUserNotFound(res);
-      return;
-    }
+    let requestPromise = inFlightRequests.get(inFlightKey);
 
-    await resetDailyAiUsageIfNeeded(initialUser);
-    const currentUser = await findPulseAiUserProfile(userId);
-    if (!currentUser) {
-      sendUserNotFound(res);
-      return;
-    }
-
-    const effectiveLanguage = requestedLanguage ?? currentUser.locale;
-    const requestReceivedAt = new Date();
-    const conversationContext = await resolveConversationContext(currentUser.id);
-
-    const cacheKey = generateCacheKey({
-      userId: currentUser.id,
-      model: currentUser.blendiModel,
-      goal: currentUser.goal,
-      language: effectiveLanguage,
-      unitSystem: currentUser.unitSystem,
-      aiProvider: env.AI_PROVIDER,
-      aiModel: env.AI_MODEL,
-      rawMessage: normalizedMessage,
-    });
-
-    const cacheKeyParts = cacheKey.split(':');
-    if (cacheKeyParts[7] !== normalizedMessageHash) {
-      throw new Error('[pulseAi.controller] cacheKey hash mismatch');
-    }
-
-    const cachedResponse = await getFromCache(cacheKey);
-    if (cachedResponse) {
-      const parsedCachedResponse = pulseAiCachedResponseSchema.safeParse(cachedResponse);
-
-      if (parsedCachedResponse.success) {
-        const usageReservation = await reservePulseAiUsage(currentUser);
-
-        if (!usageReservation.ok) {
-          sendDailyLimitReached(res);
-          return;
-        }
-
-        try {
-          await persistConversationTurn({
-            conversationId: conversationContext.conversationId,
-            userMessage: message,
-            userSentAt: requestReceivedAt,
-            recipe: parsedCachedResponse.data.recipe,
-          });
-        } catch (error) {
-          await rollbackPulseAiUsageReservation(currentUser);
-          throw error;
-        }
-
-        const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
-        triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
-
-        res.status(200).json({
-          success: true,
-          data: {
-            recipe: parsedCachedResponse.data.recipe,
-            fromCache: true,
-            usageRemaining: usageReservation.usageRemaining,
-            aiProvider: parsedCachedResponse.data.aiProvider,
-            aiModel: parsedCachedResponse.data.aiModel,
-            xpAwarded,
-            conversationId: String(conversationContext.conversationId),
-            macrosValidated: parsedCachedResponse.data.recipe.macrosValidated ?? true,
-          },
-        });
-        return;
-      }
-    }
-
-    const recentBlendLogs = await BlendLogModel.find({ userId: currentUser.id })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select({ recipeName: 1, _id: 0 })
-      .lean()
-      .exec();
-
-    const prompt = buildPulseAiPrompt({
-      blendiModel: currentUser.blendiModel,
-      goal: currentUser.goal,
-      language: requestedLanguage,
-      locale: currentUser.locale,
-      unitSystem: currentUser.unitSystem,
-      dailyProteinTarget: currentUser.dailyProteinTarget,
-      dailyCarbTarget: currentUser.dailyCarbTarget,
-      dailyCalorieTarget: currentUser.dailyCalorieTarget,
-      recentBlendRecipeNames: recentBlendLogs.flatMap(log => (
-        log.recipeName ? [log.recipeName] : []
-      )),
-      message,
-    });
-
-    if (conversationContext.historyMessages.length > 0) {
-      prompt.messages = [...conversationContext.historyMessages, ...prompt.messages];
-    }
-
-    const usageReservation = await reservePulseAiUsage(currentUser);
-
-    if (!usageReservation.ok) {
-      sendDailyLimitReached(res);
-      return;
-    }
-
-    let shouldRollbackUsage = !currentUser.isPro;
-
-    let recipe: PulseAiRecipe | null = null;
-    let aiResponse: AiProviderResponse | null = null;
-
-    try {
-      try {
-        const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
-        recipe = generatedRecipe.recipe;
-        aiResponse = generatedRecipe.aiResponse;
-      } catch (error) {
-        if (shouldRollbackUsage) {
-          await rollbackPulseAiUsageReservation(currentUser);
-          shouldRollbackUsage = false;
-        }
-
-        if (error instanceof AiProviderRequestError) {
-          sendPulseAiUnavailable(res);
-          return;
-        }
-
-        throw error;
-      }
-
-      if (!recipe) {
-        try {
-          const regeneratedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, [
-            ...prompt.messages,
-            {
-              role: 'user',
-              content: INVALID_JSON_RETRY_INSTRUCTION,
-            },
-          ]);
-          recipe = regeneratedRecipe.recipe;
-          aiResponse = regeneratedRecipe.aiResponse;
-        } catch (error) {
-          if (shouldRollbackUsage) {
-            await rollbackPulseAiUsageReservation(currentUser);
-            shouldRollbackUsage = false;
-          }
-
-          if (error instanceof AiProviderRequestError) {
-            sendPulseAiUnavailable(res);
-            return;
-          }
-
-          throw error;
-        }
-      }
-
-      if (!recipe || !aiResponse) {
-        if (shouldRollbackUsage) {
-          await rollbackPulseAiUsageReservation(currentUser);
-          shouldRollbackUsage = false;
-        }
-
-        sendErrorResponse(res, {
-          statusCode: 500,
-          code: 'pulseai/invalid-ai-response',
-          message: 'Pulse AI returned an invalid response.',
-        });
-        return;
-      }
-
-      recipe = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
-      recipe = await ensureMacroConsistency(recipe, prompt);
-
-      await persistConversationTurn({
-        conversationId: conversationContext.conversationId,
-        userMessage: message,
-        userSentAt: requestReceivedAt,
-        recipe,
+    if (!requestPromise) {
+      requestPromise = runPulseAiChat({
+        userId,
+        message,
+        normalizedMessage,
+        normalizedMessageHash,
+        requestedLanguage,
+      }).finally(() => {
+        inFlightRequests.delete(inFlightKey);
       });
 
-      await setInCache({
-        cacheKey,
-        userId: currentUser.id,
-        model: currentUser.blendiModel,
-        goal: currentUser.goal,
-        language: effectiveLanguage,
-        unitSystem: currentUser.unitSystem,
-        aiProvider: aiResponse.provider,
-        aiModel: aiResponse.model,
-        rawMessage: normalizedMessage,
-        response: {
-          recipe,
-          aiProvider: aiResponse.provider,
-          aiModel: aiResponse.model,
-        },
-      });
-
-      shouldRollbackUsage = false;
-
-      const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
-      triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          recipe,
-          fromCache: false,
-          usageRemaining: usageReservation.usageRemaining,
-          aiProvider: aiResponse.provider,
-          aiModel: aiResponse.model,
-          xpAwarded,
-          conversationId: String(conversationContext.conversationId),
-          macrosValidated: recipe.macrosValidated ?? true,
-        },
-      });
-    } catch (error) {
-      if (shouldRollbackUsage) {
-        await rollbackPulseAiUsageReservation(currentUser);
-        shouldRollbackUsage = false;
-      }
-
-      throw error;
+      inFlightRequests.set(inFlightKey, requestPromise);
     }
+
+    const outcome = await requestPromise;
+    sendPulseAiChatOutcome(res, outcome);
   } catch (error) {
     next(error);
   }

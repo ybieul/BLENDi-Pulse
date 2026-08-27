@@ -20,8 +20,6 @@ import {
 
 interface BlendUserContext {
   timezone: string;
-  currentStreak: number;
-  longestStreak: number;
   blendCount: number;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
@@ -166,8 +164,6 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
   const user = await UserModel.findById(userId)
     .select({
       timezone: 1,
-      currentStreak: 1,
-      longestStreak: 1,
       blendCount: 1,
       dailyProteinTarget: 1,
       dailyCalorieTarget: 1,
@@ -180,8 +176,6 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
 
   return {
     timezone: user.timezone,
-    currentStreak: user.currentStreak ?? 0,
-    longestStreak: user.longestStreak ?? 0,
     blendCount: user.blendCount ?? 0,
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
@@ -252,8 +246,7 @@ async function awardDailyBlendGoalXP(
 async function updateCurrentStreak(
   userId: string,
   currentCreatedAt: Date,
-  timezone: string,
-  currentStreak: number
+  timezone: string
 ): Promise<{ currentStreak: number; longestStreak: number }> {
   const previousLog = await BlendLogModel.findOne({
     userId,
@@ -263,36 +256,73 @@ async function updateCurrentStreak(
     .select({ createdAt: 1 })
     .lean();
 
-  let nextStreak = 1;
+  const isSameDay = previousLog
+    ? isSameDayInTimezone(previousLog.createdAt, currentCreatedAt, timezone)
+    : false;
+  const isPreviousDay = previousLog
+    ? isPreviousDayInTimezone(previousLog.createdAt, currentCreatedAt, timezone)
+    : false;
 
-  if (previousLog) {
-    if (isSameDayInTimezone(previousLog.createdAt, currentCreatedAt, timezone)) {
-      nextStreak = Math.max(currentStreak, 1);
-    } else if (isPreviousDayInTimezone(previousLog.createdAt, currentCreatedAt, timezone)) {
-      nextStreak = Math.max(currentStreak, 0) + 1;
-    }
+  let updatedUser: { currentStreak?: number; longestStreak?: number } | null;
+
+  if (isSameDay) {
+    // Já há blend hoje: só garante o piso de 1, nunca reduz. $max é idempotente
+    // e seguro sob concorrência sem precisar reler o valor atual antes de escrever.
+    updatedUser = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $max: {
+          currentStreak: 1,
+          longestStreak: 1,
+        },
+      },
+      { new: true }
+    )
+      .select({ currentStreak: 1, longestStreak: 1 })
+      .lean();
+  } else if (isPreviousDay) {
+    // Sequência contínua: $inc é atômico (sem lost update). longestStreak
+    // referencia o currentStreak já incrementado dentro do próprio pipeline
+    // de update — não depende de um valor lido antes da escrita.
+    updatedUser = await UserModel.findByIdAndUpdate(
+      userId,
+      [
+        {
+          $set: {
+            currentStreak: { $add: ['$currentStreak', 1] },
+          },
+        },
+        {
+          $set: {
+            longestStreak: { $max: ['$longestStreak', '$currentStreak'] },
+          },
+        },
+      ],
+      { new: true }
+    )
+      .select({ currentStreak: 1, longestStreak: 1 })
+      .lean();
+  } else {
+    // Gap: reset para 1 é idempotente sob concorrência.
+    updatedUser = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          currentStreak: 1,
+        },
+        $max: {
+          longestStreak: 1,
+        },
+      },
+      { new: true }
+    )
+      .select({ currentStreak: 1, longestStreak: 1 })
+      .lean();
   }
 
-  const updatedUser = await UserModel.findByIdAndUpdate(
-    userId,
-    {
-      $set: {
-        currentStreak: nextStreak,
-      },
-      $max: {
-        longestStreak: nextStreak,
-      },
-    },
-    {
-      new: true,
-    }
-  )
-    .select({ currentStreak: 1, longestStreak: 1 })
-    .lean();
-
   return {
-    currentStreak: updatedUser?.currentStreak ?? nextStreak,
-    longestStreak: updatedUser?.longestStreak ?? nextStreak,
+    currentStreak: updatedUser?.currentStreak ?? 1,
+    longestStreak: updatedUser?.longestStreak ?? 1,
   };
 }
 
@@ -343,7 +373,7 @@ export async function createBlendLog(
       )
         .select({ blendCount: 1 })
         .lean(),
-      updateCurrentStreak(userId, log.createdAt, user.timezone, user.currentStreak),
+      updateCurrentStreak(userId, log.createdAt, user.timezone),
     ]);
 
     const updatedBlendCount = updatedUser?.blendCount ?? user.blendCount + 1;

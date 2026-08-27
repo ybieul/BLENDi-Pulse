@@ -9,6 +9,8 @@
 
 import { z } from 'zod';
 
+import { isValidIanaTimezone } from '../utils/timezone.utils';
+
 const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
 const unitSystemValues = ['metric', 'imperial'] as const;
@@ -219,10 +221,9 @@ export const macroTargetSchema = z.object({
 // Fonte de verdade para validação do campo timezone em qualquer contexto de
 // domínio do usuário (perfil, preferências, sincronização de dispositivo).
 //
-// Aceita qualquer string IANA não-vazia (ex: 'America/Sao_Paulo', 'UTC',
-// 'Europe/London'). A validação de existência do timezone no banco de dados
-// IANA é responsabilidade da camada de negócio — o schema garante apenas que
-// o campo foi fornecido como string.
+// Valida que o valor é um timezone IANA reconhecido (ex: 'America/Sao_Paulo',
+// 'UTC', 'Europe/London') via isValidIanaTimezone — mesma checagem usada pelo
+// runtime do backend (apps/api/src/utils/timezone.utils.ts, validateTimezone).
 //
 // Consumidores:
 //   • Backend  → PATCH /auth/timezone (updateTimezoneSchema reutiliza este)
@@ -234,7 +235,8 @@ export const timezoneSchema = z.object({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.required',
     })
-    .min(1, 'errors.validation.required'),
+    .min(1, 'errors.validation.required')
+    .refine(isValidIanaTimezone, 'errors.validation.timezone_invalid'),
 });
 
 export const calculateMacrosResponseSchema = z.object({

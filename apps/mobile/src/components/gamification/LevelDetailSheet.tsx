@@ -110,8 +110,6 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
       return;
     }
 
-    progressAnimation.setValue(0);
-
     const animation = Animated.timing(progressAnimation, {
       toValue: levelInfo.progress,
       duration: 600,
