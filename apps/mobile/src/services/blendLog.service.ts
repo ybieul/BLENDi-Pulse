@@ -50,7 +50,6 @@ export interface CreateBlendLogResult {
   leveledUp: boolean;
   newLevel: number | null;
   totalBlends: number;
-  missionsUpdated?: string[];
 }
 
 export interface BlendLogsTodayData {

@@ -94,12 +94,16 @@ export const QUERY_KEYS = {
 export const PERSISTABLE_QUERY_KEYS = [
   'user',
   'userProfile',
+  'dailyMissions',
   'blendLogsToday',
+  'blendHistory',
   'favorites',
   'hydrationToday',
+  'hydrationHistory',
   'shoppingLists',
   'shoppingListDetail',
   'supplementStack',
+  'supplementHistory',
   'pulseAiHistory',
 ] as const satisfies ReadonlyArray<keyof typeof QUERY_KEYS>;
 

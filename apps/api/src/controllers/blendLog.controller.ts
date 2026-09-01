@@ -344,8 +344,31 @@ export async function createBlendLog(
       return;
     }
 
-    const user = await getBlendUserContext(userId);
+    // getBlendUserContext e a criação do blend não dependem uma da outra —
+    // a criação só precisa de userId + payload já validado, o contexto do
+    // usuário só é usado a partir daqui pra baixo (streak, metas). Rodar em
+    // paralelo economiza 1 round-trip sequencial ao Atlas.
+    const [user, log] = await Promise.all([
+      getBlendUserContext(userId),
+      BlendLogModel.create({
+        userId,
+        ...parsed.data,
+      }),
+    ]);
+
     if (!user) {
+      // Janela de corrida raríssima: o usuário deixou de existir entre a
+      // autenticação do JWT e este ponto. O blend já foi criado em paralelo —
+      // remove o documento órfão antes de responder 404, já que ele nunca
+      // poderia ser exibido a ninguém.
+      await BlendLogModel.deleteOne({ _id: log._id }).catch(err => {
+        console.error('[blendLog.controller] failed to remove orphaned blend log', {
+          userId,
+          logId: String(log._id),
+          err,
+        });
+      });
+
       sendErrorResponse(res, {
         statusCode: 404,
         code: 'resource/not-found',
@@ -353,11 +376,6 @@ export async function createBlendLog(
       });
       return;
     }
-
-    const log = await BlendLogModel.create({
-      userId,
-      ...parsed.data,
-    });
 
     const [updatedUser, updatedStreaks] = await Promise.all([
       UserModel.findByIdAndUpdate(
@@ -402,41 +420,33 @@ export async function createBlendLog(
       typeof req.body?.fromFavoriteId === 'string' && req.body.fromFavoriteId.trim().length > 0
         ? req.body.fromFavoriteId
         : undefined;
-    const missionProgressUpdates = [
-      {
-        type: 'makeBlend',
-        promise: updateMissionProgress(userId, 'makeBlend', user.timezone),
-      },
-      ...(proteinGoalXPOutcome.goalHit
-        ? [
-            {
-              type: 'hitProteinGoal',
-              promise: updateMissionProgress(userId, 'hitProteinGoal', user.timezone),
-            },
-          ]
-        : []),
-      ...(calorieGoalXPOutcome.goalHit
-        ? [
-            {
-              type: 'hitCalorieGoal',
-              promise: updateMissionProgress(userId, 'hitCalorieGoal', user.timezone),
-            },
-          ]
-        : []),
-      ...(fromFavoriteId !== undefined
-        ? [
-            {
-              type: 'makeBlendFromFavorite',
-              promise: updateMissionProgress(userId, 'makeBlendFromFavorite', user.timezone),
-            },
-          ]
-        : []),
+
+    // Background: progresso de missão não é usado na resposta e não compromete a
+    // integridade do blend já persistido — não há motivo pra a requisição esperar
+    // por até 4 cadeias de findOrCreate+increment+reconcile de bônus, cada uma
+    // podendo levar vários round-trips ao Atlas. handleMissionResponse no mobile
+    // invalida dailyMissions incondicionalmente após o blend, então a Home reflete
+    // o resultado assim que a atualização em background terminar.
+    const missionTypesToUpdate: string[] = [
+      'makeBlend',
+      ...(proteinGoalXPOutcome.goalHit ? ['hitProteinGoal'] : []),
+      ...(calorieGoalXPOutcome.goalHit ? ['hitCalorieGoal'] : []),
+      ...(fromFavoriteId !== undefined ? ['makeBlendFromFavorite'] : []),
     ];
-    const missionResults = await Promise.all(missionProgressUpdates.map(update => update.promise));
+
+    for (const missionType of missionTypesToUpdate) {
+      void updateMissionProgress(userId, missionType, user.timezone).catch(err => {
+        console.error('[blendLog.controller] updateMissionProgress failed in background', {
+          userId,
+          missionType,
+          err,
+        });
+      });
+    }
+
     const xpAwarded = xpResults
       .filter(result => result.awarded)
       .reduce((sum, result) => sum + result.amount, 0);
-    const missionXPAwarded = missionResults.reduce((sum, result) => sum + result.totalXPAwarded, 0);
     const leveledUp = xpResults.some(result => result.leveledUp);
     const newLevel = xpResults.reduce<number | null>(
       (highestLevel, result) => {
@@ -448,9 +458,6 @@ export async function createBlendLog(
       },
       null
     );
-    const missionsUpdated = missionProgressUpdates
-      .filter((_, index) => missionResults[index]?.missionUpdated)
-      .map(update => update.type);
 
     res.status(201).json({
       success: true,
@@ -470,10 +477,9 @@ export async function createBlendLog(
         currentStreak: updatedStreaks.currentStreak,
         longestStreak: updatedStreaks.longestStreak,
         blendCount: updatedBlendCount,
-        xpAwarded: xpAwarded + missionXPAwarded,
+        xpAwarded,
         leveledUp,
         newLevel,
-        missionsUpdated,
         totalBlends: updatedBlendCount,
       },
     });

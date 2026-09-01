@@ -172,7 +172,11 @@ export async function awardXP(
     const levelName = getLevelName(levelAfter.level, locale);
     const title = locale === 'pt-BR' ? 'Subiu de Nível! 🎉' : 'Level Up! 🎉';
     const body = locale === 'pt-BR' ? `${levelName} — Continue assim!` : `${levelName} — Keep it up!`;
-    const notificationResult = await sendNotificationBatch([
+
+    // Background: o app já mostra sua própria celebração local via leveledUp/newLevel
+    // na resposta — o push só importa se o app estiver em background, então não há
+    // motivo pra bloquear a resposta HTTP numa chamada externa ao Expo Push.
+    void sendNotificationBatch([
       {
         pushToken: updatedUser.pushToken,
         title,
@@ -183,9 +187,11 @@ export async function awardXP(
         },
         priority: 'high',
       },
-    ]);
-
-    await cleanInvalidTokens(notificationResult.invalidTokens);
+    ])
+      .then(notificationResult => cleanInvalidTokens(notificationResult.invalidTokens))
+      .catch(err => {
+        console.error('[xp.service] level-up push notification failed', { userId, err });
+      });
   }
 
   return {

@@ -95,4 +95,8 @@ aiCacheSchema.index({ cacheKey: 1 }, { unique: true });
 // Expiração automática exatamente no instante de expiresAt.
 aiCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+// Usado por invalidateUserCache (deleteMany({ userId })) — sem esse índice a
+// invalidação de cache de um usuário faz collection scan na coleção inteira.
+aiCacheSchema.index({ userId: 1 });
+
 export const AiCacheModel = mongoose.model<IAiCache>('AiCache', aiCacheSchema);

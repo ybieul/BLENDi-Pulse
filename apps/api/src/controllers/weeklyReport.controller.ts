@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
-import type { WeeklyReportSummary } from '@blendi/shared';
 
 import { WeeklyReportModel, type IWeeklyReport } from '../models/WeeklyReport';
 import { UserModel } from '../models/User';
@@ -33,14 +32,33 @@ function getFirstQueryValue(value: unknown): string | undefined {
   return typeof rawValue === 'string' ? rawValue : undefined;
 }
 
-function serializeWeeklyReport(report: WeeklyReportLean): WeeklyReportSummary {
+// Omite campos que o mobile nunca lê (auditados via grep em apps/mobile/src):
+// data.nutrition.calorieGoalHitDays, data.supplements.bySupplementName
+// (mapa dinâmico que cresce com o supplementStack do usuário, o maior dos
+// seis), data.gamification.blendDaysInWeek, previousWeekComparison.avgDailyMlDeltaPercent
+// e .adherenceRateDeltaPercent, e isProAtGeneration no topo do documento.
+// O schema armazenado e as interfaces do shared continuam com todos os
+// campos — só a resposta da API é reduzida.
+function serializeWeeklyReport(report: WeeklyReportLean) {
+  const { calorieGoalHitDays: _calorieGoalHitDays, ...nutritionResponse } = report.data.nutrition;
+  const { bySupplementName: _bySupplementName, ...supplementsResponse } = report.data.supplements;
+  const { blendDaysInWeek: _blendDaysInWeek, ...gamificationResponse } = report.data.gamification;
+
   return {
     id: String(report._id),
     weekStartDate: report.weekStartDate,
     weekEndDate: report.weekEndDate,
-    isProAtGeneration: report.isProAtGeneration,
-    data: report.data,
-    ...(report.previousWeekComparison && { previousWeekComparison: report.previousWeekComparison }),
+    data: {
+      nutrition: nutritionResponse,
+      hydration: report.data.hydration,
+      supplements: supplementsResponse,
+      gamification: gamificationResponse,
+    },
+    ...(report.previousWeekComparison && {
+      previousWeekComparison: {
+        avgProteinPerDayDeltaPercent: report.previousWeekComparison.avgProteinPerDayDeltaPercent,
+      },
+    }),
     createdAt: report.createdAt.toISOString(),
   };
 }

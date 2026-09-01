@@ -105,6 +105,7 @@ export const MISSION_POOLS: Record<MissionGoal, MissionPoolEntry[]> = {
     { type: 'makeBlend', weight: 1 },
     { type: 'scanPantry', weight: 1 },
     { type: 'favoriteRecipe', weight: 1 },
+    { type: 'hitProteinGoal', weight: 1 },
   ],
   Energy: [
     { type: 'hitCalorieGoal', weight: 3 },
@@ -118,6 +119,7 @@ export const MISSION_POOLS: Record<MissionGoal, MissionPoolEntry[]> = {
     { type: 'completeSuppStack', weight: 3 },
     { type: 'hitHydrationGoal', weight: 3 },
     { type: 'usePulseAI', weight: 2 },
+    { type: 'hitProteinGoal', weight: 2 },
     { type: 'makeBlend', weight: 1 },
     { type: 'favoriteRecipe', weight: 1 },
     { type: 'scanPantry', weight: 1 },

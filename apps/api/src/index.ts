@@ -12,6 +12,7 @@ import { env, paymentsConfig } from './config/env';
 import { connectDatabase } from './config/database';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import { pingRouter } from './routes/ping';
@@ -65,16 +66,20 @@ app.use(
   })
 );
 
+// 2. Compressão gzip das respostas — precisa vir antes de qualquer middleware
+// de rota para interceptar corretamente o corpo enviado por res.send/res.json.
+app.use(compression());
+
 // Webhooks do RevenueCat precisam do corpo bruto para verificar o HMAC recebido.
 app.use('/webhooks', express.raw({ type: 'application/json', limit: '1mb' }), webhooksRouter);
 
-// 2. Parsing de JSON com limite de 4 MB para acomodar imagens base64 do Pantry Scanner
+// 3. Parsing de JSON com limite de 4 MB para acomodar imagens base64 do Pantry Scanner
 app.use(express.json({ limit: '4mb' }));
 
-// 3. Parsing de URL encoded
+// 4. Parsing de URL encoded
 app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
-// 4. Logger de requisições (apenas em development)
+// 5. Logger de requisições (apenas em development)
 app.use(requestLogger);
 
 // ─── Rotas ────────────────────────────────────────────────────────────────────

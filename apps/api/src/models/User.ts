@@ -551,6 +551,21 @@ userSchema.method(
   }
 );
 
+// ─── Índices ──────────────────────────────────────────────────────────────────
+
+// Usado por findUserForWebhook (revenueCatWebhook.controller.ts) no braço não-_id
+// do $or. sparse: true porque a maioria dos usuários não tem esse campo
+// preenchido até assinar o Pro — um índice não-sparse indexaria todo documento
+// com o campo ausente, sem ganho de performance.
+userSchema.index({ revenueCatCustomerId: 1 }, { sparse: true });
+
+// Usado pelos cron jobs de notificação (notifications.jobs.ts), que filtram
+// por { pushToken: { $exists: true, $type: 'string', $ne: '' } } antes de
+// checar notificationPreferences em memória. sparse: true porque a maioria
+// dos usuários em desenvolvimento não tem pushToken definido — o índice
+// cobre exatamente o subconjunto de documentos onde o campo existe.
+userSchema.index({ pushToken: 1 }, { sparse: true });
+
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 // O campo email já possui unique: true, que cria o índice automaticamente.
 // Não declarar userSchema.index({ email: 1 }) para evitar índice duplicado.
