@@ -13,7 +13,10 @@ import { connectDatabase } from './config/database';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
 import { requestLogger } from './middlewares/requestLogger';
+import { authenticatedLimiter } from './middlewares/rateLimiter';
 import { errorHandler } from './middlewares/errorHandler';
 import { pingRouter } from './routes/ping';
 import { authRouter } from './routes/auth';
@@ -49,9 +52,22 @@ function isAllowedOrigin(origin?: string): boolean {
   return env.NODE_ENV === 'development' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
+// Rotas que legitimamente recebem payloads grandes (imagens em base64) —
+// todo o resto usa o limite padrão pequeno. Ver uso na cadeia de
+// middlewares abaixo.
+const LARGE_JSON_PAYLOAD_PATHS = new Set(['/users/profile-photo', '/pantry-scanner/analyze']);
+const defaultJsonParser = express.json({ limit: '50kb' });
+const largeJsonParser = express.json({ limit: '4mb' });
+
 // ─── Middlewares globais (ordem importa) ─────────────────────────────────────
 
-// 1. CORS — aceita origens configuradas e localhost/127.0.0.1 em desenvolvimento
+// 1. Helmet — headers de segurança HTTP (HSTS, X-Content-Type-Options,
+// X-Frame-Options, remove X-Powered-By, etc.). Defaults do pacote são
+// adequados aqui: a API serve exclusivamente JSON para o app mobile, sem
+// rotas HTML, então não há CSP/frame-options que precisem de ajuste.
+app.use(helmet());
+
+// 2. CORS — aceita origens configuradas e localhost/127.0.0.1 em desenvolvimento
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -66,21 +82,60 @@ app.use(
   })
 );
 
-// 2. Compressão gzip das respostas — precisa vir antes de qualquer middleware
+// 3. Compressão gzip das respostas — precisa vir antes de qualquer middleware
 // de rota para interceptar corretamente o corpo enviado por res.send/res.json.
 app.use(compression());
 
 // Webhooks do RevenueCat precisam do corpo bruto para verificar o HMAC recebido.
 app.use('/webhooks', express.raw({ type: 'application/json', limit: '1mb' }), webhooksRouter);
 
-// 3. Parsing de JSON com limite de 4 MB para acomodar imagens base64 do Pantry Scanner
-app.use(express.json({ limit: '4mb' }));
+// 4. Parsing de JSON — 50 KB por padrão (defesa em profundidade contra
+// abuso de banda/memória em rotas que não precisam de payload grande, ex:
+// /auth/login); 4 MB só nas duas rotas que legitimamente recebem imagens
+// em base64. Escolha dinâmica por req.path com uma única instância de
+// parser por requisição — dois express.json() empilhados via app.use()
+// com prefixo de rota consumiriam o corpo da requisição duas vezes.
+app.use((req, res, next) => {
+  const parser = LARGE_JSON_PAYLOAD_PATHS.has(req.path) ? largeJsonParser : defaultJsonParser;
+  parser(req, res, next);
+});
 
-// 4. Parsing de URL encoded
+// 5. Parsing de URL encoded
 app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
-// 5. Logger de requisições (apenas em development)
+// 6. Sanitização contra injeção de operadores MongoDB ($ne, $gt, $where, etc.)
+// em req.body/req.params/req.headers/req.query — precisa vir depois do
+// parsing do body. Remoção completa de chaves com $ ou . (não substituição):
+// nenhum campo legítimo da API usa esses caracteres em nomes de chave.
+//
+// NÃO usamos app.use(mongoSanitize()) diretamente: a implementação da
+// biblioteca (v2.2.0) reatribui req[key] = target ao final de cada chave
+// sanitizada. No Express 5, req.query é um getter somente-leitura, e essa
+// reatribuição lança "TypeError: Cannot set property query of
+// #<IncomingMessage> which has only a getter" — derrubando toda requisição
+// com 500 (confirmado ao vivo: até GET /ping sem nenhum parâmetro quebrava).
+// A função sanitize() exportada já muta o objeto em memória (delete + nova
+// atribuição de chave) antes dessa reatribuição acontecer — chamá-la
+// diretamente, sem reatribuir req[key], preserva o mesmo efeito de
+// sanitização sem o crash.
+app.use((req, _res, next) => {
+  (['body', 'params', 'headers', 'query'] as const).forEach(key => {
+    const target = req[key];
+    if (target && typeof target === 'object') {
+      mongoSanitize.sanitize(target as Record<string, unknown>);
+    }
+  });
+  next();
+});
+
+// 7. Logger de requisições (apenas em development)
 app.use(requestLogger);
+
+// 8. Rate limiting global para requisições autenticadas (120/min por usuário).
+// /auth/*, /webhooks/* e /ping já têm seus próprios limites (ou não
+// precisam de nenhum) e são excluídos via a opção `skip` do limitador —
+// ver apps/api/src/middlewares/rateLimiter.ts.
+app.use(authenticatedLimiter);
 
 // ─── Rotas ────────────────────────────────────────────────────────────────────
 

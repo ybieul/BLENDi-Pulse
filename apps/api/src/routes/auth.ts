@@ -5,6 +5,7 @@ import {
   register,
   login,
   refresh,
+  logout,
   updateTimezone,
 } from '../controllers/auth.controller';
 import {
@@ -17,26 +18,34 @@ import {
   resetPassword,
 } from '../controllers/password.controller';
 import { authenticate } from '../middlewares/authenticate';
+import { authLoginLimiter, authRegisterLimiter } from '../middlewares/rateLimiter';
 
 export const authRouter: IRouter = Router();
 
 /**
- * POST /auth/register
+ * POST /auth/register  🔒 rate limited (5/60min por IP)
  * Cria um novo usuário. Body: RegisterInput (ver packages/shared/src/schemas/auth.ts)
  */
-authRouter.post('/register', register);
+authRouter.post('/register', authRegisterLimiter, register);
 
 /**
- * POST /auth/login
+ * POST /auth/login  🔒 rate limited (10/15min por IP+email)
  * Autentica um usuário existente. Body: LoginInput
  */
-authRouter.post('/login', login);
+authRouter.post('/login', authLoginLimiter, login);
 
 /**
  * POST /auth/refresh
  * Refresh Token Rotation — retorna novo par de tokens. Body: { refreshToken }
  */
 authRouter.post('/refresh', refresh);
+
+/**
+ * POST /auth/logout  🔒 autenticado
+ * Revoga a sessão atual: incrementa tokenVersion, invalidando todos os
+ * refresh tokens já emitidos para este usuário.
+ */
+authRouter.post('/logout', authenticate, logout);
 
 /**
  * PATCH /auth/timezone  🔒 autenticado

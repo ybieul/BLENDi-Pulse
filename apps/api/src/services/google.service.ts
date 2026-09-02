@@ -40,6 +40,14 @@ export interface GoogleUserInfo {
   googleId: string;
   /** Endereço de email — apenas usar após confirmar verificação no controller. */
   email: string;
+  /**
+   * Reflete o claim `email_verified` do id_token do Google. O controller DEVE
+   * rejeitar o fluxo quando `false` antes de qualquer lookup no banco —
+   * usar `email` para login direto ou para vincular a uma conta existente
+   * sem essa checagem permite que alguém com um e-mail não verificado
+   * assuma a conta de outra pessoa que já tenha esse endereço cadastrado.
+   */
+  emailVerified: boolean;
   /** Nome completo do usuário. */
   name: string;
   /** URL da foto de perfil (pode estar ausente em contas sem foto). */
@@ -110,7 +118,7 @@ export async function exchangeCodeForTokens(code: string): Promise<string> {
  *
  * O que entra: `idToken` — string JWT retornada por `exchangeCodeForTokens`.
  *
- * O que sai: objeto `GoogleUserInfo` com googleId, email, name e picture.
+ * O que sai: objeto `GoogleUserInfo` com googleId, email, emailVerified, name e picture.
  *
  * O que acontece internamente: `oauth2Client.verifyIdToken` valida:
  *   ✅ Assinatura RS256 usando as chaves públicas do Google (JWKS automático)
@@ -138,6 +146,7 @@ export async function getUserInfoFromToken(idToken: string): Promise<GoogleUserI
   return {
     googleId: payload.sub,
     email: payload.email,
+    emailVerified: payload.email_verified === true,
     name: payload.name,
     picture: payload.picture ?? undefined,
   };

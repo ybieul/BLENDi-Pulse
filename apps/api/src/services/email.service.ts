@@ -109,7 +109,7 @@ export class EmailService implements IEmailService {
    */
   async sendVerificationEmail(name: string, email: string, code: string): Promise<void> {
     try {
-      if (env.NODE_ENV !== 'production') {
+      if (env.ENABLE_DEV_EMAIL_LOG) {
         console.log('\n📧  [EmailService] Verification email would be sent to:');
         console.log(`    To:      ${name} <${email}>`);
         console.log(`    Subject: Verify your BLENDi Pulse account`);
@@ -157,7 +157,7 @@ export class EmailService implements IEmailService {
       const expires = interpolate(t.expires, vars);
       const ignore = interpolate(t.ignore, vars);
 
-      if (env.NODE_ENV !== 'production') {
+      if (env.ENABLE_DEV_EMAIL_LOG) {
         console.log(`\n🔑  [EmailService] Password reset OTP for ${name} <${email}>: ${code}`);
         console.log(`    Subject:  ${subject}`);
         console.log(`    ─────────────────────────────────────────────────────`);

@@ -1,10 +1,10 @@
 // apps/api/src/controllers/password.controller.ts
 // Handlers HTTP para o fluxo de redefinição de senha via OTP.
 //
-// Fluxo de 3 etapas:
-//   1. POST /auth/password/forgot     → envia OTP por e-mail (sempre retorna 200)
-//   2. POST /auth/password/verify-otp → valida OTP e retorna resetToken (JWT 10 min)
-//   3. POST /auth/password/reset      → usa resetToken para definir nova senha
+// Fluxo de 3 etapas (rotas registradas em routes/auth.ts):
+//   1. POST  /auth/forgot-password → envia OTP por e-mail (sempre retorna 200)
+//   2. POST  /auth/verify-otp      → valida OTP e retorna resetToken (JWT 10 min)
+//   3. PATCH /auth/reset-password  → usa resetToken para definir nova senha
 //
 // Cada handler segue o contrato:
 //   Sucesso → { success: true, data: { ... } }
@@ -56,7 +56,7 @@ function sendValidationError(res: Response, err: ZodError): void {
 // ─── Forgot Password ──────────────────────────────────────────────────────────
 
 /**
- * POST /auth/password/forgot
+ * POST /auth/forgot-password
  *
  * Inicia o fluxo de redefinição de senha enviando um OTP de 6 dígitos por e-mail.
  *
@@ -102,7 +102,7 @@ export async function forgotPassword(
 // ─── Verify OTP ───────────────────────────────────────────────────────────────
 
 /**
- * POST /auth/password/verify-otp
+ * POST /auth/verify-otp
  *
  * Valida o OTP recebido por e-mail e, se correto, retorna um resetToken JWT
  * de uso único com expiração de 10 minutos.
@@ -163,17 +163,16 @@ export async function verifyOtp(
 // ─── Reset Password ───────────────────────────────────────────────────────────
 
 /**
- * POST /auth/password/reset
+ * PATCH /auth/reset-password
  *
  * Redefine a senha do usuário usando o resetToken obtido em /verify-otp.
  *
  * O pré-save hook do UserModel aplica Argon2id na nova senha automaticamente —
  * não é necessário chamar hashPassword() manualmente aqui.
  *
- * TODO (Fase 3 — Gerenciamento de Sessões):
- *   Incrementar `tokenVersion` do usuário para invalidar todos os refresh tokens
- *   ativos. Atualmente, sessões existentes permanecem válidas até expirar.
- *   Implementar quando o campo `tokenVersion` for adicionado ao UserModel.
+ * Incrementa `tokenVersion` para revogar todos os refresh tokens emitidos
+ * antes desta troca de senha — se a senha foi trocada porque a conta estava
+ * comprometida, um refresh token já vazado deixa de funcionar imediatamente.
  */
 export async function resetPassword(
   req: Request,
@@ -240,6 +239,8 @@ export async function resetPassword(
 
     // O pré-save hook do UserModel aplica Argon2id automaticamente
     user.password = newPassword;
+    // Revoga todos os refresh tokens emitidos antes desta troca de senha.
+    user.tokenVersion += 1;
     await user.save();
 
     res.status(200).json({

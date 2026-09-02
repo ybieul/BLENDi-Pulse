@@ -24,6 +24,14 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sub: string;
+  /**
+   * `tokenVersion` do usuário no momento em que este token foi emitido.
+   * Comparado contra o valor atual em `UserModel` no handler de refresh —
+   * se divergirem, a sessão foi revogada (logout ou reset de senha) e o
+   * refresh é rejeitado com `auth/session-revoked`, mesmo que o token
+   * ainda não tenha expirado.
+   */
+  tokenVersion: number;
   iat: number;
   exp: number;
 }
@@ -61,11 +69,11 @@ export function generateAccessToken(userId: string, email: string): string {
 
 /**
  * Gera um refresh token JWT assinado.
- * Payload mínimo: apenas sub (userId) — menos dados = menor superfície se vazado.
- * Expiração: 30 dias.
+ * Payload: sub (userId) e tokenVersion (para suportar revogação de sessão —
+ * ver `RefreshTokenPayload`). Expiração: 30 dias.
  */
-export function generateRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId }, authConfig.refreshToken.secret, {
+export function generateRefreshToken(userId: string, tokenVersion: number): string {
+  return jwt.sign({ sub: userId, tokenVersion }, authConfig.refreshToken.secret, {
     expiresIn: authConfig.refreshToken.expiresIn,
   });
 }
@@ -78,7 +86,7 @@ export function generateRefreshToken(userId: string): string {
  * @throws {JsonWebTokenError} se o token for inválido
  */
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, authConfig.accessToken.secret) as AccessTokenPayload;
+  return jwt.verify(token, authConfig.accessToken.secret, { algorithms: ['HS256'] }) as AccessTokenPayload;
 }
 
 /**
@@ -87,7 +95,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
  * @throws {JsonWebTokenError} se o token for inválido
  */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return jwt.verify(token, authConfig.refreshToken.secret) as RefreshTokenPayload;
+  return jwt.verify(token, authConfig.refreshToken.secret, { algorithms: ['HS256'] }) as RefreshTokenPayload;
 }
 
 // ─── Utilitário de tipo para erros JWT ───────────────────────────────────────
@@ -116,7 +124,7 @@ export function generateResetToken(email: string): string {
  * @throws {JsonWebTokenError} se o token for inválido
  */
 export function verifyResetToken(token: string): ResetTokenPayload {
-  return jwt.verify(token, env.JWT_RESET_SECRET) as ResetTokenPayload;
+  return jwt.verify(token, env.JWT_RESET_SECRET, { algorithms: ['HS256'] }) as ResetTokenPayload;
 }
 
 // ─── Senha: hash e verificação ────────────────────────────────────────────────

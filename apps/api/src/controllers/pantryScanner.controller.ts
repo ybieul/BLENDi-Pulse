@@ -7,6 +7,7 @@ import {
   pulseAiRecipeSchema,
   type PantryAnalysisResult,
   type PantryIngredient,
+  type PantryScanInput,
   type PulseAiRecipe,
 } from '@blendi/shared';
 import { addMonths } from 'date-fns';
@@ -128,6 +129,39 @@ function sendInvalidImage(res: Response, err: ZodError): void {
     message: 'Invalid pantry scan image.',
     errors: formatZodErrors(err),
   });
+}
+
+function sendInvalidContent(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 400,
+    code: 'scanner/invalid-content',
+    message: 'Invalid image content.',
+  });
+}
+
+const JPEG_MAGIC_BYTES = [0xff, 0xd8, 0xff];
+const PNG_MAGIC_BYTES = [0x89, 0x50, 0x4e, 0x47];
+
+/**
+ * Confirma que os bytes reais da imagem — não apenas o `mimeType` declarado
+ * pelo cliente — correspondem à assinatura de um JPEG ou PNG válido. Mesma
+ * proteção aplicada ao upload de foto de perfil (`user.controller.ts`,
+ * achado M8 do diagnóstico de segurança); aqui a imagem nunca é persistida
+ * nem servida de volta a nenhum cliente — é processada uma vez pela Vision
+ * AI e descartada — então o risco não é XSS armazenado, é abuso de custo/
+ * quota: um payload que não é uma imagem de verdade ainda consumiria uma
+ * chamada real de IA (e contaria contra o limite mensal de scans) antes de
+ * falhar.
+ *
+ * 16 caracteres base64 (múltiplo de 4 — decodifica sem padding parcial)
+ * cobrem os 12 primeiros bytes do arquivo, suficiente para as duas
+ * assinaturas verificadas aqui.
+ */
+function hasValidImageMagicBytes(imageBase64: string, mimeType: PantryScanInput['mimeType']): boolean {
+  const headerBytes = Buffer.from(imageBase64.slice(0, 16), 'base64');
+  const signature = mimeType === 'image/jpeg' ? JPEG_MAGIC_BYTES : PNG_MAGIC_BYTES;
+
+  return signature.every((byte, index) => headerBytes[index] === byte);
 }
 
 function sendMonthlyLimitReached(res: Response, resetDate: Date): void {
@@ -431,6 +465,12 @@ export async function analyzePantry(
     }
 
     const { imageBase64, mimeType } = parsed.data;
+
+    if (!hasValidImageMagicBytes(imageBase64, mimeType)) {
+      sendInvalidContent(res);
+      return;
+    }
+
     const imageSizeKb = calculateImageSizeKb(imageBase64);
 
     console.info('[pantryScanner] analyze request', {

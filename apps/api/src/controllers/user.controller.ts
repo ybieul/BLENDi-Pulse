@@ -109,6 +109,28 @@ const profilePhotoBodySchema = z.object({
 });
 
 type ProfilePhotoFileType = z.infer<typeof profilePhotoBodySchema>['fileType'];
+
+const JPEG_MAGIC_BYTES = [0xff, 0xd8, 0xff];
+const PNG_MAGIC_BYTES = [0x89, 0x50, 0x4e, 0x47];
+
+/**
+ * Confirma que os bytes reais do arquivo — não apenas o `fileType`
+ * declarado pelo cliente — correspondem à assinatura de um JPEG ou PNG
+ * válido. Antes desta checagem, `fileType` era um rótulo puramente
+ * confiado: um SVG com `<script>` embutido, por exemplo, era aceito e
+ * servido de volta rotulado como `image/png` sem nenhuma rejeição
+ * (achado M8 do diagnóstico de segurança, confirmado com um payload real).
+ *
+ * 16 caracteres base64 (múltiplo de 4 — decodifica sem padding parcial)
+ * cobrem os 12 primeiros bytes do arquivo, suficiente para as duas
+ * assinaturas verificadas aqui.
+ */
+function hasValidImageMagicBytes(imageBase64: string, fileType: ProfilePhotoFileType): boolean {
+  const headerBytes = Buffer.from(imageBase64.slice(0, 16), 'base64');
+  const signature = fileType === 'jpeg' ? JPEG_MAGIC_BYTES : PNG_MAGIC_BYTES;
+
+  return signature.every((byte, index) => headerBytes[index] === byte);
+}
 type UserPhotoProfileResponse = {
   _id: unknown;
   email: string;
@@ -271,6 +293,15 @@ export async function uploadProfilePhoto(
         statusCode: 413,
         code: 'profilePhoto/file-too-large',
         message: 'Profile photo exceeds the maximum allowed size.',
+      });
+      return;
+    }
+
+    if (!hasValidImageMagicBytes(parsed.data.imageBase64, parsed.data.fileType)) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'profilePhoto/invalid-content',
+        message: 'Invalid image content.',
       });
       return;
     }

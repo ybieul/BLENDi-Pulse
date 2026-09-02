@@ -142,30 +142,42 @@ export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
 }
 
 /**
+ * Revoga a sessão atual no servidor (incrementa `tokenVersion`, invalidando
+ * todos os refresh tokens já emitidos para o usuário).
+ * POST /auth/logout → 200 { message }
+ *
+ * Chamada pelo auth.store.ts antes de limpar o refresh token local — melhor
+ * esforço, o caller decide como lidar com falha (ex: sem rede).
+ */
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout');
+}
+
+/**
  * Inicia o fluxo de recuperação de senha.
- * POST /auth/password/forgot → 200 { message }
+ * POST /auth/forgot-password → 200 { message }
  *
  * O backend sempre retorna sucesso para evitar enumeração de emails.
  */
 export async function forgotPassword(input: ForgotPasswordInput): Promise<void> {
-  await api.post<ForgotPasswordResponse>('/auth/password/forgot', input);
+  await api.post<ForgotPasswordResponse>('/auth/forgot-password', input);
 }
 
 /**
  * Valida o OTP de 6 dígitos e retorna o resetToken para a próxima etapa.
- * POST /auth/password/verify-otp → 200 { resetToken }
+ * POST /auth/verify-otp → 200 { resetToken }
  */
 export async function verifyOtp(input: VerifyOtpInput): Promise<string> {
-  const response = await api.post<VerifyOtpResponse>('/auth/password/verify-otp', input);
+  const response = await api.post<VerifyOtpResponse>('/auth/verify-otp', input);
   return response.data.data.resetToken;
 }
 
 /**
  * Redefine a senha usando o resetToken emitido após a verificação do OTP.
- * POST /auth/password/reset → 200 { message }
+ * PATCH /auth/reset-password → 200 { message }
  */
 export async function resetPassword(input: ResetPasswordInput): Promise<void> {
-  await api.post<ResetPasswordResponse>('/auth/password/reset', input);
+  await api.patch<ResetPasswordResponse>('/auth/reset-password', input);
 }
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────

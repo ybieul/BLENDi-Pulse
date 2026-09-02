@@ -11,7 +11,7 @@ import { enableScreens } from 'react-native-screens';
 // melhorar transições em dispositivos físicos.
 enableScreens();
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -27,6 +27,7 @@ import { useGamificationStore } from './src/store/gamification.store';
 
 // Query cache — client persistido em MMKV
 import { persistOptions, queryClient } from './src/config/queryClient';
+import { initMMKVEncryptionKey } from './src/config/storage';
 
 // Navigation — root switch entre auth e app
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -95,6 +96,22 @@ const navigationTheme: Theme = {
 };
 
 export default function App() {
+  // Aguarda a chave de criptografia do MMKV ANTES de renderizar
+  // PersistQueryClientProvider — ele começa a restaurar o cache persistido
+  // (que vive em MMKV) assim que monta, então precisa vir depois deste
+  // gate, não dentro de AppShell (que é filho dele, tarde demais).
+  // A splash screen (SplashScreen.preventAutoHideAsync() no topo do
+  // arquivo) permanece visível enquanto isStorageReady for false.
+  const [isStorageReady, setIsStorageReady] = useState(false);
+
+  useEffect(() => {
+    void initMMKVEncryptionKey().finally(() => setIsStorageReady(true));
+  }, []);
+
+  if (!isStorageReady) {
+    return null;
+  }
+
   return (
     <SafeAreaProvider>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>

@@ -765,7 +765,8 @@
       "google_auth_failed": "Falha ao entrar com Google. Tente novamente.",
       "google_cancelled": "Login com Google cancelado.",
       "invalid_state": "Solicitação de autenticação expirada. Tente novamente.",
-      "email_not_verified": "O e-mail da sua conta Google não está verificado."
+      "email_not_verified": "O e-mail da sua conta Google não está verificado.",
+      "logout_success": "Você saiu da sua conta."
     },
     "network": {
       "offline": "Você está offline. Verifique sua conexão.",
@@ -782,19 +783,24 @@
     "auth_reset_token_invalid": "Este link de redefinição de senha é inválido.",
     "auth_reset_token_expired": "Este link de redefinição de senha expirou.",
     "auth_session_expired": "Sua sessão expirou. Faça login novamente.",
+    "auth_session_revoked": "Sua sessão foi encerrada. Faça login novamente.",
     "auth_unauthorized": "Você não tem acesso a este recurso.",
+    "auth_too_many_requests": "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+    "auth_too_many_registrations": "Muitas contas criadas recentemente. Tente novamente mais tarde.",
     "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
     "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar",
     "scanner_monthly_limit_reached": "Você atingiu o limite gratuito mensal do Pantry Scanner.",
     "scanner_invalid_image": "Não foi possível analisar esta imagem. Tente outra foto.",
+    "scanner_invalid_content": "Conteúdo de imagem inválido.",
     "scanner_vision_parse_error": "Não foi possível entender o resultado do scan da despensa. Tente novamente.",
     "scanner_vision_unavailable": "O Pantry Scanner está indisponível no momento. Tente novamente em instantes.",
     "scanner_image_processing_failed": "Não foi possível preparar esta imagem para análise. Tente outra foto.",
     "favorites_invalid_data": "Não foi possível salvar esta receita. Revise os dados e tente novamente.",
     "favorites_not_found": "Este favorito não existe mais.",
     "favorites_forbidden": "Você não tem permissão para alterar este favorito.",
+    "profilephoto_invalid_content": "Conteúdo de imagem inválido.",
     "supplement_not_found": "Este suplemento não foi encontrado.",
     "supplement_log_not_found": "Este check de suplemento não foi encontrado.",
     "supplement_check_failed": "Não foi possível atualizar o check do suplemento. Tente novamente.",
@@ -811,6 +817,7 @@
     "shoppinglist_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa",
     "shoppingList_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa",
     "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
+    "unexpected_error": "Ocorreu um erro inesperado.",
     "resource_not_found": "O recurso solicitado não foi encontrado."
   },
 

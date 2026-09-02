@@ -4,7 +4,17 @@ import type { PulseAiRecipe } from '@blendi/shared';
 
 import { createAppStorage } from '../config/storage';
 
-const BLEND_STORAGE_NAMESPACE = 'blendi-pulse';
+// Namespace DEDICADO (não o 'blendi-pulse' compartilhado pelo resto do app):
+// o middleware `persist` do Zustand lê este storage de forma SÍNCRONA no
+// momento em que o store é criado — em import-time, antes que
+// `initMMKVEncryptionKey()` (assíncrono, aguardado em App.tsx) tenha
+// qualquer chance de resolver. Mesmo raciocínio de locales/i18n.ts: isolar
+// aqui confina esse gap a um dado de baixa sensibilidade (duração do timer,
+// última receita) sem abrir sem criptografia o namespace compartilhado —
+// onde ficam token de fallback, cache de foto, dados de saúde — que
+// continua protegido desde a primeira abertura por só ser tocado dentro de
+// efeitos/ações do React, já depois do boot aguardar a chave.
+const BLEND_STORAGE_NAMESPACE = 'blendi-pulse-blend';
 const BLEND_TIMER_DURATION_KEY = 'blend_timer_duration';
 const DEFAULT_TIMER_DURATION_SECONDS = 30;
 const MIN_TIMER_DURATION_SECONDS = 15;

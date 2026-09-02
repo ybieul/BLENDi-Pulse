@@ -177,6 +177,15 @@ function persistOnboardingCompletion(isCompleted: boolean): void {
   authStorage.set(ONBOARDING_COMPLETED_KEY, isCompleted);
 }
 
+/**
+ * Persiste o refresh token no expo-secure-store (Keychain/Keystore nativo)
+ * — o único mecanismo usado para esta credencial. Se a escrita falhar por
+ * qualquer motivo, a sessão simplesmente não é persistida (o usuário
+ * precisará fazer login de novo na próxima abertura do app) — NUNCA cai
+ * para MMKV sem criptografia. Achado A1 do diagnóstico de segurança: o
+ * fallback anterior gravava a credencial de sessão em texto claro no
+ * sandbox do app, silenciosamente, sem nenhum alerta.
+ */
 async function setRefreshToken(token: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(
@@ -184,9 +193,11 @@ async function setRefreshToken(token: string): Promise<void> {
       token,
       SECURE_STORE_OPTIONS
     );
-    return;
-  } catch {
-    authStorage.set(REFRESH_TOKEN_KEY, token);
+  } catch (error) {
+    console.warn(
+      '[auth.store] Falha ao persistir o refresh token no SecureStore — a sessão não será mantida entre aberturas do app.',
+      error
+    );
   }
 }
 
@@ -196,16 +207,19 @@ async function getRefreshToken(): Promise<string | null> {
       REFRESH_TOKEN_KEY,
       SECURE_STORE_OPTIONS
     );
-  } catch {
-    return authStorage.getString(REFRESH_TOKEN_KEY) ?? null;
+  } catch (error) {
+    console.warn('[auth.store] Falha ao ler o refresh token do SecureStore.', error);
+    return null;
   }
 }
 
 async function deleteRefreshToken(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, SECURE_STORE_OPTIONS);
-  } catch {
-    authStorage.delete(REFRESH_TOKEN_KEY);
+  } catch (error) {
+    // Não relança — o objetivo (limpar a sessão local) deve ser considerado
+    // alcançado mesmo se o SecureStore falhar, para o logout sempre funcionar.
+    console.warn('[auth.store] Falha ao remover o refresh token do SecureStore.', error);
   }
 }
 
@@ -335,6 +349,18 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   // ── logout ────────────────────────────────────────────────────────────────
 
   logout: async () => {
+    // Revoga a sessão no servidor (incrementa tokenVersion — invalida todos
+    // os refresh tokens emitidos) ANTES de limpar o estado local: o
+    // interceptor do Axios lê o accessToken do estado atual, então a
+    // chamada precisa acontecer enquanto ele ainda está presente.
+    // Melhor esforço — falha de rede/servidor não deve bloquear o logout
+    // local, o usuário precisa conseguir sair do app mesmo offline.
+    try {
+      await AuthService.logout();
+    } catch {
+      // Sessão local é limpa de qualquer forma abaixo.
+    }
+
     // Remove do Secure Store (melhor esforço — não bloqueia o logout se falhar)
     await deleteRefreshToken();
 

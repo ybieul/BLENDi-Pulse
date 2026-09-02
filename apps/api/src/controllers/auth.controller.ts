@@ -113,7 +113,7 @@ export async function register(
 
     // 4. Gerar par de tokens
     const accessToken = generateAccessToken(user.id as string, user.email);
-    const refreshToken = generateRefreshToken(user.id as string);
+    const refreshToken = generateRefreshToken(user.id as string, user.tokenVersion);
 
     // 5. Disparar e-mail de boas-vindas (não bloqueia — falha silenciosa)
     void emailService.sendWelcomeEmail(user.name, user.email);
@@ -195,7 +195,7 @@ export async function login(
 
     // 5. Gerar novos tokens
     const accessToken = generateAccessToken(user.id as string, user.email);
-    const refreshToken = generateRefreshToken(user.id as string);
+    const refreshToken = generateRefreshToken(user.id as string, user.tokenVersion);
 
     // 6. Retornar 200 com dados públicos + tokens
     res.status(200).json({
@@ -273,9 +273,22 @@ export async function refresh(
       return;
     }
 
+    // 3b. Confirmar que a sessão não foi revogada (logout ou reset de senha
+    // desde que este refresh token foi emitido). Leitura extra ao banco por
+    // refresh — aceitável, já que refresh só ocorre a cada 15 min (expiração
+    // do access token) por usuário ativo, não a cada requisição.
+    if (payload.tokenVersion < user.tokenVersion) {
+      sendErrorResponse(res, {
+        statusCode: 401,
+        code: 'auth/session-revoked',
+        message: 'Session revoked.',
+      });
+      return;
+    }
+
     // 4. Emitir novo par de tokens (rotação)
     const newAccessToken = generateAccessToken(String(user._id), user.email);
-    const newRefreshToken = generateRefreshToken(String(user._id));
+    const newRefreshToken = generateRefreshToken(String(user._id), user.tokenVersion);
 
     // 5. Retornar novos tokens
     res.status(200).json({
@@ -284,6 +297,36 @@ export async function refresh(
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Logout ───────────────────────────────────────────────────────────────────
+
+/**
+ * POST /auth/logout
+ * Revoga a sessão atual do usuário autenticado: incrementa `tokenVersion`,
+ * invalidando todos os refresh tokens já emitidos (inclusive os que não
+ * estão em posse deste dispositivo — logout aqui derruba todos os
+ * dispositivos, não é por-refresh-token). Requer autenticação (middleware
+ * authenticate — só o access token, ainda válido por até 15 min, precisa
+ * ser apresentado; o refresh token não é enviado nem necessário aqui).
+ */
+export async function logout(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user!.sub;
+
+    await UserModel.updateOne({ _id: userId }, { $inc: { tokenVersion: 1 } });
+
+    res.status(200).json({
+      success: true,
+      data: { message: 'errors.auth.logout_success' },
     });
   } catch (err) {
     next(err);

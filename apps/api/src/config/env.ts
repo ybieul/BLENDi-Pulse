@@ -49,6 +49,36 @@ const optionalString = () =>
     return trimmed.length > 0 ? trimmed : undefined;
   }, z.string().optional());
 
+/**
+ * Secret opcional com força mínima quando configurado: aceita ausente ou
+ * string vazia (o recurso que ele protege fica desabilitado, por design —
+ * ver `paymentsConfig.isConfigured`), mas rejeita no boot qualquer valor
+ * não vazio abaixo do comprimento mínimo. Mesmo padrão de robustez dos
+ * secrets JWT (`.min(32)`), aplicado condicionalmente.
+ */
+const optionalSecret = (name: string, minLength: number) =>
+  z.preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z
+      .string()
+      .min(minLength, `${name} deve ter pelo menos ${minLength} caracteres quando configurado`)
+      .or(z.literal(''))
+      .optional()
+  );
+
+/**
+ * Flag booleana lida de uma variável de ambiente string ('true'/'false').
+ * Qualquer valor diferente da string 'true' (incluindo ausente) resolve
+ * para `defaultValue` — checagem POSITIVA, nunca negativa (ver
+ * ENABLE_DEV_EMAIL_LOG: o gate anterior de log de OTP usava uma checagem
+ * negativa de NODE_ENV que logava em qualquer ambiente mal configurado).
+ */
+const booleanFlag = (defaultValue: boolean) =>
+  z.preprocess(
+    value => (typeof value === 'string' ? value.trim().toLowerCase() === 'true' : value),
+    z.boolean().default(defaultValue)
+  );
+
 const envSchema = z.object({
   // Servidor
   PORT: z
@@ -58,6 +88,10 @@ const envSchema = z.object({
     .refine(n => n > 0 && n < 65536, 'PORT deve ser um número entre 1 e 65535'),
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
   API_VERSION: z.string().min(1, 'API_VERSION é obrigatória'),
+  // Habilita o log em texto claro de OTP/código de verificação no console
+  // (ver services/email.service.ts). Checagem POSITIVA — default false.
+  // NUNCA definir como 'true' em produção.
+  ENABLE_DEV_EMAIL_LOG: booleanFlag(false),
 
   // MongoDB
   MONGODB_URI: z
@@ -116,7 +150,7 @@ const envSchema = z.object({
 
   // RevenueCat
   REVENUECAT_API_KEY: optionalString(),
-  REVENUECAT_WEBHOOK_SECRET: optionalString(),
+  REVENUECAT_WEBHOOK_SECRET: optionalSecret('REVENUECAT_WEBHOOK_SECRET', 32),
   REVENUECAT_APP_ID: optionalString(),
 });
 

@@ -17,7 +17,20 @@ import { createAppStorage } from '../config/storage';
 // ─── Storage síncrono do app ───────────────────────────────────────────────────
 // Em builds nativos usa MMKV. No Expo Go, cai para memória para evitar crash
 // no boot quando TurboModules/MMKV não estiverem disponíveis.
-export const storage = createAppStorage('blendi-pulse');
+//
+// Namespace DEDICADO (não o 'blendi-pulse' compartilhado pelo resto do app):
+// este módulo é importado no topo do App.tsx e lê a preferência de idioma de
+// forma SÍNCRONA, em import-time — antes que `initMMKVEncryptionKey()' (que
+// é assíncrono) tenha qualquer chance de resolver. Se usasse o namespace
+// compartilhado, essa primeira leitura sem criptografia "abriria" o arquivo
+// físico do MMKV para todo o resto do app nesse estado, já que
+// react-native-mmkv reutiliza a instância nativa por id pelo tempo de vida
+// do processo — a chave passada em aberturas seguintes do mesmo id seria
+// ignorada. Isolar em um namespace próprio confina esse gap (dado de
+// sensibilidade desprezível: só a preferência de idioma) e mantém o
+// namespace compartilhado — onde ficam token de fallback, cache de foto,
+// dados de saúde — protegido desde a primeira abertura.
+export const storage = createAppStorage('blendi-pulse-i18n');
 
 const LANGUAGE_KEY = 'user_language';
 

@@ -119,7 +119,7 @@ export async function handleGoogleCallback(
     }
 
     try {
-      jwt.verify(state, env.JWT_ACCESS_SECRET);
+      jwt.verify(state, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
     } catch {
       res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
       return;
@@ -143,6 +143,16 @@ export async function handleGoogleCallback(
     } catch {
       // Código inválido, expirado, já utilizado ou falha na verificação do token
       res.redirect('blendipulse://auth/callback?error=errors.auth.google_auth_failed');
+      return;
+    }
+
+    // Rejeita ANTES de qualquer lookup no banco — usar um e-mail não
+    // verificado tanto para login/registro (Caso 3) quanto, principalmente,
+    // para vincular a uma conta existente (Caso 2) permitiria que alguém
+    // com um e-mail que não controla de verdade assumisse a conta de quem
+    // já tem esse endereço cadastrado no BLENDi.
+    if (!userInfo.emailVerified) {
+      res.redirect('blendipulse://auth/callback?error=errors.auth.email_not_verified');
       return;
     }
 
@@ -190,7 +200,7 @@ export async function handleGoogleCallback(
     // O browser detecta o esquema blendipulse:// e fecha automaticamente.
     // openAuthSessionAsync retorna { type: 'success', url } com a URL completa.
     const accessToken = generateAccessToken(user.id as string, user.email);
-    const refreshToken = generateRefreshToken(user.id as string);
+    const refreshToken = generateRefreshToken(user.id as string, user.tokenVersion);
 
     // O objeto user é serializado como JSON → base64url para transporte via query string.
     // Não contém dados sensíveis além do que já está no access token.

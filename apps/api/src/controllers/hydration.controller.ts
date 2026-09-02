@@ -16,6 +16,10 @@ import { getMidnightUTC, toUTC } from '../utils/timezone.utils';
 
 const DEFAULT_HYDRATION_AMOUNT_ML = 250;
 const DEFAULT_HYDRATION_GOAL_ML = 2500;
+// 5 litros — generoso o suficiente para qualquer uso real (inclusive
+// registro manual de um dia inteiro de uma vez), mas fecha a lacuna de
+// validação que permitia qualquer valor positivo, sem teto.
+const MAX_HYDRATION_AMOUNT_ML = 5000;
 
 interface HydrationContext {
   timezone: string;
@@ -164,7 +168,12 @@ function getAmountMl(body: Request['body']): number | null {
     return DEFAULT_HYDRATION_AMOUNT_ML;
   }
 
-  if (typeof amountMl !== 'number' || !Number.isInteger(amountMl) || amountMl <= 0) {
+  if (
+    typeof amountMl !== 'number'
+    || !Number.isInteger(amountMl)
+    || amountMl <= 0
+    || amountMl > MAX_HYDRATION_AMOUNT_ML
+  ) {
     return null;
   }
 

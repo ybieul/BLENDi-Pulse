@@ -126,6 +126,14 @@ export interface IUser {
    * troca e portanto não pode ser reutilizado.
    */
   passwordChangedAt?: Date;
+  /**
+   * Contador de geração de sessão — incrementado em `POST /auth/logout` e
+   * na redefinição de senha bem-sucedida. Todo refresh token carrega o
+   * `tokenVersion` vigente no momento em que foi emitido; se o valor do
+   * token divergir do valor atual do usuário, a sessão foi revogada e o
+   * refresh é rejeitado (`auth/session-revoked`). Não exposto ao cliente.
+   */
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -522,6 +530,16 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     passwordChangedAt: {
       type: Date,
       required: false,
+    },
+    tokenVersion: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
     },
   },
   {

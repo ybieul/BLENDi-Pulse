@@ -765,7 +765,8 @@
       "google_auth_failed": "Google sign-in failed. Please try again.",
       "google_cancelled": "Google sign-in was cancelled.",
       "invalid_state": "Authentication request expired. Please try again.",
-      "email_not_verified": "Your Google account email is not verified."
+      "email_not_verified": "Your Google account email is not verified.",
+      "logout_success": "You've been signed out."
     },
     "network": {
       "offline": "You're offline. Check your connection.",
@@ -782,19 +783,24 @@
     "auth_reset_token_invalid": "This password reset link is invalid.",
     "auth_reset_token_expired": "This password reset link has expired.",
     "auth_session_expired": "Your session expired. Please sign in again.",
+    "auth_session_revoked": "Your session was ended. Please sign in again.",
     "auth_unauthorized": "You don't have access to this feature.",
+    "auth_too_many_requests": "Too many attempts. Please wait a few minutes and try again.",
+    "auth_too_many_registrations": "Too many accounts created recently. Please try again later.",
     "pulseai_daily_limit": "You've reached today's free Pulse AI limit.",
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
     "macros_inconsistent": "Nutrition values estimated — actual macros may vary",
     "scanner_monthly_limit_reached": "You've reached this month's free Pantry Scanner limit.",
     "scanner_invalid_image": "This image couldn't be analyzed. Try another photo.",
+    "scanner_invalid_content": "Invalid image content.",
     "scanner_vision_parse_error": "We couldn't understand the pantry scan result. Please try again.",
     "scanner_vision_unavailable": "Pantry Scanner is temporarily unavailable. Please try again shortly.",
     "scanner_image_processing_failed": "We couldn't prepare this image for analysis. Try another photo.",
     "favorites_invalid_data": "This recipe couldn't be saved. Please review the data and try again.",
     "favorites_not_found": "This favorite no longer exists.",
     "favorites_forbidden": "You don't have permission to change this favorite.",
+    "profilephoto_invalid_content": "Invalid image content.",
     "supplement_not_found": "This supplement was not found.",
     "supplement_log_not_found": "This supplement check could not be found.",
     "supplement_check_failed": "Couldn't update supplement check. Please try again.",
@@ -811,6 +817,7 @@
     "shoppinglist_free_tier_limit": "Free plan supports only 1 active list",
     "shoppingList_free_tier_limit": "Free plan supports only 1 active list",
     "network_internal_server_error": "Server error. We're on it — try again shortly.",
+    "unexpected_error": "An unexpected error occurred.",
     "resource_not_found": "The requested resource was not found."
   },
 
