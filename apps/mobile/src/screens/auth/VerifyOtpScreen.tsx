@@ -21,6 +21,7 @@ import { AuthButton, AuthScreenLayout } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { forgotPassword, verifyOtp } from '../../services/auth.service';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
+import { showToast } from '../../utils/toast.utils';
 import type { AuthScreenProps } from '../../navigation/types';
 
 const OTP_LENGTH = 6;
@@ -275,13 +276,24 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
 
     setIsResending(true);
     setOtpErrorMessage(null);
-    clearOtpState();
-    setSecondsRemaining(RESEND_COUNTDOWN_SECONDS);
 
     try {
       await requestForgotPassword({ email: parsed.data.email });
-    } catch {
-      // O fluxo continua disponível localmente mesmo se a API falhar ao reenviar.
+
+      // Só reseta o countdown e limpa o campo depois de confirmar que o
+      // e-mail foi de fato reenviado — em falha, o código antigo (e o que
+      // o usuário já digitou) continuam válidos.
+      if (isMountedRef.current) {
+        clearOtpState();
+        setSecondsRemaining(RESEND_COUNTDOWN_SECONDS);
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        const translationKey = axios.isAxiosError(error)
+          ? getAxiosErrorTranslationKey(error)
+          : 'errors.network_internal_server_error';
+        showToast(translateKey(translationKey));
+      }
     } finally {
       if (isMountedRef.current) {
         setIsResending(false);

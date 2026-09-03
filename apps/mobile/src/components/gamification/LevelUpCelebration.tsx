@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -345,55 +346,63 @@ export function LevelUpCelebration() {
   return (
     <>
       {levelUpData ? (
-        <TouchableWithoutFeedback onPress={() => handleClose()}>
-          <View style={styles.overlay}>
-            <Animated.View style={[styles.backdrop, { opacity: overlayOpacity.current }]} />
-            <View style={styles.centerContent}>
-              {particles.current.map((particle, index) => (
-                <Animated.View
-                  key={`level-up-particle-${index}`}
-                  style={[
-                    styles.particle,
-                    {
-                      backgroundColor: getParticleColor(index),
-                      opacity: particle.opacity,
-                      transform: [
-                        { translateY: particle.translateY },
-                        { translateX: particle.translateX },
-                        { scale: particle.scale },
-                      ],
-                    },
-                  ]}
-                />
-              ))}
+        <Modal
+          animationType="none"
+          onRequestClose={dismissLevelUp}
+          statusBarTranslucent
+          transparent
+          visible={levelUpData !== null}
+        >
+          <TouchableWithoutFeedback onPress={() => handleClose()}>
+            <View style={styles.overlay}>
+              <Animated.View style={[styles.backdrop, { opacity: overlayOpacity.current }]} />
+              <View style={styles.centerContent}>
+                {particles.current.map((particle, index) => (
+                  <Animated.View
+                    key={`level-up-particle-${index}`}
+                    style={[
+                      styles.particle,
+                      {
+                        backgroundColor: getParticleColor(index),
+                        opacity: particle.opacity,
+                        transform: [
+                          { translateY: particle.translateY },
+                          { translateX: particle.translateX },
+                          { scale: particle.scale },
+                        ],
+                      },
+                    ]}
+                  />
+                ))}
 
-              <TouchableWithoutFeedback onPress={() => {}}>
-                <Animated.View
-                  style={[
-                    styles.card,
-                    {
-                      opacity: cardOpacity.current,
-                      transform: [{ scale: cardScale.current }],
-                    },
-                  ]}
-                >
-                  <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
-                  <Text style={styles.levelName}>
-                    {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
-                  </Text>
-                  <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={handleShareMoment}
-                    style={styles.shareButton}
+                <TouchableWithoutFeedback onPress={() => {}}>
+                  <Animated.View
+                    style={[
+                      styles.card,
+                      {
+                        opacity: cardOpacity.current,
+                        transform: [{ scale: cardScale.current }],
+                      },
+                    ]}
                   >
-                    <Text style={styles.shareButtonText}>{t('share.shareMoment')}</Text>
-                  </Pressable>
-                </Animated.View>
-              </TouchableWithoutFeedback>
+                    <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
+                    <Text style={styles.levelName}>
+                      {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
+                    </Text>
+                    <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={handleShareMoment}
+                      style={styles.shareButton}
+                    >
+                      <Text style={styles.shareButtonText}>{t('share.shareMoment')}</Text>
+                    </Pressable>
+                  </Animated.View>
+                </TouchableWithoutFeedback>
+              </View>
             </View>
-          </View>
-        </TouchableWithoutFeedback>
+          </TouchableWithoutFeedback>
+        </Modal>
       ) : null}
 
       {pendingShareData ? (

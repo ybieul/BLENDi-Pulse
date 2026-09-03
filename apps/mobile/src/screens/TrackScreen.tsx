@@ -14,6 +14,7 @@
 import { useCallback, useMemo } from 'react';
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -165,6 +166,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   const {
     data: hydrationTodayResponse,
     isLoading: isLoadingHydration,
+    isFetching: isFetchingHydration,
     isError: isErrorHydration,
     refetch: refetchHydration,
     dataUpdatedAt: hydrationTodayUpdatedAt,
@@ -183,6 +185,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   const {
     data: supplementStack,
     isLoading: isLoadingStack,
+    isFetching: isFetchingStack,
     isError: isErrorStack,
     refetch: refetchStack,
   } = useQuery<
@@ -237,15 +240,17 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     retry: 1,
   });
   const isLoadingHistory = hydrationHistoryQuery.isLoading;
+  const isFetchingHistory = hydrationHistoryQuery.isFetching;
   const isErrorHistory = hydrationHistoryQuery.isError;
   const refetchHistory = hydrationHistoryQuery.refetch;
 
   const isLoading = isLoadingHydration || isLoadingStack || isLoadingHistory;
   const isError = isErrorHydration || isErrorStack || isErrorHistory;
+  const isRefreshing = isFetchingHydration || isFetchingStack || isFetchingHistory;
 
   // ── Mutation: log water ───────────────────────────────────────────────────
 
-  const { mutate: mutateLogWater } = useMutation({
+  const { mutate: mutateLogWater, isPending: isLogWaterPending } = useMutation({
     mutationFn: () => logWater(250),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
@@ -266,7 +271,12 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     snapshot: SupplementStackItem[] | undefined;
   }
 
-  const { mutate: mutateProgress } = useMutation<void, Error, ProgressVars, ProgressContext>({
+  const { mutate: mutateProgress, isPending: isSupplementProgressPending } = useMutation<
+    void,
+    Error,
+    ProgressVars,
+    ProgressContext
+  >({
     mutationFn: async ({ supplementId, direction }): Promise<void> => {
       if (direction === 'decrement') {
         await uncheckSupplement(supplementId);
@@ -419,6 +429,13 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
         removeClippedSubviews={true}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRetry}
+            tintColor={colors.brand.pulse}
+          />
+        }
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + 16 },
@@ -491,6 +508,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 onLogWater={handleLogWater}
                 history7Days={history7Days}
                 dataUpdatedAt={hydrationTodayUpdatedAt}
+                isLogWaterPending={isLogWaterPending}
               />
             </View>
 
@@ -500,6 +518,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 onIncrement={handleIncrementSupplement}
                 onDecrement={handleDecrementSupplement}
                 onManage={handleManage}
+                isCheckPending={isSupplementProgressPending}
               />
             </View>
 

@@ -21,6 +21,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -364,6 +365,7 @@ export function ShoppingListsScreen({
   const {
     data: shoppingListsData,
     isLoading,
+    isFetching,
     isError,
     refetch,
   } = useQuery<
@@ -763,6 +765,13 @@ export function ShoppingListsScreen({
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={renderFooter}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={() => { void refetch(); }}
+              tintColor={colors.brand.pulse}
+            />
+          }
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
         />

@@ -3,11 +3,15 @@
 // actions de atualização com UI otimista + mutation React Query.
 
 import { useCallback } from 'react';
+import axios from 'axios';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '../config/api';
 import { QUERY_KEYS } from '../config/cache.config';
 import { useAuthStore } from '../store/auth.store';
+import { getAxiosErrorTranslationKey } from '../utils/error.utils';
+import { showToast } from '../utils/toast.events';
+import { useAppTranslation } from './useAppTranslation';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +42,26 @@ const DEFAULT_DAILY_PULSE_TIME: DailyPulseTime = { hour: 7, minute: 0 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+interface StoredNotificationPreferences extends NotificationPreferences {
+  levelUp: boolean;
+}
+
+interface TogglePreferenceContext {
+  previousPreferences: StoredNotificationPreferences;
+}
+
+interface UpdateDailyPulseTimeContext {
+  previousDailyPulseTime: DailyPulseTime;
+}
+
+function getErrorTranslationKey(error: unknown): string {
+  return axios.isAxiosError(error)
+    ? getAxiosErrorTranslationKey(error)
+    : 'errors.network_internal_server_error';
+}
+
 export function useNotificationPreferences() {
+  const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const updateUserProfile = useAuthStore((s) => s.updateUserProfile);
   const storedPreferences = useAuthStore((s) => s.user?.notificationPreferences);
@@ -53,50 +76,81 @@ export function useNotificationPreferences() {
 
   const dailyPulseTime: DailyPulseTime = storedDailyPulseTime ?? DEFAULT_DAILY_PULSE_TIME;
 
-  const preferencesMutation = useMutation({
-    mutationFn: async (payload: Partial<NotificationPreferences>) => {
+  const preferencesMutation = useMutation<
+    void,
+    unknown,
+    Partial<NotificationPreferences>,
+    TogglePreferenceContext
+  >({
+    mutationFn: async (payload) => {
       await api.patch('/users/notification-preferences', payload);
+    },
+    onMutate: (payload) => {
+      const previousPreferences: StoredNotificationPreferences = {
+        dailyPulse: storedPreferences?.dailyPulse ?? true,
+        streakReminder: storedPreferences?.streakReminder ?? true,
+        supplementReminder: storedPreferences?.supplementReminder ?? true,
+        hydrationReminder: storedPreferences?.hydrationReminder ?? true,
+        levelUp: storedPreferences?.levelUp ?? true,
+      };
+
+      // UI otimista — atualiza o store antes da resposta do backend.
+      updateUserProfile({
+        notificationPreferences: { ...previousPreferences, ...payload },
+      });
+
+      return { previousPreferences };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+    },
+    onError: (error, _payload, context) => {
+      // Sem rollback aqui, o Switch ficaria mostrando um estado que o
+      // servidor nunca recebeu — reverte para o valor de antes do toque.
+      if (context) {
+        updateUserProfile({ notificationPreferences: context.previousPreferences });
+      }
+
+      showToast(t(getErrorTranslationKey(error) as Parameters<typeof t>[0]));
     },
   });
 
-  const timeMutation = useMutation({
-    mutationFn: async (time: DailyPulseTime) => {
+  const timeMutation = useMutation<void, unknown, DailyPulseTime, UpdateDailyPulseTimeContext>({
+    mutationFn: async (time) => {
       await api.patch('/users/daily-pulse-time', time);
+    },
+    onMutate: (time) => {
+      const previousDailyPulseTime = dailyPulseTime;
+
+      // UI otimista
+      updateUserProfile({ dailyPulseTime: time });
+
+      return { previousDailyPulseTime };
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+    },
+    onError: (error, _time, context) => {
+      if (context) {
+        updateUserProfile({ dailyPulseTime: context.previousDailyPulseTime });
+      }
+
+      showToast(t(getErrorTranslationKey(error) as Parameters<typeof t>[0]));
     },
   });
 
   const togglePreference = useCallback(
     (key: NotificationPrefKey, value: boolean) => {
-      // UI otimista — atualiza o store antes da resposta do backend
-      updateUserProfile({
-        notificationPreferences: {
-          dailyPulse: storedPreferences?.dailyPulse ?? true,
-          streakReminder: storedPreferences?.streakReminder ?? true,
-          supplementReminder: storedPreferences?.supplementReminder ?? true,
-          hydrationReminder: storedPreferences?.hydrationReminder ?? true,
-          levelUp: storedPreferences?.levelUp ?? true,
-          [key]: value,
-        },
-      });
-
       preferencesMutation.mutate({ [key]: value });
     },
-    [storedPreferences, preferencesMutation, updateUserProfile],
+    [preferencesMutation],
   );
 
   const updateDailyPulseTime = useCallback(
     (time: DailyPulseTime) => {
-      // UI otimista
-      updateUserProfile({ dailyPulseTime: time });
       timeMutation.mutate(time);
     },
-    [timeMutation, updateUserProfile],
+    [timeMutation],
   );
 
   return {

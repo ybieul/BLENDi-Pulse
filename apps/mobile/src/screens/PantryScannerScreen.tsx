@@ -4,6 +4,8 @@
 
 import { type ElementRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -61,6 +63,14 @@ const CAMERA_PERMISSION_ICON_SIZE = 64;
 const CAPTURE_BUTTON_SIZE = 72;
 const LOGO_SIZE = 64;
 
+const ANALYZING_STEP_KEYS = [
+  'pantryScanner.analyzingStep1',
+  'pantryScanner.analyzingStep2',
+  'pantryScanner.analyzingStep3',
+] as const;
+const ANALYZING_STEP_INTERVAL_MS = 6000;
+const ANALYZING_FADE_DURATION_MS = 200;
+
 const TOP_BAR_BG = 'rgba(0,0,0,0.45)';
 const BOTTOM_BAR_BG = 'rgba(0,0,0,0.55)';
 const CAPTURE_BUTTON_BG = 'rgba(255,255,255,0.20)';
@@ -112,9 +122,11 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newIngredientText, setNewIngredientText] = useState('');
+  const [analyzingStepIndex, setAnalyzingStepIndex] = useState(0);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const cameraRef = useRef<ElementRef<typeof CameraView>>(null);
+  const analyzingTextOpacity = useRef(new Animated.Value(1)).current;
 
   // ── Check permission on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -126,6 +138,43 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       })
       .catch(() => undefined);
   }, []);
+
+  // ── Analyzing: alterna as 3 mensagens de status a cada 6s ──────────────────
+  useEffect(() => {
+    if (step !== 'analyzing') {
+      return;
+    }
+
+    setAnalyzingStepIndex(0);
+    analyzingTextOpacity.setValue(1);
+
+    const intervalId = setInterval(() => {
+      setAnalyzingStepIndex((current) => {
+        if (current >= ANALYZING_STEP_KEYS.length - 1) {
+          return current;
+        }
+
+        Animated.sequence([
+          Animated.timing(analyzingTextOpacity, {
+            toValue: 0,
+            duration: ANALYZING_FADE_DURATION_MS,
+            useNativeDriver: true,
+          }),
+          Animated.timing(analyzingTextOpacity, {
+            toValue: 1,
+            duration: ANALYZING_FADE_DURATION_MS,
+            useNativeDriver: true,
+          }),
+        ]).start();
+
+        return current + 1;
+      });
+    }, ANALYZING_STEP_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [step, analyzingTextOpacity]);
 
   const handleUpgradePress = useCallback(() => {
     navigation
@@ -456,7 +505,10 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         <AuroraBackground intensity="full" />
         <View style={styles.analyzingContainer}>
           <View style={[styles.logoPlaceholder, imagePlaceholderStyles.blendiLogo]} />
-          <Text style={styles.analyzingText}>{t('pantryScanner.analyzing')}</Text>
+          <Animated.Text style={[styles.analyzingText, { opacity: analyzingTextOpacity }]}>
+            {t(ANALYZING_STEP_KEYS[analyzingStepIndex])}
+          </Animated.Text>
+          <ActivityIndicator color={colors.brand.pulse} size="large" />
         </View>
       </View>
     );

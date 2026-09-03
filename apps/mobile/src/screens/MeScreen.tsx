@@ -98,6 +98,8 @@ import { getBlendHistory, type BlendHistoryData } from "../services/blendLog.ser
 import { getSupplementHistory, type SupplementHistoryData } from "../services/supplementLog.service";
 import { generateAndShare } from "../utils/shareCard.utils";
 import { showToast } from "../utils/toast.utils";
+import { getAxiosErrorTranslationKey } from "../utils/error.utils";
+import axios from "axios";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -529,7 +531,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
   // ── Profile query ────────────────────────────────────────────────────────
 
-  const { data: profileResponse } = useQuery<UserProfileResponse>({
+  const { data: profileResponse, isLoading: isMeProfileLoading } = useQuery<UserProfileResponse>({
     queryKey: QUERY_KEYS.userProfile,
     queryFn: fetchUserProfile,
     staleTime: CACHE_CONFIG.USER_PROFILE_TTL,
@@ -704,47 +706,54 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           return;
       }
 
-      await api.patch("/users/me", body);
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
+      try {
+        await api.patch("/users/me", body);
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
 
-      switch (editingType) {
-        case "model":
-          updateUserProfile({ blendiModel: nextValue as BlendiModel });
-          break;
-        case "goal":
-          updateUserProfile({ goal: nextValue as UserGoal });
-          break;
-        case "protein":
-          updateUserProfile({ dailyProteinTarget: Number(nextValue) });
-          break;
-        case "carbs":
-          updateUserProfile({ dailyCarbTarget: Number(nextValue) });
-          break;
-        case "calories":
-          updateUserProfile({ dailyCalorieTarget: Number(nextValue) });
-          break;
-        case "unitSystem":
-          updateUserProfile({ unitSystem: nextValue as "metric" | "imperial" });
-          break;
-        case "language":
-          updateUserProfile({ locale: nextValue as SupportedLocale });
-          await changeLocale(nextValue as SupportedLocale);
-          break;
-      }
-
-      // Invalidate AI cache when model or goal change — old cached recipes
-      // may no longer match the user hardware or nutritional target.
-      if (editingType === "model" || editingType === "goal") {
-        try {
-          await api.delete("/pulse-ai/cache");
-        } catch {
-          // best effort
+        switch (editingType) {
+          case "model":
+            updateUserProfile({ blendiModel: nextValue as BlendiModel });
+            break;
+          case "goal":
+            updateUserProfile({ goal: nextValue as UserGoal });
+            break;
+          case "protein":
+            updateUserProfile({ dailyProteinTarget: Number(nextValue) });
+            break;
+          case "carbs":
+            updateUserProfile({ dailyCarbTarget: Number(nextValue) });
+            break;
+          case "calories":
+            updateUserProfile({ dailyCalorieTarget: Number(nextValue) });
+            break;
+          case "unitSystem":
+            updateUserProfile({ unitSystem: nextValue as "metric" | "imperial" });
+            break;
+          case "language":
+            updateUserProfile({ locale: nextValue as SupportedLocale });
+            await changeLocale(nextValue as SupportedLocale);
+            break;
         }
-      }
 
-      setEditingType(null);
+        // Invalidate AI cache when model or goal change — old cached recipes
+        // may no longer match the user hardware or nutritional target.
+        if (editingType === "model" || editingType === "goal") {
+          try {
+            await api.delete("/pulse-ai/cache");
+          } catch {
+            // best effort
+          }
+        }
+      } catch (error) {
+        const translationKey = axios.isAxiosError(error)
+          ? getAxiosErrorTranslationKey(error)
+          : "errors.network_internal_server_error";
+        showToast(t(translationKey as Parameters<typeof t>[0]));
+      } finally {
+        setEditingType(null);
+      }
     },
-    [editingType, queryClient, updateUserProfile, changeLocale],
+    [editingType, queryClient, updateUserProfile, changeLocale, t],
   );
 
   const handleUploadProcessedProfilePhoto = useCallback(
@@ -1166,12 +1175,14 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                 iconColor={colors.brand.pulse}
                 value={String(profile?.currentStreak ?? 0)}
                 label={t("me.currentStreak")}
+                isLoading={isMeProfileLoading}
               />
               <StatCard
                 icon="cafe-outline"
                 iconColor={colors.text.primary}
                 value={String(profile?.blendCount ?? 0)}
                 label={t("me.totalBlends")}
+                isLoading={isMeProfileLoading}
               />
             </View>
             <View style={styles.statsRow}>
@@ -1180,12 +1191,14 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                 iconColor={LONGEST_STREAK_COLOR}
                 value={String(profile?.longestStreak ?? 0)}
                 label={t("me.longestStreak")}
+                isLoading={isMeProfileLoading}
               />
               <StatCard
                 icon="star"
                 iconColor={LONGEST_STREAK_COLOR}
                 value={String(levelInfo.level)}
                 label={t("me.level")}
+                isLoading={isMeProfileLoading}
               />
             </View>
           </View>

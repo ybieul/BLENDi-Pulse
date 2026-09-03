@@ -60,6 +60,8 @@ export interface HydrationSectionProps {
   onLogWater: () => void | Promise<void>;
   history7Days: HydrationHistoryDailyBreakdownItem[];
   dataUpdatedAt: number;
+  /** `isPending` da mutation de log de água — desabilita o botão enquanto uma chamada está em voo. */
+  isLogWaterPending?: boolean;
 }
 
 function clampProgress(current: number, target: number): number {
@@ -109,6 +111,7 @@ export function HydrationSection({
   onLogWater,
   history7Days,
   dataUpdatedAt,
+  isLogWaterPending = false,
 }: HydrationSectionProps) {
   const { t } = useAppTranslation();
   const { formatWeekdayShort } = useDateFormat();
@@ -305,6 +308,7 @@ export function HydrationSection({
 
       <Pressable
         accessibilityRole="button"
+        disabled={isLogWaterPending}
         onPress={handleLogWater}
         style={styles.logButton}
       >

@@ -135,16 +135,19 @@ export function useHistoryData(period: HistoryPeriod) {
 
     blendSummaryData: blendSummaryQuery.data,
     isBlendSummaryLoading: blendSummaryQuery.isLoading,
+    isBlendSummaryFetching: blendSummaryQuery.isFetching,
     blendSummaryError: blendSummaryQuery.error,
     refetchBlendSummary: blendSummaryQuery.refetch,
 
     hydrationSummaryData: hydrationSummaryQuery.data,
     isHydrationSummaryLoading: hydrationSummaryQuery.isLoading,
+    isHydrationSummaryFetching: hydrationSummaryQuery.isFetching,
     hydrationSummaryError: hydrationSummaryQuery.error,
     refetchHydrationSummary: hydrationSummaryQuery.refetch,
 
     supplementSummaryData: supplementSummaryQuery.data,
     isSupplementSummaryLoading: supplementSummaryQuery.isLoading,
+    isSupplementSummaryFetching: supplementSummaryQuery.isFetching,
     supplementSummaryError: supplementSummaryQuery.error,
     refetchSupplementSummary: supplementSummaryQuery.refetch,
 

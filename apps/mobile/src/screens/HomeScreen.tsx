@@ -53,6 +53,7 @@ import { usePulseAIStore } from '../store/pulseAi.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
 import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
 import type { AppTabScreenProps } from '../navigation/types';
+import type { PulseAiRecipe } from '@blendi/shared';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ProfileSkeleton, RecipeCardSkeleton, SkeletonLoader } from '../components/ui';
@@ -196,14 +197,18 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     });
 
   // hydrationToday — retry: 0 porque o endpoint será implementado em uma parte futura
-  const { data: hydrationResponse, refetch: refetchHydration } = useQuery({
+  const {
+    data: hydrationResponse,
+    isLoading: isLoadingHydration,
+    refetch: refetchHydration,
+  } = useQuery({
     queryKey: QUERY_KEYS.hydrationToday,
     queryFn: getHydrationToday,
     staleTime: CACHE_CONFIG.HYDRATION_TODAY_TTL,
     retry: 0,
   });
 
-  const isLoading = isLoadingProfile || isLoadingLogs;
+  const isLoading = isLoadingProfile || isLoadingLogs || isLoadingHydration;
 
   // ── Fade in quando dados chegam ───────────────────────────────────────────
 
@@ -329,8 +334,8 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     [navigation, setPendingProtocol],
   );
 
-  const handleStartBlend = useCallback(() => {
-    navigation.navigate('Blend');
+  const handleStartBlend = useCallback((recipe: PulseAiRecipe) => {
+    navigation.navigate('Blend', { recipe });
   }, [navigation]);
 
   const handleMissionToastDismiss = useCallback(() => {

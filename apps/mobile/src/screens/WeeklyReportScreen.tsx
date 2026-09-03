@@ -363,7 +363,7 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
           <View style={styles.weekSelector}>
             <Pressable
               accessibilityRole="button"
-              disabled={!canGoOlder}
+              disabled={!canGoOlder || reportQuery.isLoading}
               onPress={handlePrev}
               style={styles.chevronButton}
             >
@@ -371,13 +371,13 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
                 name="chevron-back"
                 size={20}
                 color={colors.text.primary}
-                style={!canGoOlder && styles.chevronDisabled}
+                style={(!canGoOlder || reportQuery.isLoading) && styles.chevronDisabled}
               />
             </Pressable>
             <Text style={styles.weekRangeText}>{weekRangeLabel}</Text>
             <Pressable
               accessibilityRole="button"
-              disabled={!canGoNewer}
+              disabled={!canGoNewer || reportQuery.isLoading}
               onPress={handleNext}
               style={styles.chevronButton}
             >
@@ -385,7 +385,7 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
                 name="chevron-forward"
                 size={20}
                 color={colors.text.primary}
-                style={!canGoNewer && styles.chevronDisabled}
+                style={(!canGoNewer || reportQuery.isLoading) && styles.chevronDisabled}
               />
             </Pressable>
           </View>

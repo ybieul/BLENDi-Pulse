@@ -57,6 +57,10 @@ export interface ManageStackScreenProps {
   onAdd?: (data: NewSupplementFormData) => void;
   onDelete?: (supplementId: string) => void;
   onToggleActive?: (supplementId: string, isActive: boolean) => void;
+  /** `isPending` da mutation de adicionar suplemento — controla quando a sheet pode fechar. */
+  isSaving?: boolean;
+  /** `isError` da mesma mutation — se true, a sheet permanece aberta com o toast de erro visível. */
+  isSaveError?: boolean;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -193,6 +197,8 @@ export function ManageStackScreen({
   onAdd = () => {},
   onDelete = () => {},
   onToggleActive = () => {},
+  isSaving = false,
+  isSaveError = false,
 }: ManageStackScreenProps) {
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
@@ -203,6 +209,9 @@ export function ManageStackScreen({
   // ── Bottom sheet visibility ─────────────────────────────────────────────
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetMounted, setSheetMounted] = useState(false);
+  // Setado em handleSave, consultado quando isSaving vira false — evita
+  // fechar a sheet antes da mutation de adicionar suplemento resolver.
+  const awaitingSaveRef = useRef(false);
 
   // ── Form state ──────────────────────────────────────────────────────────
   const [formName, setFormName] = useState('');
@@ -272,6 +281,19 @@ export function ManageStackScreen({
     };
   }, [backdropOpacity, height, sheetVisible, translateY]);
 
+  // ── Fecha a sheet só depois que a mutation de adicionar resolver ────────
+  useEffect(() => {
+    if (!awaitingSaveRef.current || isSaving) {
+      return;
+    }
+
+    awaitingSaveRef.current = false;
+
+    if (!isSaveError) {
+      setSheetVisible(false);
+    }
+  }, [isSaving, isSaveError]);
+
   // ── Form helpers ────────────────────────────────────────────────────────
 
   function resetForm() {
@@ -320,13 +342,15 @@ export function ManageStackScreen({
       return;
     }
 
+    awaitingSaveRef.current = true;
     onAdd({
       name: trimmedName,
       dosage: formDosage.trim(),
       dailyTargetCount: parsedDailyTargetCount,
       timing: formTiming,
     });
-    closeSheet();
+    // A sheet só fecha quando isSaving voltar a false com sucesso — ver o
+    // useEffect acima. Em caso de erro, ela permanece aberta com o toast.
   }
 
   function handleDelete(supplementId: string) {

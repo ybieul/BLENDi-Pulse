@@ -13,8 +13,16 @@ import {
   removePendingBlend,
   type PendingBlendLog,
 } from './pendingBlends.utils';
-import { getDirtyLists, markListClean } from './shoppingListSync.utils';
+import { getDirtyLists, markListClean, markListDirty } from './shoppingListSync.utils';
 import { showPersistentToast } from './toast.events';
+
+const SHOPPING_LIST_SYNC_MAX_ATTEMPTS = 3;
+
+// Contagem de tentativas de sync por lista — só de sessão (não persistida).
+// A flag "dirty" em si já é persistida no MMKV via shoppingListSync.utils;
+// este Map só limita quantos reconnects seguidos tentam a mesma lista antes
+// de avisar o usuário.
+const shoppingListSyncAttempts = new Map<string, number>();
 
 function toCreateBlendLogInput(pendingBlend: PendingBlendLog): CreateBlendLogInput {
   return {
@@ -92,6 +100,27 @@ async function invalidateCriticalQueries(queryClient: QueryClient): Promise<void
   ]);
 }
 
+function getShoppingListSyncFailureMessage(shoppingList: ShoppingListDetail): string {
+  const listName = shoppingList.name.trim();
+  const baseMessage = String(i18n.t('shoppingList.syncFailedPersistent'));
+
+  if (listName) {
+    return `${listName} · ${baseMessage}`;
+  }
+
+  return baseMessage;
+}
+
+function buildShoppingListRetryAction(listId: string): Parameters<typeof showPersistentToast>[1] {
+  return {
+    label: String(i18n.t('common.actions.retry')),
+    onPress: () => {
+      shoppingListSyncAttempts.delete(listId);
+      markListDirty(listId);
+    },
+  };
+}
+
 async function syncDirtyShoppingLists(queryClient: QueryClient): Promise<void> {
   const dirtyListIds = getDirtyLists();
 
@@ -113,8 +142,24 @@ async function syncDirtyShoppingLists(queryClient: QueryClient): Promise<void> {
         updatedShoppingList,
       );
 
+      shoppingListSyncAttempts.delete(listId);
       markListClean(listId);
     } catch {
+      const nextAttemptCount = (shoppingListSyncAttempts.get(listId) ?? 0) + 1;
+
+      if (nextAttemptCount >= SHOPPING_LIST_SYNC_MAX_ATTEMPTS) {
+        shoppingListSyncAttempts.delete(listId);
+        // Para de tentar sozinho — o dado fica divergente do servidor até o
+        // usuário intervir manualmente pelo toast (mesmo padrão do blend log).
+        markListClean(listId);
+        showPersistentToast(
+          getShoppingListSyncFailureMessage(shoppingList),
+          buildShoppingListRetryAction(listId),
+        );
+        continue;
+      }
+
+      shoppingListSyncAttempts.set(listId, nextAttemptCount);
       // Mantém a flag dirty para nova tentativa no próximo reconnect.
     }
   }

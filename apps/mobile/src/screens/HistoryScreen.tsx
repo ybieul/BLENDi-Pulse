@@ -4,6 +4,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,6 +26,7 @@ import { MacroBarChart } from '../components/history/MacroBarChart';
 import { PeriodSelector } from '../components/history/PeriodSelector';
 import { StatCard } from '../components/history/StatCard';
 import { SupplementHeatmap } from '../components/history/SupplementHeatmap';
+import { SkeletonLoader } from '../components/ui';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useHistoryData, type HistoryPeriod } from '../hooks/useHistoryData';
 import { useUnits } from '../hooks/useUnits';
@@ -116,21 +118,36 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
   const {
     blendSummaryData,
     isBlendSummaryLoading,
+    isBlendSummaryFetching,
     blendSummaryError,
     refetchBlendSummary,
     hydrationSummaryData,
     isHydrationSummaryLoading,
+    isHydrationSummaryFetching,
     hydrationSummaryError,
     refetchHydrationSummary,
     supplementSummaryData,
     isSupplementSummaryLoading,
+    isSupplementSummaryFetching,
     supplementSummaryError,
     refetchSupplementSummary,
     blendInfiniteData,
+    isBlendInfiniteLoading,
+    blendInfiniteError,
     fetchNextBlendPage,
     hasNextBlendPage,
     isFetchingNextBlendPage,
+    refetchBlendInfinite,
   } = useHistoryData(period);
+
+  const isRefreshing = isBlendSummaryFetching || isHydrationSummaryFetching || isSupplementSummaryFetching;
+
+  const handleRefresh = useCallback(() => {
+    void refetchBlendSummary();
+    void refetchHydrationSummary();
+    void refetchSupplementSummary();
+    void refetchBlendInfinite();
+  }, [refetchBlendSummary, refetchHydrationSummary, refetchSupplementSummary, refetchBlendInfinite]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -227,6 +244,13 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.brand.pulse}
+          />
+        }
         contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + 16 }]}
       >
         {/* ── Header ────────────────────────────────────────────────────── */}
@@ -290,6 +314,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
                   period={period}
                   calorieTarget={calorieTarget}
                   animate={nutritionVisible}
+                  isLoading={isBlendSummaryLoading}
                 />
               </View>
 
@@ -301,6 +326,16 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
                   <Text style={styles.emptyStateTitle}>{t('track.history.empty_title')}</Text>
                   <Text style={styles.emptyStateMessage}>{t('track.history.empty_message')}</Text>
                 </View>
+              ) : isBlendInfiniteLoading ? (
+                <View>
+                  <SkeletonLoader variant="card" style={styles.blendItemSkeleton} />
+                  <View style={styles.itemGap} />
+                  <SkeletonLoader variant="card" style={styles.blendItemSkeleton} />
+                  <View style={styles.itemGap} />
+                  <SkeletonLoader variant="card" style={styles.blendItemSkeleton} />
+                </View>
+              ) : blendInfiniteError ? (
+                <SectionError onRetry={() => { void refetchBlendInfinite(); }} />
               ) : (
                 <View>
                   {blendLogs.map((item, index) => (
@@ -370,6 +405,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
                   period={period}
                   dailyTarget={dailyHydrationTarget}
                   animate={hydrationVisible}
+                  isLoading={isHydrationSummaryLoading}
                 />
               </View>
             </>
@@ -516,6 +552,9 @@ const styles = StyleSheet.create({
   },
   itemGap: {
     height: 8,
+  },
+  blendItemSkeleton: {
+    height: 82,
   },
   loadMoreButton: {
     marginTop: 12,

@@ -9,7 +9,7 @@
 // avança para OnboardingMacros.
 // Caminho alternativo: link "Pular por agora" avança sem salvar dados corporais.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -104,6 +104,8 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<CalculateMacrosResponse | null>(null);
+  const [macrosError, setMacrosError] = useState(false);
+  const calculationRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (selectedUnitSystem === null) {
@@ -120,51 +122,72 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const heightValid = typeof storageHeight === 'number' && storageHeight >= 100 && storageHeight <= 250;
   const canFetch = weightValid && heightValid;
 
-  // Debounced API call — stale flag prevents setting state from an outdated request
-  useEffect(() => {
+  // Requisição de cálculo de macros — usada tanto pelo debounce automático
+  // quanto pelo retry manual. calculationRequestIdRef substitui o antigo
+  // "stale flag" local do efeito: como agora duas origens podem disparar
+  // esta função, um contador compartilhado garante que só a resposta da
+  // chamada mais recente atualize o estado.
+  const runMacrosCalculation = useCallback(async () => {
     if (!canFetch) {
-      setResult(null);
-      setIsCalculating(false);
       return;
     }
 
     const goal: UserGoal = (selectedGoal as UserGoal | null) ?? DEFAULT_GOAL;
-    let stale = false;
+    const requestId = calculationRequestIdRef.current + 1;
+    calculationRequestIdRef.current = requestId;
+
+    setIsCalculating(true);
+    setMacrosError(false);
+
+    try {
+      const response = await api.post<{ success: true; data: CalculateMacrosResponse }>(
+        '/users/calculate-macros',
+        {
+          weight: storageWeight,
+          height: storageHeight,
+          activityLevel,
+          goal,
+          unitSystem: 'metric',
+        },
+      );
+
+      if (calculationRequestIdRef.current === requestId) {
+        setResult(response.data.data);
+      }
+    } catch {
+      if (calculationRequestIdRef.current === requestId) {
+        setResult(null);
+        setMacrosError(true);
+      }
+    } finally {
+      if (calculationRequestIdRef.current === requestId) {
+        setIsCalculating(false);
+      }
+    }
+  }, [activityLevel, canFetch, selectedGoal, storageHeight, storageWeight]);
+
+  // Debounced auto-cálculo — dispara runMacrosCalculation 600ms após a
+  // última mudança de peso/altura/atividade/objetivo.
+  useEffect(() => {
+    if (!canFetch) {
+      setResult(null);
+      setIsCalculating(false);
+      setMacrosError(false);
+      return;
+    }
 
     const timer = setTimeout(() => {
-      void (async () => {
-        setIsCalculating(true);
-        try {
-          const response = await api.post<{ success: true; data: CalculateMacrosResponse }>(
-            '/users/calculate-macros',
-            {
-              weight: storageWeight,
-              height: storageHeight,
-              activityLevel,
-              goal,
-              unitSystem: 'metric',
-            },
-          );
-          if (!stale) {
-            setResult(response.data.data);
-          }
-        } catch {
-          if (!stale) {
-            setResult(null);
-          }
-        } finally {
-          if (!stale) {
-            setIsCalculating(false);
-          }
-        }
-      })();
+      void runMacrosCalculation();
     }, DEBOUNCE_MS);
 
     return () => {
-      stale = true;
       clearTimeout(timer);
     };
-  }, [activityLevel, canFetch, selectedGoal, storageHeight, storageWeight]);
+  }, [canFetch, runMacrosCalculation]);
+
+  const handleRetryMacrosCalculation = useCallback(() => {
+    void runMacrosCalculation();
+  }, [runMacrosCalculation]);
 
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -282,6 +305,18 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                       {t(IMC_CLASS_KEYS[result.imcClassification])}
                     </Text>
                   </View>
+                ) : macrosError ? (
+                  <View style={styles.imcErrorContent}>
+                    <Text style={styles.imcErrorText}>
+                      {t('onboarding.macrosCalculationError')}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={handleRetryMacrosCalculation}
+                    >
+                      <Text style={styles.imcRetryText}>{t('common.actions.retry')}</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
               </View>
             ) : null}
@@ -383,6 +418,24 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
+  },
+  imcErrorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  imcErrorText: {
+    flexShrink: 1,
+    color: colors.feedback.error,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+  },
+  imcRetryText: {
+    color: colors.brand.pulse,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
   },
   chipRow: {
     flexDirection: 'row',

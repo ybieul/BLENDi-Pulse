@@ -9,6 +9,7 @@ import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import {
   getStack,
   updateStack,
+  SupplementStackServiceError,
 } from '../services/supplementStack.service';
 import type { SupplementStackItem } from '../services/supplementStack.service';
 import { TrackScreen } from '../screens/TrackScreen';
@@ -18,6 +19,8 @@ import { ShoppingListsScreen } from '../screens/ShoppingListsScreen';
 import { ShoppingListDetailScreen } from '../screens/ShoppingListDetailScreen';
 import type { NewSupplementFormData } from '../screens/ManageStackScreen';
 import type { TrackStackParamList } from './types';
+import { useAppTranslation } from '../hooks/useAppTranslation';
+import { showToast } from '../utils/toast.utils';
 
 const Stack = createNativeStackNavigator<TrackStackParamList>();
 
@@ -25,6 +28,7 @@ const Stack = createNativeStackNavigator<TrackStackParamList>();
 // A lógica de persistência (PUT /supplement-stack) fica aqui, não dentro do
 // componente de UI.
 function ManageStackRoute() {
+  const { t } = useAppTranslation();
   const queryClient = useQueryClient();
 
   const { data: supplementStack } = useQuery({
@@ -33,10 +37,21 @@ function ManageStackRoute() {
     staleTime: CACHE_CONFIG.SUPPLEMENT_STACK_TTL,
   });
 
-  const { mutate: mutateUpdateStack } = useMutation({
+  const {
+    mutate: mutateUpdateStack,
+    isPending: isUpdatingStack,
+    isError: isUpdateStackError,
+  } = useMutation({
     mutationFn: (newStack: SupplementStackItem[]) => updateStack(newStack),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.supplementStack });
+    },
+    onError: (error: unknown) => {
+      const translationKey =
+        error instanceof SupplementStackServiceError
+          ? error.translationKey
+          : 'errors.network_internal_server_error';
+      showToast(t(translationKey as Parameters<typeof t>[0]));
     },
   });
 
@@ -85,6 +100,8 @@ function ManageStackRoute() {
       onAdd={handleAdd}
       onDelete={handleDelete}
       onToggleActive={handleToggleActive}
+      isSaving={isUpdatingStack}
+      isSaveError={isUpdateStackError}
     />
   );
 }

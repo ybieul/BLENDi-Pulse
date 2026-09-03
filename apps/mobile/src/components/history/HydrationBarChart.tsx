@@ -23,6 +23,7 @@ import {
 
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { useUnits } from '../../hooks/useUnits';
+import { SkeletonLoader } from '../ui/SkeletonLoader';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
@@ -53,7 +54,10 @@ interface HydrationBarChartProps {
   period: PeriodValue;
   dailyTarget: number;
   animate?: boolean;
+  isLoading?: boolean;
 }
+
+const LABELS_ROW_ESTIMATED_HEIGHT = 24;
 
 interface ChartDatum {
   key: string;
@@ -156,6 +160,7 @@ export function HydrationBarChart({
   period,
   dailyTarget,
   animate = true,
+  isLoading = false,
 }: HydrationBarChartProps) {
   const { formatWeekdayShort, formatShortDate } = useDateFormat();
   const { displayVolume: displayMetricVolume } = useUnits('metric');
@@ -243,8 +248,19 @@ export function HydrationBarChart({
     };
   }, [chartHeight, tooltipDatum, selectedIndex, slotWidth, svgWidth, yAxisMax]);
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { width: svgWidth }]}>
+        <SkeletonLoader
+          variant="card"
+          style={{ width: svgWidth, height: chartHeight + TOOLTIP_TOP_REGION + LABELS_ROW_ESTIMATED_HEIGHT }}
+        />
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.container, { width: svgWidth }]}> 
+    <View style={[styles.container, { width: svgWidth }]}>
       <View style={[styles.chartStage, { width: svgWidth, paddingTop: TOOLTIP_TOP_REGION }]}> 
         <Svg height={chartHeight} width={svgWidth}>
           <Line

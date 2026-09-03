@@ -68,6 +68,9 @@ const BADGE_FONT_SIZE_OVERFLOW = 8;
 const HEADER_SIDE_WIDTH = 96;
 const SCANNER_BADGE_BACKGROUND = 'rgba(245,158,11,0.90)';
 
+const TAKING_LONGER_THRESHOLD_SECONDS = 8;
+const TAKING_LONGER_FADE_DURATION_MS = 300;
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
@@ -184,6 +187,8 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
 
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [elapsedLoadingSeconds, setElapsedLoadingSeconds] = useState(0);
+  const takingLongerOpacity = useRef(new Animated.Value(0)).current;
   const [usageRemaining, setUsageRemaining] = useState<number | null>(null);
   const [pantryScanStatus, setPantryScanStatus] = useState<PantryScanStatus | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -253,6 +258,37 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     if (messages.length === 0) return;
     flatListRef.current?.scrollToEnd({ animated: true });
   }, [messages.length]);
+
+  // ── Cronômetro de espera — mostra aviso após 8s sem resposta ─────────────
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsedLoadingSeconds(0);
+      takingLongerOpacity.setValue(0);
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setElapsedLoadingSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isLoading, takingLongerOpacity]);
+
+  const showTakingLonger = isLoading && elapsedLoadingSeconds >= TAKING_LONGER_THRESHOLD_SECONDS;
+
+  useEffect(() => {
+    if (!showTakingLonger) {
+      return;
+    }
+
+    Animated.timing(takingLongerOpacity, {
+      toValue: 1,
+      duration: TAKING_LONGER_FADE_DURATION_MS,
+      useNativeDriver: true,
+    }).start();
+  }, [showTakingLonger, takingLongerOpacity]);
 
   // ── Busca uso inicial na montagem ─────────────────────────────────────────
   useEffect(() => {
@@ -368,9 +404,21 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           err.apiCode === 'pulseai/daily-limit-reached';
 
         if (is429) {
-          // Remove a mensagem do usuário — a consulta não chegou ao GPT-4o
-          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+          // A mensagem do usuário permanece visível — não chegou ao GPT-4o,
+          // mas o motivo aparece como resposta do assistente logo abaixo,
+          // no mesmo lugar onde o usuário está olhando (em vez de só na
+          // limitRow do ChatInput, que pode passar despercebida).
           setUsageRemaining(0);
+
+          const limitReachedMessage: ChatMessageItem = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: t(err.translationKey as Parameters<typeof t>[0]),
+            timestamp: new Date(),
+            isError: true,
+          };
+
+          setMessages((prev) => [...prev, limitReachedMessage].slice(-MAX_MESSAGES));
         } else {
           void pulseAiService
             .getUsage()
@@ -495,7 +543,16 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     );
   }, [favoriteIdsByRecipeKey, handleStartBlend]);
 
-  const ListFooterComponent = isLoading ? <ChatMessageSkeleton /> : null;
+  const ListFooterComponent = isLoading ? (
+    <View>
+      <ChatMessageSkeleton />
+      {showTakingLonger ? (
+        <Animated.Text style={[styles.takingLongerText, { opacity: takingLongerOpacity }]}>
+          {t('pulseAi.takingLonger')}
+        </Animated.Text>
+      ) : null}
+    </View>
+  ) : null;
 
   const ListEmptyComponent = (
     <WelcomeState
@@ -739,6 +796,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
     gap: spacing.xl,
+  },
+  takingLongerText: {
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xl,
+    color: colors.text.secondary,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    textAlign: 'center',
   },
 
   // Welcome State

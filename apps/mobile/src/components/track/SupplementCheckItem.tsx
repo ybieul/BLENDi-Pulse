@@ -55,12 +55,15 @@ export interface SupplementCheckItemProps {
   supplement: SupplementStackItem;
   onIncrement: () => void;
   onDecrement: () => void;
+  /** `isPending` da mutation compartilhada de progresso — desabilita o check enquanto uma chamada está em voo. */
+  isCheckPending?: boolean;
 }
 
 export function SupplementCheckItem({
   supplement,
   onIncrement,
   onDecrement,
+  isCheckPending = false,
 }: SupplementCheckItemProps) {
   const { t } = useAppTranslation();
   const rawDailyTargetCount = (supplement as { dailyTargetCount?: unknown }).dailyTargetCount;
@@ -158,6 +161,7 @@ export function SupplementCheckItem({
           accessibilityRole="button"
           accessibilityLabel={`${supplement.name} ${progressLabel}`}
           accessibilityHint="Toque para adicionar uma dose. Segure para desfazer uma dose."
+          disabled={isCheckPending}
           hitSlop={spacing.md}
           delayLongPress={220}
           onLongPress={handleDecrement}

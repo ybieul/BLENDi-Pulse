@@ -23,6 +23,7 @@ import {
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useDateFormat } from '../../hooks/useDateFormat';
+import { SkeletonLoader } from '../ui/SkeletonLoader';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
@@ -58,7 +59,10 @@ interface MacroBarChartProps {
   calorieTarget: number;
   height?: number;
   animate?: boolean;
+  isLoading?: boolean;
 }
+
+const LABELS_ROW_ESTIMATED_HEIGHT = 24;
 
 interface ChartDatum extends MacroBarChartDatum {
   key: string;
@@ -166,6 +170,7 @@ export function MacroBarChart({
   calorieTarget,
   height = 160,
   animate = true,
+  isLoading = false,
 }: MacroBarChartProps) {
   const { t } = useAppTranslation();
   const { formatWeekdayShort, formatShortDate } = useDateFormat();
@@ -258,8 +263,19 @@ export function MacroBarChart({
 
   const targetLineY = height - ((Math.min(normalizedTarget, yAxisMax) / yAxisMax) * height);
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { width: svgWidth }]}>
+        <SkeletonLoader
+          variant="card"
+          style={{ width: svgWidth, height: height + TOOLTIP_TOP_REGION + LABELS_ROW_ESTIMATED_HEIGHT }}
+        />
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.container, { width: svgWidth }]}> 
+    <View style={[styles.container, { width: svgWidth }]}>
       <View style={[styles.chartStage, { width: svgWidth, paddingTop: TOOLTIP_TOP_REGION }]}> 
         <Svg height={height} width={svgWidth}>
           <Line

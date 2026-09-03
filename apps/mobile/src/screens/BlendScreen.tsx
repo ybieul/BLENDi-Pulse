@@ -20,7 +20,7 @@
 // garantindo que TimerCircle receba o `remainingSeconds` correto na transição.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,7 +36,7 @@ import { CleaningReminder } from '../components/blend/CleaningReminder';
 import { useBlendStore } from '../store/blend.store';
 import { useAuthStore } from '../store/auth.store';
 import { useNetworkStore } from '../store/network.store';
-import { createBlendLog } from '../services/blendLog.service';
+import { BlendLogServiceError, createBlendLog } from '../services/blendLog.service';
 import { QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { addPendingBlend } from '../utils/pendingBlends.utils';
@@ -231,19 +231,19 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       setShowRating(false);
       setIsLogging(true);
 
-      try {
-        const blendLogInput: CreateBlendLogInput = {
-          recipeName: activeRecipe?.title,
-          protein: activeRecipe?.macros.protein ?? 0,
-          carbs: activeRecipe?.macros.carbs ?? 0,
-          fat: activeRecipe?.macros.fat ?? 0,
-          calories: activeRecipe?.macros.calories ?? 0,
-          blendiModel: blendiModel ?? 'Lite',
-          durationSeconds: timerDuration,
-          ...(activeFavoriteId !== null ? { fromFavoriteId: activeFavoriteId } : {}),
-          ...(rating !== undefined ? { rating } : {}),
-        };
+      const blendLogInput: CreateBlendLogInput = {
+        recipeName: activeRecipe?.title,
+        protein: activeRecipe?.macros.protein ?? 0,
+        carbs: activeRecipe?.macros.carbs ?? 0,
+        fat: activeRecipe?.macros.fat ?? 0,
+        calories: activeRecipe?.macros.calories ?? 0,
+        blendiModel: blendiModel ?? 'Lite',
+        durationSeconds: timerDuration,
+        ...(activeFavoriteId !== null ? { fromFavoriteId: activeFavoriteId } : {}),
+        ...(rating !== undefined ? { rating } : {}),
+      };
 
+      try {
         if (isConnected) {
           await createBlendLog(blendLogInput);
 
@@ -269,10 +269,20 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
           setTimerStatus('ready');
           setElapsedSeconds(0);
         }, LOG_CLEAN_CHECK_DELAY_MS);
-      } catch {
+      } catch (error) {
         setIsLogging(false);
+
+        // A requisição foi tentada online (isConnected era true) e falhou —
+        // cai no mesmo offline queue do branch acima, para não depender só
+        // do usuário tentar de novo manualmente pra não perder o blend.
+        addPendingBlend(blendLogInput);
+
+        const translationKey =
+          error instanceof BlendLogServiceError
+            ? error.translationKey
+            : 'errors.network.server';
+        showToast(t(translationKey as Parameters<typeof t>[0]));
         // timerStatus permanece 'completed' para o usuário poder tentar novamente
-        Alert.alert(t('errors.network.server'));
       }
     },
     [

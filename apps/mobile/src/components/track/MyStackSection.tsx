@@ -43,6 +43,8 @@ export interface MyStackSectionProps {
   onIncrement: (supplement: SupplementStackItem) => void;
   onDecrement: (supplement: SupplementStackItem) => void;
   onManage: () => void;
+  /** `isPending` da mutation compartilhada de progresso — desabilita os checks enquanto uma chamada está em voo. */
+  isCheckPending?: boolean;
 }
 
 function ItemSeparator() {
@@ -54,6 +56,7 @@ export function MyStackSection({
   onIncrement,
   onDecrement,
   onManage,
+  isCheckPending = false,
 }: MyStackSectionProps) {
   const { t } = useAppTranslation();
   const progressScale = useRef(new Animated.Value(1)).current;
@@ -101,6 +104,7 @@ export function MyStackSection({
       supplement={item}
       onIncrement={() => onIncrement(item)}
       onDecrement={() => onDecrement(item)}
+      isCheckPending={isCheckPending}
     />
   );
 
