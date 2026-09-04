@@ -1,5 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  GoogleGenerativeAI,
+  GoogleGenerativeAIFetchError,
+  type GenerateContentRequest,
+  type GenerativeModel,
+} from '@google/generative-ai';
 import OpenAI from 'openai';
 
 import { env } from '../config/env';
@@ -8,6 +13,11 @@ const AI_PROVIDER_TIMEOUT_MS = 30_000;
 const VISION_PROVIDER_TIMEOUT_MS = 45_000;
 const DEFAULT_MAX_TOKENS = 800;
 const DEFAULT_VISION_MAX_TOKENS = 1000;
+// Retry único (backoff fixo, não exponencial) para 503 "high demand" do Gemini.
+// Diferente de OpenAI/Anthropic, o SDK do Google não tem retry embutido —
+// achado da Tarefa 10 do diagnóstico de resiliência, que confirmou instabilidade
+// real desse tipo já documentada abaixo em AI_MODEL.
+const GOOGLE_HIGH_DEMAND_RETRY_DELAY_MS = 1_000;
 const ANTHROPIC_JSON_INSTRUCTION =
   'You must respond with valid JSON only, no additional text.';
 const ANTHROPIC_VISION_JSON_INSTRUCTION = 'Respond with valid JSON only.';
@@ -136,6 +146,47 @@ async function callAnthropic(request: AiProviderRequest): Promise<AiProviderResp
   };
 }
 
+function isGoogleHighDemandError(error: unknown): boolean {
+  return error instanceof GoogleGenerativeAIFetchError && error.status === 503;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Chama model.generateContent com cancelamento real via AbortController — o
+ * SDK do Google só cria um internamente se `signal`/`timeout` forem passados
+ * explicitamente (ver Tarefa 3 do diagnóstico de resiliência); sem isso, a
+ * chamada ao Gemini seguia rodando em background mesmo depois do withTimeout
+ * já ter descartado o resultado. O mesmo AbortController cobre as duas
+ * tentativas (original + 1 retry de 503), então o orçamento de `timeoutMs`
+ * nunca dobra — o retry acontece dentro da mesma janela, não depois dela.
+ */
+async function generateGoogleContent(
+  model: GenerativeModel,
+  request: GenerateContentRequest,
+  timeoutMs: number
+): ReturnType<GenerativeModel['generateContent']> {
+  const controller = new AbortController();
+  const abortTimeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    try {
+      return await model.generateContent(request, { signal: controller.signal });
+    } catch (error) {
+      if (!isGoogleHighDemandError(error)) {
+        throw error;
+      }
+
+      await delay(GOOGLE_HIGH_DEMAND_RETRY_DELAY_MS);
+      return await model.generateContent(request, { signal: controller.signal });
+    }
+  } finally {
+    clearTimeout(abortTimeoutId);
+  }
+}
+
 async function callGoogle(request: AiProviderRequest): Promise<AiProviderResponse> {
   const client = new GoogleGenerativeAI(env.AI_API_KEY);
   const model = client.getGenerativeModel({
@@ -147,12 +198,16 @@ async function callGoogle(request: AiProviderRequest): Promise<AiProviderRespons
     },
   });
 
-  const response = await model.generateContent({
-    contents: request.messages.map(message => ({
-      role: message.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: message.content }],
-    })),
-  });
+  const response = await generateGoogleContent(
+    model,
+    {
+      contents: request.messages.map(message => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }],
+      })),
+    },
+    AI_PROVIDER_TIMEOUT_MS
+  );
 
   return {
     content: ensureTextContent(response.response.text(), 'google'),
@@ -245,24 +300,28 @@ async function callGoogleVision(request: VisionProviderRequest): Promise<VisionP
     },
   });
 
-  const response = await model.generateContent({
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType: request.mimeType,
-              data: request.imageBase64,
+  const response = await generateGoogleContent(
+    model,
+    {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: request.mimeType,
+                data: request.imageBase64,
+              },
             },
-          },
-          {
-            text: request.prompt,
-          },
-        ],
-      },
-    ],
-  });
+            {
+              text: request.prompt,
+            },
+          ],
+        },
+      ],
+    },
+    VISION_PROVIDER_TIMEOUT_MS
+  );
 
   return {
     content: ensureTextContent(response.response.text(), 'google vision'),

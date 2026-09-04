@@ -8,9 +8,11 @@
 //   5. Registrar handler de erros (SEMPRE por último)
 //   6. Começar a escutar requisições
 
+import type { Server } from 'node:http';
 import { env, paymentsConfig } from './config/env';
 import { connectDatabase } from './config/database';
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
@@ -171,6 +173,77 @@ app.use((_req, res) => {
 
 app.use(errorHandler);
 
+// ─── Handlers globais de processo ──────────────────────────────────────────────
+// Sem eles, o comportamento padrão do Node para os três eventos abaixo é
+// encerrar o processo imediatamente (unhandledRejection e uncaughtException)
+// ou deixar o Railway matar o processo sem gracidade (SIGTERM, disparado a
+// cada deploy) — nos três casos, interrompendo requisições em andamento.
+
+// Teto de espera pelo shutdown gracioso (server.close + mongoose.connection.close)
+// antes de forçar o encerramento do processo — evita travar indefinidamente se
+// alguma requisição em voo nunca terminar.
+const PROCESS_SHUTDOWN_FORCE_EXIT_MS = 5_000;
+
+function setupProcessHandlers(server: Server): void {
+  // unhandledRejection: só loga e continua. Diferente de uncaughtException,
+  // não indica necessariamente estado corrompido do processo — em produção,
+  // priorizar disponibilidade (o Railway já reinicia o processo se ele
+  // efetivamente crashar por outro motivo).
+  process.on('unhandledRejection', (reason, _promise) => {
+    console.error('[UnhandledRejection]', {
+      reason,
+      stack: reason instanceof Error ? reason.stack : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // uncaughtException: o processo está em estado potencialmente corrompido —
+  // encerra o mais rápido possível, mas de forma estruturada (para de aceitar
+  // conexões novas, fecha a conexão com o Mongo, então sai).
+  process.on('uncaughtException', (err, origin) => {
+    console.error('[UncaughtException]', {
+      err,
+      stack: err.stack,
+      origin,
+      timestamp: new Date().toISOString(),
+    });
+
+    const forceExitTimeout = setTimeout(() => {
+      process.exit(1);
+    }, PROCESS_SHUTDOWN_FORCE_EXIT_MS);
+
+    server.close(() => {
+      void mongoose.connection.close().finally(() => {
+        clearTimeout(forceExitTimeout);
+        process.exit(1);
+      });
+    });
+  });
+
+  // SIGTERM (Railway em todo deploy/restart) e SIGINT (Ctrl+C local): shutdown
+  // gracioso idêntico — para de aceitar conexões novas, dá tempo das
+  // requisições em andamento terminarem, fecha o Mongo, então sai com 0.
+  function gracefulShutdown(signal: string): void {
+    console.log(`[${signal}] Shutdown gracioso iniciado.`, {
+      timestamp: new Date().toISOString(),
+    });
+
+    const forceExitTimeout = setTimeout(() => {
+      process.exit(0);
+    }, PROCESS_SHUTDOWN_FORCE_EXIT_MS);
+
+    server.close(() => {
+      void mongoose.connection.close().finally(() => {
+        clearTimeout(forceExitTimeout);
+        process.exit(0);
+      });
+    });
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function bootstrap(): Promise<void> {
@@ -178,7 +251,7 @@ async function bootstrap(): Promise<void> {
   await connectDatabase();
   initializeNotificationJobs();
 
-  app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, () => {
     console.log(`\n🚀  BLENDi Pulse API`);
     console.log(`   Ambiente : ${env.NODE_ENV}`);
     console.log(`   Versão   : v${env.API_VERSION}`);
@@ -191,6 +264,8 @@ async function bootstrap(): Promise<void> {
       );
     }
   });
+
+  setupProcessHandlers(server);
 }
 
 void bootstrap();

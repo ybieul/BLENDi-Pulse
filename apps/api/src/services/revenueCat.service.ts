@@ -3,6 +3,10 @@ import { env, paymentsConfig } from '../config/env';
 import type { UserSubscriptionPlan } from '../models/User';
 
 const REVENUECAT_API_BASE_URL = 'https://api.revenuecat.com/v1';
+// Sem isso, um RevenueCat lento (não fora do ar) deixava POST /purchases/verify
+// pendurado indefinidamente — achado de Alta do diagnóstico de resiliência
+// (Tarefa 4): nenhuma camada tinha timeout algum para essas duas chamadas.
+const REVENUECAT_REQUEST_TIMEOUT_MS = 15_000;
 
 export type RevenueCatPlatform = 'ios' | 'android';
 
@@ -206,6 +210,7 @@ export async function postReceiptAndGetActiveSubscription(input: {
       fetch_token: input.receipt,
       ...(input.productId ? { product_id: input.productId } : {}),
     }),
+    signal: AbortSignal.timeout(REVENUECAT_REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -228,6 +233,7 @@ export async function getSubscriberCustomerInfo(appUserId: string): Promise<Reve
     {
       method: 'GET',
       headers: getRevenueCatHeaders(),
+      signal: AbortSignal.timeout(REVENUECAT_REQUEST_TIMEOUT_MS),
     }
   );
 

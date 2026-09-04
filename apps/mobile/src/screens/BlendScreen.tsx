@@ -315,7 +315,20 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       return undefined;
     }
 
-    const elapsed = Math.floor((Date.now() - timerStartedAt.getTime()) / 1000);
+    // timerStartedAt agora é persistido no MMKV (blend.store.ts) e sobrevive
+    // a um crash/restart do processo — mas createJSONStorage serializa via
+    // JSON.stringify/parse sem reviver customizado, então depois de
+    // reidratado ele chega aqui como STRING (ISO), não como instância de
+    // Date. `new Date(...)` aceita os dois casos (Date ou string) sem
+    // diferença de comportamento dentro do mesmo processo (remontagem de
+    // tela, valor ainda é Date de verdade).
+    const timerStartedAtMs = new Date(timerStartedAt).getTime();
+
+    if (Number.isNaN(timerStartedAtMs)) {
+      return undefined;
+    }
+
+    const elapsed = Math.floor((Date.now() - timerStartedAtMs) / 1000);
 
     if (elapsed >= timerDuration) {
       // Blend já terminou enquanto a tela estava fora do foco

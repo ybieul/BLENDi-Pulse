@@ -1,3 +1,4 @@
+import axios from 'axios';
 import {
   QueryClient,
   defaultShouldDehydrateQuery,
@@ -84,12 +85,30 @@ function pruneExpiredPersistedQueries(persistedClient: PersistedClient): Persist
   };
 }
 
+// 4xx é erro definitivo do cliente — um 401 já passou pelo interceptor de
+// refresh de token (auth.store.ts) sem conseguir renovar, e um 400/403 nunca
+// muda de resultado só por tentar de nervo com os mesmos dados. Retentar
+// esses casos só soma até ~20s (2 tentativas extras, cada uma com o timeout
+// cheio de 10s do Axios) antes do erro final aparecer na UI, sem chance real
+// de sucesso — achado de Média do diagnóstico de resiliência (Tarefa 8).
+// Qualquer outro erro (5xx, timeout, offline) é potencialmente transitório —
+// mantém as 2 tentativas com backoff que já existiam.
+function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+
+  if (status !== undefined && status >= 400 && status < 500) {
+    return false;
+  }
+
+  return failureCount < 2;
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: DEFAULT_STALE_TIME,
       gcTime: CACHE_CONFIG.FAVORITES_TTL,
-      retry: 2,
+      retry: shouldRetryQuery,
       retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30_000),
     },
   },

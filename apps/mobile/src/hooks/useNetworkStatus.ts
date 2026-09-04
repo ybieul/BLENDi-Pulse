@@ -3,7 +3,9 @@ import type { QueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { useNetworkStore } from '../store/network.store';
+import { getPendingBlends } from '../utils/pendingBlends.utils';
 import { triggerReconnectSync } from '../utils/reconnectSync.utils';
+import { getDirtyLists } from '../utils/shoppingListSync.utils';
 
 type NetInfoClient = Pick<typeof NetInfo, 'addEventListener' | 'fetch'>;
 
@@ -50,6 +52,26 @@ export function useNetworkStatus(
       unsubscribe();
     };
   }, [netInfoClient, setConnectionState]);
+
+  // Sincronização de startup: cobre o caso de o app fechar abruptamente com
+  // dado local não sincronizado (shoppingListDirty, blends offline) e ser
+  // reaberto já com conectividade estável. wasOffline sempre começa `false`
+  // num processo novo (network.store não persiste), então o efeito abaixo
+  // (que depende de uma transição offline→online observada nesta sessão)
+  // nunca dispara sozinho nesse cenário — achado de Alta do diagnóstico de
+  // resiliência (Tarefa 9). Roda uma única vez no mount, independente do
+  // estado de conectividade atual (triggerReconnectSync já lida com estar
+  // offline no momento da chamada) e independente de wasOffline — é uma
+  // checagem de "existe dado pendente?", não de "houve transição de rede?".
+  useEffect(() => {
+    const hasPendingShoppingListSync = getDirtyLists().length > 0;
+    const hasPendingBlendSync = getPendingBlends().length > 0;
+
+    if (hasPendingShoppingListSync || hasPendingBlendSync) {
+      void triggerReconnectSync(queryClient).catch(() => undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const reconnectedAfterOffline =

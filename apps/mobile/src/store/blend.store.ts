@@ -122,8 +122,25 @@ export const useBlendStore = create<BlendState & BlendActions>()(
     {
       name: BLEND_TIMER_DURATION_KEY,
       storage: createJSONStorage(() => blendTimerStorage),
+      // isTimerRunning/timerStartedAt persistidos agora — sem isso, uma
+      // sessão de blend em andamento era esquecida silenciosamente em
+      // qualquer crash/restart do processo (achado de Média do diagnóstico
+      // de resiliência, Tarefa 9). O mecanismo de recuperação em
+      // BlendScreen.tsx já existia e funcionava para remontagem dentro do
+      // mesmo processo — só faltava esses dois campos sobreviverem a um
+      // processo novo.
+      //
+      // ATENÇÃO: timerStartedAt é um Date, mas createJSONStorage usa
+      // JSON.stringify/JSON.parse sem reviver customizado — na reidratação
+      // ele volta como STRING (ISO), não como instância de Date. Quem lê
+      // esse campo (BlendScreen.tsx) precisa envolver em `new Date(...)`
+      // antes de chamar `.getTime()`, já que `"...".getTime is not a
+      // function` quebraria a recuperação exatamente no cenário que esta
+      // correção deveria resolver.
       partialize: (state) => ({
         timerDuration: state.timerDuration,
+        isTimerRunning: state.isTimerRunning,
+        timerStartedAt: state.timerStartedAt,
       }),
     }
   )

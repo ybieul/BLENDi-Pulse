@@ -20,14 +20,30 @@
 import { google } from 'googleapis';
 import { env } from '../config/env';
 
+// Sem isso, exchangeCodeForTokens e getUserInfoFromToken (via busca de chaves
+// JWKS) ficavam sem nenhum timeout — achado de Alta do diagnóstico de
+// resiliência (segunda passada): nem o gaxios (transporte HTTP interno do
+// googleapis) impõe um teto por padrão, e diferente das outras chamadas do
+// backend, esse fluxo é acessado por navegação de browser (openAuthSessionAsync),
+// sem o backstop do timeout de 10s do Axios do mobile.
+const GOOGLE_OAUTH_REQUEST_TIMEOUT_MS = 10_000;
+
 // ─── Cliente OAuth2 (singleton) ───────────────────────────────────────────────
 // Instanciado uma vez no início do módulo e reutilizado em todas as requisições.
-// Parâmetros: clientId, clientSecret, redirectUri — lidos do env validado.
-const oauth2Client = new google.auth.OAuth2(
-  env.GOOGLE_CLIENT_ID,
-  env.GOOGLE_CLIENT_SECRET,
-  env.GOOGLE_REDIRECT_URI,
-);
+// A forma de 3 argumentos posicionais (clientId, clientSecret, redirectUri) é
+// deprecated pelo SDK e não aceita opções de transporte — usamos a forma de
+// objeto único para poder passar transporterOptions.timeout, repassado
+// diretamente ao gaxios interno (this.transporter = new Gaxios(transporterOptions)),
+// que aplica esse timeout via AbortSignal em toda requisição feita pelo client
+// (getToken e a busca de chaves JWKS dentro de verifyIdToken).
+const oauth2Client = new google.auth.OAuth2({
+  clientId: env.GOOGLE_CLIENT_ID,
+  clientSecret: env.GOOGLE_CLIENT_SECRET,
+  redirectUri: env.GOOGLE_REDIRECT_URI,
+  transporterOptions: {
+    timeout: GOOGLE_OAUTH_REQUEST_TIMEOUT_MS,
+  },
+});
 
 // ─── Interface de retorno ─────────────────────────────────────────────────────
 

@@ -165,30 +165,48 @@ async function syncDirtyShoppingLists(queryClient: QueryClient): Promise<void> {
   }
 }
 
+// triggerReconnectSync não tinha proteção própria contra chamada concorrente
+// (achado verificado na Tarefa 9 do FIX-5) — agora que existe um segundo
+// gatilho além da transição offline→online (a checagem de startup em
+// useNetworkStatus.ts), duas chamadas podem coincidir na mesma sessão. Sem
+// essa flag, ambas rodariam em paralelo, duplicando o trabalho (e, no pior
+// caso, tentando o mesmo POST/PATCH de sync duas vezes ao mesmo tempo).
+let isReconnectSyncInProgress = false;
+
 export async function triggerReconnectSync(queryClient: QueryClient): Promise<void> {
-  try {
-    await processPendingBlendQueue();
-  } catch {
-    // O reconnect sync é best-effort: falhas da fila não devem interromper
-    // os próximos passos de revalidação do estado do app.
+  if (isReconnectSyncInProgress) {
+    return;
   }
 
-  try {
-    await invalidateCriticalQueries(queryClient);
-  } catch {
-    // Invalidação de cache falha em silêncio; a próxima navegação ou ação do
-    // usuário ainda pode disparar refetch normalmente.
-  }
+  isReconnectSyncInProgress = true;
 
   try {
-    useNetworkStore.getState().markSyncCompleted();
-  } catch {
-    // A limpeza da flag local não deve propagar erro para a camada de hook.
-  }
+    try {
+      await processPendingBlendQueue();
+    } catch {
+      // O reconnect sync é best-effort: falhas da fila não devem interromper
+      // os próximos passos de revalidação do estado do app.
+    }
 
-  try {
-    await syncDirtyShoppingLists(queryClient);
-  } catch {
-    // A sincronização de listas também é best-effort e não deve quebrar o fluxo.
+    try {
+      await invalidateCriticalQueries(queryClient);
+    } catch {
+      // Invalidação de cache falha em silêncio; a próxima navegação ou ação do
+      // usuário ainda pode disparar refetch normalmente.
+    }
+
+    try {
+      useNetworkStore.getState().markSyncCompleted();
+    } catch {
+      // A limpeza da flag local não deve propagar erro para a camada de hook.
+    }
+
+    try {
+      await syncDirtyShoppingLists(queryClient);
+    } catch {
+      // A sincronização de listas também é best-effort e não deve quebrar o fluxo.
+    }
+  } finally {
+    isReconnectSyncInProgress = false;
   }
 }

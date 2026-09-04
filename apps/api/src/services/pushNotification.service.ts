@@ -3,6 +3,11 @@ import { UserModel } from '../models/User';
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 const EXPO_MAX_BATCH_SIZE = 100;
+// Sem isso, um lote pendurado (Expo lento, não fora do ar) bloqueava o cron
+// job inteiro por tempo indeterminado — achado de Média do diagnóstico de
+// resiliência (Tarefa 6). 30s é suficiente para um lote de até 100 notificações
+// sob carga normal.
+const EXPO_PUSH_TIMEOUT_MS = 30_000;
 const EXPO_SUCCESS_STATUS = 'ok';
 const EXPO_ERROR_STATUS = 'error';
 const DEVICE_NOT_REGISTERED_ERROR = 'DeviceNotRegistered';
@@ -107,6 +112,7 @@ async function sendExpoBatch(batch: PushNotificationPayload[]): Promise<PushNoti
         Accept: 'application/json',
       },
       body: JSON.stringify(buildExpoRequestBody(batch)),
+      signal: AbortSignal.timeout(EXPO_PUSH_TIMEOUT_MS),
     });
 
     let responseBody: ExpoPushResponse | null = null;
@@ -131,12 +137,19 @@ export async function sendNotificationBatch(payloads: PushNotificationPayload[])
   successCount: number;
   errorCount: number;
   invalidTokens: string[];
+  // Tokens confirmados como entregues pelo Expo (status 'ok' no ticket) — usado
+  // pelos cron jobs para reservar no NotificationLog só depois da confirmação
+  // de entrega, não antes (achado de Alta do diagnóstico de resiliência,
+  // Tarefa 6: a ordem antiga — reserva antes do envio — perdia notificação
+  // permanentemente em qualquer falha transitória do Expo).
+  successfulTokens: string[];
 }> {
   if (payloads.length === 0) {
     return {
       successCount: 0,
       errorCount: 0,
       invalidTokens: [],
+      successfulTokens: [],
     };
   }
 
@@ -158,10 +171,15 @@ export async function sendNotificationBatch(payloads: PushNotificationPayload[])
     )
   );
 
+  const successfulTokens = results
+    .filter(result => result.status === 'success')
+    .map(result => result.token);
+
   return {
     successCount: results.filter(result => result.status === 'success').length,
     errorCount: results.filter(result => result.status === 'error').length,
     invalidTokens,
+    successfulTokens,
   };
 }
 

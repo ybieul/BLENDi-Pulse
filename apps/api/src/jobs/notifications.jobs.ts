@@ -156,28 +156,87 @@ async function reserveNotificationLog(
   }
 }
 
-async function dispatchNotifications(payloads: PushNotificationPayload[]): Promise<void> {
+async function dispatchNotifications(
+  payloads: PushNotificationPayload[]
+): Promise<{ successfulTokens: Set<string> }> {
   const result = await sendNotificationBatch(payloads);
   await cleanInvalidTokens(result.invalidTokens);
+  return { successfulTokens: new Set(result.successfulTokens) };
+}
+
+// Checagem somente-leitura de "usuário já notificado hoje/nesta janela" —
+// substitui a checagem que reserveNotificationLog fazia embutida, agora que a
+// escrita da reserva foi movida para depois da confirmação de entrega (ver
+// reserveDeliveredNotifications). Sem isso, um usuário já notificado com
+// sucesso na janela anterior (ex: tick de :00) seria notificado de novo no
+// tick seguinte (:30), já que não haveria mais reserva prévia bloqueando-o.
+async function hasExistingNotificationLog(
+  userId: unknown,
+  type: Exclude<NotificationType, 'levelUp'>,
+  notificationDate: string
+): Promise<boolean> {
+  const existingLog = await NotificationLogModel.exists({ userId, type, notificationDate });
+  return existingLog !== null;
+}
+
+interface PendingNotificationReservation {
+  userId: unknown;
+  type: Exclude<NotificationType, 'levelUp'>;
+  notificationDate: string;
+}
+
+// Reserva no NotificationLog só para os tokens que o Expo confirmou como
+// entregues (status 'ok') — não mais otimisticamente antes do envio. Corrige
+// o achado de Alta do diagnóstico de resiliência (Tarefa 6): com a reserva
+// acontecendo antes da confirmação de entrega, qualquer falha transitória do
+// Expo perdia a notificação permanentemente (o próximo tick encontrava a
+// reserva já feita e pulava o usuário, mesmo sem entrega real). Um usuário
+// cujo envio falhou simplesmente não é reservado aqui — o próximo tick volta
+// a tratá-lo como elegível, que é o retry automático que faltava.
+async function reserveDeliveredNotifications(
+  jobName: string,
+  successfulTokens: Set<string>,
+  pendingReservations: Map<string, PendingNotificationReservation>
+): Promise<void> {
+  await Promise.all(
+    Array.from(successfulTokens, token => pendingReservations.get(token))
+      .filter((entry): entry is PendingNotificationReservation => entry !== undefined)
+      .map(entry =>
+        reserveNotificationLog(entry.userId, entry.type, entry.notificationDate).catch(err => {
+          console.error(
+            `[NotificationJob:${jobName}] Failed to reserve notification log after successful delivery`,
+            { userId: entry.userId, type: entry.type, err }
+          );
+        })
+      )
+  );
 }
 
 async function runDailyPulseJob(): Promise<void> {
   const nowUtc = new Date();
   const windowEndUtc = new Date(nowUtc.getTime() + FIVE_MINUTES_IN_MILLISECONDS);
   const notifications: PushNotificationPayload[] = [];
+  const pendingReservations = new Map<string, PendingNotificationReservation>();
 
-  const users = await UserModel.find({
-    'notificationPreferences.dailyPulse': true,
-    pushToken: { $exists: true, $type: 'string', $ne: '' },
-  })
-    .select({
-      pushToken: 1,
-      goal: 1,
-      timezone: 1,
-      dailyPulseTime: 1,
+  let users: DailyPulseUserCandidate[];
+
+  try {
+    users = await UserModel.find({
+      'notificationPreferences.dailyPulse': true,
+      pushToken: { $exists: true, $type: 'string', $ne: '' },
     })
-    .lean<DailyPulseUserCandidate[]>()
-    .exec();
+      .select({
+        pushToken: 1,
+        goal: 1,
+        timezone: 1,
+        dailyPulseTime: 1,
+      })
+      .lean<DailyPulseUserCandidate[]>()
+      .exec();
+  } catch (err) {
+    console.error('[NotificationJob:runDailyPulseJob] Failed to load candidate users — aborting this tick', err);
+    return;
+  }
 
   for (const user of users) {
     try {
@@ -196,41 +255,59 @@ async function runDailyPulseJob(): Promise<void> {
       }
 
       const notificationDate = formatLocalDateKey(toLocalDate(nextOccurrenceUtc, user.timezone));
-      const content = await getDailyPulseContent(String(user._id), user.goal);
-      const reserved = await reserveNotificationLog(user._id, 'dailyPulse', notificationDate);
 
-      if (!reserved) {
+      if (await hasExistingNotificationLog(user._id, 'dailyPulse', notificationDate)) {
         continue;
       }
+
+      const content = await getDailyPulseContent(String(user._id), user.goal);
 
       notifications.push(
         buildPushPayload(user.pushToken, 'dailyPulse', content.title, content.body)
       );
+      pendingReservations.set(user.pushToken, {
+        userId: user._id,
+        type: 'dailyPulse',
+        notificationDate,
+      });
     } catch (err) {
       console.error(`[NotificationJob:runDailyPulseJob] Failed to process user ${String(user._id)}`, err);
     }
   }
 
-  await dispatchNotifications(notifications);
+  try {
+    const { successfulTokens } = await dispatchNotifications(notifications);
+    await reserveDeliveredNotifications('runDailyPulseJob', successfulTokens, pendingReservations);
+  } catch (err) {
+    console.error('[NotificationJob:runDailyPulseJob] Failed to dispatch notifications batch', err);
+  }
 }
 
 async function runStreakReminderJob(): Promise<void> {
   const nowUtc = new Date();
   const notifications: PushNotificationPayload[] = [];
+  const pendingReservations = new Map<string, PendingNotificationReservation>();
 
-  const users = await UserModel.find({
-    'notificationPreferences.streakReminder': true,
-    currentStreak: { $gt: 0 },
-    pushToken: { $exists: true, $type: 'string', $ne: '' },
-  })
-    .select({
-      pushToken: 1,
-      currentStreak: 1,
-      locale: 1,
-      timezone: 1,
+  let users: StreakReminderUserCandidate[];
+
+  try {
+    users = await UserModel.find({
+      'notificationPreferences.streakReminder': true,
+      currentStreak: { $gt: 0 },
+      pushToken: { $exists: true, $type: 'string', $ne: '' },
     })
-    .lean<StreakReminderUserCandidate[]>()
-    .exec();
+      .select({
+        pushToken: 1,
+        currentStreak: 1,
+        locale: 1,
+        timezone: 1,
+      })
+      .lean<StreakReminderUserCandidate[]>()
+      .exec();
+  } catch (err) {
+    console.error('[NotificationJob:runStreakReminderJob] Failed to load candidate users — aborting this tick', err);
+    return;
+  }
 
   for (const user of users) {
     try {
@@ -244,6 +321,11 @@ async function runStreakReminderJob(): Promise<void> {
       }
 
       const notificationDate = formatLocalDateKey(localNow);
+
+      if (await hasExistingNotificationLog(user._id, 'streakReminder', notificationDate)) {
+        continue;
+      }
+
       const startOfDayUtc = getMidnightUTC(user.timezone);
       const blendCount = await BlendLogModel.countDocuments({
         userId: user._id,
@@ -255,40 +337,56 @@ async function runStreakReminderJob(): Promise<void> {
       }
 
       const content = getStreakReminderContent(user.currentStreak, user.locale);
-      const reserved = await reserveNotificationLog(user._id, 'streakReminder', notificationDate);
-
-      if (!reserved) {
-        continue;
-      }
 
       notifications.push(
         buildPushPayload(user.pushToken, 'streakReminder', content.title, content.body)
       );
+      pendingReservations.set(user.pushToken, {
+        userId: user._id,
+        type: 'streakReminder',
+        notificationDate,
+      });
     } catch (err) {
       console.error(`[NotificationJob:runStreakReminderJob] Failed to process user ${String(user._id)}`, err);
     }
   }
 
-  await dispatchNotifications(notifications);
+  try {
+    const { successfulTokens } = await dispatchNotifications(notifications);
+    await reserveDeliveredNotifications('runStreakReminderJob', successfulTokens, pendingReservations);
+  } catch (err) {
+    console.error('[NotificationJob:runStreakReminderJob] Failed to dispatch notifications batch', err);
+  }
 }
 
 async function runSupplementReminderJob(): Promise<void> {
   const nowUtc = new Date();
   const notifications: PushNotificationPayload[] = [];
+  const pendingReservations = new Map<string, PendingNotificationReservation>();
 
-  const users = await UserModel.find({
-    'notificationPreferences.supplementReminder': true,
-    'supplementStack.isActive': true,
-    pushToken: { $exists: true, $type: 'string', $ne: '' },
-  })
-    .select({
-      pushToken: 1,
-      locale: 1,
-      timezone: 1,
-      supplementStack: 1,
+  let users: SupplementReminderUserCandidate[];
+
+  try {
+    users = await UserModel.find({
+      'notificationPreferences.supplementReminder': true,
+      'supplementStack.isActive': true,
+      pushToken: { $exists: true, $type: 'string', $ne: '' },
     })
-    .lean<SupplementReminderUserCandidate[]>()
-    .exec();
+      .select({
+        pushToken: 1,
+        locale: 1,
+        timezone: 1,
+        supplementStack: 1,
+      })
+      .lean<SupplementReminderUserCandidate[]>()
+      .exec();
+  } catch (err) {
+    console.error(
+      '[NotificationJob:runSupplementReminderJob] Failed to load candidate users — aborting this tick',
+      err
+    );
+    return;
+  }
 
   for (const user of users) {
     try {
@@ -302,6 +400,11 @@ async function runSupplementReminderJob(): Promise<void> {
       }
 
       const notificationDate = formatLocalDateKey(localNow);
+
+      if (await hasExistingNotificationLog(user._id, 'supplementReminder', notificationDate)) {
+        continue;
+      }
+
       const activeSupplements = user.supplementStack.filter(supplement => supplement.isActive);
 
       if (activeSupplements.length === 0) {
@@ -326,40 +429,56 @@ async function runSupplementReminderJob(): Promise<void> {
       }
 
       const content = getSupplementReminderContent(pendingSupplementNames, user.locale);
-      const reserved = await reserveNotificationLog(user._id, 'supplementReminder', notificationDate);
-
-      if (!reserved) {
-        continue;
-      }
 
       notifications.push(
         buildPushPayload(user.pushToken, 'supplementReminder', content.title, content.body)
       );
+      pendingReservations.set(user.pushToken, {
+        userId: user._id,
+        type: 'supplementReminder',
+        notificationDate,
+      });
     } catch (err) {
       console.error(`[NotificationJob:runSupplementReminderJob] Failed to process user ${String(user._id)}`, err);
     }
   }
 
-  await dispatchNotifications(notifications);
+  try {
+    const { successfulTokens } = await dispatchNotifications(notifications);
+    await reserveDeliveredNotifications('runSupplementReminderJob', successfulTokens, pendingReservations);
+  } catch (err) {
+    console.error('[NotificationJob:runSupplementReminderJob] Failed to dispatch notifications batch', err);
+  }
 }
 
 async function runHydrationReminderJob(): Promise<void> {
   const nowUtc = new Date();
   const notifications: PushNotificationPayload[] = [];
+  const pendingReservations = new Map<string, PendingNotificationReservation>();
 
-  const users = await UserModel.find({
-    'notificationPreferences.hydrationReminder': true,
-    pushToken: { $exists: true, $type: 'string', $ne: '' },
-  })
-    .select({
-      pushToken: 1,
-      locale: 1,
-      timezone: 1,
-      unitSystem: 1,
-      dailyHydrationTarget: 1,
+  let users: HydrationReminderUserCandidate[];
+
+  try {
+    users = await UserModel.find({
+      'notificationPreferences.hydrationReminder': true,
+      pushToken: { $exists: true, $type: 'string', $ne: '' },
     })
-    .lean<HydrationReminderUserCandidate[]>()
-    .exec();
+      .select({
+        pushToken: 1,
+        locale: 1,
+        timezone: 1,
+        unitSystem: 1,
+        dailyHydrationTarget: 1,
+      })
+      .lean<HydrationReminderUserCandidate[]>()
+      .exec();
+  } catch (err) {
+    console.error(
+      '[NotificationJob:runHydrationReminderJob] Failed to load candidate users — aborting this tick',
+      err
+    );
+    return;
+  }
 
   for (const user of users) {
     try {
@@ -373,6 +492,11 @@ async function runHydrationReminderJob(): Promise<void> {
       }
 
       const notificationDate = formatLocalDateKey(localNow);
+
+      if (await hasExistingNotificationLog(user._id, 'hydrationReminder', notificationDate)) {
+        continue;
+      }
+
       const startOfDayUtc = getMidnightUTC(user.timezone);
       const hydrationLogs = await HydrationLogModel.find({
         userId: user._id,
@@ -395,21 +519,26 @@ async function runHydrationReminderJob(): Promise<void> {
         user.unitSystem,
         user.locale
       );
-      const reserved = await reserveNotificationLog(user._id, 'hydrationReminder', notificationDate);
-
-      if (!reserved) {
-        continue;
-      }
 
       notifications.push(
         buildPushPayload(user.pushToken, 'hydrationReminder', content.title, content.body)
       );
+      pendingReservations.set(user.pushToken, {
+        userId: user._id,
+        type: 'hydrationReminder',
+        notificationDate,
+      });
     } catch (err) {
       console.error(`[NotificationJob:runHydrationReminderJob] Failed to process user ${String(user._id)}`, err);
     }
   }
 
-  await dispatchNotifications(notifications);
+  try {
+    const { successfulTokens } = await dispatchNotifications(notifications);
+    await reserveDeliveredNotifications('runHydrationReminderJob', successfulTokens, pendingReservations);
+  } catch (err) {
+    console.error('[NotificationJob:runHydrationReminderJob] Failed to dispatch notifications batch', err);
+  }
 }
 
 function percentDelta(current: number, previous: number): number {
@@ -532,35 +661,62 @@ async function runWeeklyReportJob(): Promise<void> {
 }
 
 export function initializeNotificationJobs(): void {
-  cron.schedule(DAILY_PULSE_CRON_EXPRESSION, () => {
-    void runDailyPulseJob().catch(err => {
-      console.error('[notifications.jobs] Daily Pulse job failed:', err);
-    });
-  });
+  // noOverlap: true — bloqueia uma nova execução enquanto a anterior ainda
+  // está pendente (suporte nativo do node-cron 4.x, confirmado no diagnóstico
+  // de resiliência, Tarefa 5). Reduz a sobrecarga de queries paralelas no
+  // Atlas M0 quando um tick demora mais que o próprio intervalo do cron —
+  // a idempotência dos dados (índices únicos de NotificationLog/WeeklyReport)
+  // já protegia contra duplicata mesmo sem isso, mas overlap ainda gerava
+  // trabalho repetido desnecessário.
+  cron.schedule(
+    DAILY_PULSE_CRON_EXPRESSION,
+    () => {
+      void runDailyPulseJob().catch(err => {
+        console.error('[notifications.jobs] Daily Pulse job failed:', err);
+      });
+    },
+    { noOverlap: true }
+  );
 
-  cron.schedule(HALF_HOUR_CRON_EXPRESSION, () => {
-    void runStreakReminderJob().catch(err => {
-      console.error('[notifications.jobs] Streak Reminder job failed:', err);
-    });
-  });
+  cron.schedule(
+    HALF_HOUR_CRON_EXPRESSION,
+    () => {
+      void runStreakReminderJob().catch(err => {
+        console.error('[notifications.jobs] Streak Reminder job failed:', err);
+      });
+    },
+    { noOverlap: true }
+  );
 
-  cron.schedule(HALF_HOUR_CRON_EXPRESSION, () => {
-    void runSupplementReminderJob().catch(err => {
-      console.error('[notifications.jobs] Supplement Reminder job failed:', err);
-    });
-  });
+  cron.schedule(
+    HALF_HOUR_CRON_EXPRESSION,
+    () => {
+      void runSupplementReminderJob().catch(err => {
+        console.error('[notifications.jobs] Supplement Reminder job failed:', err);
+      });
+    },
+    { noOverlap: true }
+  );
 
-  cron.schedule(HALF_HOUR_CRON_EXPRESSION, () => {
-    void runHydrationReminderJob().catch(err => {
-      console.error('[notifications.jobs] Hydration Reminder job failed:', err);
-    });
-  });
+  cron.schedule(
+    HALF_HOUR_CRON_EXPRESSION,
+    () => {
+      void runHydrationReminderJob().catch(err => {
+        console.error('[notifications.jobs] Hydration Reminder job failed:', err);
+      });
+    },
+    { noOverlap: true }
+  );
 
-  cron.schedule(WEEKLY_REPORT_CRON_EXPRESSION, () => {
-    void runWeeklyReportJob().catch(err => {
-      console.error('[notifications.jobs] Weekly Report job failed:', err);
-    });
-  });
+  cron.schedule(
+    WEEKLY_REPORT_CRON_EXPRESSION,
+    () => {
+      void runWeeklyReportJob().catch(err => {
+        console.error('[notifications.jobs] Weekly Report job failed:', err);
+      });
+    },
+    { noOverlap: true }
+  );
 
   console.log('✅ Notification cron jobs registered successfully.');
 }
