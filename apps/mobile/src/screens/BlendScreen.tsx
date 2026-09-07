@@ -33,7 +33,7 @@ import { TimerCircle, type TimerCircleStatus } from '../components/blend/TimerCi
 import { TimerControls } from '../components/blend/TimerControls';
 import { RatingBottomSheet } from '../components/blend/RatingBottomSheet';
 import { CleaningReminder } from '../components/blend/CleaningReminder';
-import { useBlendStore } from '../store/blend.store';
+import { useBlendStore, useHasBlendStoreHydrated } from '../store/blend.store';
 import { useAuthStore } from '../store/auth.store';
 import { useNetworkStore } from '../store/network.store';
 import { BlendLogServiceError, createBlendLog } from '../services/blendLog.service';
@@ -152,6 +152,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   const timerDuration = useBlendStore((s) => s.timerDuration);
   const isTimerRunning = useBlendStore((s) => s.isTimerRunning);
   const timerStartedAt = useBlendStore((s) => s.timerStartedAt);
+  const hasBlendStoreHydrated = useHasBlendStoreHydrated();
   const startTimer = useBlendStore((s) => s.startTimer);
   const stopTimer = useBlendStore((s) => s.stopTimer);
   const completeBlend = useBlendStore((s) => s.completeBlend);
@@ -305,13 +306,23 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
     [timerDuration, setTimerDuration],
   );
 
-  // ── Recuperação de timer em andamento (montagem) ──────────────────────────
-  // Aplica-se quando o componente remonta com isTimerRunning = true no store.
+  // ── Recuperação de timer em andamento (montagem ou hidratação) ────────────
+  // Aplica-se quando isTimerRunning = true no store, seja numa remontagem
+  // dentro do mesmo processo, seja após a hidratação assíncrona do MMKV
+  // terminar (deps: [hasBlendStoreHydrated] — dispara de novo se a
+  // montagem acontecer antes da hidratação terminar, não só uma vez).
   // O React 18 batcha setElapsedSeconds + setTimerStatus no mesmo render,
   // garantindo que TimerCircle receba remainingSeconds correto na transição.
 
   useEffect(() => {
-    if (!isTimerRunning || !timerStartedAt) {
+    // blend.store.ts usa skipHydration: true (hidratação manual, disparada
+    // em App.tsx depois do boot) — antes de hasBlendStoreHydrated virar
+    // true, isTimerRunning/timerStartedAt ainda são os valores padrão
+    // (false/null), não o que estiver persistido. Sem essa checagem, este
+    // efeito (que só roda quando as deps mudam, incluindo esta) chegaria a
+    // rodar com o valor errado sempre que hidratasse antes do mount — agora
+    // ele espera de verdade a hidratação terminar antes de decidir.
+    if (!hasBlendStoreHydrated || !isTimerRunning || !timerStartedAt) {
       return undefined;
     }
 
@@ -346,7 +357,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       clearTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hasBlendStoreHydrated]);
 
   // ── Receita via parâmetro de navegação ────────────────────────────────────
   // Chamado quando o usuário vem do Pulse AI ou da Home via "Start Blend".

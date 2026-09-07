@@ -1,5 +1,5 @@
 import NetInfo from '@react-native-community/netinfo';
-import type { QueryClient } from '@tanstack/react-query';
+import { useIsRestoring, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { useNetworkStore } from '../store/network.store';
@@ -30,6 +30,8 @@ export function useNetworkStatus(
     isConnected,
     isInternetReachable,
   });
+  const hasCheckedPendingSyncRef = useRef(false);
+  const isRestoringQueryCache = useIsRestoring();
 
   useEffect(() => {
     let isMounted = true;
@@ -59,19 +61,31 @@ export function useNetworkStatus(
   // num processo novo (network.store não persiste), então o efeito abaixo
   // (que depende de uma transição offline→online observada nesta sessão)
   // nunca dispara sozinho nesse cenário — achado de Alta do diagnóstico de
-  // resiliência (Tarefa 9). Roda uma única vez no mount, independente do
-  // estado de conectividade atual (triggerReconnectSync já lida com estar
-  // offline no momento da chamada) e independente de wasOffline — é uma
-  // checagem de "existe dado pendente?", não de "houve transição de rede?".
+  // resiliência (Tarefa 9).
+  //
+  // Precisa esperar isRestoringQueryCache virar false antes de checar: o
+  // PersistQueryClientProvider (App.tsx) renderiza os filhos ANTES de
+  // terminar de restaurar o cache do React Query — se checássemos no mount
+  // puro, getDirtyLists() encontraria a lista suja corretamente (MMKV puro,
+  // síncrono), mas syncDirtyShoppingLists() leria queryClient.getQueryData()
+  // vazio (cache ainda não restaurado) e pularia a lista silenciosamente,
+  // mesmo com dado pendente de verdade. hasCheckedPendingSyncRef garante que
+  // a checagem rode exatamente uma vez, assim que a restauração terminar —
+  // não a cada re-render em que isRestoringQueryCache continuar false.
   useEffect(() => {
+    if (isRestoringQueryCache || hasCheckedPendingSyncRef.current) {
+      return;
+    }
+
+    hasCheckedPendingSyncRef.current = true;
+
     const hasPendingShoppingListSync = getDirtyLists().length > 0;
     const hasPendingBlendSync = getPendingBlends().length > 0;
 
     if (hasPendingShoppingListSync || hasPendingBlendSync) {
       void triggerReconnectSync(queryClient).catch(() => undefined);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isRestoringQueryCache, queryClient]);
 
   useEffect(() => {
     const reconnectedAfterOffline =

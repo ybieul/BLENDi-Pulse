@@ -23,6 +23,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Auth — interceptors Axios e restauração de sessão
 import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
+import { useBlendStore } from './src/store/blend.store';
 import { useGamificationStore } from './src/store/gamification.store';
 
 // Query cache — client persistido em MMKV
@@ -172,6 +173,16 @@ function AppShell() {
     // Dispara imediatamente após a montagem, sem delay intermediário.
     void restoreSession();
   }, [restoreSession]);
+
+  // ── Hidratação manual do blend.store ────────────────────────────────────────
+  // blend.store.ts usa skipHydration: true — a hidratação automática do
+  // persist rodaria em import-time, antes do bridge nativo estar pronto no
+  // Expo Go (onde o MMKV real cai em fallback de memória, que não sobrevive
+  // a um restart). Aqui, dentro de AppShell, o boot já passou pelo gate
+  // isStorageReady — o bridge está pronto e o MMKV real funciona.
+  useEffect(() => {
+    void useBlendStore.persist.rehydrate();
+  }, []);
 
   // ── Splash nativa: só some depois que as fontes estiverem resolvidas ───────
   useEffect(() => {

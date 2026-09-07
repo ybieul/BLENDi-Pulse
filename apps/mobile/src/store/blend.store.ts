@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type { PulseAiRecipe } from '@blendi/shared';
@@ -142,6 +143,31 @@ export const useBlendStore = create<BlendState & BlendActions>()(
         isTimerRunning: state.isTimerRunning,
         timerStartedAt: state.timerStartedAt,
       }),
+      // skipHydration: a hidratação automática do persist rodaria em
+      // import-time — antes do bridge nativo terminar de inicializar no
+      // Expo Go, onde react-native-mmkv ainda não está pronto e
+      // createAppStorage (storage.ts) cai no fallback em memória, que nunca
+      // sobrevive a um restart do processo (bug real encontrado testando a
+      // própria Tarefa 9 — timerDuration, que já existia antes dela, também
+      // se perdia). App.tsx dispara a hidratação manualmente via
+      // useBlendStore.persist.rehydrate() depois do boot (AppShell, já
+      // depois do gate isStorageReady), quando o MMKV real já funciona.
+      skipHydration: true,
     }
   )
 );
+
+// Telas que dependem do estado persistido (ex: BlendScreen recuperando um
+// timer em andamento) precisam saber quando é seguro confiar nele — a
+// hidratação agora é manual e assíncrona (ver skipHydration acima), não
+// mais garantida no primeiro render.
+export function useHasBlendStoreHydrated(): boolean {
+  const [hasHydrated, setHasHydrated] = useState(() => useBlendStore.persist.hasHydrated());
+
+  useEffect(() => {
+    setHasHydrated(useBlendStore.persist.hasHydrated());
+    return useBlendStore.persist.onFinishHydration(() => setHasHydrated(true));
+  }, []);
+
+  return hasHydrated;
+}
