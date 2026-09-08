@@ -1,3 +1,4 @@
+import { XP_EVENTS } from '@blendi/shared';
 import { DailyMissionModel, type IDailyMissionItem, type DailyMissionDocument } from '../models/DailyMission';
 import { UserModel } from '../models/User';
 import { FavoriteModel } from '../models/Favorite';
@@ -12,18 +13,6 @@ const DEFAULT_RESULT = {
   missionCompleted: false,
   allMissionsCompleted: false,
   totalXPAwarded: 0,
-};
-const MISSION_XP_REWARDS: Record<string, number> = {
-  missionMakeBlend: 15,
-  missionHitProteinGoal: 20,
-  missionHitCalorieGoal: 15,
-  missionHitHydrationGoal: 15,
-  missionCompleteSuppStack: 20,
-  missionUsePulseAI: 10,
-  missionFavoriteRecipe: 10,
-  missionScanPantry: 15,
-  missionMakeBlendFromFavorite: 15,
-  missionBonus: 20,
 };
 
 type MissionXPType = Parameters<typeof awardXP>[1];
@@ -66,7 +55,14 @@ function getMissionDefinition(type: string) {
 }
 
 function resolveMissionXPReward(xpRewardType: string): number {
-  const xpReward = MISSION_XP_REWARDS[xpRewardType];
+  // xpRewardType vem de MissionDefinition.xpRewardType (string simples, não
+  // restrito a keyof XP_EVENTS em tempo de compilação) — os 10 valores
+  // mission*/missionBonus usados em missionDefinitions.ts são um subset já
+  // verificado de XP_EVENTS (@blendi/shared), a única fonte de verdade de
+  // recompensas de XP do projeto. Antes desta correção, este arquivo mantinha
+  // uma cópia manual duplicada (MISSION_XP_REWARDS) usada só para exibição —
+  // removida para eliminar o risco de as duas tabelas divergirem no futuro.
+  const xpReward = XP_EVENTS[xpRewardType as keyof typeof XP_EVENTS];
 
   if (!Number.isInteger(xpReward) || xpReward <= 0) {
     throw new Error(`Mission XP reward not found for type: ${xpRewardType}`);

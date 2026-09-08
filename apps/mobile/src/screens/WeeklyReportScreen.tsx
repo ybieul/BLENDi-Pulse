@@ -50,6 +50,12 @@ const PAYWALL_BORDER_COLOR = 'rgba(245,158,11,0.60)';
 const PAYWALL_BACKGROUND = 'rgba(43,20,41,0.95)';
 const PAYWALL_BADGE_BACKGROUND = '#F59E0B';
 const PAYWALL_BADGE_TEXT_COLOR = '#2D1600';
+const SUBTLE_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
+const SUBTLE_BUTTON_BORDER = 'rgba(255,255,255,0.12)';
+const SHARE_BUTTON_BACKGROUND = 'rgba(255,255,255,0.06)';
+const RETRY_BUTTON_BORDER = 'rgba(255,255,255,0.14)';
+const ERROR_BACKGROUND = 'rgba(239,68,68,0.06)';
+const ERROR_BORDER = 'rgba(239,68,68,0.18)';
 
 function addDaysToDateKey(dateKey: string, days: number): string {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -221,6 +227,7 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
       totalBlends: report.data.nutrition.blendCount,
       averageDailyProtein: report.data.nutrition.avgProteinPerDay,
       currentStreak: report.data.gamification.currentStreak,
+      streakDate: report.weekStartDate,
       supplementAdherenceRate: report.data.supplements.adherenceRate * 100,
     });
   }, [report, isShareLoading]);
@@ -466,6 +473,7 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
           totalBlends={pendingShare.totalBlends}
           averageDailyProtein={pendingShare.averageDailyProtein}
           currentStreak={pendingShare.currentStreak}
+          streakDate={pendingShare.streakDate}
           supplementAdherenceRate={pendingShare.supplementAdherenceRate}
           user={{
             userId: authUser?.id,
@@ -498,9 +506,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: SUBTLE_BUTTON_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: SUBTLE_BUTTON_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -634,9 +642,9 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: SHARE_BUTTON_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: SUBTLE_BUTTON_BORDER,
     marginTop: 4,
   },
   shareButtonLocked: {
@@ -686,9 +694,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginTop: 12,
-    backgroundColor: 'rgba(239,68,68,0.06)',
+    backgroundColor: ERROR_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.18)',
+    borderColor: ERROR_BORDER,
     borderRadius: 12,
   },
   errorText: {
@@ -700,9 +708,9 @@ const styles = StyleSheet.create({
   retryButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: CARD_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: RETRY_BUTTON_BORDER,
     borderRadius: 8,
   },
   retryText: {

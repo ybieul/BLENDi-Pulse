@@ -273,7 +273,13 @@ async function aggregateSupplements(
     userId,
     createdAt: { $gte: startAt, $lt: endAtExclusive },
   })
-    .select({ supplementId: 1, logDate: 1, consumedCount: 1 })
+    .select({
+      supplementId: 1,
+      logDate: 1,
+      consumedCount: 1,
+      snapshotDosage: 1,
+      snapshotDailyTargetCount: 1,
+    })
     .lean();
 
   const activeStackById = new Map(activeStack.map((item) => [item.supplementId, item] as const));
@@ -281,13 +287,25 @@ async function aggregateSupplements(
 
   for (const log of logs) {
     const supplement = activeStackById.get(log.supplementId);
-    if (!supplement) {
+    // Prefere o snapshot gravado no log (dosagem/meta vigente no momento do
+    // registro) — cobre tanto o suplemento removido do stack (updateStack faz
+    // replace total do array, sem cascata de exclusão de logs; só existe via
+    // snapshot) quanto o redosado (ainda ativo, dosagem mudou depois). Sem
+    // snapshot nem suplemento correspondente no stack atual, log irresolúvel
+    // é ignorado, como antes. O denominador (activeStack.length, abaixo)
+    // permanece o stack atual — corrigir isso integralmente exigiria que
+    // toda a semana tivesse logs com snapshot, fora do escopo desta correção.
+    const dosage = log.snapshotDosage ?? supplement?.dosage;
+
+    if (!dosage) {
       continue;
     }
 
+    const dailyTargetCount = log.snapshotDailyTargetCount ?? supplement?.dailyTargetCount;
+
     if (
       getSupplementConsumedCount(log)
-      < getSupplementDailyTargetCount(supplement.dosage, supplement.dailyTargetCount)
+      < getSupplementDailyTargetCount(dosage, dailyTargetCount)
     ) {
       continue;
     }

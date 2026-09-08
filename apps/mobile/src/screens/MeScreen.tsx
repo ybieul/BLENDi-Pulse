@@ -662,7 +662,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 2000
         );
       case "hydration":
-        return profile?.dailyHydrationTarget ?? 2000;
+        return profile?.dailyHydrationTarget ?? 2500;
       case "unitSystem":
         return displayUnitSystem;
       case "language":
@@ -725,6 +725,15 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             break;
           case "calories":
             updateUserProfile({ dailyCalorieTarget: Number(nextValue) });
+            break;
+          case "hydration":
+            updateUserProfile({ dailyHydrationTarget: Number(nextValue) });
+            // hydrationToday (GET /hydration-logs/today) é a fonte de goalMl
+            // usada tanto pela HomeScreen quanto pela TrackScreen — sem essa
+            // invalidação, as duas telas continuam mostrando a meta antiga
+            // (cache compartilhado, staleTime de 1h) até outra ação
+            // (registrar água, etc.) invalidar essa query por outro motivo.
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
             break;
           case "unitSystem":
             updateUserProfile({ unitSystem: nextValue as "metric" | "imperial" });
@@ -1307,7 +1316,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
             <SettingRow
               label={t("track.hydration")}
-              value={displayVolume(profile?.dailyHydrationTarget ?? 2000)}
+              value={displayVolume(profile?.dailyHydrationTarget ?? 2500)}
               onPress={() => { setEditingType("hydration"); }}
             />
             <View style={styles.divider} />

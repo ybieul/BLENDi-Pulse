@@ -421,20 +421,29 @@ export async function createBlendLog(
         ? req.body.fromFavoriteId
         : undefined;
 
-    // Background: progresso de missão não é usado na resposta e não compromete a
-    // integridade do blend já persistido — não há motivo pra a requisição esperar
-    // por até 4 cadeias de findOrCreate+increment+reconcile de bônus, cada uma
-    // podendo levar vários round-trips ao Atlas. handleMissionResponse no mobile
-    // invalida dailyMissions incondicionalmente após o blend, então a Home reflete
-    // o resultado assim que a atualização em background terminar.
-    const missionTypesToUpdate: string[] = [
-      'makeBlend',
+    // makeBlend é aguardado (rollback parcial e cirúrgico do FIX-1B) — é a
+    // missão mais provável de ser completada em qualquer blend, e o mobile
+    // invalida dailyMissions de forma síncrona e incondicional assim que a
+    // resposta chega (handleMissionResponse). Sem aguardar aqui, esse refetch
+    // quase sempre vencia a corrida contra o fire-and-forget e mostrava a
+    // missão ainda incompleta. As demais missões condicionais (menos prováveis
+    // neste blend específico) continuam em background — não há motivo pra a
+    // requisição esperar por todas as cadeias de findOrCreate+increment+
+    // reconcile de bônus só pra cobrir os casos menos comuns.
+    await updateMissionProgress(userId, 'makeBlend', user.timezone).catch(err => {
+      console.error('[blendLog.controller] updateMissionProgress failed for makeBlend', {
+        userId,
+        err,
+      });
+    });
+
+    const backgroundMissionTypesToUpdate: string[] = [
       ...(proteinGoalXPOutcome.goalHit ? ['hitProteinGoal'] : []),
       ...(calorieGoalXPOutcome.goalHit ? ['hitCalorieGoal'] : []),
       ...(fromFavoriteId !== undefined ? ['makeBlendFromFavorite'] : []),
     ];
 
-    for (const missionType of missionTypesToUpdate) {
+    for (const missionType of backgroundMissionTypesToUpdate) {
       void updateMissionProgress(userId, missionType, user.timezone).catch(err => {
         console.error('[blendLog.controller] updateMissionProgress failed in background', {
           userId,

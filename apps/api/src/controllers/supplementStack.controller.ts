@@ -1,9 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { XP_EVENTS, updateSupplementStackSchema } from '@blendi/shared';
+import { updateSupplementStackSchema } from '@blendi/shared';
 import { SupplementLogModel, type ISupplementLog } from '../models/SupplementLog';
-import { XPLogModel } from '../models/XPLog';
 import { UserModel, type IUserSupplement } from '../models/User';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
@@ -352,6 +351,8 @@ export async function checkSupplement(
           userId,
           supplementId,
           supplementName: supplement.name,
+          snapshotDosage: supplement.dosage,
+          snapshotDailyTargetCount: supplement.dailyTargetCount,
           logDate,
           consumedCount: 1,
         });
@@ -381,17 +382,14 @@ export async function checkSupplement(
             });
 
           if (allActiveSupplementsChecked) {
-            const supplementGoalAlreadyAwarded = await XPLogModel.exists({
-              userId,
-              xpType: 'supplementGoal',
-              logDate,
-            });
-
-            xpAwarded = supplementGoalAlreadyAwarded ? 0 : XP_EVENTS.supplementGoal;
-
-            Promise.resolve()
-              .then(() => awardXP(userId, 'supplementGoal', context.timezone))
-              .catch(err => console.error('XP award failed:', err));
+            // Aguarda o resultado real do award em vez de decidir xpAwarded por
+            // uma pré-checagem de existência — mesma correção aplicada em
+            // hydration.controller.ts (logWater): elimina a janela de corrida
+            // em que duas requisições quase simultâneas viam "ainda não
+            // premiado" e ambas reportavam XP > 0 enquanto o banco credita
+            // só uma vez (índice único do XPLog).
+            const xpResult = await awardXP(userId, 'supplementGoal', context.timezone);
+            xpAwarded = xpResult.awarded ? xpResult.amount : 0;
 
             Promise.resolve()
               .then(() => updateMissionProgress(userId, 'completeSuppStack', context.timezone))
@@ -429,6 +427,8 @@ export async function checkSupplement(
     if (currentConsumedCount < dailyTargetCount) {
       log.consumedCount = currentConsumedCount + 1;
       log.supplementName = supplement.name;
+      log.snapshotDosage = supplement.dosage;
+      log.snapshotDailyTargetCount = supplement.dailyTargetCount;
       await log.save();
     }
 

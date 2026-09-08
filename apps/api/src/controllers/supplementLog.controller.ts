@@ -172,26 +172,69 @@ export async function getSupplementHistory(
         $lt: endAtExclusive,
       },
     })
-      .select({ supplementId: 1, logDate: 1, consumedCount: 1 })
+      .select({
+        supplementId: 1,
+        logDate: 1,
+        consumedCount: 1,
+        supplementName: 1,
+        snapshotDosage: 1,
+        snapshotDailyTargetCount: 1,
+      })
       .sort({ logDate: -1, createdAt: -1 })
       .lean();
 
-    const activeSupplementIds = new Set(activeStack.map(item => item.supplementId));
-    const checkedByDate = new Map<string, Set<string>>();
+    // updateStack (PUT /supplement-stack) faz replace total do array — um
+    // suplemento removido some de user.supplementStack sem cascata de exclusão
+    // dos SupplementLog já gravados. Sem reconstruir uma entrada sintética a
+    // partir do snapshot do próprio log, esses dias "esqueciam" silenciosamente
+    // que o suplemento foi tomado, mesmo com o registro intacto no banco.
+    const historyStack: IUserSupplement[] = [...activeStack];
+    const historyStackById = new Map(activeStackById);
 
     for (const log of logs) {
-      if (!activeSupplementIds.has(log.supplementId)) {
+      if (historyStackById.has(log.supplementId)) {
         continue;
       }
 
-      const supplement = activeStackById.get(log.supplementId);
+      if (!log.supplementName || !log.snapshotDosage) {
+        // Log legado (anterior ao snapshot, FIX-4 Tarefa 9) de um suplemento
+        // que não existe mais no stack atual — sem dado suficiente para
+        // reconstruir a meta com segurança, mesmo comportamento de antes.
+        continue;
+      }
+
+      const removedItem: IUserSupplement = {
+        supplementId: log.supplementId,
+        name: log.supplementName,
+        dosage: log.snapshotDosage,
+        dailyTargetCount: log.snapshotDailyTargetCount,
+        timing: 'morning',
+        isActive: false,
+        order: historyStack.length,
+      };
+
+      historyStack.push(removedItem);
+      historyStackById.set(log.supplementId, removedItem);
+    }
+
+    const checkedByDate = new Map<string, Set<string>>();
+
+    for (const log of logs) {
+      const supplement = historyStackById.get(log.supplementId);
       if (!supplement) {
         continue;
       }
 
+      // Prefere o snapshot gravado no log (dosagem/meta vigente no momento do
+      // registro) — cobre tanto o suplemento removido (só existe via snapshot)
+      // quanto o redosado (ainda ativo, mas com dosagem diferente hoje).
+      // Sem snapshot (log legado), cai no suplemento atual, como antes.
+      const dosage = log.snapshotDosage ?? supplement.dosage;
+      const dailyTargetCount = log.snapshotDailyTargetCount ?? supplement.dailyTargetCount;
+
       if (
         getSupplementConsumedCount(log)
-        < getSupplementDailyTargetCount(supplement.dosage, supplement.dailyTargetCount)
+        < getSupplementDailyTargetCount(dosage, dailyTargetCount)
       ) {
         continue;
       }
@@ -207,15 +250,15 @@ export async function getSupplementHistory(
       .reverse()
       .map(date => {
         const checkedIds = checkedByDate.get(date) ?? new Set<string>();
-        const checkedSupplements = activeStack
+        const checkedSupplements = historyStack
           .filter(item => checkedIds.has(item.supplementId))
           .map(serializeSupplementItem);
-        const missedSupplements = activeStack
+        const missedSupplements = historyStack
           .filter(item => !checkedIds.has(item.supplementId))
           .map(serializeSupplementItem);
-        const adherenceRate = activeStack.length === 0
+        const adherenceRate = historyStack.length === 0
           ? 0
-          : roundToTwoDecimals((checkedSupplements.length / activeStack.length) * 100);
+          : roundToTwoDecimals((checkedSupplements.length / historyStack.length) * 100);
 
         return {
           date,

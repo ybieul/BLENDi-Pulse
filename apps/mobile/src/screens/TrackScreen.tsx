@@ -65,7 +65,7 @@ import { MyStackSection } from '../components/track/MyStackSection';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_HYDRATION_TARGET_ML = 2000;
+const DEFAULT_HYDRATION_TARGET_ML = 2500;
 const SHOPPING_LIST_BADGE_SIZE = 16;
 const SHOPPING_LIST_BADGE_FONT_SIZE = 10;
 const SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW = 8;

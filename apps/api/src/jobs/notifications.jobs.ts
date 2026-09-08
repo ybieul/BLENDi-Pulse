@@ -589,9 +589,13 @@ async function runWeeklyReportJob(): Promise<void> {
   const nowUtc = new Date();
   const notifications: PushNotificationPayload[] = [];
 
+  // isPro é o único filtro de elegibilidade para a GERAÇÃO do relatório — o
+  // relatório é uma feature paga, não uma notificação. pushToken não entra
+  // aqui: ele só decide se o usuário recebe o push de "relatório disponível"
+  // (checado individualmente mais abaixo, mesmo padrão dos outros jobs deste
+  // arquivo), nunca se o WeeklyReportModel chega a ser criado.
   const users = await UserModel.find({
     isPro: true,
-    pushToken: { $exists: true, $type: 'string', $ne: '' },
   })
     .select({
       pushToken: 1,
@@ -602,10 +606,6 @@ async function runWeeklyReportJob(): Promise<void> {
     .exec();
 
   for (const user of users) {
-    if (!hasNonEmptyPushToken(user.pushToken)) {
-      continue;
-    }
-
     const localNow = toLocalDate(nowUtc, user.timezone);
     const isMonday = localNow.getUTCDay() === WEEKLY_REPORT_LOCAL_MONDAY_WEEKDAY;
     const isReportHour = localNow.getUTCHours() === WEEKLY_REPORT_LOCAL_MONDAY_HOUR;
@@ -636,13 +636,19 @@ async function runWeeklyReportJob(): Promise<void> {
         ...(previousWeekComparison && { previousWeekComparison }),
       });
 
-      const content = getWeeklyReportContent(data, user.locale);
-      const reserved = await reserveNotificationLog(user._id, 'weeklyReport', weekStartDate);
+      // O relatório já existe no banco a partir daqui, independente de push
+      // token — a WeeklyReportScreen lê o dado direto do banco, sem depender
+      // de notificação. Sem token válido, só o push é pulado, silenciosamente.
+      if (hasNonEmptyPushToken(user.pushToken)) {
+        const pushToken = user.pushToken;
+        const content = getWeeklyReportContent(data, user.locale);
+        const reserved = await reserveNotificationLog(user._id, 'weeklyReport', weekStartDate);
 
-      if (reserved) {
-        notifications.push(
-          buildPushPayload(user.pushToken, 'weeklyReport', content.title, content.body)
-        );
+        if (reserved) {
+          notifications.push(
+            buildPushPayload(pushToken, 'weeklyReport', content.title, content.body)
+          );
+        }
       }
     } catch (err) {
       if (isDuplicateKeyError(err)) {

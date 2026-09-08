@@ -1074,6 +1074,7 @@
     "missionsCompleted": "{{count}} missões completadas",
     "levelUpText": "Você chegou ao Nível {{level}}!",
     "streakBroken": "Streak quebrado em {{day}}",
+    "streakAsOf": "Streak em {{date}}",
     "shareWeek": "Compartilhar minha semana",
     "shareLocked": "Compartilhamento é uma feature Pro",
     "comparisonUp": "+{{amount}} vs semana passada",

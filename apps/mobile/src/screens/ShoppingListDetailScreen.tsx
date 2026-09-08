@@ -291,6 +291,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
           setLocalItems((currentItems) =>
             currentItems.map((item) => (item.itemId === itemId ? syncedItem : item)),
           );
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.shoppingLists });
         })
         .catch(() => {
           setLocalItems(previousItems);
@@ -299,7 +300,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
           setIsSyncing(false);
         });
     },
-    [isOffline, listId, localItems, patchShoppingListDetailCache, t],
+    [isOffline, listId, localItems, patchShoppingListDetailCache, queryClient, t],
   );
 
   const handleDeleteItem = useCallback(
@@ -317,6 +318,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
       void updateItems(listId, nextItems)
         .then((shoppingList) => {
           setLocalItems(shoppingList.items);
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.shoppingLists });
         })
         .catch(() => {
           setLocalItems(previousItems);
@@ -326,7 +328,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
           setIsSyncing(false);
         });
     },
-    [listId, localItems, t],
+    [listId, localItems, queryClient, t],
   );
 
   const handleAddItem = useCallback(() => {
@@ -397,6 +399,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
             void clearCheckedItems(listId)
               .then((result) => {
                 setLocalItems(result.shoppingList.items);
+                void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.shoppingLists });
               })
               .catch(() => {
                 showToast(t('common.states.error'));
@@ -408,7 +411,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
         },
       ],
     );
-  }, [checkedItems.length, isSyncing, listId, t]);
+  }, [checkedItems.length, isSyncing, listId, queryClient, t]);
 
   const sections = useMemo(
     () => [

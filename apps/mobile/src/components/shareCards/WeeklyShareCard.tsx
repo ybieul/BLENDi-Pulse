@@ -29,6 +29,13 @@ export interface WeeklyShareCardProps {
   totalBlends: number;
   averageDailyProtein: number;
   currentStreak: number;
+  /**
+   * Data de referência do streak, para relatórios históricos (WeeklyReportScreen)
+   * onde currentStreak é um snapshot congelado no momento da geração do relatório,
+   * não o valor ao vivo. Quando presente, troca o rótulo "streak atual" por
+   * "streak em {{date}}". Ausente = streak ao vivo (fluxo da MeScreen).
+   */
+  streakDate?: string | Date;
   supplementAdherenceRate: number;
   user: WeeklyShareCardProfile;
 }
@@ -88,6 +95,7 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
       totalBlends,
       averageDailyProtein,
       currentStreak,
+      streakDate,
       supplementAdherenceRate,
       user,
     },
@@ -99,6 +107,13 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
     const weekLabel = useMemo(
       () => formatWeekRange(weekStart, weekEnd, locale, formatDate),
       [formatDate, locale, weekEnd, weekStart],
+    );
+    const streakLabel = useMemo(
+      () =>
+        streakDate === undefined
+          ? t('me.currentStreak')
+          : t('weeklyReport.streakAsOf', { date: formatDate(streakDate) }),
+      [formatDate, streakDate, t],
     );
     const statItems = useMemo<WeeklyStatItem[]>(
       () => [
@@ -118,7 +133,7 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
           key: 'streak',
           icon: 'flame-outline',
           value: String(currentStreak),
-          label: t('me.currentStreak'),
+          label: streakLabel,
         },
         {
           key: 'adherence',
@@ -127,7 +142,7 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
           label: t('me.weeklyShare.supplementAdherence'),
         },
       ],
-      [averageDailyProtein, currentStreak, supplementAdherenceRate, t, totalBlends],
+      [averageDailyProtein, currentStreak, streakLabel, supplementAdherenceRate, t, totalBlends],
     );
 
     return (

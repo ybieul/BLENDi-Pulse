@@ -6,6 +6,16 @@ export interface ISupplementLog {
   userId: mongoose.Types.ObjectId;
   supplementId: string;
   supplementName: string;
+  /**
+   * Dosagem/meta diária do suplemento no momento do registro (mesmo shape de
+   * IUserSupplement.dosage/dailyTargetCount no supplementStack) — opcionais
+   * para não quebrar logs anteriores a esta correção (FIX-4 Tarefa 9), que não
+   * têm esses campos. Usados pelas agregações de histórico/relatório semanal
+   * para não reavaliar dias passados contra uma dosagem que só passou a valer
+   * depois (ou contra um suplemento já desativado no stack atual).
+   */
+  snapshotDosage?: string;
+  snapshotDailyTargetCount?: number;
   logDate: string;
   consumedCount: number;
   createdAt: Date;
@@ -30,6 +40,16 @@ const supplementLogSchema = new mongoose.Schema<ISupplementLog>(
       type: String,
       required: true,
       trim: true,
+    },
+    snapshotDosage: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    snapshotDailyTargetCount: {
+      type: Number,
+      required: false,
+      min: 1,
     },
     logDate: {
       type: String,

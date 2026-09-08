@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { XP_EVENTS, historyQuerySchema } from '@blendi/shared';
+import { historyQuerySchema } from '@blendi/shared';
 import { HydrationLogModel } from '../models/HydrationLog';
-import { XPLogModel } from '../models/XPLog';
 import { UserModel } from '../models/User';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
@@ -146,21 +145,6 @@ function roundToTwoDecimals(value: number): number {
   return Number(value.toFixed(2));
 }
 
-function formatLocalDateKey(timezone: string): string {
-  const midnightUTC = getMidnightUTC(timezone);
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(midnightUTC);
-
-  const getPart = (type: 'year' | 'month' | 'day') =>
-    parts.find(part => part.type === type)?.value ?? '00';
-
-  return `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
-}
-
 function getAmountMl(body: Request['body']): number | null {
   const amountMl = body?.amountMl;
 
@@ -254,17 +238,13 @@ export async function logWater(
     let xpAwarded = 0;
 
     if (summary.totalMl >= hydrationContext.goalMl) {
-      const hydrationGoalAlreadyAwarded = await XPLogModel.exists({
-        userId,
-        xpType: 'hydrationGoal',
-        logDate: formatLocalDateKey(hydrationContext.timezone),
-      });
-
-      xpAwarded = hydrationGoalAlreadyAwarded ? 0 : XP_EVENTS.hydrationGoal;
-
-      Promise.resolve()
-        .then(() => awardXP(userId, 'hydrationGoal', hydrationContext.timezone))
-        .catch(err => console.error('XP award failed:', err));
+      // Aguarda o resultado real do award em vez de decidir xpAwarded por uma
+      // pré-checagem de existência: awardXP já é idempotente via índice único
+      // do XPLog (result.awarded=false em duplicata), então usar o resultado
+      // real elimina a janela de corrida em que duas requisições quase
+      // simultâneas viam "ainda não premiado" e as duas reportavam XP > 0.
+      const xpResult = await awardXP(userId, 'hydrationGoal', hydrationContext.timezone);
+      xpAwarded = xpResult.awarded ? xpResult.amount : 0;
 
       Promise.resolve()
         .then(() => updateMissionProgress(userId, 'hitHydrationGoal', hydrationContext.timezone))

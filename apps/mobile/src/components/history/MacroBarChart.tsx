@@ -294,12 +294,25 @@ export function MacroBarChart({
             const carbsCalories = item.carbs * 4;
             const remainingCalories = Math.max(item.calories - proteinCalories - carbsCalories, 0);
             const placeholderHeight = item.isPlaceholder ? height * EMPTY_BAR_HEIGHT_RATIO : 0;
+            const totalHeight = item.isPlaceholder ? 0 : (item.calories / yAxisMax) * height;
 
-            const proteinHeight = item.isPlaceholder ? 0 : (proteinCalories / yAxisMax) * height;
-            const carbsHeight = item.isPlaceholder ? 0 : (carbsCalories / yAxisMax) * height;
+            let proteinHeight = item.isPlaceholder ? 0 : (proteinCalories / yAxisMax) * height;
+            let carbsHeight = item.isPlaceholder ? 0 : (carbsCalories / yAxisMax) * height;
             const remainingHeight = item.isPlaceholder
               ? placeholderHeight
               : (remainingCalories / yAxisMax) * height;
+
+            // Clamp: receitas com macros inconsistentes (macrosValidated:false,
+            // ainda aceitas e servidas — ver Camada 3 de validação no backend)
+            // podem ter protein×4 + carbs×4 já maior que as calorias declaradas.
+            // remainingHeight já satura em 0 nesse caso (remainingCalories acima),
+            // mas sem este clamp os dois segmentos somados ainda ultrapassariam
+            // visualmente a altura total que a barra deveria ter para esse item.
+            if (!item.isPlaceholder && proteinHeight + carbsHeight > totalHeight) {
+              const scale = totalHeight > 0 ? totalHeight / (proteinHeight + carbsHeight) : 0;
+              proteinHeight *= scale;
+              carbsHeight *= scale;
+            }
 
             const proteinY = height - proteinHeight;
             const carbsY = proteinY - carbsHeight;

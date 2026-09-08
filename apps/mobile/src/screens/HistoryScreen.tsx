@@ -193,7 +193,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
   const isBlendListEmpty = !isBlendSummaryLoading && blendCount === 0;
 
   // ── Hydration data ────────────────────────────────────────────────────────
-  const dailyHydrationTarget = hydrationSummaryData?.dailyHydrationTarget ?? 2000;
+  const dailyHydrationTarget = hydrationSummaryData?.dailyHydrationTarget ?? 2500;
   const totalMl = hydrationSummaryData?.summary.totalMl ?? 0;
   const avgDailyMl = hydrationSummaryData?.summary.averageDailyMl ?? 0;
 

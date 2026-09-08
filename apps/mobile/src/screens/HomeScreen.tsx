@@ -71,8 +71,8 @@ import type { DailyMissionItem } from '../services/dailyMission.service';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FADE_DURATION = 300;
-/** Meta padrão de hidratação diária enquanto o endpoint não retorna meta personalizada. */
-const HYDRATION_TARGET_ML = 2000;
+/** Fallback de meta de hidratação diária, usado só se a API não retornar goalMl. Alinhado com DEFAULT_DAILY_HYDRATION_TARGET do backend. */
+const HYDRATION_TARGET_ML = 2500;
 const BADGE_HEIGHT = 24;
 const BADGE_PADDING_H = 10;
 const BADGE_FREE_BACKGROUND = 'rgba(255,255,255,0.08)';
@@ -305,6 +305,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday }),
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationHistory }),
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }),
     ]);
   }, [queryClient]);
 
@@ -448,7 +449,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                 caloriesCurrent={logsData?.totalCalories ?? 0}
                 calorieTarget={profile?.dailyCalorieTarget ?? 0}
                 hydrationCurrent={hydrationData?.totalMl ?? 0}
-                hydrationTarget={HYDRATION_TARGET_ML}
+                hydrationTarget={hydrationData?.goalMl ?? HYDRATION_TARGET_ML}
                 dataUpdatedAt={blendLogsUpdatedAt}
               />
             </View>

@@ -29,8 +29,15 @@ import {
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.service';
-import { buildPantryRecipePrompt } from '../services/promptBuilder.service';
+import {
+  buildPantryRecipePrompt,
+  type BuildPulseAiPromptResult,
+} from '../services/promptBuilder.service';
 import { sendErrorResponse } from '../utils/error.utils';
+import {
+  buildMacroInconsistencyRetryMessage,
+  validateMacroConsistency,
+} from '../utils/macroValidation.utils';
 
 const FREE_MONTHLY_SCAN_LIMIT = 3;
 const PANTRY_RECIPE_COUNT = 2;
@@ -252,6 +259,69 @@ function parsePantryRecipes(content: string): PulseAiRecipe[] {
   }
 }
 
+function parsePantryRecipe(content: string): PulseAiRecipe | null {
+  try {
+    const payload: unknown = JSON.parse(content);
+    const parsed = pulseAiRecipeSchema.safeParse(payload);
+
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+// Camada 3 de validação matemática de macros (protein×4 + carbs×4 + fat×9 ≈
+// calories), mesma rede de segurança já aplicada às receitas do chat do Pulse
+// AI (pulseAi.controller.ts, ensureMacroConsistency) — aqui replicada por
+// receita individual, já que o Pantry Scanner gera um array de 2 receitas por
+// chamada em vez de uma só. Nunca bloqueia o usuário: macrosValidated:false
+// ainda é servido, só sinalizado.
+async function ensurePantryRecipeMacroConsistency(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult
+): Promise<PulseAiRecipe> {
+  const initialConsistency = validateMacroConsistency(recipe);
+
+  if (initialConsistency.macrosValidated) {
+    return { ...recipe, macrosValidated: true };
+  }
+
+  console.info('[pantryScanner] macro inconsistency detected, retrying', {
+    discrepancy: initialConsistency.discrepancy,
+  });
+
+  try {
+    const retryMessage = buildMacroInconsistencyRetryMessage(
+      recipe,
+      initialConsistency.discrepancy
+    );
+    const retryResponse = await callAi({
+      systemPrompt: prompt.systemPrompt,
+      messages: [
+        ...prompt.messages,
+        { role: 'assistant', content: JSON.stringify(recipe) },
+        { role: 'user', content: retryMessage },
+      ],
+      maxTokens: 2000,
+    });
+    const retriedRecipe = parsePantryRecipe(retryResponse.content);
+
+    if (!retriedRecipe) {
+      return { ...recipe, macrosValidated: false };
+    }
+
+    const retriedConsistency = validateMacroConsistency(retriedRecipe);
+    return { ...retriedRecipe, macrosValidated: retriedConsistency.macrosValidated };
+  } catch (error) {
+    console.error('[pantryScanner] macro consistency retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return { ...recipe, macrosValidated: false };
+  }
+}
+
 async function findPantryScannerUserProfile(
   userId: string
 ): Promise<PantryScannerUserProfile | null> {
@@ -432,7 +502,11 @@ async function generatePantryRecipes(
       maxTokens: PANTRY_RECIPE_MAX_TOKENS,
     });
 
-    return parsePantryRecipes(aiResponse.content);
+    const recipes = parsePantryRecipes(aiResponse.content);
+
+    return await Promise.all(
+      recipes.map(recipe => ensurePantryRecipeMacroConsistency(recipe, prompt))
+    );
   } catch (error) {
     console.error('[pantryScanner] recipe generation failed', {
       userId: user.id,
