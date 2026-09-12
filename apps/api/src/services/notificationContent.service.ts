@@ -9,6 +9,14 @@ export interface NotificationContent {
   body: string;
 }
 
+export interface DailyPulseContent extends NotificationContent {
+  // Nome da receita usada para interpolar o corpo da notificação (quando
+  // disponível) — repassado também aqui, de forma estruturada, para que o
+  // caller (runDailyPulseJob) possa incluí-lo no payload `data` do push e o
+  // mobile use no deep link (prefilledMessage do Pulse AI).
+  recipeName?: string;
+}
+
 type NotificationLocaleTemplates = typeof notificationEn;
 
 const NOTIFICATION_TEMPLATES: Record<UserLocale, NotificationLocaleTemplates> = {
@@ -114,7 +122,7 @@ function formatHydrationValue(
 export async function getDailyPulseContent(
   userId: string,
   goal: UserGoal
-): Promise<NotificationContent> {
+): Promise<DailyPulseContent> {
   const preferredLanguage = await getUserLocale(userId);
   const recentCacheEntries = await AiCacheModel.find({ userId })
     .sort({ createdAt: -1 })
@@ -135,6 +143,7 @@ export async function getDailyPulseContent(
     body: recipeName
       ? interpolate(goalContent.withRecipe, { recipeName })
       : goalContent.generic,
+    recipeName,
   };
 }
 

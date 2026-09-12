@@ -27,6 +27,7 @@ interface ApiErrorResponse {
 }
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
 const DIVIDER_LINE_COLOR = 'rgba(255,255,255,0.08)';
 const DIVIDER_TEXT_COLOR = 'rgba(255,255,255,0.4)';
@@ -51,7 +52,30 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const [formError, setFormError] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = (input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  };
 
   const clearFormErrors = () => {
     setEmailError(null);
@@ -90,7 +114,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
-        const message = translateKey(issue.message);
+        const message = translateKey(issue);
 
         if (issue.path[0] === 'email') {
           setEmailError(message);

@@ -4,6 +4,7 @@ import type { WeeklyReportHighlightRecipe } from '@blendi/shared';
 
 import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
 const PROTEIN_PILL_BACKGROUND = 'rgba(154,72,147,0.25)';
 const CARBS_PILL_BACKGROUND = 'rgba(245,158,11,0.25)';
@@ -19,14 +20,12 @@ interface MacroPillProps {
   backgroundColor: string;
 }
 
-function formatMacroValue(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 function MacroPill({ value, unit, backgroundColor }: MacroPillProps) {
+  const { formatDecimal } = useFormatNumbers();
+
   return (
     <View style={[styles.macroPill, { backgroundColor }]}>
-      <Text style={styles.macroPillText}>{`${formatMacroValue(value)} ${unit}`}</Text>
+      <Text style={styles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
     </View>
   );
 }

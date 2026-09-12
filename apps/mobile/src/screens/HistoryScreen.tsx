@@ -28,6 +28,7 @@ import { StatCard } from '../components/history/StatCard';
 import { SupplementHeatmap } from '../components/history/SupplementHeatmap';
 import { SkeletonLoader } from '../components/ui';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useFormatNumbers } from '../hooks/useFormatNumbers';
 import { useHistoryData, type HistoryPeriod } from '../hooks/useHistoryData';
 import { useUnits } from '../hooks/useUnits';
 import type { TrackStackScreenProps } from '../navigation/types';
@@ -107,6 +108,7 @@ const errorStyles = StyleSheet.create({
 export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) {
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
+  const { formatCount } = useFormatNumbers();
   const calorieTarget = useAuthStore((state) => state.user?.dailyCalorieTarget ?? 2000);
   const { displayVolume } = useUnits();
 
@@ -296,13 +298,13 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
                 />
                 <View style={styles.cardGap} />
                 <StatCard
-                  value={`${totalCalories.toFixed(0)}`}
+                  value={formatCount(totalCalories)}
                   label={t('history.totalCalories')}
                   isLoading={isBlendSummaryLoading}
                 />
                 <View style={styles.cardGap} />
                 <StatCard
-                  value={`${bestDayCalories.toFixed(0)}`}
+                  value={formatCount(bestDayCalories)}
                   label={t('history.bestDay')}
                   isLoading={isBlendSummaryLoading}
                 />

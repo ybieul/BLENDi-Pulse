@@ -6,10 +6,17 @@
 //
 //   • Mobile  → t(error.message, params)
 //   • Backend → retorna a chave no JSON
+//
+// number_range usa rangeErrorMessage(min, max) — string JSON com os dois
+// limites embutidos, porque a chave precisa de {{min}} e {{max}} juntos e um
+// único ZodIssue de min()/max() só carrega o lado que falhou. too_short/
+// too_long continuam string simples — o limite vem de issue.minimum/maximum,
+// que o Zod já injeta automaticamente.
 
 import { z } from 'zod';
 
 import { isValidIanaTimezone } from '../utils/timezone.utils';
+import { rangeErrorMessage } from '../utils/validationRange.utils';
 
 const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
@@ -27,19 +34,19 @@ export const dailyPulseTimeSchema = z.object({
   hour: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(0, 23),
     })
     .int('errors.validation.integer')
-    .min(0, 'errors.validation.number_range')
-    .max(23, 'errors.validation.number_range'),
+    .min(0, rangeErrorMessage(0, 23))
+    .max(23, rangeErrorMessage(0, 23)),
   minute: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(0, 59),
     })
     .int('errors.validation.integer')
-    .min(0, 'errors.validation.number_range')
-    .max(59, 'errors.validation.number_range'),
+    .min(0, rangeErrorMessage(0, 59))
+    .max(59, rangeErrorMessage(0, 59)),
 });
 
 // ─── Schema: atualização parcial do perfil do usuário ───────────────────────
@@ -59,54 +66,54 @@ export const updateUserSchema = z
     dailyProteinTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(10, 400),
       })
       .int('errors.validation.integer')
-      .min(10, 'errors.validation.number_range')
-      .max(400, 'errors.validation.number_range'),
+      .min(10, rangeErrorMessage(10, 400))
+      .max(400, rangeErrorMessage(10, 400)),
 
     dailyCalorieTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(500, 10_000),
       })
       .int('errors.validation.integer')
-      .min(500, 'errors.validation.number_range')
-      .max(10_000, 'errors.validation.number_range'),
+      .min(500, rangeErrorMessage(500, 10_000))
+      .max(10_000, rangeErrorMessage(500, 10_000)),
 
     dailyCarbTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(50, 800),
       })
       .int('errors.validation.integer')
-      .min(50, 'errors.validation.number_range')
-      .max(800, 'errors.validation.number_range'),
+      .min(50, rangeErrorMessage(50, 800))
+      .max(800, rangeErrorMessage(50, 800)),
 
     dailyHydrationTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(500, 8000),
       })
       .int('errors.validation.integer')
-      .min(500, 'errors.validation.number_range')
-      .max(8000, 'errors.validation.number_range'),
+      .min(500, rangeErrorMessage(500, 8000))
+      .max(8000, rangeErrorMessage(500, 8000)),
 
     weight: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(20, 300),
       })
-      .min(20, 'errors.validation.number_range')
-      .max(300, 'errors.validation.number_range'),
+      .min(20, rangeErrorMessage(20, 300))
+      .max(300, rangeErrorMessage(20, 300)),
 
     height: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(100, 250),
       })
-      .min(100, 'errors.validation.number_range')
-      .max(250, 'errors.validation.number_range'),
+      .min(100, rangeErrorMessage(100, 250))
+      .max(250, rangeErrorMessage(100, 250)),
 
     scanCount: z
       .number({
@@ -181,39 +188,39 @@ export const macroTargetSchema = z.object({
   dailyCalorieTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(500, 10_000),
     })
     .int('errors.validation.integer')
-    .min(500, 'errors.validation.number_range')
-    .max(10_000, 'errors.validation.number_range'),
+    .min(500, rangeErrorMessage(500, 10_000))
+    .max(10_000, rangeErrorMessage(500, 10_000)),
 
   dailyProteinTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(10, 400),
     })
     .int('errors.validation.integer')
-    .min(10, 'errors.validation.number_range')
-    .max(400, 'errors.validation.number_range'),
+    .min(10, rangeErrorMessage(10, 400))
+    .max(400, rangeErrorMessage(10, 400)),
 
   dailyCarbTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(50, 800),
     })
     .int('errors.validation.integer')
-    .min(50, 'errors.validation.number_range')
-    .max(800, 'errors.validation.number_range')
+    .min(50, rangeErrorMessage(50, 800))
+    .max(800, rangeErrorMessage(50, 800))
     .optional(),
 
   dailyFatTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(0, 500),
     })
     .int('errors.validation.integer')
-    .min(0, 'errors.validation.number_range')
-    .max(500, 'errors.validation.number_range')
+    .min(0, rangeErrorMessage(0, 500))
+    .max(500, rangeErrorMessage(0, 500))
     .optional(),
 });
 

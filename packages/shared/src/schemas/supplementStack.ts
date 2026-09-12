@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { rangeErrorMessage } from '../utils/validationRange.utils';
+
 const supplementTimingValues = ['morning', 'preWorkout', 'postWorkout', 'evening', 'withMeal'] as const;
 const MAX_SUPPLEMENT_STACK_ITEMS = 20;
 const MAX_HISTORY_RANGE_MS = 365 * 24 * 60 * 60 * 1000;
@@ -28,11 +30,11 @@ export const supplementItemSchema = z.object({
 
   dailyTargetCount: z
     .number({
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(1, MAX_DAILY_TARGET_COUNT),
     })
     .int('errors.validation.integer')
-    .min(1, 'errors.validation.number_range')
-    .max(MAX_DAILY_TARGET_COUNT, 'errors.validation.number_range')
+    .min(1, rangeErrorMessage(1, MAX_DAILY_TARGET_COUNT))
+    .max(MAX_DAILY_TARGET_COUNT, rangeErrorMessage(1, MAX_DAILY_TARGET_COUNT))
     .optional()
     .default(1),
 
@@ -64,11 +66,11 @@ export const historyQuerySchema = z
 
     limit: z
       .number({
-        invalid_type_error: 'errors.validation.number_range',
+        invalid_type_error: rangeErrorMessage(1, 100),
       })
       .int('errors.validation.integer')
-      .min(1, 'errors.validation.number_range')
-      .max(100, 'errors.validation.number_range')
+      .min(1, rangeErrorMessage(1, 100))
+      .max(100, rangeErrorMessage(1, 100))
       .default(30),
   })
   .superRefine((value, ctx) => {

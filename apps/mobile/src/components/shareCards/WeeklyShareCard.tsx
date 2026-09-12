@@ -126,7 +126,7 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
         {
           key: 'protein',
           icon: 'barbell-outline',
-          value: `${Math.round(averageDailyProtein)}g`,
+          value: `${Math.round(averageDailyProtein)}${t('common.units.grams')}`,
           label: t('me.weeklyShare.averageDailyProtein'),
         },
         {

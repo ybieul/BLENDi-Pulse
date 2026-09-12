@@ -1,10 +1,11 @@
 import { forwardRef, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import type { PulseAiRecipe } from '@blendi/shared';
 
 import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { ProfilePhoto } from '../profile/ProfilePhoto';
 import { AuroraBackground } from '../ui/AuroraBackground';
 
@@ -43,19 +44,12 @@ export interface RecipeShareCardProps {
 
 export type RecipeShareCardHandle = React.ElementRef<typeof ViewShot>;
 
+type MacroKey = 'protein' | 'carbs' | 'fat' | 'calories';
+
 interface MacroItem {
-  key: 'protein' | 'carbs' | 'fat' | 'calories';
+  key: MacroKey;
   label: string;
   value: string;
-  backgroundColor: string;
-}
-
-function formatMacroValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
 }
 
 function getTitleFontSize(title: string, format: ShareCardFormat): number {
@@ -69,58 +63,77 @@ function getTitleFontSize(title: string, format: ShareCardFormat): number {
 
 export const RecipeShareCard = forwardRef<RecipeShareCardHandle, RecipeShareCardProps>(
   function RecipeShareCard({ recipe, user, format }, ref) {
-    const { locale, t } = useAppTranslation();
-    const dimensions = SHARE_CARD_DIMENSIONS[format];
-    const titleFontSize = useMemo(() => getTitleFontSize(recipe.title, format), [format, recipe.title]);
+    const { t } = useAppTranslation();
+    const { formatDecimal } = useFormatNumbers();
     const isStory = format === 'story';
     const macroLabelSize = isStory ? 24 : 22;
     const macroValueSize = isStory ? 34 : 30;
     const userName = user.name.trim() || t('share.defaultUser');
-    const macroItems = useMemo<MacroItem[]>(() => {
-      const isPortuguese = locale === 'pt-BR';
 
-      return [
-        {
-          key: 'protein',
-          label: isPortuguese ? 'Proteína' : 'Protein',
-          value: `${formatMacroValue(recipe.macros.protein)}g`,
-          backgroundColor: PROTEIN_PILL_BACKGROUND,
+    // Estilos que dependem de format/isStory, pré-computados uma vez por
+    // mudança de formato em vez de objetos literais inline no JSX (eslint
+    // react-native/no-inline-styles).
+    const cardMetrics = useMemo(() => {
+      const dims = SHARE_CARD_DIMENSIONS[format];
+
+      return {
+        capture: {
+          width: dims.width,
+          height: dims.height,
+          paddingHorizontal: isStory ? 92 : 84,
+          paddingTop: isStory ? 160 : 120,
+          paddingBottom: isStory ? 112 : 84,
         },
-        {
-          key: 'carbs',
-          label: isPortuguese ? 'Carboidratos' : 'Carbs',
-          value: `${formatMacroValue(recipe.macros.carbs)}g`,
-          backgroundColor: CARBS_PILL_BACKGROUND,
+        macroGrid: {
+          gap: isStory ? 24 : 20,
         },
-        {
-          key: 'fat',
-          label: isPortuguese ? 'Gordura' : 'Fat',
-          value: `${formatMacroValue(recipe.macros.fat)}g`,
-          backgroundColor: FAT_PILL_BACKGROUND,
+        macroPill: {
+          minHeight: isStory ? 138 : 124,
+          paddingHorizontal: isStory ? 28 : 24,
+          paddingVertical: isStory ? 22 : 18,
         },
-        {
-          key: 'calories',
-          label: isPortuguese ? 'Calorias' : 'Calories',
-          value: `${formatMacroValue(recipe.macros.calories)} kcal`,
-          backgroundColor: CALORIES_PILL_BACKGROUND,
-        },
-      ];
-    }, [locale, recipe.macros]);
+      };
+    }, [format, isStory]);
+
+    const titleStyle = useMemo(() => {
+      const fontSize = getTitleFontSize(recipe.title, format);
+
+      return {
+        fontSize,
+        lineHeight: Math.round(fontSize * 1.04),
+        maxWidth: isStory ? 840 : 900,
+        marginBottom: isStory ? 72 : 56,
+      };
+    }, [format, isStory, recipe.title]);
+
+    const macroItems = useMemo<MacroItem[]>(() => [
+      {
+        key: 'protein',
+        label: t('common.macros.protein'),
+        value: `${formatDecimal(recipe.macros.protein)}${t('common.units.grams')}`,
+      },
+      {
+        key: 'carbs',
+        label: t('common.macros.carbs'),
+        value: `${formatDecimal(recipe.macros.carbs)}${t('common.units.grams')}`,
+      },
+      {
+        key: 'fat',
+        label: t('common.macros.fat'),
+        value: `${formatDecimal(recipe.macros.fat)}${t('common.units.grams')}`,
+      },
+      {
+        key: 'calories',
+        label: t('common.macros.calories'),
+        value: `${formatDecimal(recipe.macros.calories)} ${t('common.units.kilocalories')}`,
+      },
+    ], [recipe.macros, formatDecimal, t]);
 
     return (
       <View pointerEvents="none" style={styles.offscreenRoot}>
         <ViewShot
           ref={ref}
-          style={[
-            styles.captureRoot,
-            {
-              width: dimensions.width,
-              height: dimensions.height,
-              paddingHorizontal: isStory ? 92 : 84,
-              paddingTop: isStory ? 160 : 120,
-              paddingBottom: isStory ? 112 : 84,
-            },
-          ]}
+          style={[styles.captureRoot, cardMetrics.capture]}
         >
           <View style={styles.backgroundLayer} />
           <View style={styles.auroraLayer}>
@@ -133,31 +146,19 @@ export const RecipeShareCard = forwardRef<RecipeShareCardHandle, RecipeShareCard
                 adjustsFontSizeToFit
                 minimumFontScale={0.6}
                 numberOfLines={3}
-                style={[
-                  styles.title,
-                  {
-                    fontSize: titleFontSize,
-                    lineHeight: Math.round(titleFontSize * 1.04),
-                    maxWidth: isStory ? 840 : 900,
-                    marginBottom: isStory ? 72 : 56,
-                  },
-                ]}
+                style={[styles.title, titleStyle]}
               >
                 {recipe.title}
               </Text>
 
-              <View style={[styles.macroGrid, { gap: isStory ? 24 : 20 }]}> 
+              <View style={[styles.macroGrid, cardMetrics.macroGrid]}>
                 {macroItems.map((item) => (
                   <View
                     key={item.key}
                     style={[
                       styles.macroPill,
-                      {
-                        backgroundColor: item.backgroundColor,
-                        minHeight: isStory ? 138 : 124,
-                        paddingHorizontal: isStory ? 28 : 24,
-                        paddingVertical: isStory ? 22 : 18,
-                      },
+                      MACRO_PILL_BACKGROUND_STYLES[item.key],
+                      cardMetrics.macroPill,
                     ]}
                   >
                     <Text style={[styles.macroLabel, { fontSize: macroLabelSize }]}>{item.label}</Text>
@@ -236,6 +237,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     justifyContent: 'center',
   },
+  macroPillProtein: {
+    backgroundColor: PROTEIN_PILL_BACKGROUND,
+  },
+  macroPillCarbs: {
+    backgroundColor: CARBS_PILL_BACKGROUND,
+  },
+  macroPillFat: {
+    backgroundColor: FAT_PILL_BACKGROUND,
+  },
+  macroPillCalories: {
+    backgroundColor: CALORIES_PILL_BACKGROUND,
+  },
   macroLabel: {
     color: MACRO_LABEL_COLOR,
     fontFamily: fonts.body,
@@ -273,3 +286,10 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
 });
+
+const MACRO_PILL_BACKGROUND_STYLES: Record<MacroKey, ViewStyle> = {
+  protein: styles.macroPillProtein,
+  carbs: styles.macroPillCarbs,
+  fat: styles.macroPillFat,
+  calories: styles.macroPillCalories,
+};

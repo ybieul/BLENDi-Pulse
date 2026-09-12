@@ -22,6 +22,7 @@ import {
   AuthProgressDots,
   AuthScreenLayout,
 } from '../../components/ui';
+import { TERMS_URL, PRIVACY_URL } from '../../config/legal';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
@@ -30,8 +31,6 @@ import type { AuthScreenProps } from '../../navigation/types';
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_IDEAL_LENGTH = 12;
 const PASSWORD_STRENGTH_ANIMATION_DURATION = 300;
-const TERMS_URL = 'https://blendi.app/terms';
-const PRIVACY_URL = 'https://blendi.app/privacy';
 
 const SEGMENT_ACTIVE_COLORS = [
   colors.feedback.error,
@@ -43,6 +42,7 @@ const SEGMENT_ACTIVE_COLORS = [
 const SEGMENT_INACTIVE_COLOR = 'rgba(255, 255, 255, 0.10)';
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type FieldName = 'name' | 'email' | 'password' | 'confirmPassword';
 
 type FieldErrors = Record<FieldName, string | null>;
@@ -167,7 +167,30 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     confirmPassword: false,
   });
 
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = (input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  };
 
   const validateName = (value: string): string | null => {
     if (value.trim().length === 0) {
@@ -179,7 +202,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
       return null;
     }
 
-    return translateKey(parsed.error.issues[0]?.message ?? 'errors.validation.required');
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
   };
 
   const validateEmail = (value: string): string | null => {
@@ -192,7 +215,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
       return null;
     }
 
-    return translateKey(parsed.error.issues[0]?.message ?? 'errors.validation.required');
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
   };
 
   const validatePassword = (value: string): string | null => {
@@ -205,7 +228,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
       return null;
     }
 
-    return translateKey(parsed.error.issues[0]?.message ?? 'errors.validation.required');
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
   };
 
   const validateConfirmPassword = (value: string, currentPassword: string): string | null => {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { rangeErrorMessage } from '../utils/validationRange.utils';
+
 const blendiModelValues = ['Lite', 'ProPlus', 'Steel'] as const;
 
 export const createBlendLogSchema = z.object({
@@ -51,22 +53,22 @@ export const createBlendLogSchema = z.object({
   durationSeconds: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(5, 300),
     })
     .int('errors.validation.integer')
-    .min(5, 'errors.validation.number_range')
-    .max(300, 'errors.validation.number_range'),
+    .min(5, rangeErrorMessage(5, 300))
+    .max(300, rangeErrorMessage(5, 300)),
 
   fromFavoriteId: z.string().trim().min(1, 'errors.validation.required').optional(),
 
   rating: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(1, 5),
     })
     .int('errors.validation.integer')
-    .min(1, 'errors.validation.number_range')
-    .max(5, 'errors.validation.number_range')
+    .min(1, rangeErrorMessage(1, 5))
+    .max(5, rangeErrorMessage(1, 5))
     .optional(),
 });
 

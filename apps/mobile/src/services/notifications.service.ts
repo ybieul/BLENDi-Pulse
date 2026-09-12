@@ -34,7 +34,7 @@ export interface NotificationRouteResult {
 }
 
 function getExpoProjectId(): string | null {
-  const extra = Constants.expoConfig?.extra as ExpoExtraConfig | undefined;
+  const extra: ExpoExtraConfig | undefined = Constants.expoConfig?.extra;
   const expoProjectId = extra?.expoProjectId;
 
   return typeof expoProjectId === 'string' && expoProjectId.trim().length > 0
@@ -51,7 +51,7 @@ function buildDailyPulsePrompt(recipeTitle: string | undefined): string | null {
     return null;
   }
 
-  return i18n.t('notifications.dailyPulsePrompt', { recipeTitle });
+  return i18n.t('me.notifications.dailyPulsePrompt', { recipeTitle });
 }
 
 function buildNestedRoute(
@@ -98,7 +98,7 @@ export async function setupNotificationChannel(): Promise<void> {
   }
 
   await Notifications.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
-    name: i18n.t('notifications.channelName'),
+    name: i18n.t('me.notifications.channelName'),
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: NOTIFICATION_CHANNEL_VIBRATION_PATTERN,
     lightColor: NOTIFICATION_CHANNEL_LIGHT_COLOR,

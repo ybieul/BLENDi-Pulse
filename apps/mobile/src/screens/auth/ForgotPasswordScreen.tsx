@@ -11,6 +11,7 @@ import type { AuthScreenProps } from '../../navigation/types';
 const MINIMUM_LOADING_MS = 800;
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ForgotPasswordRequest = (input: { email: string }) => Promise<void>;
 
 export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPassword'>) {
@@ -22,7 +23,30 @@ export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPass
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = (input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  };
 
   useEffect(() => {
     return () => {
@@ -40,7 +64,7 @@ export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPass
       return null;
     }
 
-    return translateKey(parsed.error.issues[0]?.message ?? 'errors.validation.required');
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
   };
 
   const handleChangeEmail = (nextValue: string) => {
@@ -62,8 +86,8 @@ export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPass
   const handleSubmit = async () => {
     const parsed = forgotPasswordSchema.safeParse({ email });
     if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? 'errors.validation.required';
-      setEmailError(translateKey(message));
+      const issue = parsed.error.issues[0] ?? 'errors.validation.required';
+      setEmailError(translateKey(issue));
       return;
     }
 

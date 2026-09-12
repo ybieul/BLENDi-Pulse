@@ -31,8 +31,11 @@ import { useAuthStore } from '../store/auth.store';
  *
  *   'en'    → 'en-US'  (garante formatação americana: Apr 22, 2026 / 11:00 PM)
  *   'pt-BR' → 'pt-BR'  (já é uma tag BCP 47 válida)
+ *
+ * Exportada para reuso por qualquer utilitário que precise de uma tag Intl
+ * válida a partir do locale do i18n (ex: utils/formatNumbers.ts).
  */
-function toIntlLocale(locale: SupportedLocale): string {
+export function toIntlLocale(locale: SupportedLocale): string {
   return locale === 'en' ? 'en-US' : 'pt-BR';
 }
 
@@ -167,6 +170,19 @@ export interface UseDateFormatReturn {
   formatDate: (date: Date | number | string) => string;
 
   /**
+   * Formata uma data como "mês por extenso + ano" no idioma e timezone do
+   * dispositivo — sem o dia. Usado para referências de período, não de um
+   * dia específico (ex: "membro desde").
+   *
+   * @example
+   *   // UTC: 2026-01-15T12:00:00Z, timezone: America/Sao_Paulo (UTC-3)
+   *   formatMonthYear(new Date('2026-01-15T12:00:00Z'))
+   *   // en-US → "January 2026"
+   *   // pt-BR → "janeiro de 2026"
+   */
+  formatMonthYear: (date: Date | number | string) => string;
+
+  /**
    * Formata o dia da semana abreviado no idioma e timezone do dispositivo.
    *
    * @example
@@ -267,6 +283,14 @@ export function useDateFormat(): UseDateFormatReturn {
       // 'long' → "April 22, 2026" (en-US) | "22 de abril de 2026" (pt-BR)
     });
 
+    // ── formatMonthYear ─────────────────────────────────────────────────────
+    const monthYearFormatter = new Intl.DateTimeFormat(intlLocale, {
+      timeZone: timezone,
+      month: 'long',
+      year: 'numeric',
+      // en-US → "January 2026" | pt-BR → "janeiro de 2026"
+    });
+
     const weekdayFormatter = new Intl.DateTimeFormat(intlLocale, {
       timeZone: timezone,
       weekday: 'short',
@@ -299,6 +323,10 @@ export function useDateFormat(): UseDateFormatReturn {
 
     function formatDate(value: Date | number | string): string {
       return dateFormatter.format(toDate(value, timezone));
+    }
+
+    function formatMonthYear(value: Date | number | string): string {
+      return monthYearFormatter.format(toDate(value, timezone));
     }
 
     function formatWeekdayShort(value: Date | number | string): string {
@@ -354,6 +382,7 @@ export function useDateFormat(): UseDateFormatReturn {
 
     return {
       formatDate,
+      formatMonthYear,
       formatWeekdayShort,
       formatShortDate,
       formatTime,

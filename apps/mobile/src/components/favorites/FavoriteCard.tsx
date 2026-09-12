@@ -10,6 +10,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useAuthStore } from '../../store/auth.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
 import {
@@ -48,18 +49,12 @@ export interface FavoriteCardProps {
   onRemove: () => void;
 }
 
-function formatMacroValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
-}
-
 function MacroPill({ value, unit, backgroundColor }: MacroPillProps) {
+  const { formatDecimal } = useFormatNumbers();
+
   return (
     <View style={[styles.macroPill, { backgroundColor }]}>
-      <Text style={styles.macroPillText}>{`${formatMacroValue(value)} ${unit}`}</Text>
+      <Text style={styles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
     </View>
   );
 }

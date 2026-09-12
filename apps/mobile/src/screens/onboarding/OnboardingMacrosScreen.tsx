@@ -31,6 +31,7 @@ type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
 interface ApiErrorResponse {
   code?: string;
@@ -70,7 +71,30 @@ const DEFAULT_GOAL_CONFIG = GOAL_CONFIG.Wellness;
 
 export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'OnboardingMacros'>) {
   const { t } = useAppTranslation();
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = (input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  };
 
   const selectedModel    = useOnboardingStore((state) => state.selectedModel);
   const selectedGoal     = useOnboardingStore((state) => state.selectedGoal);

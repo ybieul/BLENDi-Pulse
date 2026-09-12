@@ -18,6 +18,7 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useGamificationStore } from '../../store/gamification.store';
 
 const SHEET_RADIUS = 24;
@@ -33,12 +34,9 @@ export interface LevelDetailSheetProps {
   onClose: () => void;
 }
 
-function formatXP(value: number): string {
-  return value.toLocaleString();
-}
-
 export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
   const { t } = useAppTranslation();
+  const { formatCount } = useFormatNumbers();
   const { height } = useWindowDimensions();
   const totalXP = useGamificationStore((state) => state.totalXP);
 
@@ -136,10 +134,10 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
   const levelDetailLabel = t('gamification.levelDetail', { level: levelInfo.level });
   const currentLevelName = t(levelInfo.levelNameKey, { level: levelInfo.level });
   const nextLevelName = t(nextLevelInfo.levelNameKey, { level: nextLevelInfo.level });
-  const formattedTotalXP = formatXP(totalXP);
-  const formattedCurrentLevelXP = formatXP(levelInfo.xpForCurrentLevel);
-  const formattedNextLevelXP = formatXP(levelInfo.xpForNextLevel);
-  const formattedXpToNextLevel = formatXP(levelInfo.xpToNextLevel);
+  const formattedTotalXP = formatCount(totalXP);
+  const formattedCurrentLevelXP = formatCount(levelInfo.xpForCurrentLevel);
+  const formattedNextLevelXP = formatCount(levelInfo.xpForNextLevel);
+  const formattedXpToNextLevel = formatCount(levelInfo.xpToNextLevel);
 
   return (
     <Modal transparent visible={isMounted} animationType="none" statusBarTranslucent>

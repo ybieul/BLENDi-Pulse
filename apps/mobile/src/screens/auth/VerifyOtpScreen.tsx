@@ -32,6 +32,7 @@ const SHAKE_TOTAL_DURATION_MS = 300;
 const ERROR_BORDER_DURATION_MS = 600;
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ApiErrorResponse = { code?: string };
 type VerifyOtpRequest = (input: { email: string; otp: string }) => Promise<string>;
 type ForgotPasswordRequest = (input: { email: string }) => Promise<void>;
@@ -66,7 +67,30 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
   const [secondsRemaining, setSecondsRemaining] = useState(RESEND_COUNTDOWN_SECONDS);
   const [otpErrorMessage, setOtpErrorMessage] = useState<string | null>(null);
 
-  const translateKey = useCallback((key: string) => t(key as TranslationKey), [t]);
+  const translateKey = useCallback((input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  }, [t]);
   const maskedEmail = useMemo(() => maskEmail(route.params.email), [route.params.email]);
   const digits = otpCode.split('');
   const activeIndex = otpCode.length >= OTP_LENGTH ? -1 : otpCode.length;

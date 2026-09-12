@@ -19,6 +19,7 @@ import {
   GOAL_RING_ANIMATION_DURATION,
   HOME_INTERACTION_DELAY,
 } from '../../config/cache.config';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -51,14 +52,6 @@ function clampProgress(current: number, target: number): number {
   return Math.max(0, Math.min(current / target, 1));
 }
 
-function formatMetricValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
-}
-
 function createCelebrationAnimation(scale: Animated.Value): Animated.CompositeAnimation {
   return Animated.sequence(
     Array.from({ length: 3 }, () =>
@@ -89,6 +82,7 @@ export function GoalRing({
   color = colors.brand.pulse,
   animate = true,
 }: GoalRingProps) {
+  const { formatDecimal } = useFormatNumbers();
   const progress = clampProgress(current, target);
   const isComplete = progress >= 1;
   const ringColor = isComplete ? colors.feedback.success : color;
@@ -200,13 +194,13 @@ export function GoalRing({
       <View pointerEvents="none" style={styles.content}>
         <Text style={[styles.valueRow, { fontSize: valueFontSize }]}>
           <Text style={[styles.currentValue, { fontSize: valueFontSize }]}>
-            {formatMetricValue(current)}
+            {formatDecimal(current)}
           </Text>
           <Text style={[styles.separator, { fontSize: targetFontSize }]}>
             /
           </Text>
           <Text style={[styles.targetValue, { fontSize: targetFontSize }]}>
-            {formatMetricValue(target)}
+            {formatDecimal(target)}
           </Text>
         </Text>
         <Text style={styles.label}>{label}</Text>

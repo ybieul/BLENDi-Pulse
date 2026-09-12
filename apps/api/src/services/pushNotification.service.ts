@@ -32,6 +32,7 @@ export interface PushNotificationPayload {
   data: {
     deepLink: string;
     type: string;
+    recipeTitle?: string;
   };
   priority: PushNotificationPriority;
 }

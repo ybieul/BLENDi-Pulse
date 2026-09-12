@@ -19,6 +19,7 @@ import {
 } from '@blendi/shared';
 import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
@@ -72,15 +73,8 @@ export interface RecipeCardProps {
   isFromCache?: boolean;
 }
 
-function formatMacroValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
-}
-
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
+  const { formatDecimal } = useFormatNumbers();
   const backgroundColor =
     tone === 'protein'
       ? PROTEIN_PILL_BACKGROUND
@@ -91,9 +85,9 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
           : CALORIES_PILL_BACKGROUND;
 
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}> 
+    <View style={[styles.macroPill, { backgroundColor }]}>
       <Ionicons name={icon} size={10} color={colors.text.primary} />
-      <Text style={styles.macroValue}>{formatMacroValue(value)}</Text>
+      <Text style={styles.macroValue}>{formatDecimal(value)}</Text>
       <Text style={styles.macroUnit}>{unit}</Text>
     </View>
   );

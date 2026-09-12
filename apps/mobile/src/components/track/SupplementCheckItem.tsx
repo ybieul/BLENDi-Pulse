@@ -160,7 +160,7 @@ export function SupplementCheckItem({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${supplement.name} ${progressLabel}`}
-          accessibilityHint="Toque para adicionar uma dose. Segure para desfazer uma dose."
+          accessibilityHint={t('track.supplementCheckHint')}
           disabled={isCheckPending}
           hitSlop={spacing.md}
           delayLongPress={220}

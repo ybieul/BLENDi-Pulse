@@ -111,7 +111,8 @@ function buildPushPayload(
   pushToken: string,
   type: Exclude<NotificationType, 'levelUp'>,
   title: string,
-  body: string
+  body: string,
+  recipeTitle?: string
 ): PushNotificationPayload {
   return {
     pushToken,
@@ -120,6 +121,7 @@ function buildPushPayload(
     data: {
       deepLink: NOTIFICATION_DEEP_LINKS[type],
       type,
+      ...(recipeTitle ? { recipeTitle } : {}),
     },
     priority: 'high',
   };
@@ -263,7 +265,7 @@ async function runDailyPulseJob(): Promise<void> {
       const content = await getDailyPulseContent(String(user._id), user.goal);
 
       notifications.push(
-        buildPushPayload(user.pushToken, 'dailyPulse', content.title, content.body)
+        buildPushPayload(user.pushToken, 'dailyPulse', content.title, content.body, content.recipeName)
       );
       pendingReservations.set(user.pushToken, {
         userId: user._id,

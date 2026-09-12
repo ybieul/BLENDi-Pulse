@@ -59,6 +59,8 @@ import { CACHE_CONFIG, QUERY_KEYS } from "../config/cache.config";
 import { PRICING_CONFIG } from "../config/pricing.config";
 import { createAppStorage } from "../config/storage";
 import { useAppTranslation } from "../hooks/useAppTranslation";
+import { useDateFormat } from "../hooks/useDateFormat";
+import { useFormatNumbers } from "../hooks/useFormatNumbers";
 import { buildHistoryRange } from "../utils/historyRange.utils";
 import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
@@ -332,13 +334,6 @@ function getLanguageKey(language: string): TranslationKey {
     : "profile.language.en";
 }
 
-function formatMemberSince(createdAt: string, locale: string): string {
-  return new Date(createdAt).toLocaleDateString(locale, {
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function getLocalDateKey(value: Date | string, timezone: string): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -425,25 +420,7 @@ async function processProfilePhoto(uri: string): Promise<{
 
 function getProfilePhotoActionCopy(
   t: ReturnType<typeof useAppTranslation>["t"],
-  locale: string,
 ): ProfilePhotoActionCopy {
-  if (locale === "pt-BR") {
-    return {
-      title: t("me.profilePhotoTitle"),
-      takePhoto: t("me.takePhoto"),
-      chooseFromGallery: t("me.chooseFromGallery"),
-      removePhoto: t("me.removePhoto"),
-      removePhotoConfirm: t("me.removePhotoConfirm"),
-      uploadingPhoto: t("me.uploadingPhoto"),
-      photoUpdated: t("me.photoUpdated"),
-      photoRemoved: t("me.photoRemoved"),
-      photoTooLarge: t("me.photoTooLarge"),
-      photoError: t("me.photoError"),
-      cameraPermissionDenied: "Permita o acesso à câmera para tirar uma foto.",
-      galleryPermissionDenied: "Permita o acesso à galeria para escolher uma foto.",
-    };
-  }
-
   return {
     title: t("me.profilePhotoTitle"),
     takePhoto: t("me.takePhoto"),
@@ -455,8 +432,8 @@ function getProfilePhotoActionCopy(
     photoRemoved: t("me.photoRemoved"),
     photoTooLarge: t("me.photoTooLarge"),
     photoError: t("me.photoError"),
-    cameraPermissionDenied: "Allow camera access to take a photo.",
-    galleryPermissionDenied: "Allow photo library access to choose a photo.",
+    cameraPermissionDenied: t("me.cameraPermissionDenied"),
+    galleryPermissionDenied: t("me.galleryPermissionDenied"),
   };
 }
 
@@ -465,12 +442,19 @@ function getProfilePhotoActionCopy(
 export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const insets = useSafeAreaInsets();
   const { t, locale, changeLocale } = useAppTranslation();
+  const { formatCount } = useFormatNumbers();
+  const { formatMonthYear } = useDateFormat();
   const authUser = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const queryClient = useQueryClient();
   const { displayVolume } = useUnits();
-  const { isBusy: isPurchaseBusy, restoreProAccess } = usePulseProPurchase();
+  const {
+    availablePlans,
+    isBusy: isPurchaseBusy,
+    loadPurchasePlans,
+    restoreProAccess,
+  } = usePulseProPurchase();
   const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
   const totalXP = useGamificationStore((state) => state.totalXP);
   const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
@@ -547,11 +531,15 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     setGamificationTotalXP(fetchedTotalXP);
   }, [profileResponse?.data.user.totalXP, setGamificationTotalXP]);
 
+  useEffect(() => {
+    void loadPurchasePlans();
+  }, [loadPurchasePlans]);
+
   const profile = profileResponse?.data.user;
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  const profilePhotoActionCopy = useMemo(() => getProfilePhotoActionCopy(t, locale), [locale, t]);
+  const profilePhotoActionCopy = useMemo(() => getProfilePhotoActionCopy(t), [t]);
   const displayUserId = authUser?.id ?? profile?.id ?? null;
   const displayName = profile?.name ?? authUser?.name ?? "";
   const displayEmail = profile?.email ?? authUser?.email ?? "";
@@ -576,8 +564,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
   const memberSinceStr = useMemo(() => {
     if (!createdAt) return "";
-    return formatMemberSince(createdAt, locale);
-  }, [createdAt, locale]);
+    return formatMonthYear(createdAt);
+  }, [createdAt, formatMonthYear]);
   const weeklyHistoryRange = useMemo(() => buildHistoryRange(7, historyTimezone), [historyTimezone]);
   const canShareWeekly = useMemo(() => {
     if (!createdAt) {
@@ -596,11 +584,23 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   );
 
   const upgradePriceSummary = useMemo(() => {
+    const realMonthlyPlan = availablePlans.find((plan) => plan.id === "monthly");
+    const realAnnualPlan = availablePlans.find((plan) => plan.id === "annual");
+
+    if (realMonthlyPlan && realAnnualPlan) {
+      return t("me.upgrade.price", {
+        monthlyPrice: realMonthlyPlan.priceString,
+        annualPrice: realAnnualPlan.priceString,
+      });
+    }
+
+    // Fallback: preços reais da loja ainda não carregaram, ou RevenueCat
+    // indisponível (ex: ambiente de desenvolvimento sem REVENUECAT_APP_ID).
     return t("me.upgrade.price", {
       monthlyPrice: formatUsdCurrency(locale, PRICING_CONFIG.PRO_MONTHLY_PRICE_USD),
       annualPrice: formatUsdCurrency(locale, PRICING_CONFIG.PRO_ANNUAL_PRICE_USD),
     });
-  }, [locale, t]);
+  }, [availablePlans, locale, t]);
 
   const userBadges = useMemo(() => {
     return calculateUserBadges({
@@ -1236,7 +1236,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
             <Text style={styles.levelNextCopy}>
               {t('gamification.xpToNextLevel', {
-                xp: levelInfo.xpToNextLevel.toLocaleString(),
+                xp: formatCount(levelInfo.xpToNextLevel),
                 levelName: t(nextLevelInfo.levelNameKey as TranslationKey, {
                   level: nextLevelInfo.level,
                 }),
@@ -1295,21 +1295,21 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
             <SettingRow
               label={t("profile.fields.protein_target")}
-              value={String(profile?.dailyProteinTarget ?? authUser?.dailyProteinTarget ?? 0) + "g"}
+              value={formatCount(profile?.dailyProteinTarget ?? authUser?.dailyProteinTarget ?? 0) + t("common.units.grams")}
               onPress={() => { setEditingType("protein"); }}
             />
             <View style={styles.divider} />
 
             <SettingRow
               label={t("me.settingCarbs")}
-              value={String(profile?.dailyCarbTarget ?? authUser?.dailyCarbTarget ?? 0) + "g"}
+              value={formatCount(profile?.dailyCarbTarget ?? authUser?.dailyCarbTarget ?? 0) + t("common.units.grams")}
               onPress={() => { setEditingType("carbs"); }}
             />
             <View style={styles.divider} />
 
             <SettingRow
               label={t("profile.fields.calories_target")}
-              value={String(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) + " kcal"}
+              value={formatCount(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) + " " + t("common.units.kilocalories")}
               onPress={() => { setEditingType("calories"); }}
             />
             <View style={styles.divider} />

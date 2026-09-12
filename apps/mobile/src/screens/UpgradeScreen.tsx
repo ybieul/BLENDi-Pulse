@@ -1,4 +1,4 @@
-import { type ComponentProps, useMemo, useState } from 'react';
+import { type ComponentProps, useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Pressable,
@@ -22,15 +22,13 @@ import {
 } from '@blendi/shared';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui';
+import { TERMS_URL, PRIVACY_URL } from '../config/legal';
 import { PRICING_CONFIG } from '../config/pricing.config';
 import { usePulseProPurchase } from '../hooks/usePulseProPurchase';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import type { RootStackParamList } from '../navigation/types';
 import type { PurchasePlanId } from '../services/purchase.service';
 import { formatUsdCurrency } from '../utils/pricing.utils';
-
-const TERMS_URL = 'https://blendi.app/terms';
-const PRIVACY_URL = 'https://blendi.app/privacy';
 const GOLD_GRADIENT = ['#FDE68A', '#F59E0B', '#F97316'] as const;
 const BUTTON_GRADIENT = ['#FACC15', '#F59E0B'] as const;
 const HERO_GLOW_TOP = ['rgba(245,158,11,0.18)', 'transparent'] as const;
@@ -60,10 +58,25 @@ interface DisplayPlan {
 export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
   const insets = useSafeAreaInsets();
   const { t, locale } = useAppTranslation();
-  const { activePlanId, isRestoring, purchaseProPlan, restoreProAccess } = usePulseProPurchase();
+  const {
+    availablePlans,
+    activePlanId,
+    isRestoring,
+    loadPurchasePlans,
+    purchaseProPlan,
+    restoreProAccess,
+  } = usePulseProPurchase();
   const [selectedPlanId, setSelectedPlanId] = useState<PurchasePlanId>('annual');
 
-  const annualSavingsPercent = useMemo(() => {
+  useEffect(() => {
+    void loadPurchasePlans();
+  }, [loadPurchasePlans]);
+
+  // Fallback só usado enquanto os planos reais da loja ainda não carregaram,
+  // ou se a RevenueCat estiver indisponível (ex: ambiente de desenvolvimento
+  // sem REVENUECAT_APP_ID) — PRICING_CONFIG é uma constante USD, não o preço
+  // real cobrado do usuário no país dele.
+  const fallbackAnnualSavingsPercent = useMemo(() => {
     const yearlyMonthlyTotal = PRICING_CONFIG.PRO_MONTHLY_PRICE_USD * 12;
     if (yearlyMonthlyTotal <= 0) {
       return 0;
@@ -78,6 +91,42 @@ export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
   }, []);
 
   const plans = useMemo<DisplayPlan[]>(() => {
+    const realMonthlyPlan = availablePlans.find((plan) => plan.id === 'monthly');
+    const realAnnualPlan = availablePlans.find((plan) => plan.id === 'annual');
+
+    if (realMonthlyPlan && realAnnualPlan) {
+      const yearlyMonthlyTotal = realMonthlyPlan.price * 12;
+      const savingsPercent = yearlyMonthlyTotal > 0
+        ? Math.max(
+          0,
+          Math.round(((yearlyMonthlyTotal - realAnnualPlan.price) / yearlyMonthlyTotal) * 100),
+        )
+        : 0;
+
+      return [
+        {
+          id: 'monthly',
+          title: t('me.upgradeScreen.plans.monthly'),
+          description: t('me.upgradeScreen.plans.monthlyDescription'),
+          // Preço real localizado pela loja (RevenueCat/App Store/Play Store) —
+          // já formatado na moeda e no idioma do país do usuário.
+          priceString: realMonthlyPlan.priceString,
+        },
+        {
+          id: 'annual',
+          title: t('me.upgradeScreen.plans.annual'),
+          description: t('me.upgradeScreen.plans.annualDescription'),
+          priceString: realAnnualPlan.priceString,
+          monthlyEquivalent: realAnnualPlan.pricePerMonthString
+            ? t('me.upgradeScreen.plans.annualEquivalent', {
+              price: realAnnualPlan.pricePerMonthString,
+            })
+            : undefined,
+          savingsText: t('me.upgradeScreen.plans.save', { percent: savingsPercent }),
+        },
+      ];
+    }
+
     const monthlyPriceString = formatUsdCurrency(locale, PRICING_CONFIG.PRO_MONTHLY_PRICE_USD);
     const annualPriceString = formatUsdCurrency(locale, PRICING_CONFIG.PRO_ANNUAL_PRICE_USD);
     const annualMonthlyEquivalent = formatUsdCurrency(
@@ -100,10 +149,10 @@ export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
         monthlyEquivalent: t('me.upgradeScreen.plans.annualEquivalent', {
           price: annualMonthlyEquivalent,
         }),
-        savingsText: t('me.upgradeScreen.plans.save', { percent: annualSavingsPercent }),
+        savingsText: t('me.upgradeScreen.plans.save', { percent: fallbackAnnualSavingsPercent }),
       },
     ];
-  }, [annualSavingsPercent, locale, t]);
+  }, [availablePlans, fallbackAnnualSavingsPercent, locale, t]);
 
   const benefitItems = useMemo(
     () => [

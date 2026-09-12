@@ -11,6 +11,7 @@ import { AntDesign } from '@expo/vector-icons';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@blendi/shared';
+import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { AuroraBackground } from './AuroraBackground';
 
 const FOOTER_HORIZONTAL_PADDING = spacing['3xl'];
@@ -33,6 +34,7 @@ export function AuthScreenLayout({
 }: AuthScreenLayoutProps) {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
+  const { t } = useAppTranslation();
 
   const handleGoBack = () => {
     if (navigation.canGoBack()) {
@@ -54,7 +56,7 @@ export function AuthScreenLayout({
             onPress={handleGoBack}
             style={[styles.backButton, { top: insets.top + BACK_BUTTON_TOP_OFFSET }]}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.actions.back')}
             hitSlop={12}
           >
             <AntDesign name="arrowleft" size={20} color={colors.text.primary} />

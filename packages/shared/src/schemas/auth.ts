@@ -7,13 +7,19 @@
 //   • Mobile  → t(error.message, params)  — exibe no idioma do usuário
 //   • Backend → retorna a chave no JSON   — cliente resolve como quiser
 //
-// Parâmetros de interpolação ({{min}}, {{max}}) são derivados dos campos
-// `minimum` / `maximum` que o Zod injeta automaticamente em cada ZodIssue.
-// Nunca codifique os valores numéricos dentro da string da chave.
+// Duas convenções de mensagem coexistem de propósito:
+//   • too_short/too_long → string simples (ex: 'errors.validation.too_short').
+//     O limite vem do próprio ZodIssue (issue.minimum/issue.maximum), que o
+//     Zod já injeta automaticamente — nenhum valor numérico é hardcoded aqui.
+//   • number_range → string JSON via rangeErrorMessage(min, max). Essa chave
+//     precisa de {{min}} E {{max}} na mesma frase, mas um ZodIssue de min()
+//     ou max() só carrega o lado que falhou — por isso os dois limites vão
+//     embutidos na mensagem. Ver packages/shared/src/utils/validationRange.utils.ts.
 
 import { z } from 'zod';
 
 import { isValidIanaTimezone } from '../utils/timezone.utils';
+import { rangeErrorMessage } from '../utils/validationRange.utils';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -59,20 +65,20 @@ export const registerSchema = z.object({
   dailyProteinTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(10, 400),
     })
     .int('errors.validation.integer')
-    .min(10, 'errors.validation.number_range')
-    .max(400, 'errors.validation.number_range'),
+    .min(10, rangeErrorMessage(10, 400))
+    .max(400, rangeErrorMessage(10, 400)),
 
   dailyCalorieTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: 'errors.validation.number_range',
+      invalid_type_error: rangeErrorMessage(500, 10_000),
     })
     .int('errors.validation.integer')
-    .min(500, 'errors.validation.number_range')
-    .max(10_000, 'errors.validation.number_range'),
+    .min(500, rangeErrorMessage(500, 10_000))
+    .max(10_000, rangeErrorMessage(500, 10_000)),
 
   // Timezone IANA do dispositivo (ex: 'America/Sao_Paulo', 'Europe/London').
   // Capturado automaticamente pelo app durante o onboarding via expo-localization —

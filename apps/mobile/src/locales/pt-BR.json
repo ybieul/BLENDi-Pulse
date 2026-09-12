@@ -10,31 +10,21 @@
     "daysAgoN": "Há {{days}} dias",
     "or": "ou",
     "actions": {
-      "confirm": "Confirmar",
+      "add": "Adicionar",
       "cancel": "Cancelar",
       "save": "Salvar",
       "back": "Voltar",
-      "continue": "Continuar",
-      "edit": "Editar",
-      "remove": "Remover",
-      "done": "Concluído",
       "retry": "Tentar novamente",
       "restore": "Restaurar",
       "close": "Fechar"
     },
     "states": {
       "loading": "Carregando…",
-      "offline": "Sem conexão",
-      "error": "Algo deu errado. Tente novamente.",
-      "empty": "Nada aqui ainda."
+      "error": "Algo deu errado. Tente novamente."
     },
     "units": {
       "grams": "g",
-      "grams_long": "gramas",
-      "milliliters": "ml",
-      "milliliters_long": "mililitros",
-      "kilocalories": "kcal",
-      "kilocalories_long": "quilocalorias"
+      "kilocalories": "kcal"
     },
     "macros": {
       "protein": "Proteína",
@@ -53,72 +43,20 @@
   },
 
   "onboarding": {
-    "welcome": {
-      "title": "Conheça seu\nblender pessoal.",
-      "subtitle": "O BLENDi Pulse transforma seu hardware em um sistema inteligente de nutrição.",
-      "cta": "Começar"
-    },
-    "profile": {
-      "title": "Fale um pouco\nsobre você.",
-      "subtitle": "Vamos personalizar suas receitas e metas.",
-      "name_label": "Seu nome",
-      "name_placeholder": "ex.: Alex",
-      "email_label": "E-mail",
-      "email_placeholder": "alex@exemplo.com",
-      "name_required": "O nome é obrigatório.",
-      "name_min": "O nome deve ter pelo menos 2 caracteres.",
-      "email_required": "O e-mail é obrigatório.",
-      "email_invalid": "Insira um e-mail válido."
-    },
     "model": {
-      "title": "Qual BLENDi\nvocê tem?",
-      "subtitle": "Vamos otimizar as receitas para a potência do seu motor.",
       "lite": {
-        "name": "BLENDi Lite",
-        "description": "500W — ideal para smoothies e blends leves"
+        "name": "BLENDi Lite"
       },
       "pro_plus": {
-        "name": "BLENDi Pro+",
-        "description": "900W — frutas congeladas e sementes sem esforço"
+        "name": "BLENDi Pro+"
       },
       "steel": {
-        "name": "BLENDi Steel",
-        "description": "1400W — potência total para qualquer ingrediente"
+        "name": "BLENDi Steel"
       }
     },
     "goal": {
       "title": "Qual é o seu\nprincipal objetivo?",
-      "subtitle": "Seu objetivo define suas receitas diárias e metas de macros.",
-      "muscle": {
-        "name": "Músculo",
-        "description": "Blends ricos em proteína para força e recuperação"
-      },
-      "wellness": {
-        "name": "Bem-estar",
-        "description": "Nutrição equilibrada para se sentir energizado todos os dias"
-      },
-      "energy": {
-        "name": "Energia",
-        "description": "Blends focados em performance para estilos de vida ativos"
-      },
-      "recovery": {
-        "name": "Recuperação",
-        "description": "Ingredientes anti-inflamatórios para o corpo se recuperar"
-      }
-    },
-    "targets": {
-      "title": "Defina suas\nmetas diárias.",
-      "subtitle": "Estes são seus macros de referência. Você pode ajustá-los a qualquer momento.",
-      "protein_label": "Meta diária de proteína",
-      "protein_placeholder": "ex.: 120",
-      "calories_label": "Meta diária de calorias",
-      "calories_placeholder": "ex.: 2000",
-      "protein_hint": "g / dia",
-      "calories_hint": "kcal / dia",
-      "protein_required": "A meta de proteína é obrigatória.",
-      "protein_invalid": "Insira um valor entre 20 e 400 g.",
-      "calories_required": "A meta de calorias é obrigatória.",
-      "calories_invalid": "Insira um valor entre 500 e 6000 kcal."
+      "subtitle": "Seu objetivo define suas receitas diárias e metas de macros."
     },
     "modelTitle": "Qual BLENDi\nvocê tem?",
     "modelSubtitle": "Vamos otimizar as receitas para a potência do seu motor.",
@@ -136,8 +74,6 @@
     "goalRecoveryDesc": "Ingredientes anti-inflamatórios para o corpo se recuperar",
     "bodyTitle": "Fale sobre\no seu corpo.",
     "bodySubtitle": "Vamos calcular suas metas diárias ideais de macros.",
-    "weightPlaceholder": "Peso",
-    "heightPlaceholder": "Altura",
     "weightPlaceholderMetric": "Peso em kg",
     "weightPlaceholderImperial": "Peso em libras",
     "heightPlaceholderMetric": "Altura em cm",
@@ -170,13 +106,9 @@
     "greeting_afternoon": "Boa tarde, {{name}}.",
     "greeting_evening": "Boa noite, {{name}}.",
     "logWater": "Registrar água",
-    "lastBlend": "Last Blend",
+    "lastBlend": "Último Blend",
     "startBlend": "Iniciar blend",
-    "waterAdded": "+{{amount}} ml",
-    "waterLoggedMl": "{{amount}} ml adicionados",
-    "waterLoggedFlOz": "{{amount}} fl oz adicionados",
     "dayStreak": "dias seguidos",
-    "days": "dias",
     "todaysBlend": "Blend de hoje",
     "quickStart": "Início Rápido",
     "dailyMissions": "Missões Diárias",
@@ -186,7 +118,7 @@
     "carbsRing": "Carboidratos",
     "caloriesRing": "Calorias",
     "hydrationBar": "{{current}} / {{target}}",
-    "freePlan": "Free",
+    "freePlan": "Grátis",
     "proPlan": "Pro",
     "goalMuscleRecipe": "Blend Power Protein",
     "goalWellnessRecipe": "Smoothie Equilíbrio Verde",
@@ -220,43 +152,18 @@
     "dailyRecipeIngredientRecovery2Amount": "1 xícara",
     "dailyRecipeIngredientRecovery3Name": "Água de coco",
     "dailyRecipeIngredientRecovery3Amount": "250ml",
-    "greeting": {
-      "morning": "Bom dia, {{name}}.",
-      "afternoon": "Boa tarde, {{name}}.",
-      "evening": "Boa noite, {{name}}."
-    },
-    "rings": {
-      "protein_label": "Proteína",
-      "calories_label": "Calorias",
-      "progress": "{{current}} de {{goal}} {{unit}}",
-      "complete": "Meta atingida! 🎉"
-    },
-    "streak": {
-      "label_one": "{{count}} dia seguido",
-      "label_other": "{{count}} dias seguidos",
-      "none": "Comece sua sequência hoje"
-    },
-    "recipe_of_day": {
-      "label": "Receita do dia",
-      "cta": "Blendar agora"
-    },
     "protocols": {
-      "title": "Protocolos Rápidos",
       "gym_protein": {
-        "name": "Academia & Proteína",
-        "description": "Shakes pré e pós-treino"
+        "name": "Academia & Proteína"
       },
       "active_moms": {
-        "name": "Mães Ativas",
-        "description": "Blends equilibrados para dias corridos"
+        "name": "Mães Ativas"
       },
       "beach_cocktails": {
-        "name": "Praia & Drinks",
-        "description": "Mocktails refrescantes e blends de frutas"
+        "name": "Praia & Drinks"
       },
       "travel": {
-        "name": "Viagem",
-        "description": "Nutrição rápida e prática onde você estiver"
+        "name": "Viagem"
       }
     },
     "protocolPrompts": {
@@ -272,56 +179,38 @@
       "title": "Faça um blend",
       "description": "Faça 1 blend hoje para avançar no progresso da sua missão diária."
     },
-    "makeBlendTitle": "Faça um blend",
-    "makeBlendDesc": "Faça 1 blend hoje para avançar no progresso da sua missão diária.",
     "hitProteinGoal": {
       "title": "Bata a meta de proteína",
       "description": "Alcance sua meta de proteína hoje para completar esta missão."
     },
-    "hitProteinGoalTitle": "Bata a meta de proteína",
-    "hitProteinGoalDesc": "Alcance sua meta de proteína hoje para completar esta missão.",
     "hitCalorieGoal": {
       "title": "Bata a meta de calorias",
       "description": "Alcance sua meta de calorias hoje para completar esta missão."
     },
-    "hitCalorieGoalTitle": "Bata a meta de calorias",
-    "hitCalorieGoalDesc": "Alcance sua meta de calorias hoje para completar esta missão.",
     "hitHydrationGoal": {
       "title": "Bata a meta de hidratação",
       "description": "Alcance sua meta de hidratação hoje para completar esta missão."
     },
-    "hitHydrationGoalTitle": "Bata a meta de hidratação",
-    "hitHydrationGoalDesc": "Alcance sua meta de hidratação hoje para completar esta missão.",
     "completeSuppStack": {
       "title": "Complete os suplementos",
       "description": "Complete todos os suplementos programados para hoje para concluir esta missão."
     },
-    "completeSuppStackTitle": "Complete os suplementos",
-    "completeSuppStackDesc": "Complete todos os suplementos programados para hoje para concluir esta missão.",
     "usePulseAI": {
       "title": "Use o Pulse AI",
       "description": "Abra o Pulse AI e use-o uma vez hoje para completar esta missão."
     },
-    "usePulseAITitle": "Use o Pulse AI",
-    "usePulseAIDesc": "Abra o Pulse AI e use-o uma vez hoje para completar esta missão.",
     "favoriteRecipe": {
       "title": "Salve uma receita",
       "description": "Salve qualquer receita nos seus favoritos para completar esta missão."
     },
-    "favoriteRecipeTitle": "Salve uma receita",
-    "favoriteRecipeDesc": "Salve qualquer receita nos seus favoritos para completar esta missão.",
     "scanPantry": {
       "title": "Escaneie sua despensa",
       "description": "Escaneie sua despensa uma vez hoje para completar esta missão."
     },
-    "scanPantryTitle": "Escaneie sua despensa",
-    "scanPantryDesc": "Escaneie sua despensa uma vez hoje para completar esta missão.",
     "makeBlendFromFavorite": {
       "title": "Bata uma receita salva",
       "description": "Bata hoje uma das suas receitas salvas para completar esta missão."
-    },
-    "makeBlendFromFavoriteTitle": "Bata uma receita salva",
-    "makeBlendFromFavoriteDesc": "Bata hoje uma das suas receitas salvas para completar esta missão."
+    }
   },
 
   "blend": {
@@ -336,57 +225,13 @@
     "skip": "Pular",
     "cleanReminder": "Hora de limpar seu BLENDi",
     "markCleaned": "Limpo ✓",
-    "freeMode": "Blend livre",
-    "timerDuration": "{{seconds}}s",
-    "adjustTimer": "Ajustar tempo",
-    "timer": {
-      "ready": "Pronto para blendar",
-      "blending": "Blendando…",
-      "finished": "Blend concluído!"
-    },
-    "models": {
-      "lite": "Lite · 500W",
-      "pro_plus": "Pro+ · 900W",
-      "steel": "Steel · 1400W"
-    },
-    "feedback": {
-      "start": "Iniciando blend",
-      "complete": "Blend concluído",
-      "logged": "Salvo no seu histórico"
-    },
     "savedLocally": "Blend salvo localmente — será sincronizado com conexão",
-    "syncFailed": "Não foi possível sincronizar blend após 3 tentativas",
-    "clean_reminder": {
-      "title": "Limpe seu BLENDi",
-      "message": "Adicione água e uma gota de detergente, depois bata por 10 segundos.",
-      "cta": "Iniciar ciclo de limpeza"
-    }
+    "syncFailed": "Não foi possível sincronizar blend após 3 tentativas"
   },
 
   "recipes": {
-    "ai": {
-      "placeholder": "Peça uma receita ao Pulse AI…",
-      "loading_one": "Criando sua receita…",
-      "loading_two": "Verificando seus macros…",
-      "loading_three": "Quase pronto…",
-      "error_offline": "Você está offline. Mostrando receitas salvas.",
-      "error_generic": "Não foi possível conectar ao Pulse AI. Tente novamente."
-    },
-    "filters": {
-      "all_goals": "Todos os objetivos",
-      "all_models": "Todos os modelos",
-      "goal_label": "Objetivo",
-      "model_label": "Modelo"
-    },
     "favorites": {
-      "title": "Favoritos",
-      "empty_title": "Nenhum favorito ainda",
-      "empty_message": "Toque no coração de qualquer receita para salvá-la aqui.",
       "toggle_error": "Não foi possível atualizar o favorito. Tente novamente."
-    },
-    "substitutes": {
-      "label": "Substituições Inteligentes",
-      "loading": "Buscando substituições…"
     }
   },
 
@@ -395,35 +240,7 @@
     "emptyTitle": "Nenhum favorito ainda",
     "emptySubtitle": "As receitas que você curtir no Pulse AI aparecerão aqui",
     "discoverRecipes": "Descobrir Receitas",
-    "moreIngredients": "+{{count}} itens",
-    "removeSuccess": "Receita removida",
-    "removeError": "Não foi possível remover",
-    "addSuccess": "Receita salva!",
-    "addError": "Não foi possível salvar",
-    "alreadySaved": "Já salva"
-  },
-
-  "shoppingLists": {
-    "title": "Listas de compras",
-    "emptyTitle": "Nenhuma lista ainda",
-    "emptySubtitle": "Crie uma lista de compras para acompanhar tudo que precisa comprar.",
-    "createFirst": "Criar primeira lista",
-    "newList": "Nova Lista",
-    "listNamePlaceholder": "Nome da lista",
-    "createList": "Criar Lista",
-    "renameList": "Renomear Lista",
-    "archivedSection": "Listas anteriores",
-    "rename": "Renomear",
-    "archive": "Arquivar",
-    "restore": "Restaurar",
-    "delete": "Deletar",
-    "deleteConfirmTitle": "Deletar lista?",
-    "deleteConfirmMessage": "Essa ação não pode ser desfeita.",
-    "allBought": "Tudo comprado ✓",
-    "pendingItem_one": "{{count}} item",
-    "pendingItem_other": "{{count}} itens",
-    "upgradeTitle": "Limite de listas atingido",
-    "upgradeDescription": "Contas gratuitas suportam apenas 1 lista ativa. Faça upgrade para Pro e tenha listas ilimitadas."
+    "moreIngredients": "+{{count}} itens"
   },
 
   "shoppingList": {
@@ -460,7 +277,6 @@
     "deleteList": "Excluir lista",
     "deleteListConfirm": "Isso excluirá permanentemente a lista e todos os seus itens.",
     "freeTierLimit": "Assine o Pro para criar listas ilimitadas",
-    "upgradeTitle": "Limite de listas atingido",
     "noActiveLists": "Você ainda não tem listas de compras ativas.",
     "addedToList": "Itens adicionados a {{listName}}",
     "savedLocally": "Salvo localmente — será sincronizado com conexão",
@@ -468,13 +284,13 @@
   },
 
   "track": {
-    "title": "Track",
+    "title": "Acompanhar",
     "hydration": "Hidratação",
     "logWater": "Registrar Água",
     "viewHistory": "Ver histórico completo",
     "myStack": "Meu Stack",
-    "manage": "Gerenciar",
     "manageStack": "Gerenciar Stack",
+    "supplementCheckHint": "Toque para adicionar uma dose. Segure para desfazer uma dose.",
     "noSupplements": "Nenhum suplemento configurado",
     "addSupplement": "Adicionar suplemento",
     "supplementName": "Nome do suplemento",
@@ -490,33 +306,20 @@
     "delete": "Excluir",
     "deleteConfirmTitle": "Remover suplemento?",
     "deleteConfirmMessage": "Isso removerá todo o histórico deste suplemento.",
-    "allDone": "Tudo tomado! ✓",
     "last7Days": "Últimos 7 dias",
     "goalReached": "Meta atingida",
-    "cancel": "Cancelar",
     "supplementNameRequired": "O nome do suplemento é obrigatório.",
     "dailyTargetRequired": "A meta diária é obrigatória.",
     "dailyTargetInvalid": "Informe um número inteiro entre 1 e 20.",
     "dailyTargetSummary_one": "1x/dia",
     "dailyTargetSummary_other": "{{count}}x/dia",
     "supplements": {
-      "title": "Meu Stack",
-      "add_button": "Adicionar suplemento",
       "item_checked": "Tomado",
-      "item_unchecked": "Não tomado",
-      "empty_title": "Seu stack está vazio",
-      "empty_message": "Adicione seus suplementos diários para acompanhá-los aqui."
+      "item_unchecked": "Não tomado"
     },
     "history": {
-      "title": "Histórico de Blends",
       "empty_title": "Nenhum blend ainda",
-      "empty_message": "Seus blends aparecerão aqui após a primeira sessão.",
-      "item_label": "{{name}} · {{calories}} kcal"
-    },
-    "share_card": {
-      "title": "Share Card",
-      "generate_cta": "Gerar meu card",
-      "loading": "Criando seu card…"
+      "empty_message": "Seus blends aparecerão aqui após a primeira sessão."
     }
   },
 
@@ -551,94 +354,18 @@
   },
 
   "profile": {
-    "title": "Perfil",
     "fields": {
-      "name": "Nome",
-      "email": "E-mail",
       "model": "Meu BLENDi",
       "goal": "Objetivo",
       "protein_target": "Meta de proteína",
       "calories_target": "Meta de calorias"
-    },
-    "badges": {
-      "title": "Conquistas",
-      "bronze": "Bronze",
-      "silver": "Prata",
-      "gold": "Ouro",
-      "locked": "Bloqueado",
-      "blendJourneyTitle": "Jornada do Blend",
-      "blendJourneyDescription": "Acompanhe seus marcos de blends enquanto constrói sua rotina.",
-      "streakMasterTitle": "Mestre da Sequência",
-      "streakMasterDescription": "Mantenha a consistência viva e transforme sequências longas em status.",
-      "earlyAdopterTitle": "Early Adopter",
-      "earlyAdopterDesc": "Concedido a todos os usuários fundadores.",
-      "blendiLiteTitle": "BLENDi Lite",
-      "blendiLiteDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Lite.",
-      "blendiProPlusTitle": "BLENDi Pro+",
-      "blendiProPlusDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Pro+.",
-      "blendiSteelTitle": "BLENDi Steel",
-      "blendiSteelDescription": "Desbloqueado para usuários que usam atualmente o BLENDi Steel.",
-      "progressLabel": "Faltam {{requirement}} para {{stage}}",
-      "requirements": {
-        "blendJourneyBronze_one": "{{count}} blend",
-        "blendJourneyBronze_other": "{{count}} blends",
-        "blendJourneySilver_one": "{{count}} blend",
-        "blendJourneySilver_other": "{{count}} blends",
-        "blendJourneyGold_one": "{{count}} blend",
-        "blendJourneyGold_other": "{{count}} blends",
-        "streakMasterBronze_one": "{{count}} dia",
-        "streakMasterBronze_other": "{{count}} dias",
-        "streakMasterSilver_one": "{{count}} dia",
-        "streakMasterSilver_other": "{{count}} dias",
-        "streakMasterGold_one": "{{count}} dia",
-        "streakMasterGold_other": "{{count}} dias",
-        "earlyAdopter": "Acesso fundador",
-        "blendiLite": "Usuário BLENDi Lite",
-        "blendiProPlus": "Usuário BLENDi Pro+",
-        "blendiSteel": "Usuário BLENDi Steel"
-      },
-      "first_blend": {
-        "name": "Primeiro Blend",
-        "description": "Conclua sua primeira sessão de blend"
-      },
-      "streak_7": {
-        "name": "Guerreiro da Semana",
-        "description": "Sequência de 7 dias"
-      },
-      "streak_30": {
-        "name": "Campeão do Mês",
-        "description": "Sequência de 30 dias"
-      },
-      "protein_goal": {
-        "name": "Mestre da Proteína",
-        "description": "Atinja sua meta de proteína por 5 dias seguidos"
-      }
-    },
-    "edit": {
-      "modelTitle": "Alterar meu BLENDi",
-      "goalTitle": "Alterar objetivo",
-      "proteinTitle": "Editar meta de proteína",
-      "carbsTitle": "Editar meta de carboidratos",
-      "caloriesTitle": "Editar meta de calorias",
-      "hydrationTitle": "Editar meta de hidratação",
-      "unitSystemTitle": "Alterar sistema de unidades",
-      "languageTitle": "Alterar idioma",
-      "confirm": "Confirmar"
-    },
-    "subscription": {
-      "free_label": "Plano gratuito",
-      "pro_label": "Pulse Pro",
-      "upgrade_cta": "Assinar Pro · R$ 29,90/mês",
-      "pro_badge": "PRO"
     },
     "language": {
       "label": "Idioma",
       "en": "English",
       "pt_BR": "Português (Brasil)"
     },
-    "unitSystem": "Sistema de unidades",
-    "metric": "Métrico (kg/cm)",
-    "imperial": "Imperial (lbs/ft)"
+    "unitSystem": "Sistema de unidades"
   },
 
   "pulseAi": {
@@ -712,7 +439,6 @@
     "permissionDenied": "Acesso à câmera foi negado. Ative-o nas Configurações do dispositivo para usar esse recurso.",
     "scansRemaining": "{{count}} scans restantes este mês",
     "renewsIn": "Renova em {{days}} dias",
-    "proUnlimited": "Scans ilimitados com o Pro",
     "analyzingStep1": "Analisando os ingredientes...",
     "analyzingStep2": "Calculando receitas personalizadas...",
     "analyzingStep3": "Quase pronto...",
@@ -741,7 +467,6 @@
     "forgotPasswordTitle": "Redefina sua senha.",
     "forgotPasswordDescription": "Digite o e-mail vinculado à sua conta. Vamos enviar um código de verificação para continuar.",
     "forgotPasswordCta": "Enviar código",
-    "forgotPasswordSuccess": "Enviamos um código de verificação para o seu e-mail.",
     "verifyOtpTitle": "Confira seu e-mail.",
     "verifyOtpDescription": "Digite o código de 6 dígitos que enviamos para",
     "verifyOtpCta": "Digite os 6 dígitos",
@@ -761,15 +486,12 @@
     "showPassword": "Mostrar senha",
     "hidePassword": "Ocultar senha",
     "noAccount": "Ainda não tem uma conta?",
-    "createAccount": "Criar conta",
     "alreadyHaveAccount": "Já tem uma conta?",
     "signIn": "Entrar",
-    "passwordsDoNotMatch": "As senhas não coincidem.",
     "passwordStrengthWeak": "Senha fraca",
     "passwordStrengthFair": "Senha razoável",
     "passwordStrengthGood": "Senha boa",
     "passwordStrengthStrong": "Senha forte",
-    "termsPrefix": "Ao continuar, você concorda com nossos",
     "termsOfService": "Termos de Serviço",
     "termsConnector": "e",
     "privacyPolicy": "Política de Privacidade",
@@ -821,7 +543,7 @@
     "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
-    "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar",
+    "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar.",
     "scanner_monthly_limit_reached": "Você atingiu o limite gratuito mensal do Pantry Scanner.",
     "scanner_invalid_image": "Não foi possível analisar esta imagem. Tente outra foto.",
     "scanner_invalid_content": "Conteúdo de imagem inválido.",
@@ -845,49 +567,23 @@
     "purchases_plans_unavailable": "Os planos estão indisponíveis no momento. Tente novamente em instantes.",
     "purchases_restore_not_found": "Nenhuma compra anterior do Pulse Pro foi encontrada para esta conta.",
     "purchases_system_unavailable": "Os pagamentos estão temporariamente indisponíveis enquanto o sistema de assinaturas é configurado.",
-    "shoppinglist_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa",
-    "shoppingList_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa",
+    "shoppinglist_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa.",
+    "shoppingList_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa.",
     "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
     "unexpected_error": "Ocorreu um erro inesperado.",
     "resource_not_found": "O recurso solicitado não foi encontrado."
   },
 
-  "notifications": {
-    "daily_pulse": {
-      "title": "Seu Pulse diário está pronto 🥤",
-      "body": "Experimente {{recipe}} hoje — {{protein}}g de proteína em um blend."
-    },
-    "streak": {
-      "reminder_title": "Não quebre sua sequência!",
-      "reminder_body": "Você ainda não blendou hoje. Mantenha sua sequência de {{count}} dias.",
-      "lost_title": "Sequência reiniciada 😔",
-      "lost_body": "Sua sequência acabou. Comece de novo hoje!"
-    },
-    "dailyPulseTitle": "Hora do blend! 🎯",
-    "streakReminderTitle": "Seu streak está esperando!",
-    "supplementReminderTitle": "Hora dos suplementos 💊",
-    "hydrationReminderTitle": "Mantenha-se hidratado! 💧",
-    "levelUpTitle": "Level Up! 🎉",
-    "levelUpBody": "Você atingiu {{levelName}}! Continue blendando!"
-  },
-
   "gamification": {
     "levelUpTitle": "Subiu de Nível! 🎉",
-    "levelUpSubtitle": "Você está arrasando!",
-    "shareCard": {
-      "cta": "Compartilhar esse momento",
-      "unlocked": "Level desbloqueado"
-    },
     "xpToNextLevel": "{{xp}} XP para {{levelName}}",
     "currentXp": "{{xp}} XP total",
     "levelPrefix": "Nv.",
-    "levelDetail": "Nível {{level}}",
-    "pendingLevelUp": "Chave de documentação interna para o sequenciamento adiado de subida de nível."
+    "levelDetail": "Nível {{level}}"
   },
 
   "share": {
     "shareRecipe": "Compartilhar receita",
-    "shareAchievement": "Compartilhar conquista",
     "shareWeek": "Compartilhar minha semana",
     "chooseFormat": "Escolha o formato",
     "formatStories": "Stories (9:16)",
@@ -927,6 +623,8 @@
     "photoRemoved": "Foto removida",
     "photoTooLarge": "Foto muito grande. Tente uma imagem menor.",
     "photoError": "Erro ao salvar a foto. Tente novamente.",
+    "cameraPermissionDenied": "Permita o acesso à câmera para tirar uma foto.",
+    "galleryPermissionDenied": "Permita o acesso à galeria para escolher uma foto.",
     "weeklyShare": {
       "averageDailyProtein": "Prot. média/dia",
       "supplementAdherence": "Adesão aos suplementos",
@@ -934,7 +632,6 @@
     },
     "longestStreak": "Melhor Streak",
     "level": "Nível",
-    "levelProgress": "Progresso de Nível",
     "settings": "Configurações",
     "memberSince": "Membro desde {{date}}",
     "metric": "Métrico",
@@ -996,9 +693,7 @@
       "benefit2": "Personalização avançada de receitas",
       "benefit3": "Acesso prioritário a novidades",
       "price": "{{monthlyPrice}} / mês ou {{annualPrice}} / ano",
-      "button": "Assinar Agora",
-      "soonTitle": "Em Breve",
-      "soonMessage": "Os pagamentos estarão disponíveis na próxima atualização"
+      "button": "Assinar Agora"
     },
     "upgradeScreen": {
       "badge": "Pro",

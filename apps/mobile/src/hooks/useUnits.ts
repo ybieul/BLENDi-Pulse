@@ -1,5 +1,7 @@
 import { useAuthStore } from '../store/auth.store';
 import type { AuthUser } from '../services/auth.service';
+import { formatDecimal } from '../utils/formatNumbers';
+import { useAppTranslation } from './useAppTranslation';
 
 type UnitSystem = AuthUser['unitSystem'];
 type StorageConversionResult = number | '—';
@@ -25,10 +27,6 @@ function formatOneDecimal(value: number): string {
   return roundToOneDecimal(value).toFixed(1);
 }
 
-function formatMetricValue(value: number): string {
-  return Number.isInteger(value) ? String(value) : formatOneDecimal(value);
-}
-
 export interface UseUnitsResult {
   unitSystem: UnitSystem;
   weightUnit: 'kg' | 'lbs';
@@ -44,6 +42,7 @@ export interface UseUnitsResult {
 }
 
 export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult {
+  const { locale } = useAppTranslation();
   const storedUnitSystem = useAuthStore((state) => state.user?.unitSystem ?? 'metric');
   const unitSystem = unitSystemOverride ?? storedUnitSystem;
 
@@ -94,7 +93,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
       return `${formatOneDecimal(valueInMl / MILLILITERS_PER_FLUID_OUNCE)} ${volumeUnit}`;
     }
 
-    return `${formatMetricValue(valueInMl)} ${volumeUnit}`;
+    return `${formatDecimal(valueInMl, locale)} ${volumeUnit}`;
   };
 
   const displayHydration = (valueInMl: number): string => displayVolume(valueInMl);

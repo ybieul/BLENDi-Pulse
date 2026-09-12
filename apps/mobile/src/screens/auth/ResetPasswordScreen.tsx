@@ -39,6 +39,7 @@ const SUCCESS_RESET_DELAY_MS = 2500;
 const WAVE_SIZE = 80;
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ResetPasswordRequest = (input: { resetToken: string; newPassword: string }) => Promise<void>;
 
 interface PasswordStrengthMeterProps {
@@ -152,7 +153,30 @@ export function ResetPasswordScreen({ navigation, route }: AuthScreenProps<'Rese
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const translateKey = (key: string) => t(key as TranslationKey);
+  const translateKey = (input: string | ValidationIssue) => {
+    const raw = typeof input === 'string' ? input : input.message;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && 'key' in parsed) {
+        const { key, ...vars } = parsed as { key: TranslationKey } & Record<string, unknown>;
+        return t(key, vars);
+      }
+    } catch {
+      // não é uma mensagem serializada — trata como chave literal
+    }
+
+    if (typeof input !== 'string') {
+      if (input.code === 'too_small' && typeof input.minimum === 'number') {
+        return t(raw as TranslationKey, { min: input.minimum });
+      }
+      if (input.code === 'too_big' && typeof input.maximum === 'number') {
+        return t(raw as TranslationKey, { max: input.maximum });
+      }
+    }
+
+    return t(raw as TranslationKey);
+  };
   const passwordsDiffer =
     newPassword.length > 0 && confirmPassword.length > 0 && newPassword !== confirmPassword;
   const passwordStrongEnough = resetPasswordSchema.shape.newPassword.safeParse(newPassword).success;
@@ -197,7 +221,7 @@ export function ResetPasswordScreen({ navigation, route }: AuthScreenProps<'Rese
       return null;
     }
 
-    return translateKey(parsed.error.issues[0]?.message ?? 'errors.validation.required');
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
   };
 
   const getConfirmPasswordError = (passwordValue: string, confirmValue: string): string | null => {
@@ -309,8 +333,8 @@ export function ResetPasswordScreen({ navigation, route }: AuthScreenProps<'Rese
     setConfirmPasswordError(mismatchError);
 
     if (!parsed.success) {
-      const message = parsed.error.issues[0]?.message ?? 'errors.validation.required';
-      setPasswordError(translateKey(message));
+      const issue = parsed.error.issues[0] ?? 'errors.validation.required';
+      setPasswordError(translateKey(issue));
       return;
     }
 

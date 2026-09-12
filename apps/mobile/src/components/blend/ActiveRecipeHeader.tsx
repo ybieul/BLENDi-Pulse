@@ -17,6 +17,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useBlendStore } from '../../store/blend.store';
 
 const HEADER_BACKGROUND = 'rgba(255,255,255,0.07)';
@@ -45,15 +46,8 @@ interface MacroPillData {
   unit: string;
 }
 
-function formatMacroValue(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return value.toFixed(1);
-}
-
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
+  const { formatDecimal } = useFormatNumbers();
   const backgroundColor =
     tone === 'protein'
       ? PROTEIN_PILL_BACKGROUND
@@ -64,9 +58,9 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
           : CALORIES_PILL_BACKGROUND;
 
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}> 
+    <View style={[styles.macroPill, { backgroundColor }]}>
       <Ionicons color={colors.text.primary} name={icon} size={10} />
-      <Text style={styles.macroValue}>{formatMacroValue(value)}</Text>
+      <Text style={styles.macroValue}>{formatDecimal(value)}</Text>
       <Text style={styles.macroUnit}>{unit}</Text>
     </View>
   );
