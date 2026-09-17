@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Keyboard,
+  LayoutAnimation,
+  Platform,
   SectionList,
   StyleSheet,
   Text,
@@ -9,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { EmitterSubscription, KeyboardEvent } from 'react-native';
 import type { ShoppingListDetail, ShoppingListItem } from '@blendi/shared';
 import {
   borderRadius,
@@ -203,6 +207,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
   const [isAdding, setIsAdding] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isImportSheetVisible, setIsImportSheetVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   // Marcado antes de um patch otimista no cache offline para o useEffect abaixo
   // pular o reset de localItems a partir de `data` nesse ciclo — evita que o
   // patch otimista seja imediatamente sobrescrito pelo próprio dado que ele gerou.
@@ -225,6 +230,49 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
       setLocalItems(data.items);
     }
   }, [data]);
+
+  // Altura do teclado rastreada manualmente em vez de KeyboardAvoidingView:
+  // o rodapé de "adicionar item" é posicionado com position:absolute/bottom:0
+  // (para o conteúdo da lista rolar por baixo dele), e o cálculo automático do
+  // KeyboardAvoidingView depende de medir o próprio frame via onLayout, que é
+  // relativo ao pai — dentro de uma tela empilhada por react-native-screens
+  // isso já se mostrou instável. Aplicar a altura do teclado direto como
+  // `bottom` do rodapé elimina essa dependência.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const handleShow = (event: KeyboardEvent) => {
+      if (Platform.OS === 'ios' && event.duration && event.easing) {
+        LayoutAnimation.configureNext({
+          duration: event.duration,
+          update: { duration: event.duration, type: LayoutAnimation.Types[event.easing] ?? 'keyboard' },
+        });
+      }
+
+      setKeyboardHeight(event.endCoordinates.height);
+    };
+
+    const handleHide = (event: KeyboardEvent) => {
+      if (Platform.OS === 'ios' && event.duration && event.easing) {
+        LayoutAnimation.configureNext({
+          duration: event.duration,
+          update: { duration: event.duration, type: LayoutAnimation.Types[event.easing] ?? 'keyboard' },
+        });
+      }
+
+      setKeyboardHeight(0);
+    };
+
+    const subscriptions: EmitterSubscription[] = [
+      Keyboard.addListener(showEvent, handleShow),
+      Keyboard.addListener(hideEvent, handleHide),
+    ];
+
+    return () => {
+      subscriptions.forEach((subscription) => subscription.remove());
+    };
+  }, []);
 
   const patchShoppingListDetailCache = useCallback(
     (nextItems: ShoppingListItem[]) => {
@@ -525,7 +573,14 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
         />
       )}
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}> 
+      <View
+        style={[
+          styles.footer,
+          keyboardHeight > 0
+            ? { bottom: keyboardHeight, paddingBottom: spacing.md }
+            : { paddingBottom: insets.bottom + spacing.md },
+        ]}
+      >
         <LinearGradient
           colors={['transparent', colors.background.primary]}
           pointerEvents="none"

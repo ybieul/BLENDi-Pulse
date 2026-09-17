@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { ZodError } from 'zod';
-import { XP_EVENTS, createFavoriteSchema, type FavoriteItem } from '@blendi/shared';
+import { createFavoriteSchema, type FavoriteItem } from '@blendi/shared';
 import { FavoriteModel, type IFavorite } from '../models/Favorite';
 import { UserModel } from '../models/User';
 import { updateMissionProgress } from '../services/missionProgress.service';
@@ -169,11 +169,12 @@ export async function addFavorite(
         goal: user.goal,
       });
 
-      const xpAwarded = XP_EVENTS.favoriteRecipe;
-
-      Promise.resolve()
-        .then(() => awardXP(userId, 'favoriteRecipe', user.timezone))
-        .catch(err => console.error('XP award failed:', err));
+      // Aguarda o resultado real do award (mesma correção de hydration.controller.ts
+      // e supplementStack.controller.ts) — sem isso, xpAwarded/leveledUp/newLevel
+      // nunca refletiam o estado real e a celebração de level up nunca disparava
+      // ao favoritar uma receita.
+      const xpResult = await awardXP(userId, 'favoriteRecipe', user.timezone);
+      const xpAwarded = xpResult.awarded ? xpResult.amount : 0;
 
       Promise.resolve()
         .then(() => updateMissionProgress(userId, 'favoriteRecipe', user.timezone))
@@ -185,6 +186,8 @@ export async function addFavorite(
           favorite: serializeFavorite(favorite.toObject() as FavoriteRecord),
           alreadyExists: false,
           xpAwarded,
+          leveledUp: xpResult.leveledUp,
+          newLevel: xpResult.newLevel,
         },
       });
       return;

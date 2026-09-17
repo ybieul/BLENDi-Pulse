@@ -34,6 +34,7 @@ import { initMMKVEncryptionKey } from './src/config/storage';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { LevelUpCelebration } from './src/components/gamification/LevelUpCelebration';
+import { MissionCelebrationWatcher } from './src/components/missions/MissionCelebrationWatcher';
 import { ErrorBoundary } from './src/components/ui/ErrorBoundary';
 import { OfflineBanner } from './src/components/ui/OfflineBanner';
 import { showToast, ToastViewport } from './src/utils/toast.utils';
@@ -120,6 +121,7 @@ export default function App() {
         <ErrorBoundary>
           <AppShell />
         </ErrorBoundary>
+        <MissionCelebrationWatcher />
       </PersistQueryClientProvider>
       <OfflineBanner />
       <LevelUpCelebration />

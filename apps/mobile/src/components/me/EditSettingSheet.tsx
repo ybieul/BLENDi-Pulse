@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -333,33 +335,38 @@ export function EditSettingSheet({
           <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} />
         </Pressable>
 
-        <Animated.View
-          style={[
-            styles.sheetContainer,
-            {
-              maxHeight: height * 0.86,
-              transform: [{ translateY }],
-            },
-          ]}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.kvContainer}
         >
-          <View style={styles.handle} />
-
-          <Text style={styles.title}>{t(TITLE_KEYS[type])}</Text>
-          <Text style={styles.subtitle}>{t('me.edit.confirm')}</Text>
-
-          <ScrollView
-            bounces={false}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            style={styles.scrollView}
+          <Animated.View
+            style={[
+              styles.sheetContainer,
+              {
+                maxHeight: height * 0.86,
+                transform: [{ translateY }],
+              },
+            ]}
           >
-            {renderBody()}
-          </ScrollView>
+            <View style={styles.handle} />
 
-          <AuthButton disabled={confirmValue === null} onPress={handleConfirm}>
-            {t('me.edit.confirm')}
-          </AuthButton>
-        </Animated.View>
+            <Text style={styles.title}>{t(TITLE_KEYS[type])}</Text>
+            <Text style={styles.subtitle}>{t('me.edit.confirm')}</Text>
+
+            <ScrollView
+              bounces={false}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              style={styles.scrollView}
+            >
+              {renderBody()}
+            </ScrollView>
+
+            <AuthButton disabled={confirmValue === null} onPress={handleConfirm}>
+              {t('me.edit.confirm')}
+            </AuthButton>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -373,6 +380,9 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: BACKDROP_COLOR,
+  },
+  kvContainer: {
+    justifyContent: 'flex-end',
   },
   sheetContainer: {
     borderTopLeftRadius: SHEET_RADIUS,

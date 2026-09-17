@@ -64,9 +64,7 @@ import { QuickProtocolCards } from '../components/home/QuickProtocolCards';
 import type { QuickProtocol } from '../components/home/QuickProtocolCards';
 import { DailyRecipeCard } from '../components/home/DailyRecipeCard';
 import { MissionCard } from '../components/missions/MissionCard';
-import { MissionCompletionToast } from '../components/missions/MissionCompletionToast';
 import { getDailyMissions } from '../services/dailyMission.service';
-import type { DailyMissionItem } from '../services/dailyMission.service';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -155,16 +153,10 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
   const totalXP = useGamificationStore((state) => state.totalXP);
   const setPendingProtocol = usePulseAIStore((state) => state.setPendingProtocol);
-  const triggerLevelUp = useGamificationStore((state) => state.triggerLevelUp);
-  const pendingLevelUp = useGamificationStore((state) => state.pendingLevelUp);
-  const clearPendingLevelUp = useGamificationStore((state) => state.clearPendingLevelUp);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLevelDetail, setShowLevelDetail] = useState(false);
-  const [pendingMissionXP, setPendingMissionXP] = useState<number | null>(null);
-  const [showMissionToast, setShowMissionToast] = useState(false);
-  const prevMissionsRef = useRef<DailyMissionItem[] | null>(null);
   const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
   const initialLevelProgressWidth = useRef(levelInfo.progress * LEVEL_PROGRESS_BAR_WIDTH).current;
   const levelProgressWidth = useRef(new Animated.Value(initialLevelProgressWidth)).current;
@@ -238,44 +230,6 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   }, [levelInfo.progress, levelProgressWidth]);
 
   useEffect(() => {
-    if (pendingLevelUp === null || showMissionToast) {
-      return;
-    }
-
-    triggerLevelUp(pendingLevelUp);
-    clearPendingLevelUp();
-  }, [clearPendingLevelUp, pendingLevelUp, showMissionToast, triggerLevelUp]);
-
-  useEffect(() => {
-    const missions = missionsData?.missions;
-
-    if (!missions) {
-      prevMissionsRef.current = null;
-      return;
-    }
-
-    const prev = prevMissionsRef.current;
-    prevMissionsRef.current = missions;
-
-    if (!prev) {
-      return;
-    }
-
-    const newlyCompleted = missions.filter((m) => {
-      const prevMission = prev.find((p) => p.missionId === m.missionId);
-      return prevMission !== undefined && !prevMission.completed && m.completed;
-    });
-
-    if (newlyCompleted.length === 0) {
-      return;
-    }
-
-    const totalXP = newlyCompleted.reduce((sum, m) => sum + m.xpReward, 0);
-    setPendingMissionXP(totalXP);
-    setShowMissionToast(true);
-  }, [missionsData?.missions]);
-
-  useEffect(() => {
     const fetchedTotalXP = profileResponse?.data.user.totalXP;
 
     if (typeof fetchedTotalXP !== 'number') {
@@ -338,19 +292,6 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const handleStartBlend = useCallback((recipe: PulseAiRecipe) => {
     navigation.navigate('Blend', { recipe });
   }, [navigation]);
-
-  const handleMissionToastDismiss = useCallback(() => {
-    setShowMissionToast(false);
-    setPendingMissionXP(null);
-
-    if (pendingLevelUp !== null) {
-      const levelUpToTrigger = pendingLevelUp;
-      clearPendingLevelUp();
-      setTimeout(() => {
-        triggerLevelUp(levelUpToTrigger);
-      }, 500);
-    }
-  }, [clearPendingLevelUp, pendingLevelUp, triggerLevelUp]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -525,13 +466,6 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       </ScrollView>
 
       <LevelDetailSheet visible={showLevelDetail} onClose={() => setShowLevelDetail(false)} />
-      {showMissionToast && pendingMissionXP !== null ? (
-        <MissionCompletionToast
-          xpAmount={pendingMissionXP}
-          visible={showMissionToast}
-          onDismiss={handleMissionToastDismiss}
-        />
-      ) : null}
     </View>
   );
 }

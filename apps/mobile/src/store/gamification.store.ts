@@ -9,6 +9,7 @@ interface GamificationState {
   totalXP: number;
   levelUpData: LevelUpData | null;
   pendingLevelUp: LevelUpData | null;
+  missionToastXP: number | null;
 }
 
 interface GamificationActions {
@@ -18,6 +19,8 @@ interface GamificationActions {
   dismissLevelUp: () => void;
   setPendingLevelUp: (data: LevelUpData) => void;
   clearPendingLevelUp: () => void;
+  triggerMissionToast: (xpAmount: number) => void;
+  dismissMissionToast: () => void;
 }
 
 function normalizeInteger(value: number): number {
@@ -32,6 +35,7 @@ export const useGamificationStore = create<GamificationState & GamificationActio
   totalXP: 0,
   levelUpData: null,
   pendingLevelUp: null,
+  missionToastXP: null,
 
   setTotalXP: (totalXP) => {
     set({ totalXP: normalizeInteger(totalXP) });
@@ -73,5 +77,13 @@ export const useGamificationStore = create<GamificationState & GamificationActio
 
   clearPendingLevelUp: () => {
     set({ pendingLevelUp: null });
+  },
+
+  triggerMissionToast: (xpAmount) => {
+    set({ missionToastXP: normalizeInteger(xpAmount) });
+  },
+
+  dismissMissionToast: () => {
+    set({ missionToastXP: null });
   },
 }));

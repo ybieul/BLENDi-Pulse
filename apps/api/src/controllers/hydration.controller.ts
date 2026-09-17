@@ -236,6 +236,8 @@ export async function logWater(
 
     const summary = await getTodayHydrationSummary(userId, hydrationContext.timezone);
     let xpAwarded = 0;
+    let leveledUp = false;
+    let newLevel: number | null = null;
 
     if (summary.totalMl >= hydrationContext.goalMl) {
       // Aguarda o resultado real do award em vez de decidir xpAwarded por uma
@@ -245,6 +247,8 @@ export async function logWater(
       // simultâneas viam "ainda não premiado" e as duas reportavam XP > 0.
       const xpResult = await awardXP(userId, 'hydrationGoal', hydrationContext.timezone);
       xpAwarded = xpResult.awarded ? xpResult.amount : 0;
+      leveledUp = xpResult.leveledUp;
+      newLevel = xpResult.newLevel;
 
       Promise.resolve()
         .then(() => updateMissionProgress(userId, 'hitHydrationGoal', hydrationContext.timezone))
@@ -262,6 +266,8 @@ export async function logWater(
         totalMl: summary.totalMl,
         goalMl: hydrationContext.goalMl,
         xpAwarded,
+        leveledUp,
+        newLevel,
       },
     });
   } catch (err) {

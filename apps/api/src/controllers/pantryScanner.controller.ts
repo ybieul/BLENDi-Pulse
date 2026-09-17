@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
-  XP_EVENTS,
   pantryAnalysisResultSchema,
   pantryIngredientSchema,
   pantryScanSchema,
@@ -27,7 +26,7 @@ import {
   callVisionAi,
 } from '../services/aiProvider.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
-import { awardXP } from '../services/xp.service';
+import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.service';
 import {
   buildPantryRecipePrompt,
@@ -186,12 +185,12 @@ function calculateImageSizeKb(imageBase64: string): number {
   return Number((((imageBase64.length * 3) / 4) / 1024).toFixed(1));
 }
 
-function triggerPantryScannerXP(userId: string, timezone: string): number {
-  Promise.resolve()
-    .then(() => awardXP(userId, 'pantryScanner', timezone))
-    .catch(err => console.error('XP award failed:', err));
-
-  return XP_EVENTS.pantryScanner;
+async function triggerPantryScannerXP(userId: string, timezone: string): Promise<AwardXPResult> {
+  // Aguarda o resultado real do award em vez de disparar fire-and-forget e
+  // devolver um valor otimista — sem isso, leveledUp/newLevel nunca chegavam
+  // na resposta e a celebração de level up nunca disparava ao escanear a
+  // despensa (mesma correção de hydration/supplementStack/favorite.controller.ts).
+  return awardXP(userId, 'pantryScanner', timezone);
 }
 
 function triggerPantryScannerMissionProgress(userId: string, timezone: string): void {
@@ -650,7 +649,7 @@ export async function analyzePantry(
 
     const recipes = await generatePantryRecipes(currentUser, usableIngredients);
 
-    const xpAwarded = triggerPantryScannerXP(currentUser.id, currentUser.timezone);
+    const xpResult = await triggerPantryScannerXP(currentUser.id, currentUser.timezone);
     triggerPantryScannerMissionProgress(currentUser.id, currentUser.timezone);
 
     res.status(200).json({
@@ -664,7 +663,9 @@ export async function analyzePantry(
           scansUsed: scanIncrement.scanCount,
           resetDate: scanIncrement.scanResetDate,
         }),
-        xpAwarded,
+        xpAwarded: xpResult.awarded ? xpResult.amount : 0,
+        leveledUp: xpResult.leveledUp,
+        newLevel: xpResult.newLevel,
       },
     });
   } catch (error) {

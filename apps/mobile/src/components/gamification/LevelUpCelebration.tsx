@@ -34,9 +34,9 @@ const SETTLE_DELAY = 100;
 const PARTICLE_START_DELAY = 150;
 const AUTO_CLOSE_DELAY = 3000;
 const SHARE_START_DELAY = 300;
-const OVERLAY_COLOR = 'rgba(0,0,0,0.84)';
-const CARD_BACKGROUND_COLOR = 'rgba(28,12,26,0.98)';
-const CARD_BORDER_COLOR = 'rgba(211,120,203,0.92)';
+const OVERLAY_COLOR = '#000000';
+const CARD_BACKGROUND_COLOR = '#1C0C1A';
+const CARD_BORDER_COLOR = 'rgba(211,120,203,1)';
 const CARD_SHADOW_COLOR = '#000000';
 const PARTICLE_COLORS = [
   colors.brand.pulse,
@@ -176,12 +176,12 @@ export function LevelUpCelebration() {
         Animated.timing(overlayOpacity.current, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(cardOpacity.current, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]),
       ({ finished }) => {
@@ -221,6 +221,14 @@ export function LevelUpCelebration() {
     });
   }, [handleClose, levelUpData]);
 
+  // overlayOpacity/cardOpacity/cardScale usam useNativeDriver: false (ao
+  // contrário das partículas) porque essa animação de entrada começa no mesmo
+  // ciclo em que o <Modal> passa a visible=true — o driver nativo tenta
+  // conectar o Animated.Value à native view tag antes dela existir de fato
+  // (o Modal ainda não terminou sua apresentação nativa), e a conexão se
+  // perde silenciosamente: a view fica presa em algo próximo do valor inicial
+  // (opacidade quase 0), mesmo com as cores do card/backdrop 100% opacas.
+  // Rodar no thread JS evita essa corrida.
   useEffect(() => {
     if (levelUpData === null) {
       clearOverlayTimers();
@@ -246,18 +254,18 @@ export function LevelUpCelebration() {
         Animated.timing(overlayOpacity.current, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.spring(cardScale.current, {
           toValue: 1.05,
           tension: 100,
           friction: 8,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.timing(cardOpacity.current, {
           toValue: 1,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ])
     );
@@ -272,7 +280,7 @@ export function LevelUpCelebration() {
           toValue: 1,
           tension: 120,
           friction: 12,
-          useNativeDriver: true,
+          useNativeDriver: false,
         })
       );
     }, SETTLE_DELAY);

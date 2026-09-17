@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
-  XP_EVENTS,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
   type PulseAiRecipe,
@@ -40,7 +39,7 @@ import {
   setInCache,
 } from '../services/cache.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
-import { awardXP } from '../services/xp.service';
+import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 import {
@@ -125,12 +124,12 @@ function sendUserNotFound(res: Response): void {
   });
 }
 
-function triggerPulseAiXP(userId: string, timezone: string): number {
-  Promise.resolve()
-    .then(() => awardXP(userId, 'pulseAi', timezone))
-    .catch(err => console.error('XP award failed:', err));
-
-  return XP_EVENTS.pulseAi;
+// Aguarda o resultado real do award em vez de disparar fire-and-forget e
+// devolver um valor otimista — sem isso, leveledUp/newLevel nunca chegavam
+// na resposta e a celebração de level up nunca disparava ao usar o Pulse AI
+// (mesma correção de hydration/supplementStack/favorite/pantryScanner.controller.ts).
+async function triggerPulseAiXP(userId: string, timezone: string): Promise<AwardXPResult> {
+  return awardXP(userId, 'pulseAi', timezone);
 }
 
 function triggerPulseAiMissionProgress(userId: string, timezone: string): void {
@@ -560,7 +559,7 @@ async function runPulseAiChat(params: {
         throw error;
       }
 
-      const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+      const xpResult = await triggerPulseAiXP(currentUser.id, currentUser.timezone);
       triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
       return successOutcome({
@@ -569,7 +568,9 @@ async function runPulseAiChat(params: {
         usageRemaining: usageReservation.usageRemaining,
         aiProvider: parsedCachedResponse.data.aiProvider,
         aiModel: parsedCachedResponse.data.aiModel,
-        xpAwarded,
+        xpAwarded: xpResult.awarded ? xpResult.amount : 0,
+        leveledUp: xpResult.leveledUp,
+        newLevel: xpResult.newLevel,
         conversationId: String(conversationContext.conversationId),
         macrosValidated: parsedCachedResponse.data.recipe.macrosValidated ?? true,
       });
@@ -695,7 +696,7 @@ async function runPulseAiChat(params: {
 
     shouldRollbackUsage = false;
 
-    const xpAwarded = triggerPulseAiXP(currentUser.id, currentUser.timezone);
+    const xpResult = await triggerPulseAiXP(currentUser.id, currentUser.timezone);
     triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
     return successOutcome({
@@ -704,7 +705,9 @@ async function runPulseAiChat(params: {
       usageRemaining: usageReservation.usageRemaining,
       aiProvider: aiResponse.provider,
       aiModel: aiResponse.model,
-      xpAwarded,
+      xpAwarded: xpResult.awarded ? xpResult.amount : 0,
+      leveledUp: xpResult.leveledUp,
+      newLevel: xpResult.newLevel,
       conversationId: String(conversationContext.conversationId),
       macrosValidated: recipe.macrosValidated ?? true,
     });

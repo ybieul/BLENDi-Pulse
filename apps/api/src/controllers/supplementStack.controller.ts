@@ -358,6 +358,8 @@ export async function checkSupplement(
         });
 
         let xpAwarded = 0;
+        let leveledUp = false;
+        let newLevel: number | null = null;
         const activeSupplementCount = context.supplementStack.filter(item => item.isActive).length;
 
         if (activeSupplementCount > 0) {
@@ -390,6 +392,8 @@ export async function checkSupplement(
             // só uma vez (índice único do XPLog).
             const xpResult = await awardXP(userId, 'supplementGoal', context.timezone);
             xpAwarded = xpResult.awarded ? xpResult.amount : 0;
+            leveledUp = xpResult.leveledUp;
+            newLevel = xpResult.newLevel;
 
             Promise.resolve()
               .then(() => updateMissionProgress(userId, 'completeSuppStack', context.timezone))
@@ -402,6 +406,8 @@ export async function checkSupplement(
           data: {
             log: serializeSupplementLog(createdLog.toObject() as SupplementLogRecord),
             xpAwarded,
+            leveledUp,
+            newLevel,
           },
         });
         return;
