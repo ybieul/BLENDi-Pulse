@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../../config/cache.config';
 import { getDailyMissions, type DailyMissionItem } from '../../services/dailyMission.service';
+import { useAuthStore } from '../../store/auth.store';
 import { useGamificationStore } from '../../store/gamification.store';
 import { MissionCompletionToast } from './MissionCompletionToast';
 
@@ -20,10 +21,23 @@ const LEVEL_UP_HANDOFF_DELAY_MS = 500;
 // aba oculta), só a renderização do toast é que ficava presa dentro da árvore
 // da Home. Vivendo aqui, o toast aparece por cima de qualquer tela.
 export function MissionCelebrationWatcher() {
+  // Montado globalmente (fora do RootNavigator/AppFlow), então esta query
+  // roda mesmo com o usuário deslogado (tela de Login) — sem esse `enabled`,
+  // ela dispara sem accessToken, recebe 401 e aciona o fluxo de refresh/logout
+  // do interceptor do Axios (auth.store.ts) já no boot do app. Pior: se esse
+  // logout() disparado "a frio" ainda estiver em andamento (ele mesmo tenta
+  // POST /auth/logout, que também 401 sem token, re-disparando o interceptor
+  // recursivamente) no momento em que o usuário efetua login com sucesso, ele
+  // conclui DEPOIS do login e sobrescreve accessToken/isAuthenticated de volta
+  // para deslogado — o usuário via a Home abrir e imediatamente voltar pro
+  // Login, em loop.
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   const { data: missionsData } = useQuery({
     queryKey: QUERY_KEYS.dailyMissions,
     queryFn: getDailyMissions,
     staleTime: CACHE_CONFIG.DAILY_MISSIONS_TTL,
+    enabled: isAuthenticated,
   });
 
   const prevMissionsRef = useRef<DailyMissionItem[] | null>(null);

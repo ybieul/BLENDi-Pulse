@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Easing,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   colors,
@@ -32,9 +32,11 @@ const PARTICLE_DURATION = 1200;
 const PARTICLE_STAGGER = 30;
 const SETTLE_DELAY = 100;
 const PARTICLE_START_DELAY = 150;
-const AUTO_CLOSE_DELAY = 3000;
 const SHARE_START_DELAY = 300;
-const OVERLAY_COLOR = '#000000';
+// Transparência embutida na própria cor, não na opacidade animada (ver nota
+// no JSX do backdrop) — 0.82 deixa a tela de trás perceptível como pano de
+// fundo escurecido, sem apagá-la por completo.
+const OVERLAY_COLOR = 'rgba(0,0,0,0.82)';
 const CARD_BACKGROUND_COLOR = '#1C0C1A';
 const CARD_BORDER_COLOR = 'rgba(211,120,203,1)';
 const CARD_SHADOW_COLOR = '#000000';
@@ -72,9 +74,7 @@ export function LevelUpCelebration() {
   const levelUpData = useGamificationStore((state) => state.levelUpData);
   const dismissLevelUp = useGamificationStore((state) => state.dismissLevelUp);
 
-  const overlayOpacity = useRef(new Animated.Value(0));
   const cardScale = useRef(new Animated.Value(0));
-  const cardOpacity = useRef(new Animated.Value(0));
   const shareCardRef = useRef<AchievementShareCardHandle | null>(null);
   const particles = useRef(
     Array.from({ length: PARTICLE_COUNT }, () => createParticleAnimationValues())
@@ -83,7 +83,6 @@ export function LevelUpCelebration() {
   const activeAnimationsRef = useRef<Animated.CompositeAnimation[]>([]);
   const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const particlesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClosingRef = useRef(false);
   const isShareQueuedRef = useRef(false);
@@ -100,12 +99,6 @@ export function LevelUpCelebration() {
       clearTimeout(particlesTimeoutRef.current);
       particlesTimeoutRef.current = null;
     }
-
-    if (autoCloseTimeoutRef.current) {
-      clearTimeout(autoCloseTimeoutRef.current);
-      autoCloseTimeoutRef.current = null;
-    }
-
   }, []);
 
   const clearShareTimer = useCallback(() => {
@@ -124,9 +117,7 @@ export function LevelUpCelebration() {
   }, []);
 
   const resetAnimatedValues = useCallback(() => {
-    overlayOpacity.current.setValue(0);
     cardScale.current.setValue(0);
-    cardOpacity.current.setValue(0);
 
     particles.current.forEach((particle) => {
       particle.translateY.setValue(0);
@@ -161,6 +152,9 @@ export function LevelUpCelebration() {
     completionAction?.();
   }, [dismissLevelUp, resetAnimatedValues, stopAnimations]);
 
+  // Fecha imediatamente — não há mais fade de opacidade pra esperar (ver
+  // nota no JSX sobre opacity fixa em 1). finishClose() já cuida de parar
+  // animações em andamento, resetar os valores e disparar onComplete.
   const handleClose = useCallback((onComplete?: () => void) => {
     if (levelUpData === null || isClosingRef.current) {
       return;
@@ -169,33 +163,8 @@ export function LevelUpCelebration() {
     isClosingRef.current = true;
     closeCompletionActionRef.current = onComplete ?? null;
     clearOverlayTimers();
-    stopAnimations();
-
-    startTrackedAnimation(
-      Animated.parallel([
-        Animated.timing(overlayOpacity.current, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(cardOpacity.current, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]),
-      ({ finished }) => {
-        if (finished) {
-          finishClose();
-          return;
-        }
-
-        closeCompletionActionRef.current = null;
-        isClosingRef.current = false;
-        resetAnimatedValues();
-      }
-    );
-  }, [clearOverlayTimers, finishClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+    finishClose();
+  }, [clearOverlayTimers, finishClose, levelUpData]);
 
   const handleShareMoment = useCallback(() => {
     if (levelUpData === null || isClosingRef.current) {
@@ -221,14 +190,9 @@ export function LevelUpCelebration() {
     });
   }, [handleClose, levelUpData]);
 
-  // overlayOpacity/cardOpacity/cardScale usam useNativeDriver: false (ao
-  // contrário das partículas) porque essa animação de entrada começa no mesmo
-  // ciclo em que o <Modal> passa a visible=true — o driver nativo tenta
-  // conectar o Animated.Value à native view tag antes dela existir de fato
-  // (o Modal ainda não terminou sua apresentação nativa), e a conexão se
-  // perde silenciosamente: a view fica presa em algo próximo do valor inicial
-  // (opacidade quase 0), mesmo com as cores do card/backdrop 100% opacas.
-  // Rodar no thread JS evita essa corrida.
+  // Renderizado como View absoluta comum (ver JSX abaixo), não <Modal> —
+  // mesma técnica do MissionCompletionToast. A opacidade do backdrop/card é
+  // fixa (ver JSX); só a escala do card é animada aqui.
   useEffect(() => {
     if (levelUpData === null) {
       clearOverlayTimers();
@@ -250,24 +214,12 @@ export function LevelUpCelebration() {
     resetAnimatedValues();
 
     startTrackedAnimation(
-      Animated.parallel([
-        Animated.timing(overlayOpacity.current, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.spring(cardScale.current, {
-          toValue: 1.05,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: false,
-        }),
-        Animated.timing(cardOpacity.current, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: false,
-        }),
-      ])
+      Animated.spring(cardScale.current, {
+        toValue: 1.05,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      })
     );
 
     settleTimeoutRef.current = setTimeout(() => {
@@ -280,7 +232,7 @@ export function LevelUpCelebration() {
           toValue: 1,
           tension: 120,
           friction: 12,
-          useNativeDriver: false,
+          useNativeDriver: true,
         })
       );
     }, SETTLE_DELAY);
@@ -333,10 +285,6 @@ export function LevelUpCelebration() {
       });
     }, PARTICLE_START_DELAY);
 
-    autoCloseTimeoutRef.current = setTimeout(() => {
-      handleClose();
-    }, AUTO_CLOSE_DELAY);
-
     return () => {
       clearOverlayTimers();
       if (!isShareQueuedRef.current) {
@@ -345,7 +293,26 @@ export function LevelUpCelebration() {
       stopAnimations();
       isClosingRef.current = false;
     };
-  }, [clearOverlayTimers, clearShareTimer, handleClose, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+  }, [clearOverlayTimers, clearShareTimer, levelUpData, resetAnimatedValues, startTrackedAnimation, stopAnimations]);
+
+  // Repõe, sem <Modal>, a interceptação do botão voltar do Android que
+  // <Modal onRequestClose> fazia antes — agora via handleClose(), que anima
+  // a saída (o onRequestClose antigo pulava direto para dismissLevelUp(),
+  // sem animação, inconsistente com o toque fora do card).
+  useEffect(() => {
+    if (levelUpData === null) {
+      return undefined;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleClose();
+      return true;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [handleClose, levelUpData]);
 
   if (levelUpData === null && pendingShareData === null) {
     return null;
@@ -354,63 +321,72 @@ export function LevelUpCelebration() {
   return (
     <>
       {levelUpData ? (
-        <Modal
-          animationType="none"
-          onRequestClose={dismissLevelUp}
-          statusBarTranslucent
-          transparent
-          visible={levelUpData !== null}
+        <Pressable
+          accessibilityViewIsModal
+          onPress={() => handleClose()}
+          style={styles.overlay}
         >
-          <TouchableWithoutFeedback onPress={() => handleClose()}>
-            <View style={styles.overlay}>
-              <Animated.View style={[styles.backdrop, { opacity: overlayOpacity.current }]} />
-              <View style={styles.centerContent}>
-                {particles.current.map((particle, index) => (
-                  <Animated.View
-                    key={`level-up-particle-${index}`}
-                    style={[
-                      styles.particle,
-                      {
-                        backgroundColor: getParticleColor(index),
-                        opacity: particle.opacity,
-                        transform: [
-                          { translateY: particle.translateY },
-                          { translateX: particle.translateX },
-                          { scale: particle.scale },
-                        ],
-                      },
-                    ]}
-                  />
-                ))}
+          {/* View comum, não Animated — testes confirmaram que animar a
+              opacidade do backdrop nunca converge de verdade no device real
+              (trava num valor intermediário indefinidamente, independente de
+              Modal, native driver ou timing). A transparência vem só do
+              alpha embutido em OVERLAY_COLOR. */}
+          <View style={styles.backdrop} />
+          <View style={styles.centerContent}>
+            {particles.current.map((particle, index) => (
+              <Animated.View
+                key={`level-up-particle-${index}`}
+                style={[
+                  styles.particle,
+                  {
+                    backgroundColor: getParticleColor(index),
+                    opacity: particle.opacity,
+                    transform: [
+                      { translateY: particle.translateY },
+                      { translateX: particle.translateX },
+                      { scale: particle.scale },
+                    ],
+                  },
+                ]}
+              />
+            ))}
 
-                <TouchableWithoutFeedback onPress={() => {}}>
-                  <Animated.View
-                    style={[
-                      styles.card,
-                      {
-                        opacity: cardOpacity.current,
-                        transform: [{ scale: cardScale.current }],
-                      },
-                    ]}
-                  >
-                    <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
-                    <Text style={styles.levelName}>
-                      {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
-                    </Text>
-                    <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={handleShareMoment}
-                      style={styles.shareButton}
-                    >
-                      <Text style={styles.shareButtonText}>{t('share.shareMoment')}</Text>
-                    </Pressable>
-                  </Animated.View>
-                </TouchableWithoutFeedback>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+            <Pressable onPress={() => {}}>
+              {/* Sem opacity animada — mesmo motivo do backdrop acima.
+                  CARD_BACKGROUND_COLOR já é opaco de propósito (o card
+                  precisa ser sólido/legível); só a escala é animada. */}
+              <Animated.View
+                style={[
+                  styles.card,
+                  { transform: [{ scale: cardScale.current }] },
+                ]}
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.actions.close')}
+                  onPress={() => handleClose()}
+                  style={styles.closeButton}
+                  hitSlop={10}
+                >
+                  <Ionicons name="close" size={20} color={colors.text.primary} />
+                </Pressable>
+
+                <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
+                <Text style={styles.levelName}>
+                  {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
+                </Text>
+                <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleShareMoment}
+                  style={styles.shareButton}
+                >
+                  <Text style={styles.shareButtonText}>{t('share.shareMoment')}</Text>
+                </Pressable>
+              </Animated.View>
+            </Pressable>
+          </View>
+        </Pressable>
       ) : null}
 
       {pendingShareData ? (
@@ -438,6 +414,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+    elevation: 1000,
   },
   backdrop: {
     position: 'absolute',
@@ -469,6 +446,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 24,
     elevation: 14,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   levelNumber: {
     color: colors.brand.pulse,

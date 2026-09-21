@@ -355,10 +355,19 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // chamada precisa acontecer enquanto ele ainda está presente.
     // Melhor esforço — falha de rede/servidor não deve bloquear o logout
     // local, o usuário precisa conseguir sair do app mesmo offline.
-    try {
-      await AuthService.logout();
-    } catch {
-      // Sessão local é limpa de qualquer forma abaixo.
+    //
+    // Só chama a API se já houver um accessToken em memória. Sem essa guarda,
+    // um logout() disparado sem sessão (ex: uma query global 401 antes do
+    // login) faz POST /auth/logout sem token, que também 401, reentra no
+    // interceptor de refresh e chama logout() de novo — uma recursão que só
+    // para quando aparece um refresh token válido, podendo então concluir
+    // DEPOIS de um login bem-sucedido e apagar a sessão recém-criada.
+    if (get().accessToken !== null) {
+      try {
+        await AuthService.logout();
+      } catch {
+        // Sessão local é limpa de qualquer forma abaixo.
+      }
     }
 
     // Remove do Secure Store (melhor esforço — não bloqueia o logout se falhar)
