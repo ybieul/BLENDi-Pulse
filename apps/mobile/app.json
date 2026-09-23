@@ -2,6 +2,7 @@
   "expo": {
     "name": "BLENDi Pulse",
     "slug": "blendi-pulse",
+    "owner": "blendiblender",
     "scheme": "blendipulse",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +18,8 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "bundleIdentifier": "com.blendiblender.pulse",
+      "bundleIdentifier": "com.blendi.pulse",
+      "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
@@ -25,7 +27,9 @@
       }
     },
     "android": {
-      "package": "com.blendiblender.pulse",
+      "package": "com.blendi.pulse",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#2b1429"
@@ -62,7 +66,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "PENDING_EAS_PROJECT_ID"
+        "projectId": "89c39b1d-87df-4b9a-85ce-42e571b1606b"
       }
     }
   }

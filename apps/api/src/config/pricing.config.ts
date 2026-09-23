@@ -3,9 +3,9 @@
 
 import type { BlendiModel } from '../models/User';
 
-export const PRO_MONTHLY_PRICE_USD = 4.99;
-export const PRO_ANNUAL_PRICE_USD = 49.99;
-export const PRO_ANNUAL_DISCOUNT_PERCENT = 17;
+export const PRO_MONTHLY_PRICE_USD = 6.99;
+export const PRO_ANNUAL_PRICE_USD = 39.99;
+export const PRO_ANNUAL_DISCOUNT_PERCENT = 52;
 
 export const REVENUECAT_PRODUCT_ID_MONTHLY = 'pulse_pro_monthly';
 export const REVENUECAT_PRODUCT_ID_ANNUAL = 'pulse_pro_annual';
