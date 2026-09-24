@@ -41,6 +41,8 @@ const HYDRATION_ICON_COLOR = 'rgba(59,130,246,0.80)';
 const SUPPLEMENT_ICON_COLOR = 'rgba(34,197,94,0.80)';
 const LOAD_MORE_BACKGROUND = 'rgba(255,255,255,0.05)';
 const LOAD_MORE_BORDER = 'rgba(255,255,255,0.12)';
+const BACK_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
+const BACK_BUTTON_BORDER = 'rgba(255,255,255,0.12)';
 const ERROR_BACKGROUND = 'rgba(239,68,68,0.06)';
 const ERROR_BORDER = 'rgba(239,68,68,0.18)';
 const RETRY_BACKGROUND = 'rgba(255,255,255,0.07)';
@@ -208,7 +210,12 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
 
   // ── Supplement data ───────────────────────────────────────────────────────
   const avgAdherence = supplementSummaryData?.summary.averageAdherence ?? 0;
-  const supplementHistory = supplementSummaryData?.history ?? [];
+  // useMemo mantem a referencia estavel quando nao ha dados (um `?? []` inline criaria um
+  // array novo a cada render e invalidaria os useMemo abaixo).
+  const supplementHistory = useMemo(
+    () => supplementSummaryData?.history ?? [],
+    [supplementSummaryData],
+  );
 
   const perfectDays = useMemo(
     () => supplementHistory.filter((d) => d.adherenceRate >= 1).length,
@@ -281,7 +288,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
           </View>
 
           {blendSummaryError ? (
-            <SectionError onRetry={refetchBlendSummary} />
+            <SectionError onRetry={() => { void refetchBlendSummary(); }} />
           ) : (
             <>
               <View style={styles.statRow}>
@@ -352,7 +359,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
               {hasNextBlendPage && (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => fetchNextBlendPage()}
+                  onPress={() => { void fetchNextBlendPage(); }}
                   style={styles.loadMoreButton}
                 >
                   {isFetchingNextBlendPage ? (
@@ -378,7 +385,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
           </View>
 
           {hydrationSummaryError ? (
-            <SectionError onRetry={refetchHydrationSummary} />
+            <SectionError onRetry={() => { void refetchHydrationSummary(); }} />
           ) : (
             <>
               <View style={styles.statRow}>
@@ -422,7 +429,7 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
           </View>
 
           {supplementSummaryError ? (
-            <SectionError onRetry={refetchSupplementSummary} />
+            <SectionError onRetry={() => { void refetchSupplementSummary(); }} />
           ) : (
             <>
               <View style={styles.statRow}>
@@ -475,9 +482,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: BACK_BUTTON_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: BACK_BUTTON_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
   },

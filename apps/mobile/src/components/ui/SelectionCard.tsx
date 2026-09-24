@@ -107,7 +107,7 @@ export function SelectionCard({
           <View style={styles.cardHighlight} />
 
           <Animated.View pointerEvents="none" style={[styles.checkIcon, { opacity: checkOpacity }]}>
-            <AntDesign name="checkcircle" size={18} color={colors.brand.pulse} />
+            <AntDesign name="check-circle" size={18} color={colors.brand.pulse} />
           </Animated.View>
 
           {icon || badge ? (

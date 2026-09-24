@@ -332,9 +332,14 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   }, [navigation, route.params?.conversation]);
 
   // ── Continua a conversa de hoje automaticamente, se existir ──────────────
+  // Valor de route.params.conversation na montagem. O efeito acima limpa o param via
+  // setParams depois de carregá-lo; este efeito deve rodar só uma vez (deps []) e NÃO
+  // reexecutar nessa limpeza, senão sobrescreveria a conversa do histórico em exibição.
+  const initialRouteConversationRef = useRef(route.params?.conversation);
+
   useEffect(() => {
     // Uma conversa específica já chegou via navegação (efeito acima) — não sobrescrever.
-    if (route.params?.conversation) {
+    if (initialRouteConversationRef.current) {
       return;
     }
 

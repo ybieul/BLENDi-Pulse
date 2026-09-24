@@ -222,7 +222,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
           pointerEvents="none"
           style={[styles.checkIcon, { opacity: checkProgress }]}
         >
-          <AntDesign name="checkcircle" size={18} color={colors.feedback.success} />
+          <AntDesign name="check-circle" size={18} color={colors.feedback.success} />
         </Animated.View>
       </Animated.View>
 

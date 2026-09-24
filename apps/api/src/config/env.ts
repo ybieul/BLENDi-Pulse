@@ -6,6 +6,8 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+import { isPaymentsConfigured, parseRevenueCatAppIds } from './revenuecat.config';
+
 const AI_PROVIDER_VALUES = ['openai', 'anthropic', 'google'] as const;
 
 const requiredString = (name: string) =>
@@ -151,6 +153,10 @@ const envSchema = z.object({
   // RevenueCat
   REVENUECAT_API_KEY: optionalString(),
   REVENUECAT_WEBHOOK_SECRET: optionalSecret('REVENUECAT_WEBHOOK_SECRET', 32),
+  // Lista de app_ids do RevenueCat aceitos no webhook, separados por virgula
+  // (um por plataforma: iOS e Android sao apps distintos no RevenueCat).
+  REVENUECAT_APP_IDS: optionalString(),
+  // Legado (um unico app_id). Continua aceito e e somado a REVENUECAT_APP_IDS.
   REVENUECAT_APP_ID: optionalString(),
 });
 
@@ -170,11 +176,16 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
+export const revenueCatAppIds: readonly string[] = parseRevenueCatAppIds(
+  env.REVENUECAT_APP_IDS,
+  env.REVENUECAT_APP_ID
+);
+
 export const paymentsConfig = {
-  isConfigured: Boolean(
-    env.REVENUECAT_API_KEY &&
-      env.REVENUECAT_WEBHOOK_SECRET &&
-      env.REVENUECAT_APP_ID
+  isConfigured: isPaymentsConfigured(
+    env.REVENUECAT_API_KEY,
+    env.REVENUECAT_WEBHOOK_SECRET,
+    revenueCatAppIds
   ),
 } as const;
 

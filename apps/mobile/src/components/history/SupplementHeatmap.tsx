@@ -26,6 +26,9 @@ const BACKDROP_COLOR = 'rgba(0,0,0,0.3)';
 const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
 const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
 const NO_DATA_COLOR = 'rgba(255,255,255,0.06)';
+const CIRCLE_BORDER_COLOR = 'rgba(255,255,255,0.04)';
+const LEGEND_LABEL_COLOR = 'rgba(255,255,255,0.60)';
+const SHEET_SUBTITLE_COLOR = 'rgba(255,255,255,0.65)';
 const PARTIAL_COLOR = 'rgba(245,158,11,0.45)';
 const GOOD_COLOR = 'rgba(154,72,147,0.50)';
 const PERFECT_COLOR = 'rgba(34,197,94,0.70)';
@@ -291,7 +294,7 @@ const styles = StyleSheet.create({
   },
   circle: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    borderColor: CIRCLE_BORDER_COLOR,
   },
   legend: {
     flexDirection: 'row',
@@ -311,7 +314,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   legendLabel: {
-    color: 'rgba(255,255,255,0.60)',
+    color: LEGEND_LABEL_COLOR,
     fontFamily: fonts.body,
     fontSize: 12,
     fontWeight: fontWeights.regular,
@@ -353,7 +356,7 @@ const styles = StyleSheet.create({
   },
   sheetSubtitle: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.65)',
+    color: SHEET_SUBTITLE_COLOR,
     fontFamily: fonts.body,
     fontSize: 14,
     fontWeight: fontWeights.medium,

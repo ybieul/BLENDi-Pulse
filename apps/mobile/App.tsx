@@ -223,12 +223,13 @@ function AppShell() {
 
   useEffect(() => {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: false,
-        shouldShowList: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
+      handleNotification: () =>
+        Promise.resolve({
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        }),
     });
 
     return () => {
@@ -276,7 +277,7 @@ function AppShell() {
           navigationRef.current?.navigate('AppFlow', {
             screen: route.screen as never,
             params: route.params as never,
-          } as never);
+          });
         }
 
         if (options?.clearLastResponse === true) {
@@ -339,6 +340,7 @@ function AppShell() {
           lastKnownPushToken.current = resolvedPushToken;
           updateUserProfile({ pushToken: resolvedPushToken });
         } catch {
+          // Registro do push token e best-effort: falhas nao devem afetar o app.
         }
       })();
     }, 3000);

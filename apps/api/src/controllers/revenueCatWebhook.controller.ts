@@ -4,7 +4,8 @@ import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 
-import { env, paymentsConfig } from '../config/env';
+import { env, paymentsConfig, revenueCatAppIds } from '../config/env';
+import { isRevenueCatAppIdAccepted } from '../config/revenuecat.config';
 import { UserModel } from '../models/User';
 import {
   RevenueCatConfigurationError,
@@ -254,7 +255,10 @@ export async function handleRevenueCatWebhook(
 
     const { event } = parsed.data;
 
-    if (env.REVENUECAT_APP_ID && event.app_id && event.app_id !== env.REVENUECAT_APP_ID) {
+    if (!isRevenueCatAppIdAccepted(event.app_id, revenueCatAppIds)) {
+      console.warn(
+        `[revenuecat-webhook] Evento ignorado: app_id ${event.app_id} nao esta em REVENUECAT_APP_IDS.`
+      );
       sendWebhookIgnored(res, 'RevenueCat app_id does not match this backend configuration.');
       return;
     }

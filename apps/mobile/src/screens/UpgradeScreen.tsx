@@ -40,9 +40,23 @@ const CARD_SELECTED_BORDER = 'rgba(245,158,11,0.42)';
 const BADGE_BACKGROUND = 'rgba(245,158,11,0.18)';
 const BADGE_BORDER = 'rgba(245,158,11,0.34)';
 const BENEFIT_ICON_BG = 'rgba(245,158,11,0.16)';
+const CLOSE_BUTTON_BACKGROUND = 'rgba(255,255,255,0.08)';
+const CLOSE_BUTTON_BORDER = 'rgba(255,255,255,0.12)';
+const GOLD_SHADOW = '#F59E0B';
+const GOLD_TEXT = '#FFE7A6';
+const PRO_BADGE_TEXT = '#2D1600';
+const ORB_PRIMARY_BACKGROUND = 'rgba(245,158,11,0.14)';
+const ORB_SECONDARY_BACKGROUND = 'rgba(236,72,153,0.12)';
+const TRANSPARENT = 'transparent';
 const LEGAL_OPACITY = 0.72;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+interface BenefitItem {
+  key: string;
+  icon: IoniconName;
+  text: string;
+}
 
 type UpgradeScreenProps = NativeStackScreenProps<RootStackParamList, 'Upgrade'>;
 
@@ -154,13 +168,13 @@ export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
     ];
   }, [availablePlans, fallbackAnnualSavingsPercent, locale, t]);
 
-  const benefitItems = useMemo(
+  const benefitItems = useMemo<BenefitItem[]>(
     () => [
-      { key: 'pulse-ai', icon: 'chatbubble-ellipses' as IoniconName, text: t('me.upgradeScreen.benefitPulseAI') },
-      { key: 'pantry', icon: 'camera' as IoniconName, text: t('me.upgradeScreen.benefitPantry') },
-      { key: 'lists', icon: 'list' as IoniconName, text: t('me.upgradeScreen.benefitLists') },
-      { key: 'report', icon: 'stats-chart' as IoniconName, text: t('me.upgradeScreen.benefitReport') },
-      { key: 'badge', icon: 'ribbon' as IoniconName, text: t('me.upgradeScreen.benefitBadge') },
+      { key: 'pulse-ai', icon: 'chatbubble-ellipses', text: t('me.upgradeScreen.benefitPulseAI') },
+      { key: 'pantry', icon: 'camera', text: t('me.upgradeScreen.benefitPantry') },
+      { key: 'lists', icon: 'list', text: t('me.upgradeScreen.benefitLists') },
+      { key: 'report', icon: 'stats-chart', text: t('me.upgradeScreen.benefitReport') },
+      { key: 'badge', icon: 'ribbon', text: t('me.upgradeScreen.benefitBadge') },
     ],
     [t],
   );
@@ -334,9 +348,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: CLOSE_BUTTON_BACKGROUND,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: CLOSE_BUTTON_BORDER,
   },
   heroCard: {
     alignItems: 'center',
@@ -349,14 +363,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
-    shadowColor: '#F59E0B',
+    shadowColor: GOLD_SHADOW,
     shadowOpacity: 0.32,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 10,
   },
   proBadgeText: {
-    color: '#2D1600',
+    color: PRO_BADGE_TEXT,
     fontFamily: fonts.display,
     fontSize: 30,
     fontWeight: fontWeights.bold,
@@ -427,7 +441,7 @@ const styles = StyleSheet.create({
   planCardSelected: {
     backgroundColor: CARD_SELECTED_BACKGROUND,
     borderColor: CARD_SELECTED_BORDER,
-    shadowColor: '#F59E0B',
+    shadowColor: GOLD_SHADOW,
     shadowOpacity: 0.2,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
@@ -446,7 +460,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
   planTitleSelected: {
-    color: '#FFE7A6',
+    color: GOLD_TEXT,
   },
   saveBadge: {
     alignSelf: 'flex-start',
@@ -459,7 +473,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   saveBadgeText: {
-    color: '#FFE7A6',
+    color: GOLD_TEXT,
     fontFamily: fonts.body,
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.bold,
@@ -479,7 +493,7 @@ const styles = StyleSheet.create({
   },
   planEquivalent: {
     marginTop: spacing.sm,
-    color: '#FFE7A6',
+    color: GOLD_TEXT,
     fontFamily: fonts.body,
     fontSize: fontSizes.xs,
     fontWeight: fontWeights.medium,
@@ -491,14 +505,14 @@ const styles = StyleSheet.create({
   ctaButtonShell: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#F59E0B',
+    shadowColor: GOLD_SHADOW,
     shadowOpacity: 0.28,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
   ctaButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: TRANSPARENT,
   },
   restoreDescription: {
     color: colors.text.secondary,
@@ -547,7 +561,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(245,158,11,0.14)',
+    backgroundColor: ORB_PRIMARY_BACKGROUND,
   },
   orbSecondary: {
     position: 'absolute',
@@ -556,6 +570,6 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(236,72,153,0.12)',
+    backgroundColor: ORB_SECONDARY_BACKGROUND,
   },
 });

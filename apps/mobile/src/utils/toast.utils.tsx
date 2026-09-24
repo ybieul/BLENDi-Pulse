@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -24,24 +24,29 @@ export function ToastViewport() {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(IOS_TOAST_ENTRY_OFFSET)).current;
 
-  const dismissToast = (toastId: number) => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: IOS_TOAST_ENTRY_OFFSET,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) {
-        setToast((currentToast) => (currentToast?.id === toastId ? null : currentToast));
-      }
-    });
-  };
+  // useCallback: opacity/translateY sao refs estaveis e setToast e estavel, entao a
+  // referencia nao muda entre renders (o efeito do toast nao reinicia a cada render).
+  const dismissToast = useCallback(
+    (toastId: number) => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: IOS_TOAST_ENTRY_OFFSET,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) {
+          setToast((currentToast) => (currentToast?.id === toastId ? null : currentToast));
+        }
+      });
+    },
+    [opacity, translateY],
+  );
 
   useEffect(() => {
     return subscribeToToasts((payload) => {
@@ -81,7 +86,7 @@ export function ToastViewport() {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [opacity, toast, translateY]);
+  }, [dismissToast, opacity, toast, translateY]);
 
   if (!toast) {
     return null;

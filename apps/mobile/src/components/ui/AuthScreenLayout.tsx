@@ -59,7 +59,7 @@ export function AuthScreenLayout({
             accessibilityLabel={t('common.actions.back')}
             hitSlop={12}
           >
-            <AntDesign name="arrowleft" size={20} color={colors.text.primary} />
+            <AntDesign name="arrow-left" size={20} color={colors.text.primary} />
           </Pressable>
         ) : null}
 

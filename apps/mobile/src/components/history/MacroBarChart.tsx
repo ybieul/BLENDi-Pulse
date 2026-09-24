@@ -32,6 +32,7 @@ const SVG_WIDTH_OFFSET = 48;
 const CARD_LABEL_COLOR = 'rgba(255,255,255,0.55)';
 const PROTEIN_COLOR = 'rgba(154,72,147,0.75)';
 const CARBS_COLOR = 'rgba(245,158,11,0.70)';
+const TOOLTIP_CARBS_COLOR = 'rgba(245,158,11,1)';
 const REMAINING_COLOR = 'rgba(107,114,128,0.35)';
 const EMPTY_BAR_COLOR = 'rgba(255,255,255,0.16)';
 const EMPTY_BAR_HEIGHT_RATIO = 0.16;
@@ -446,7 +447,7 @@ const styles = StyleSheet.create({
     color: colors.brand.pulse,
   },
   tooltipCarbs: {
-    color: 'rgba(245,158,11,1)',
+    color: TOOLTIP_CARBS_COLOR,
   },
   tooltipCalories: {
     color: colors.text.primary,

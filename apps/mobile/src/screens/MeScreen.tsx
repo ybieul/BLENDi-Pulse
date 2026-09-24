@@ -38,7 +38,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   SaveFormat,
   manipulateAsync,
@@ -396,7 +396,7 @@ async function processProfilePhoto(uri: string): Promise<{
     },
   );
 
-  const fileInfo = await FileSystem.getInfoAsync(manipulatedImage.uri, { size: true });
+  const fileInfo = await FileSystem.getInfoAsync(manipulatedImage.uri);
 
   if (fileInfo.exists && typeof fileInfo.size === "number" && fileInfo.size > PROFILE_PHOTO_MAX_FILE_BYTES) {
     throw new Error("PROFILE_PHOTO_TOO_LARGE");
