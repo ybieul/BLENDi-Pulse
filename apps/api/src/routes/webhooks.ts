@@ -1,11 +1,16 @@
-import { Router, type IRouter } from 'express';
+import { type IRouter } from 'express';
 
+import { env } from '../config/env';
 import { handleRevenueCatWebhook } from '../controllers/revenueCatWebhook.controller';
-
-export const webhooksRouter: IRouter = Router();
+import { createRevenueCatWebhookRouter } from '../utils/revenueCatWebhookRoute';
 
 /**
- * POST /webhooks/revenuecat
- * Recebe eventos assinados do RevenueCat e sincroniza o estado da assinatura local.
+ * POST /webhooks/revenuecat/<REVENUECAT_WEBHOOK_PATH_SECRET>
+ * Recebe eventos do RevenueCat (autenticados pelo header Authorization estatico) e
+ * sincroniza o estado da assinatura local. O trecho final do caminho vem de env var
+ * (nunca fixo no codigo); nao existe rota em /webhooks/revenuecat sem ele.
  */
-webhooksRouter.post('/revenuecat', handleRevenueCatWebhook);
+export const webhooksRouter: IRouter = createRevenueCatWebhookRouter(
+  env.REVENUECAT_WEBHOOK_PATH_SECRET,
+  handleRevenueCatWebhook
+);

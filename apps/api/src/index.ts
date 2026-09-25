@@ -88,7 +88,8 @@ app.use(
 // de rota para interceptar corretamente o corpo enviado por res.send/res.json.
 app.use(compression());
 
-// Webhooks do RevenueCat precisam do corpo bruto para verificar o HMAC recebido.
+// Webhooks do RevenueCat: autenticados pelo header Authorization (ver
+// utils/revenueCatWebhookAuth.ts); o controller le o corpo bruto (Buffer) e faz o parse do JSON.
 app.use('/webhooks', express.raw({ type: 'application/json', limit: '1mb' }), webhooksRouter);
 
 // 4. Parsing de JSON — 50 KB por padrão (defesa em profundidade contra

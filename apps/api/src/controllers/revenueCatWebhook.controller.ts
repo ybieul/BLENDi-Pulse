@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
@@ -15,9 +13,7 @@ import {
   getSubscriberCustomerInfo,
 } from '../services/revenueCat.service';
 import { sendErrorResponse } from '../utils/error.utils';
-
-const WEBHOOK_SIGNATURE_HEADER = 'x-revenuecat-webhook-signature';
-const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
+import { authorizeRevenueCatWebhook } from '../utils/revenueCatWebhookAuth';
 
 const revenueCatWebhookSchema = z.object({
   api_version: z.string(),
@@ -37,60 +33,6 @@ const revenueCatWebhookSchema = z.object({
 });
 
 type RevenueCatWebhookPayload = z.infer<typeof revenueCatWebhookSchema>;
-
-function parseSignatureHeader(signatureHeader: string): { timestamp: string; signature: string } | null {
-  const segments = signatureHeader.split(',');
-  const parsed = new Map<string, string>();
-
-  for (const segment of segments) {
-    const [key, value] = segment.split('=', 2);
-    if (!key || !value) {
-      continue;
-    }
-
-    parsed.set(key.trim(), value.trim());
-  }
-
-  const timestamp = parsed.get('t');
-  const signature = parsed.get('v1');
-
-  if (!timestamp || !signature) {
-    return null;
-  }
-
-  return { timestamp, signature };
-}
-
-function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean {
-  const parsed = parseSignatureHeader(signatureHeader);
-  if (!parsed) {
-    return false;
-  }
-
-  const timestampSeconds = Number(parsed.timestamp);
-  if (!Number.isFinite(timestampSeconds)) {
-    return false;
-  }
-
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (Math.abs(nowSeconds - timestampSeconds) > WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS) {
-    return false;
-  }
-
-  const signedPayload = Buffer.concat([
-    Buffer.from(`${parsed.timestamp}.`, 'utf8'),
-    rawBody,
-  ]);
-
-  const computedSignature = createHmac('sha256', secret).update(signedPayload).digest('hex');
-  const receivedSignature = parsed.signature;
-
-  if (computedSignature.length !== receivedSignature.length) {
-    return false;
-  }
-
-  return timingSafeEqual(Buffer.from(computedSignature, 'utf8'), Buffer.from(receivedSignature, 'utf8'));
-}
 
 async function findUserForWebhook(event: RevenueCatWebhookPayload['event']) {
   const candidateIds = new Set<string>([
@@ -218,27 +160,26 @@ export async function handleRevenueCatWebhook(
       return;
     }
 
-    const signatureHeader = req.header(WEBHOOK_SIGNATURE_HEADER);
-    if (!signatureHeader) {
-      sendErrorResponse(res, {
-        statusCode: 401,
-        code: 'webhooks/unauthorized',
-        message: 'Missing RevenueCat webhook signature.',
-      });
+    if (!authorizeRevenueCatWebhook(req, res, env.REVENUECAT_WEBHOOK_SECRET)) {
       return;
     }
 
+    // O corpo chega bruto (express.raw em index.ts); requisicao autenticada com corpo
+    // ausente ou JSON invalido e erro do cliente (400), nao falha interna.
     const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from([]);
-    if (!verifyWebhookSignature(rawBody, signatureHeader, env.REVENUECAT_WEBHOOK_SECRET)) {
+
+    let parsedJson: unknown;
+    try {
+      parsedJson = JSON.parse(rawBody.toString('utf8')) as unknown;
+    } catch {
       sendErrorResponse(res, {
-        statusCode: 401,
-        code: 'webhooks/unauthorized',
-        message: 'Invalid RevenueCat webhook signature.',
+        statusCode: 400,
+        code: 'webhooks/invalid-payload',
+        message: 'Invalid RevenueCat webhook payload.',
       });
       return;
     }
 
-    const parsedJson = JSON.parse(rawBody.toString('utf8')) as unknown;
     const parsed = revenueCatWebhookSchema.safeParse(parsedJson);
     if (!parsed.success) {
       sendErrorResponse(res, {

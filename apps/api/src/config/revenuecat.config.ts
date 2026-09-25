@@ -44,3 +44,26 @@ export function isPaymentsConfigured(
 ): boolean {
   return Boolean(apiKey && webhookSecret && appIds.length > 0);
 }
+
+/**
+ * Formato aceito para REVENUECAT_WEBHOOK_PATH_SECRET (trecho aleatorio da URL do webhook):
+ * minimo 32 caracteres, somente [A-Za-z0-9_-] (hex ou base64url). O conjunto restrito
+ * garante que o valor nunca contenha caracteres com significado em rotas ("/", ":", "*", "(").
+ * Gerar com: openssl rand -hex 32
+ */
+export const REVENUECAT_WEBHOOK_PATH_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,}$/;
+
+/**
+ * Caminho do webhook relativo ao mount `/webhooks` (URL publica final:
+ * /webhooks/revenuecat/<pathSecret>). Lanca se o segredo tiver formato invalido, para nunca
+ * montar uma rota previsivel ou malformada.
+ */
+export function buildRevenueCatWebhookPath(pathSecret: string): string {
+  if (!REVENUECAT_WEBHOOK_PATH_SECRET_PATTERN.test(pathSecret)) {
+    throw new Error(
+      'REVENUECAT_WEBHOOK_PATH_SECRET invalido: use no minimo 32 caracteres [A-Za-z0-9_-].'
+    );
+  }
+
+  return `/revenuecat/${pathSecret}`;
+}

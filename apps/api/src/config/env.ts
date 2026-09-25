@@ -6,7 +6,11 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-import { isPaymentsConfigured, parseRevenueCatAppIds } from './revenuecat.config';
+import {
+  isPaymentsConfigured,
+  parseRevenueCatAppIds,
+  REVENUECAT_WEBHOOK_PATH_SECRET_PATTERN,
+} from './revenuecat.config';
 
 const AI_PROVIDER_VALUES = ['openai', 'anthropic', 'google'] as const;
 
@@ -153,6 +157,16 @@ const envSchema = z.object({
   // RevenueCat
   REVENUECAT_API_KEY: optionalString(),
   REVENUECAT_WEBHOOK_SECRET: optionalSecret('REVENUECAT_WEBHOOK_SECRET', 32),
+  // Trecho aleatorio da URL do webhook (/webhooks/revenuecat/<valor>). OBRIGATORIA: sem ela
+  // a API nao sobe, em vez de expor uma rota previsivel. Gerar com: openssl rand -hex 32
+  REVENUECAT_WEBHOOK_PATH_SECRET: requiredString('REVENUECAT_WEBHOOK_PATH_SECRET').pipe(
+    z
+      .string()
+      .regex(
+        REVENUECAT_WEBHOOK_PATH_SECRET_PATTERN,
+        'REVENUECAT_WEBHOOK_PATH_SECRET deve ter no mínimo 32 caracteres e conter apenas [A-Za-z0-9_-] (ex.: openssl rand -hex 32)'
+      )
+  ),
   // Lista de app_ids do RevenueCat aceitos no webhook, separados por virgula
   // (um por plataforma: iOS e Android sao apps distintos no RevenueCat).
   REVENUECAT_APP_IDS: optionalString(),

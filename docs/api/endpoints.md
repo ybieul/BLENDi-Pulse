@@ -2413,9 +2413,11 @@ If `REVENUECAT_API_KEY` is not configured, the endpoint returns `503` with code 
 | `502` | RevenueCat returned a 5xx error |
 | `503` | `REVENUECAT_API_KEY` is not configured |
 
-### POST /webhooks/revenuecat
+### POST /webhooks/revenuecat/{REVENUECAT_WEBHOOK_PATH_SECRET}
 
-Receives signed subscription lifecycle events from RevenueCat and synchronizes the corresponding user's subscription state. This endpoint is public and called directly by RevenueCat, not by the mobile client. It is mounted before the global JSON body parser so the raw request body can be used to verify the signature.
+Receives subscription lifecycle events from RevenueCat and synchronizes the corresponding user's subscription state. This endpoint is public and called directly by RevenueCat, not by the mobile client. It is mounted before the global JSON body parser and reads the raw request body.
+
+**Unpredictable path.** The last path segment is the value of the required `REVENUECAT_WEBHOOK_PATH_SECRET` environment variable (at least 32 characters, `[A-Za-z0-9_-]` only; generate with `openssl rand -hex 32`). The API refuses to start without it. Only the exact path matches: the old fixed `/webhooks/revenuecat`, sub-paths, a trailing slash and different letter case all return the global `404`. This is an extra layer against automated scanners — the real protection is the `Authorization` header check below. The full URL (including this segment) is what must be configured in the RevenueCat dashboard.
 
 **JWT required:** No
 
@@ -2423,7 +2425,7 @@ Receives signed subscription lifecycle events from RevenueCat and synchronizes t
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `X-RevenueCat-Webhook-Signature` | string | Yes | HMAC-SHA256 signature in the `t=<timestamp>,v1=<signature>` format, validated against `REVENUECAT_WEBHOOK_SECRET` with a 5-minute timestamp tolerance |
+| `Authorization` | string | Yes | Static value configured in the dashboard's "Authorization header value" field (HMAC signing is off). Compared in constant time against `REVENUECAT_WEBHOOK_SECRET`; it must match exactly, including the `Bearer ` prefix if the dashboard value has one |
 
 **Request body**
 
@@ -2434,16 +2436,16 @@ The payload follows RevenueCat's webhook event schema. Relevant fields:
 | `event.id` | string | Yes | RevenueCat event identifier |
 | `event.type` | string | Yes | Only `INITIAL_PURCHASE`, `RENEWAL`, `CANCELLATION`, and `EXPIRATION` are processed; other types are acknowledged and ignored |
 | `event.app_user_id` | string | Yes | RevenueCat app user id, matched against the local user by `_id` or `revenueCatCustomerId` |
-| `event.app_id` | string | No | Compared against `REVENUECAT_APP_ID` when configured; mismatched events are ignored |
+| `event.app_id` | string | No | Must be one of the comma-separated ids in `REVENUECAT_APP_IDS` (one per platform; the legacy `REVENUECAT_APP_ID` is also accepted); events from other apps are ignored |
 | `event.expiration_at_ms` | number | No | Used to set `subscriptionExpiresAt` on `CANCELLATION` and `EXPIRATION` |
 | `event.original_transaction_id` | string | No | Used to set `subscriptionId` on `CANCELLATION` |
 
 **Processing pipeline**
 
-1. Returns `503` if `REVENUECAT_API_KEY` or `REVENUECAT_WEBHOOK_SECRET` is not configured.
-2. Returns `401` if the signature header is missing or does not match the computed HMAC signature.
-3. Parses and validates the JSON payload against the webhook schema; returns `400` on mismatch.
-4. Returns `200` with `ignored: true` when `app_id` does not match `REVENUECAT_APP_ID`, when the event type is not one of the four handled types, or when no local user matches `app_user_id`, `original_app_user_id`, or `aliases`.
+1. Returns `503` if `REVENUECAT_API_KEY`, `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_APP_IDS` is not configured.
+2. Returns `401` (generic body, no reason) if the `Authorization` header is missing or does not match `REVENUECAT_WEBHOOK_SECRET`.
+3. Parses and validates the JSON payload against the webhook schema; returns `400` on malformed JSON or schema mismatch.
+4. Returns `200` with `ignored: true` when `app_id` is not in `REVENUECAT_APP_IDS`, when the event type is not one of the four handled types, or when no local user matches `app_user_id`, `original_app_user_id`, or `aliases`.
 5. For `INITIAL_PURCHASE` and `RENEWAL`, resynchronizes the user's active subscription from RevenueCat and sets `isPro: true`.
 6. For `CANCELLATION`, attempts the same resynchronization first; if RevenueCat reports no active entitlement, records `subscriptionCancelRequestedAt` instead — `isPro` is not changed, so access is kept active until expiration.
 7. For `EXPIRATION`, attempts the same resynchronization first in case a new subscription is already active; if none is found and the event's expiration timestamp has passed, sets `isPro: false` and clears `subscriptionCancelRequestedAt`.
@@ -2483,8 +2485,9 @@ Ignored events also return `200 OK`, with a different payload:
 |---|---|
 | `200` | Event processed or intentionally ignored |
 | `400` | Webhook payload failed schema validation |
-| `401` | Missing or invalid `X-RevenueCat-Webhook-Signature` header |
-| `503` | `REVENUECAT_API_KEY` or `REVENUECAT_WEBHOOK_SECRET` is not configured |
+| `401` | Missing or invalid `Authorization` header |
+| `404` | Any path other than the exact `/webhooks/revenuecat/{REVENUECAT_WEBHOOK_PATH_SECRET}` |
+| `503` | `REVENUECAT_API_KEY`, `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_APP_IDS` is not configured |
 
 ---
 
