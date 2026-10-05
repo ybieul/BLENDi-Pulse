@@ -6,6 +6,7 @@ import { type ElementRef, useCallback, useEffect, useMemo, useRef, useState } fr
 import {
   ActivityIndicator,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -41,7 +42,7 @@ import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { IngredientCheckItem } from '../components/pantryScanner/IngredientCheckItem';
 import { RecipeCard } from '../components/pulseAi/RecipeCard';
-import { imagePlaceholderStyles } from '../assets';
+import { images } from '../assets';
 import {
   analyzePantry,
   compressAndEncodeImage,
@@ -504,7 +505,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       <View style={styles.screen}>
         <AuroraBackground intensity="full" />
         <View style={styles.analyzingContainer}>
-          <View style={[styles.logoPlaceholder, imagePlaceholderStyles.blendiLogo]} />
+          <Image source={images.blendiLogo} resizeMode="contain" style={styles.logoPlaceholder} />
           <Animated.Text style={[styles.analyzingText, { opacity: analyzingTextOpacity }]}>
             {t(ANALYZING_STEP_KEYS[analyzingStepIndex])}
           </Animated.Text>

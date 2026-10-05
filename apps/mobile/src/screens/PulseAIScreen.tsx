@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -41,7 +42,7 @@ import { ChatMessage } from '../components/pulseAi/ChatMessage';
 import { ChatInput, type ChatInputHandle } from '../components/pulseAi/ChatInput';
 import { ChatMessageSkeleton } from '../components/pulseAi/ChatMessageSkeleton';
 import { UsageIndicator } from '../components/pulseAi/UsageIndicator';
-import { imagePlaceholderStyles } from '../assets';
+import { images } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
 import * as conversationService from '../services/conversation.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
@@ -148,7 +149,7 @@ interface WelcomeStateProps {
 function WelcomeState({ title, subtitle, suggestions, onSuggestionPress }: WelcomeStateProps) {
   return (
     <View style={styles.welcomeContainer}>
-      <View style={[styles.logoPlaceholder, imagePlaceholderStyles.blendiLogo]} />
+      <Image source={images.blendiLogo} resizeMode="contain" style={styles.logoPlaceholder} />
       <Text style={styles.welcomeTitle}>{title}</Text>
       <Text style={styles.welcomeSubtitle}>{subtitle}</Text>
       <View style={styles.suggestionRow}>

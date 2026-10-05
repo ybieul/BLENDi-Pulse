@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   InteractionManager,
   StyleSheet,
   Text,
@@ -15,7 +16,7 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
-import { imagePlaceholderStyles } from '../../assets';
+import { images } from '../../assets';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 
 const SWIRL_SIZE = 28;
@@ -107,10 +108,11 @@ export function StreakBadge({ streakDays }: StreakBadgeProps) {
   });
 
   const swirlPlaceholder = (
-    <View
+    <Image
+      source={images.swirl}
+      resizeMode="contain"
       style={[
         styles.swirlPlaceholder,
-        imagePlaceholderStyles.swirl,
         { opacity: isLegendaryStage ? STAGE_TWO_OPACITY : getStageOpacity(streakDays) },
       ]}
     />
@@ -126,7 +128,6 @@ export function StreakBadge({ streakDays }: StreakBadgeProps) {
         },
       ]}
     >
-      {/* TODO: substituir por Image quando swirl.png for adicionado a assets/images/. */}
       {isLegendaryStage ? (
         <Animated.View style={{ transform: [{ rotate: rotationValue }] }}>
           {swirlPlaceholder}
@@ -150,7 +151,6 @@ const styles = StyleSheet.create({
   swirlPlaceholder: {
     width: SWIRL_SIZE,
     height: SWIRL_SIZE,
-    borderRadius: 999,
   },
   textBlock: {
     marginLeft: spacing.md,
