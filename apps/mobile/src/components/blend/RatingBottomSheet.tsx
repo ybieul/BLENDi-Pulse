@@ -20,14 +20,14 @@ import {
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.3)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[30];
 const SUBTITLE_OPACITY = 0.6;
 const SKIP_OPACITY = 0.5;
 const STAR_GAP = 12;
-const STAR_SELECTED_COLOR = '#facc15';
-const STAR_IDLE_COLOR = 'rgba(255,255,255,0.24)';
+const STAR_SELECTED_COLOR = colors.rating.starFilled;
+const STAR_IDLE_COLOR = colors.overlay.plum[24];
 
 export interface RatingBottomSheetProps {
   visible: boolean;

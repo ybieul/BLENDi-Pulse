@@ -18,8 +18,8 @@ import {
 } from '@blendi/shared';
 
 const FIELD_HEIGHT = 56;
-const FIELD_BG_COLOR = 'rgba(255,255,255,0.07)';
-const FIELD_HIGHLIGHT_COLOR = 'rgba(255,255,255,0.04)';
+const FIELD_BG_COLOR = colors.overlay.plum[6];
+const FIELD_HIGHLIGHT_COLOR = colors.overlay.plum[3];
 const LABEL_IDLE_TRANSLATE_Y = 12;
 const LABEL_FLOAT_FONT_SIZE = 11;
 const LABEL_IDLE_FONT_SIZE = 15;
@@ -167,7 +167,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
 
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0.10)', 'rgba(154,72,147,0.65)'],
+    outputRange: [colors.overlay.plum[16], colors.overlay.pulse[65]],
   });
 
   return (
@@ -205,7 +205,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
           defaultValue={defaultValue}
           editable={editable}
           placeholder={undefined}
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor={colors.overlay.plum[35]}
           selectionColor={colors.brand.pulse}
           onFocus={handleFocus}
           onBlur={handleBlur}

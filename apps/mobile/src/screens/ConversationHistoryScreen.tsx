@@ -22,9 +22,9 @@ import type { PulseAIStackScreenProps } from '../navigation/types';
 import { showToast } from '../utils/toast.utils';
 
 const EMPTY_ICON_SIZE = 48;
-const EMPTY_ICON_COLOR = 'rgba(154,72,147,0.35)';
-const CARD_BACKGROUND = 'rgba(255,255,255,0.06)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
+const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
+const CARD_BACKGROUND = colors.overlay.plum[6];
+const CARD_BORDER = colors.overlay.plum[10];
 const SKELETON_COUNT = 3;
 
 // ─── Card de conversa ───────────────────────────────────────────────────────

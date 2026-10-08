@@ -17,8 +17,8 @@ import { useNetworkStore } from '../../store/network.store';
 const BANNER_HEIGHT = 36;
 const RECONNECT_VISIBLE_MS = 2500;
 const RECONNECT_HIDE_DURATION_MS = 300;
-const OFFLINE_BACKGROUND_COLOR = 'rgba(239,68,68,0.95)';
-const RECONNECTED_BACKGROUND_COLOR = 'rgba(34,197,94,0.95)';
+const OFFLINE_BACKGROUND_COLOR = colors.overlay.error[95];
+const RECONNECTED_BACKGROUND_COLOR = colors.overlay.success[95];
 
 type BannerState = 'neutral' | 'offline' | 'reconnected';
 

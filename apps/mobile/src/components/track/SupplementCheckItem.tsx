@@ -21,9 +21,9 @@ import {
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { SupplementStackItem } from '../../services/supplementStack.service';
 
-const CONTAINER_BACKGROUND = 'rgba(255,255,255,0.06)';
-const CONTAINER_BORDER = 'rgba(255,255,255,0.08)';
-const UNCHECKED_BORDER = 'rgba(255,255,255,0.25)';
+const CONTAINER_BACKGROUND = colors.overlay.plum[6];
+const CONTAINER_BORDER = colors.overlay.plum[8];
+const UNCHECKED_BORDER = colors.overlay.plum[25];
 const SECONDARY_TEXT_OPACITY = 0.6;
 const CHECK_CIRCLE_SIZE = spacing['2xl'] + spacing.md;
 const CHECK_CIRCLE_BORDER_WIDTH = spacing.xs;
@@ -178,7 +178,7 @@ export function SupplementCheckItem({
                 }),
                 backgroundColor: progressValue.interpolate({
                   inputRange: [0, 1],
-                  outputRange: ['rgba(0,0,0,0)', colors.brand.pulse],
+                  outputRange: ['transparent', colors.brand.pulse],
                 }),
                 transform: [{ scale: progressScale }],
               },

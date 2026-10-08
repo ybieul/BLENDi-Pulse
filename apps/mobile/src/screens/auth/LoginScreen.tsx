@@ -29,8 +29,8 @@ interface ApiErrorResponse {
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
-const DIVIDER_LINE_COLOR = 'rgba(255,255,255,0.08)';
-const DIVIDER_TEXT_COLOR = 'rgba(255,255,255,0.4)';
+const DIVIDER_LINE_COLOR = colors.overlay.plum[8];
+const DIVIDER_TEXT_COLOR = colors.overlay.plum[40];
 
 export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
   const { t } = useAppTranslation();

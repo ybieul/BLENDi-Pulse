@@ -2,11 +2,12 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { colors } from '@blendi/shared';
 import { api } from '../config/api';
 import i18n from '../locales/i18n';
 
 const NOTIFICATION_CHANNEL_ID = 'default';
-const NOTIFICATION_CHANNEL_LIGHT_COLOR = '#9a4893';
+const NOTIFICATION_CHANNEL_LIGHT_COLOR = colors.brand.pulse;
 const NOTIFICATION_CHANNEL_VIBRATION_PATTERN: number[] = [0, 250, 250, 250];
 
 type NotificationDataValue = string | number | boolean | null | undefined;

@@ -22,9 +22,9 @@ import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useGamificationStore } from '../../store/gamification.store';
 
 const SHEET_RADIUS = 24;
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.3)';
-const TRACK_COLOR = 'rgba(255,255,255,0.08)';
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[30];
+const TRACK_COLOR = colors.overlay.plum[8];
 const TOTAL_XP_OPACITY = 0.65;
 const XP_RANGE_OPACITY = 0.45;
 const NEXT_LEVEL_COPY_OPACITY = 0.6;

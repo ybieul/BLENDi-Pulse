@@ -26,14 +26,14 @@ import { showToast } from '../../utils/toast.utils';
 const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
 const BUTTON_RADIUS = 14;
-const BUTTON_BACKGROUND = 'rgba(255,255,255,0.07)';
-const BUTTON_BORDER = 'rgba(255,255,255,0.10)';
-const WATER_ICON_COLOR = 'rgba(59,130,246,0.80)';
+const BUTTON_BACKGROUND = colors.overlay.plum[7];
+const BUTTON_BORDER = colors.overlay.plum[10];
+const WATER_ICON_COLOR = colors.overlay.info[80];
 const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
-const WATER_OFFLINE_ICON_COLOR = 'rgba(255,255,255,0.82)';
+const WATER_OFFLINE_ICON_COLOR = colors.overlay.plum[82];
 const WATER_OFFLINE_ICON_SIZE = 10;
 
 export interface QuickActionTriggerProps {

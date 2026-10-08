@@ -23,7 +23,7 @@ import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const TRACK_STROKE = 'rgba(255,255,255,0.08)';
+const TRACK_STROKE = colors.overlay.plum[8];
 const LABEL_OPACITY = 0.6;
 const SEPARATOR_OPACITY = 0.45;
 const CELEBRATION_SCALE = 1.05;

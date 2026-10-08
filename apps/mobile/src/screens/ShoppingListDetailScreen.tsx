@@ -43,19 +43,19 @@ import { markListDirty } from '../utils/shoppingListSync.utils';
 import { showToast } from '../utils/toast.utils';
 
 const DETAIL_STALE_TIME_MS = 30_000;
-const SKELETON_BG = 'rgba(255,255,255,0.05)';
-const SKELETON_BORDER = 'rgba(255,255,255,0.08)';
-const ROW_BACKGROUND = 'rgba(255,255,255,0.06)';
-const ROW_BORDER = 'rgba(255,255,255,0.08)';
-const EMPTY_ICON_COLOR = 'rgba(154,72,147,0.35)';
-const SECTION_TEXT_COLOR = 'rgba(255,255,255,0.50)';
-const INPUT_BG = 'rgba(255,255,255,0.08)';
-const INPUT_BORDER = 'rgba(255,255,255,0.10)';
-const INPUT_PLACEHOLDER = 'rgba(255,255,255,0.35)';
-const DELETE_ICON_COLOR = 'rgba(239,68,68,0.65)';
-const UNCHECKED_BORDER = 'rgba(255,255,255,0.25)';
-const FOOTER_BORDER = 'rgba(255,255,255,0.08)';
-const HEADER_ICON_COLOR = 'rgba(255,255,255,0.70)';
+const SKELETON_BG = colors.overlay.plum[5];
+const SKELETON_BORDER = colors.overlay.plum[8];
+const ROW_BACKGROUND = colors.overlay.plum[6];
+const ROW_BORDER = colors.overlay.plum[8];
+const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
+const SECTION_TEXT_COLOR = colors.overlay.plum[50];
+const INPUT_BG = colors.overlay.plum[6];
+const INPUT_BORDER = colors.overlay.plum[18];
+const INPUT_PLACEHOLDER = colors.overlay.plum[35];
+const DELETE_ICON_COLOR = colors.overlay.error[65];
+const UNCHECKED_BORDER = colors.overlay.plum[25];
+const FOOTER_BORDER = colors.overlay.plum[8];
+const HEADER_ICON_COLOR = colors.overlay.plum[70];
 
 interface ShoppingListItemRowProps {
   item: ShoppingListItem;
@@ -102,7 +102,7 @@ function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowPr
               {
                 backgroundColor: fillProgress.interpolate({
                   inputRange: [0, 1],
-                  outputRange: ['rgba(0,0,0,0)', colors.brand.pulse],
+                  outputRange: ['transparent', colors.brand.pulse],
                 }),
                 borderColor: fillProgress.interpolate({
                   inputRange: [0, 1],
@@ -617,7 +617,7 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
             onPress={handleAddItem}
             style={[styles.addButton, isAdding && styles.addButtonDisabled]}
           >
-            <Ionicons color={colors.text.primary} name="add" size={22} />
+            <Ionicons color={colors.text.inverse} name="add" size={22} />
           </TouchableOpacity>
         </View>
       </View>

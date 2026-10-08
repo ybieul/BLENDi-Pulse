@@ -17,9 +17,9 @@ import {
   spacing,
 } from '@blendi/shared';
 
-const ROW_BACKGROUND = 'rgba(255,255,255,0.06)';
-const ROW_BORDER = 'rgba(255,255,255,0.08)';
-const UNCHECKED_BORDER = 'rgba(255,255,255,0.25)';
+const ROW_BACKGROUND = colors.overlay.plum[6];
+const ROW_BORDER = colors.overlay.plum[8];
+const UNCHECKED_BORDER = colors.overlay.plum[25];
 const QUANTITY_OPACITY = 0.55;
 const CHECK_CIRCLE_SIZE = 24;
 const CHECK_CIRCLE_BORDER_WIDTH = spacing.xs;
@@ -120,7 +120,7 @@ export function IngredientCheckItem({
             }),
             backgroundColor: progressValue.interpolate({
               inputRange: [0, 1],
-              outputRange: ['rgba(0,0,0,0)', colors.brand.pulse],
+              outputRange: ['transparent', colors.brand.pulse],
             }),
             transform: [{ scale: scaleValue }],
           },

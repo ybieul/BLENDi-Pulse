@@ -14,8 +14,8 @@ import { subscribeToToasts, type ToastPayload } from './toast.events';
 export { showPersistentToast, showToast } from './toast.events';
 
 const IOS_TOAST_ENTRY_OFFSET = -12;
-const IOS_TOAST_BORDER_COLOR = 'rgba(255,107,107,0.22)';
-const IOS_TOAST_BACKGROUND_COLOR = 'rgba(60,24,24,0.94)';
+const IOS_TOAST_BORDER_COLOR = colors.decorative.toastBorder;
+const IOS_TOAST_BACKGROUND_COLOR = colors.decorative.toastBackground;
 const TOAST_ACTION_BACKGROUND_COLOR = colors.brand.pulse;
 
 export function ToastViewport() {
@@ -154,13 +154,13 @@ const styles = StyleSheet.create({
     },
   },
   toastTitle: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.display,
     fontSize: fontSizes.md,
     marginBottom: spacing.xs,
   },
   toastText: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
     lineHeight: 20,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     backgroundColor: TOAST_ACTION_BACKGROUND_COLOR,
   },
   actionButtonText: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: fontSizes.sm,
     lineHeight: 18,

@@ -32,10 +32,10 @@ export interface BadgeProfile {
   blendiModel: BlendiModel;
 }
 
-const STREAK_MASTER_ICON_COLOR = 'rgba(245,158,11,1)';
-const EARLY_ADOPTER_ICON_COLOR = 'rgba(34,197,94,0.90)';
-const MODEL_LITE_ICON_COLOR = 'rgba(107,114,128,0.90)';
-const MODEL_STEEL_ICON_COLOR = 'rgba(245,158,11,0.90)';
+const STREAK_MASTER_ICON_COLOR = colors.feedback.warning;
+const EARLY_ADOPTER_ICON_COLOR = colors.overlay.success[90];
+const MODEL_LITE_ICON_COLOR = colors.overlay.neutralGray[90];
+const MODEL_STEEL_ICON_COLOR = colors.overlay.warning[90];
 
 const MODEL_BADGE_IDS: Record<string, BlendiModel> = {
   blendi_model_lite: 'Lite',

@@ -396,7 +396,7 @@ function AppShell() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-      <StatusBar style="light" backgroundColor={colors.background.primary} />
+      <StatusBar style="dark" backgroundColor={colors.background.primary} />
       <RootNavigator />
       <ToastViewport />
     </NavigationContainer>

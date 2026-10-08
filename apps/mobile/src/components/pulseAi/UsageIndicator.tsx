@@ -12,9 +12,9 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 
 const DAILY_QUERY_LIMIT = 3;
 const DOT_SIZE = 8;
-const FILLED_DOT_COLOR = 'rgba(154,72,147,0.92)';
-const FILLED_DOT_BORDER = 'rgba(154,72,147,1)';
-const OUTLINED_DOT_BORDER = 'rgba(255,255,255,0.26)';
+const FILLED_DOT_COLOR = colors.overlay.pulse[92];
+const FILLED_DOT_BORDER = colors.brand.pulse;
+const OUTLINED_DOT_BORDER = colors.overlay.plum[26];
 const OUTLINED_DOT_BACKGROUND = 'transparent';
 const TEXT_OPACITY = 0.68;
 const ANIMATION_FADE_START = 0.45;

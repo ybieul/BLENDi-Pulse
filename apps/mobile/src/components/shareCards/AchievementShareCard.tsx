@@ -6,14 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { ProfilePhoto } from '../profile/ProfilePhoto';
-import { AuroraBackground } from '../ui/AuroraBackground';
+import { AuroraBackground, DARK_AURORA_BASE_COLORS } from '../ui/AuroraBackground';
 
-const SHARE_CARD_BACKGROUND = '#2b1429';
-const HERO_GLOW_TOP = ['rgba(245,158,11,0.18)', 'transparent'] as const;
-const HERO_GLOW_BOTTOM = ['rgba(236,72,153,0.14)', 'transparent'] as const;
-const ORB_PRIMARY_BACKGROUND = 'rgba(245,158,11,0.10)';
-const ORB_SECONDARY_BACKGROUND = 'rgba(236,72,153,0.10)';
-const UNLOCK_LABEL_COLOR = 'rgba(255,255,255,0.7)';
+const SHARE_CARD_BACKGROUND = colors.brand.plum;
+const HERO_GLOW_TOP = [colors.overlay.warning[18], 'transparent'] as const;
+const HERO_GLOW_BOTTOM = [colors.overlay.pink[14], 'transparent'] as const;
+const ORB_PRIMARY_BACKGROUND = colors.overlay.warning[10];
+const ORB_SECONDARY_BACKGROUND = colors.overlay.pink[10];
+const UNLOCK_LABEL_COLOR = colors.overlay.white[70];
 const CARD_DIMENSION = 1080;
 
 export interface AchievementShareCardProfile {
@@ -41,7 +41,7 @@ export const AchievementShareCard = forwardRef<AchievementShareCardHandle, Achie
         <ViewShot ref={ref} style={styles.captureRoot}>
           <View style={styles.backgroundLayer} />
           <View style={styles.auroraLayer}>
-            <AuroraBackground intensity="full" />
+            <AuroraBackground intensity="full" baseColors={DARK_AURORA_BASE_COLORS} />
           </View>
 
           <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>

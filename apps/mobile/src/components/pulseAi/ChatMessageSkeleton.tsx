@@ -8,7 +8,7 @@ import { borderRadius, colors, spacing } from '@blendi/shared';
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
 const CARD_HEIGHT = 220;
-const SKELETON_CARD_BORDER = 'rgba(255,255,255,0.07)';
+const SKELETON_CARD_BORDER = colors.overlay.plum[7];
 
 export function ChatMessageSkeleton() {
   return (

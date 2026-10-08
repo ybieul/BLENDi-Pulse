@@ -23,17 +23,17 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { BadgeStage, UserBadge } from '../../utils/badges.utils';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.3)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[30];
 const DESCRIPTION_OPACITY = 0.7;
-const TRACK_COLOR = 'rgba(255,255,255,0.08)';
-const LOCKED_STAGE_ICON_COLOR = 'rgba(255,255,255,0.22)';
+const TRACK_COLOR = colors.overlay.plum[8];
+const LOCKED_STAGE_ICON_COLOR = colors.overlay.plum[22];
 const STAGE_LABEL_OPACITY = 0.78;
 const STAGE_REQUIREMENT_OPACITY = 0.6;
-const BRONZE_COLOR = 'rgba(205,127,50,0.90)';
-const SILVER_COLOR = 'rgba(192,192,192,0.90)';
-const GOLD_COLOR = 'rgba(255,215,0,0.90)';
+const BRONZE_COLOR = colors.badgeTier.bronzeIcon;
+const SILVER_COLOR = colors.badgeTier.silverIcon;
+const GOLD_COLOR = colors.badgeTier.goldIcon;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];

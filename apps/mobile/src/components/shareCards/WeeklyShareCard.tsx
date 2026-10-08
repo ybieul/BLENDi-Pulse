@@ -7,14 +7,14 @@ import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { ProfilePhoto } from '../profile/ProfilePhoto';
-import { AuroraBackground } from '../ui/AuroraBackground';
+import { AuroraBackground, DARK_AURORA_BASE_COLORS } from '../ui/AuroraBackground';
 
-const SHARE_CARD_BACKGROUND = '#2b1429';
+const SHARE_CARD_BACKGROUND = colors.brand.plum;
 const CARD_DIMENSION = 1080;
-const BLOCK_BACKGROUND = 'rgba(255,255,255,0.08)';
-const BLOCK_BORDER = 'rgba(255,255,255,0.10)';
-const LABEL_COLOR = 'rgba(255,255,255,0.7)';
-const ICON_COLOR = 'rgba(255,255,255,0.72)';
+const BLOCK_BACKGROUND = colors.overlay.white[8];
+const BLOCK_BORDER = colors.overlay.white[10];
+const LABEL_COLOR = colors.overlay.white[70];
+const ICON_COLOR = colors.overlay.white[72];
 
 export interface WeeklyShareCardProfile {
   userId?: string;
@@ -150,7 +150,7 @@ export const WeeklyShareCard = forwardRef<WeeklyShareCardHandle, WeeklyShareCard
         <ViewShot ref={ref} style={styles.captureRoot}>
           <View style={styles.backgroundLayer} />
           <View style={styles.auroraLayer}>
-            <AuroraBackground intensity="reduced" />
+            <AuroraBackground intensity="reduced" baseColors={DARK_AURORA_BASE_COLORS} />
           </View>
 
           <View style={styles.content}>

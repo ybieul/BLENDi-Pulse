@@ -105,21 +105,21 @@ import axios from "axios";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CARD_BACKGROUND = "rgba(255,255,255,0.07)";
-const CARD_BORDER = "rgba(255,255,255,0.10)";
-const DIVIDER_COLOR = "rgba(255,255,255,0.06)";
-const SWITCH_TRACK_FALSE = "rgba(154,72,147,0.30)";
-const SWITCH_UNDERLAY = "rgba(255,255,255,0.04)";
-const VALUE_COLOR = "rgba(255,255,255,0.55)";
-const CHEVRON_COLOR = "rgba(255,255,255,0.30)";
-const PLAN_BADGE_FREE_BG = "rgba(255,255,255,0.08)";
-const PLAN_BADGE_FREE_BORDER = "rgba(255,255,255,0.12)";
-const PLAN_BADGE_PRO_BG = "rgba(154,72,147,0.25)";
-const PLAN_BADGE_PRO_BORDER = "rgba(154,72,147,0.40)";
-const UPGRADE_CARD_BG = "rgba(154,72,147,0.12)";
-const UPGRADE_CARD_BORDER = "rgba(154,72,147,0.35)";
-const LONGEST_STREAK_COLOR = "rgba(245,158,11,0.90)";
-const LEVEL_PROGRESS_TRACK_COLOR = "rgba(255,255,255,0.08)";
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
+const DIVIDER_COLOR = colors.overlay.plum[6];
+const SWITCH_TRACK_FALSE = colors.overlay.pulse[30];
+const SWITCH_UNDERLAY = colors.overlay.plum[4];
+const VALUE_COLOR = colors.overlay.plum[55];
+const CHEVRON_COLOR = colors.overlay.plum[30];
+const PLAN_BADGE_FREE_BG = colors.overlay.plum[8];
+const PLAN_BADGE_FREE_BORDER = colors.overlay.plum[12];
+const PLAN_BADGE_PRO_BG = colors.overlay.pulse[25];
+const PLAN_BADGE_PRO_BORDER = colors.overlay.pulse[40];
+const UPGRADE_CARD_BG = colors.overlay.pulse[12];
+const UPGRADE_CARD_BORDER = colors.overlay.pulse[35];
+const LONGEST_STREAK_COLOR = colors.overlay.warning[90];
+const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[8];
 const LEVEL_NEXT_COPY_OPACITY = 0.6;
 const LABEL_OPACITY = 0.55;
 const VERSION_OPACITY = 0.35;
@@ -133,10 +133,10 @@ const PROFILE_PHOTO_COMPRESSION = 0.7;
 const PROFILE_PHOTO_MAX_FILE_BYTES = 300 * 1024;
 const PROFILE_PHOTO_FILE_TYPE = "jpeg" as const;
 const PROFILE_PHOTO_MIME_TYPE = "image/jpeg";
-const HEADER_ACTION_BACKGROUND = "rgba(255,255,255,0.06)";
-const HEADER_ACTION_BORDER = "rgba(255,255,255,0.12)";
-const HEADER_ACTION_ICON_COLOR = "rgba(255,255,255,0.92)";
-const PROFILE_PHOTO_LOADING_OVERLAY = "rgba(43,20,41,0.28)";
+const HEADER_ACTION_BACKGROUND = colors.overlay.plum[6];
+const HEADER_ACTION_BORDER = colors.overlay.plum[12];
+const HEADER_ACTION_ICON_COLOR = colors.overlay.plum[92];
+const PROFILE_PHOTO_LOADING_OVERLAY = colors.overlay.plum[28];
 const WEEKLY_SHARE_DELAY = 240;
 
 const ONBOARDING_KEY = "onboarding_completed";
@@ -1139,13 +1139,13 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
               {isProfilePhotoLoading ? (
                 <View style={styles.photoLoadingOverlay}>
-                  <ActivityIndicator color={colors.text.primary} size="small" />
+                  <ActivityIndicator color={colors.text.inverse} size="small" />
                 </View>
               ) : null}
 
               <View style={styles.photoCameraBadge}>
                 <Ionicons
-                  color={colors.text.primary}
+                  color={colors.text.inverse}
                   name="camera"
                   size={PROFILE_PHOTO_CAMERA_ICON_SIZE}
                 />

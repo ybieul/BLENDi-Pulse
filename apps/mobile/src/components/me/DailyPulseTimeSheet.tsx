@@ -25,11 +25,11 @@ import { AuthButton } from '../ui/AuthButton';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.55)';
-const WHEEL_HIGHLIGHT_BG = 'rgba(255,255,255,0.07)';
-const WHEEL_HIGHLIGHT_BORDER = 'rgba(255,255,255,0.14)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[55];
+const WHEEL_HIGHLIGHT_BG = colors.overlay.plum[7];
+const WHEEL_HIGHLIGHT_BORDER = colors.overlay.plum[14];
 const ITEM_HEIGHT = 48;
 const VISIBLE_ITEMS = 5;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;

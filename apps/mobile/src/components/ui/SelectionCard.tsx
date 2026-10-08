@@ -22,12 +22,12 @@ const CARD_RADIUS = 16;
 const BORDER_ANIMATION_DURATION = 200;
 const CHECK_ANIMATION_DURATION = 150;
 const SCALE_SELECTED = 1.02;
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_HIGHLIGHT = 'rgba(255,255,255,0.04)';
-const CARD_BORDER_IDLE = 'rgba(255,255,255,0.10)';
-const CARD_BORDER_SELECTED = 'rgba(154,72,147,0.65)';
-const BADGE_BACKGROUND = 'rgba(255,255,255,0.08)';
-const BADGE_BORDER = 'rgba(255,255,255,0.08)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_HIGHLIGHT = colors.overlay.plum[4];
+const CARD_BORDER_IDLE = colors.overlay.plum[10];
+const CARD_BORDER_SELECTED = colors.overlay.pulse[65];
+const BADGE_BACKGROUND = colors.overlay.plum[8];
+const BADGE_BORDER = colors.overlay.plum[8];
 
 export interface SelectionCardProps extends Pick<PressableProps, 'testID' | 'accessibilityHint'> {
   title: string;

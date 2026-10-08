@@ -56,8 +56,8 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 const DAILY_FREE_LIMIT = 3;
 const MAX_MESSAGES = 20;
 const LOGO_PLACEHOLDER_SIZE = 64;
-const SUGGESTION_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const SUGGESTION_BACKGROUND_COLOR = 'rgba(255,255,255,0.06)';
+const SUGGESTION_BORDER_COLOR = colors.overlay.plum[10];
+const SUGGESTION_BACKGROUND_COLOR = colors.overlay.plum[6];
 
 // Altura estimada do ChatInput acima da tab bar (fade + campo + padding).
 // Usado para garantir que o conteúdo não fique atrás do input fixado.
@@ -67,7 +67,7 @@ const BADGE_SIZE = 16;
 const BADGE_FONT_SIZE_NORMAL = 10;
 const BADGE_FONT_SIZE_OVERFLOW = 8;
 const HEADER_SIDE_WIDTH = 96;
-const SCANNER_BADGE_BACKGROUND = 'rgba(245,158,11,0.90)';
+const SCANNER_BADGE_BACKGROUND = colors.overlay.warning[90];
 
 const TAKING_LONGER_THRESHOLD_SECONDS = 8;
 const TAKING_LONGER_FADE_DURATION_MS = 300;
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: BADGE_FONT_SIZE_NORMAL,
     fontWeight: fontWeights.bold,

@@ -34,13 +34,13 @@ import { showToast } from '../../utils/toast.utils';
 import { AuthButton } from '../ui/AuthButton';
 
 const SHEET_RADIUS = 24;
-const BACKDROP_COLOR = 'rgba(0,0,0,0.55)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const SHEET_BORDER = 'rgba(255,255,255,0.10)';
-const ROW_BACKGROUND = 'rgba(255,255,255,0.06)';
-const ROW_BORDER = 'rgba(255,255,255,0.08)';
-const CHEVRON_COLOR = 'rgba(255,255,255,0.45)';
-const EMPTY_ICON_COLOR = 'rgba(154,72,147,0.35)';
+const BACKDROP_COLOR = colors.overlay.black[55];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const SHEET_BORDER = colors.overlay.plum[10];
+const ROW_BACKGROUND = colors.overlay.plum[6];
+const ROW_BORDER = colors.overlay.plum[8];
+const CHEVRON_COLOR = colors.overlay.plum[45];
+const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const SUBTITLE_OPACITY = 0.6;
 const META_OPACITY = 0.55;
 

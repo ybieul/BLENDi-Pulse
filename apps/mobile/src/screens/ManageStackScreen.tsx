@@ -82,16 +82,16 @@ const TIMING_TRANSLATION_KEYS = {
 } as const;
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.45)';
-const CARD_BACKGROUND = 'rgba(255,255,255,0.06)';
-const CARD_BORDER = 'rgba(255,255,255,0.08)';
-const DELETE_COLOR = 'rgba(239,68,68,0.70)';
-const GHOST_BORDER = 'rgba(154,72,147,0.40)';
-const CHIP_BORDER_IDLE = 'rgba(255,255,255,0.12)';
-const CHIP_BG_IDLE = 'rgba(255,255,255,0.05)';
-const CHIP_BG_SELECTED = 'rgba(154,72,147,0.15)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[45];
+const CARD_BACKGROUND = colors.overlay.plum[6];
+const CARD_BORDER = colors.overlay.plum[8];
+const DELETE_COLOR = colors.overlay.error[70];
+const GHOST_BORDER = colors.overlay.pulse[40];
+const CHIP_BORDER_IDLE = colors.overlay.plum[12];
+const CHIP_BG_IDLE = colors.overlay.plum[5];
+const CHIP_BG_SELECTED = colors.overlay.pulse[15];
 const EMPTY_SUPPLEMENTS: SupplementStackItem[] = [];
 const DEFAULT_DAILY_TARGET_COUNT = '1';
 const MAX_DAILY_TARGET_COUNT = 20;
@@ -171,11 +171,11 @@ function SupplementManageItem({
           value={item.isActive}
           onValueChange={(val) => onToggleActive(item.supplementId, val)}
           trackColor={{
-            false: 'rgba(255,255,255,0.15)',
+            false: colors.overlay.plum[15],
             true: `${colors.brand.pulse}55`,
           }}
-          thumbColor={item.isActive ? colors.brand.pulse : 'rgba(255,255,255,0.50)'}
-          ios_backgroundColor="rgba(255,255,255,0.15)"
+          thumbColor={item.isActive ? colors.brand.pulse : colors.overlay.plum[50]}
+          ios_backgroundColor={colors.overlay.plum[15]}
         />
         <Pressable
           accessibilityRole="button"
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     marginTop: spacing['2xl'],
   },
   saveButtonLabel: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: fontSizes.md,
     fontWeight: fontWeights.semibold,

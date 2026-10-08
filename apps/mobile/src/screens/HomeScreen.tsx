@@ -73,11 +73,11 @@ const FADE_DURATION = 300;
 const HYDRATION_TARGET_ML = 2500;
 const BADGE_HEIGHT = 24;
 const BADGE_PADDING_H = 10;
-const BADGE_FREE_BACKGROUND = 'rgba(255,255,255,0.08)';
-const BADGE_FREE_BORDER = 'rgba(255,255,255,0.12)';
-const BADGE_PRO_BACKGROUND = 'rgba(154,72,147,0.25)';
-const BADGE_PRO_BORDER = 'rgba(154,72,147,0.40)';
-const LEVEL_PROGRESS_TRACK_COLOR = 'rgba(255,255,255,0.10)';
+const BADGE_FREE_BACKGROUND = colors.overlay.plum[8];
+const BADGE_FREE_BORDER = colors.overlay.plum[12];
+const BADGE_PRO_BACKGROUND = colors.overlay.pulse[25];
+const BADGE_PRO_BORDER = colors.overlay.pulse[40];
+const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[10];
 const LEVEL_PROGRESS_BAR_WIDTH = 40;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];

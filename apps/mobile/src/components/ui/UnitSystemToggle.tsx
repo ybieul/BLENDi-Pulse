@@ -11,11 +11,11 @@ interface UnitSystemToggleProps {
   imperialLabel: string;
 }
 
-const TOGGLE_BACKGROUND = 'rgba(255,255,255,0.07)';
-const TOGGLE_BORDER = 'rgba(255,255,255,0.10)';
-const TOGGLE_HIGHLIGHT = 'rgba(255,255,255,0.04)';
-const TOGGLE_SELECTED_BACKGROUND = 'rgba(154,72,147,0.22)';
-const TOGGLE_SELECTED_BORDER = 'rgba(154,72,147,0.55)';
+const TOGGLE_BACKGROUND = colors.overlay.plum[7];
+const TOGGLE_BORDER = colors.overlay.plum[10];
+const TOGGLE_HIGHLIGHT = colors.overlay.plum[4];
+const TOGGLE_SELECTED_BACKGROUND = colors.overlay.pulse[22];
+const TOGGLE_SELECTED_BORDER = colors.overlay.pulse[55];
 
 export function UnitSystemToggle({
   value,

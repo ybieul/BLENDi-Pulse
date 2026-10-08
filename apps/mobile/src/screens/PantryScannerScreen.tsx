@@ -72,18 +72,18 @@ const ANALYZING_STEP_KEYS = [
 const ANALYZING_STEP_INTERVAL_MS = 6000;
 const ANALYZING_FADE_DURATION_MS = 200;
 
-const TOP_BAR_BG = 'rgba(0,0,0,0.45)';
-const BOTTOM_BAR_BG = 'rgba(0,0,0,0.55)';
-const CAPTURE_BUTTON_BG = 'rgba(255,255,255,0.20)';
-const CAPTURE_BUTTON_BORDER = 'rgba(255,255,255,0.40)';
-const GALLERY_BUTTON_BG = 'rgba(0,0,0,0.45)';
-const SCANS_PILL_BG = 'rgba(0,0,0,0.55)';
-const SCANS_PILL_BORDER = 'rgba(255,255,255,0.15)';
-const RENEWS_COLOR = 'rgba(255,255,255,0.55)';
-const INPUT_BG = 'rgba(255,255,255,0.06)';
-const INPUT_BORDER = 'rgba(255,255,255,0.10)';
-const GHOST_BORDER = 'rgba(255,255,255,0.15)';
-const SUBTITLE_COLOR = 'rgba(255,255,255,0.60)';
+const TOP_BAR_BG = colors.overlay.black[45];
+const BOTTOM_BAR_BG = colors.overlay.black[55];
+const CAPTURE_BUTTON_BG = colors.overlay.white[20];
+const CAPTURE_BUTTON_BORDER = colors.overlay.white[40];
+const GALLERY_BUTTON_BG = colors.overlay.black[45];
+const SCANS_PILL_BG = colors.overlay.black[55];
+const SCANS_PILL_BORDER = colors.overlay.white[15];
+const RENEWS_COLOR = colors.overlay.white[55];
+const INPUT_BG = colors.overlay.plum[6];
+const INPUT_BORDER = colors.overlay.plum[16];
+const GHOST_BORDER = colors.overlay.plum[15];
+const SUBTITLE_COLOR = colors.overlay.plum[60];
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

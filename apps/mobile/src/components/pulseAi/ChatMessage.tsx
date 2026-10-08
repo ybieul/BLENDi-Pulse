@@ -7,11 +7,11 @@ import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { RecipeCard } from './RecipeCard';
 
-const USER_BUBBLE_BACKGROUND = 'rgba(154,72,147,0.25)';
-const USER_BUBBLE_BORDER = 'rgba(154,72,147,0.35)';
-const ERROR_BUBBLE_BACKGROUND = 'rgba(220,60,60,0.12)';
-const ERROR_BUBBLE_BORDER = 'rgba(220,80,80,0.28)';
-const ERROR_ICON_COLOR = 'rgba(255,100,100,0.9)';
+const USER_BUBBLE_BACKGROUND = colors.overlay.pulse[25];
+const USER_BUBBLE_BORDER = colors.overlay.pulse[35];
+const ERROR_BUBBLE_BACKGROUND = colors.decorative.errorBubbleBackground;
+const ERROR_BUBBLE_BORDER = colors.decorative.errorBubbleBorder;
+const ERROR_ICON_COLOR = colors.decorative.errorBubbleIcon;
 const TIMESTAMP_OPACITY = 0.5;
 const ENTRY_DURATION_MS = 300;
 const ENTRY_TRANSLATE_Y = 12;

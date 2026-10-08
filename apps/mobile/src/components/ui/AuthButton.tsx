@@ -18,7 +18,7 @@ const BUTTON_HEIGHT = 56;
 const BUTTON_FONT_SIZE = 16;
 const PRESS_SCALE = 0.97;
 const LOADING_FADE_DURATION = 150;
-const SHINE_OVERLAY_COLOR = 'rgba(255,255,255,0.08)';
+const SHINE_OVERLAY_COLOR = colors.overlay.white[8];
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -119,7 +119,7 @@ export function AuthButton({
       </Animated.View>
 
       <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}>
-        <ActivityIndicator size="small" color={colors.text.primary} />
+        <ActivityIndicator size="small" color={colors.text.inverse} />
       </Animated.View>
     </AnimatedTouchableOpacity>
   );
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: 'DMSans_500Medium',
     fontSize: BUTTON_FONT_SIZE,
     letterSpacing: 0.5,

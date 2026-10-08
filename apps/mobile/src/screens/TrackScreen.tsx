@@ -69,9 +69,9 @@ const DEFAULT_HYDRATION_TARGET_ML = 2500;
 const SHOPPING_LIST_BADGE_SIZE = 16;
 const SHOPPING_LIST_BADGE_FONT_SIZE = 10;
 const SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW = 8;
-const RETRY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.15)';
-const HISTORY_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
-const HISTORY_BUTTON_BORDER_COLOR = 'rgba(255,255,255,0.12)';
+const RETRY_BUTTON_BORDER_COLOR = colors.overlay.plum[15];
+const HISTORY_BUTTON_BACKGROUND = colors.overlay.plum[5];
+const HISTORY_BUTTON_BORDER_COLOR = colors.overlay.plum[12];
 
 type TrackHydrationHistoryQueryKey = readonly [...typeof QUERY_KEYS.hydrationHistory, string, '7days'];
 
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shoppingListBadgeText: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: SHOPPING_LIST_BADGE_FONT_SIZE,
     fontWeight: fontWeights.bold,

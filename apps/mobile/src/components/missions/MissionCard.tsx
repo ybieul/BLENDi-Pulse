@@ -25,11 +25,11 @@ interface MissionCardProps {
   icon: IoniconName;
 }
 
-const CARD_BACKGROUND_IDLE = 'rgba(255,255,255,0.07)';
-const CARD_BACKGROUND_COMPLETED = 'rgba(34,197,94,0.10)';
-const CARD_BORDER_IDLE = 'rgba(255,255,255,0.10)';
-const CARD_BORDER_COMPLETED = 'rgba(34,197,94,0.30)';
-const TRACK_COLOR = 'rgba(255,255,255,0.08)';
+const CARD_BACKGROUND_IDLE = colors.overlay.plum[7];
+const CARD_BACKGROUND_COMPLETED = colors.overlay.success[10];
+const CARD_BORDER_IDLE = colors.overlay.plum[10];
+const CARD_BORDER_COMPLETED = colors.overlay.success[30];
+const TRACK_COLOR = colors.overlay.plum[8];
 const TITLE_MARGIN_TOP = 6;
 const PROGRESS_MARGIN_TOP = 8;
 

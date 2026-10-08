@@ -22,8 +22,8 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { SupplementStackItem } from '../../services/supplementStack.service';
 import { SupplementCheckItem } from './SupplementCheckItem';
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.06)';
-const CARD_BORDER = 'rgba(255,255,255,0.08)';
+const CARD_BACKGROUND = colors.overlay.plum[6];
+const CARD_BORDER = colors.overlay.plum[8];
 const EMPTY_TEXT_OPACITY = 0.6;
 const PROGRESS_OPACITY = 0.6;
 const COMPLETION_SCALE = 1.15;

@@ -39,7 +39,7 @@ const SEGMENT_ACTIVE_COLORS = [
   colors.feedback.success,
 ] as const;
 
-const SEGMENT_INACTIVE_COLOR = 'rgba(255, 255, 255, 0.10)';
+const SEGMENT_INACTIVE_COLOR = colors.overlay.plum[10];
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };

@@ -15,13 +15,13 @@ import { useDateFormat } from '../../hooks/useDateFormat';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { BlendLogEntry as BlendLog } from '../../services/blendLog.service';
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
-const META_COLOR = 'rgba(255,255,255,0.55)';
-const CARBS_COLOR = 'rgba(245,158,11,1)';
-const CALORIES_COLOR = 'rgba(255,255,255,0.70)';
-const STAR_FILLED_COLOR = '#facc15';
-const STAR_IDLE_COLOR = 'rgba(255,255,255,0.24)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
+const META_COLOR = colors.overlay.plum[55];
+const CARBS_COLOR = colors.feedback.warning;
+const CALORIES_COLOR = colors.overlay.plum[70];
+const STAR_FILLED_COLOR = colors.rating.starFilled;
+const STAR_IDLE_COLOR = colors.overlay.plum[24];
 const STAR_COUNT = 5;
 
 interface BlendLogItemProps {

@@ -29,7 +29,7 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 const BUTTON_HEIGHT = 52;
 const PRESS_SCALE = 0.97;
 const LOADING_FADE_DURATION = 150;
-const GOOGLE_BUTTON_BORDER = 'rgba(255,255,255,0.15)';
+const GOOGLE_BUTTON_BORDER = colors.overlay.plum[15];
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -99,7 +99,7 @@ export function GoogleSignInButton({ onPress, isLoading }: GoogleSignInButtonPro
     >
       <Animated.View style={[styles.pressLayer, { transform: [{ scale }] }]}> 
         <Animated.View style={[styles.content, { opacity: contentOpacity }]}> 
-          <AntDesign name="google" size={18} color="#4285F4" />
+          <AntDesign name="google" size={18} color={colors.thirdParty.google} />
           <Text style={styles.label}>{t('auth.google_sign_in')}</Text>
         </Animated.View>
 

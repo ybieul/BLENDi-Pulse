@@ -36,10 +36,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 type Props = NativeStackScreenProps<PulseAIStackParamList, 'Favorites'>;
 
-const EMPTY_ICON_COLOR = 'rgba(154,72,147,0.35)';
+const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const EMPTY_ICON_SIZE = 64;
 const ERROR_ICON_SIZE = 40;
-const ERROR_ICON_COLOR = 'rgba(255,255,255,0.50)';
+const ERROR_ICON_COLOR = colors.overlay.plum[50];
 
 function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
   return {

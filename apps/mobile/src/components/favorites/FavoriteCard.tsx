@@ -22,20 +22,20 @@ import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
-const PROTEIN_PILL_BACKGROUND = 'rgba(154,72,147,0.25)';
-const CARBS_PILL_BACKGROUND = 'rgba(245,158,11,0.25)';
-const FAT_PILL_BACKGROUND = 'rgba(107,114,128,0.25)';
-const CALORIES_PILL_BACKGROUND = 'rgba(34,197,94,0.25)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
+const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
+const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
+const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
+const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
 const INGREDIENTS_OPACITY = 0.65;
-const REMOVE_BUTTON_BACKGROUND = 'rgba(239,68,68,0.12)';
-const REMOVE_BUTTON_BORDER = 'rgba(239,68,68,0.25)';
-const REMOVE_ICON_COLOR = 'rgb(239,68,68)';
-const CART_BUTTON_BACKGROUND = 'rgba(154,72,147,0.10)';
-const CART_BUTTON_BORDER = 'rgba(154,72,147,0.20)';
-const SHARE_BUTTON_BACKGROUND = 'rgba(255,255,255,0.05)';
-const SHARE_BUTTON_BORDER = 'rgba(255,255,255,0.15)';
+const REMOVE_BUTTON_BACKGROUND = colors.overlay.error[12];
+const REMOVE_BUTTON_BORDER = colors.overlay.error[25];
+const REMOVE_ICON_COLOR = colors.feedback.error;
+const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
+const CART_BUTTON_BORDER = colors.overlay.pulse[20];
+const SHARE_BUTTON_BACKGROUND = colors.overlay.plum[5];
+const SHARE_BUTTON_BORDER = colors.overlay.plum[15];
 
 interface MacroPillProps {
   value: number;

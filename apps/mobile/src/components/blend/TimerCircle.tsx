@@ -20,10 +20,10 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const DEFAULT_SIZE = 220;
 const STROKE_WIDTH = 12;
-const READY_RING_COLOR = 'rgba(255,255,255,0.20)';
-const RUNNING_TRACK_COLOR = 'rgba(255,255,255,0.12)';
-const SUBLABEL_READY_COLOR = 'rgba(255,255,255,0.50)';
-const SUBLABEL_STOPPED_COLOR = 'rgba(255,255,255,0.50)';
+const READY_RING_COLOR = colors.overlay.plum[20];
+const RUNNING_TRACK_COLOR = colors.overlay.plum[12];
+const SUBLABEL_READY_COLOR = colors.overlay.plum[50];
+const SUBLABEL_STOPPED_COLOR = colors.overlay.plum[50];
 const COMPLETION_ICON_SCALE_OVERSHOOT = 1.2;
 const DASH_ANIMATION_DURATION_MS = 220;
 const NUMBER_PULSE_DURATION_MS = 100;

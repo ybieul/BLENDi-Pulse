@@ -20,8 +20,8 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { markCleaned } from '../../services/user.service';
 import { useAuthStore } from '../../store/auth.store';
 
-const REMINDER_BACKGROUND = 'rgba(245,158,11,0.12)';
-const REMINDER_BORDER = 'rgba(245,158,11,0.25)';
+const REMINDER_BACKGROUND = colors.overlay.warning[12];
+const REMINDER_BORDER = colors.overlay.warning[25];
 const REMINDER_AUTO_DISMISS_MS = 5000;
 const REMINDER_STALE_DAYS = 7;
 

@@ -29,15 +29,15 @@ import { AuthInput } from '../ui/AuthInput';
 import { SelectionCard } from '../ui/SelectionCard';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.3)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[30];
 const SUBTITLE_OPACITY = 0.7;
-const TOGGLE_BACKGROUND = 'rgba(255,255,255,0.07)';
-const TOGGLE_BORDER = 'rgba(255,255,255,0.10)';
-const TOGGLE_HIGHLIGHT = 'rgba(255,255,255,0.04)';
-const TOGGLE_SELECTED_BACKGROUND = 'rgba(154,72,147,0.22)';
-const TOGGLE_SELECTED_BORDER = 'rgba(154,72,147,0.55)';
+const TOGGLE_BACKGROUND = colors.overlay.plum[7];
+const TOGGLE_BORDER = colors.overlay.plum[10];
+const TOGGLE_HIGHLIGHT = colors.overlay.plum[4];
+const TOGGLE_SELECTED_BACKGROUND = colors.overlay.pulse[22];
+const TOGGLE_SELECTED_BORDER = colors.overlay.pulse[55];
 const GOAL_ICON_SIZE = 22;
 
 export type EditSettingType =

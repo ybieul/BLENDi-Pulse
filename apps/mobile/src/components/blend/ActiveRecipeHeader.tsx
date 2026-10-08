@@ -20,16 +20,16 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useBlendStore } from '../../store/blend.store';
 
-const HEADER_BACKGROUND = 'rgba(255,255,255,0.07)';
-const HEADER_BORDER = 'rgba(255,255,255,0.10)';
-const INGREDIENT_CARD_BACKGROUND = 'rgba(255,255,255,0.08)';
-const INGREDIENT_CARD_BORDER = 'rgba(255,255,255,0.12)';
-const PROTEIN_PILL_BACKGROUND = 'rgba(154,72,147,0.25)';
-const CARBS_PILL_BACKGROUND = 'rgba(245,158,11,0.25)';
-const FAT_PILL_BACKGROUND = 'rgba(107,114,128,0.25)';
-const CALORIES_PILL_BACKGROUND = 'rgba(34,197,94,0.25)';
-const HEADER_CLOSE_BACKGROUND = 'rgba(255,255,255,0.08)';
-const HEADER_CLOSE_BORDER = 'rgba(255,255,255,0.12)';
+const HEADER_BACKGROUND = colors.overlay.plum[7];
+const HEADER_BORDER = colors.overlay.plum[10];
+const INGREDIENT_CARD_BACKGROUND = colors.overlay.plum[8];
+const INGREDIENT_CARD_BORDER = colors.overlay.plum[12];
+const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
+const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
+const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
+const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
+const HEADER_CLOSE_BACKGROUND = colors.overlay.plum[8];
+const HEADER_CLOSE_BORDER = colors.overlay.plum[12];
 const INGREDIENT_AMOUNT_OPACITY = 0.7;
 const INSTRUCTION_OPACITY = 0.8;
 

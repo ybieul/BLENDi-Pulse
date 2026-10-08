@@ -26,7 +26,7 @@ import type { AuthScreenProps } from '../../navigation/types';
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_IDEAL_LENGTH = 12;
 const PASSWORD_STRENGTH_ANIMATION_DURATION = 300;
-const SEGMENT_INACTIVE_COLOR = 'rgba(255, 255, 255, 0.10)';
+const SEGMENT_INACTIVE_COLOR = colors.overlay.plum[10];
 const SEGMENT_ACTIVE_COLORS = [
   colors.feedback.error,
   colors.feedback.warning,

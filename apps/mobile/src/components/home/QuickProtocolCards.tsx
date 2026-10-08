@@ -21,9 +21,9 @@ const CARD_WIDTH = 140;
 const CARD_HEIGHT = 80;
 const CARD_RADIUS = 14;
 const CARD_GAP = 12;
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
-const CARD_HIGHLIGHT = 'rgba(255,255,255,0.04)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
+const CARD_HIGHLIGHT = colors.overlay.plum[4];
 
 type ProtocolIconName = 'barbell-outline' | 'heart-outline' | 'wine-outline' | 'airplane-outline';
 

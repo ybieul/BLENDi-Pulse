@@ -1,11 +1,11 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { fontSizes, fonts } from '@blendi/shared';
+import { colors, fontSizes, fonts } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 
-const STALE_TEXT_COLOR = 'rgba(255,255,255,0.40)';
-const STALE_WARNING_COLOR = 'rgba(245,158,11,0.60)';
+const STALE_TEXT_COLOR = colors.overlay.plum[40];
+const STALE_WARNING_COLOR = colors.overlay.warning[60];
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_HOURS = 24;
 

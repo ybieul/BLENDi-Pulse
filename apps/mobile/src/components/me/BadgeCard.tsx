@@ -7,13 +7,13 @@ import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { UserBadge } from '../../utils/badges.utils';
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
-const LOCKED_ICON_COLOR = 'rgba(255,255,255,0.40)';
-const STAGE_LABEL_COLOR = 'rgba(255,255,255,0.60)';
-const BRONZE_BORDER_GLOW = 'rgba(205,127,50,0.40)';
-const SILVER_BORDER_GLOW = 'rgba(192,192,192,0.40)';
-const GOLD_BORDER_GLOW = 'rgba(255,215,0,0.40)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
+const LOCKED_ICON_COLOR = colors.overlay.plum[40];
+const STAGE_LABEL_COLOR = colors.overlay.plum[60];
+const BRONZE_BORDER_GLOW = colors.badgeTier.bronzeGlow;
+const SILVER_BORDER_GLOW = colors.badgeTier.silverGlow;
+const GOLD_BORDER_GLOW = colors.badgeTier.goldGlow;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];

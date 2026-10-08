@@ -21,7 +21,7 @@ interface MissionCompletionToastProps {
   onDismiss: () => void;
 }
 
-const TOAST_BACKGROUND = 'rgba(34,197,94,0.92)';
+const TOAST_BACKGROUND = colors.overlay.success[92];
 const TOAST_TOP = 60;
 const ENTRY_DURATION = 250;
 const VISIBLE_DURATION = 2000;

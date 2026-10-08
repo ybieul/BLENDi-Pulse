@@ -26,8 +26,8 @@ import { useUnits } from '../../hooks/useUnits';
 import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 import { GoalRing } from '../ui/GoalRing';
 
-const HYDRATION_TRACK_COLOR = 'rgba(255,255,255,0.08)';
-const HYDRATION_FILL_COLOR = 'rgba(59,130,246,0.70)';
+const HYDRATION_TRACK_COLOR = colors.overlay.plum[8];
+const HYDRATION_FILL_COLOR = colors.overlay.info[70];
 const HYDRATION_TEXT_OPACITY = 0.6;
 const HYDRATION_BAR_HEIGHT = 6;
 const HYDRATION_BAR_RADIUS = 3;

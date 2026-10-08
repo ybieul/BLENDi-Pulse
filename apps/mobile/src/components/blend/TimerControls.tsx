@@ -15,10 +15,10 @@ import { AuthButton } from '../ui/AuthButton';
 import type { TimerCircleStatus } from './TimerCircle';
 
 const ADJUST_BUTTON_SIZE = 44;
-const ADJUST_BUTTON_BACKGROUND = 'rgba(255,255,255,0.08)';
-const ADJUST_BUTTON_BORDER = 'rgba(255,255,255,0.12)';
-const STOP_BUTTON_BACKGROUND = 'rgba(239,68,68,0.20)';
-const STOP_BUTTON_BORDER = 'rgba(239,68,68,0.40)';
+const ADJUST_BUTTON_BACKGROUND = colors.overlay.plum[8];
+const ADJUST_BUTTON_BORDER = colors.overlay.plum[12];
+const STOP_BUTTON_BACKGROUND = colors.overlay.error[20];
+const STOP_BUTTON_BORDER = colors.overlay.error[40];
 
 export interface TimerControlsProps {
   status: TimerCircleStatus;

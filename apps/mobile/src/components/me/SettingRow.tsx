@@ -3,9 +3,9 @@ import { StyleSheet, Text, TouchableHighlight, View } from 'react-native';
 
 import { colors, fonts, fontWeights, spacing } from '@blendi/shared';
 
-const UNDERLAY_COLOR = 'rgba(255,255,255,0.04)';
-const VALUE_COLOR = 'rgba(255,255,255,0.55)';
-const CHEVRON_COLOR = 'rgba(255,255,255,0.30)';
+const UNDERLAY_COLOR = colors.overlay.plum[4];
+const VALUE_COLOR = colors.overlay.plum[55];
+const CHEVRON_COLOR = colors.overlay.plum[30];
 
 export interface SettingRowProps {
   label: string;

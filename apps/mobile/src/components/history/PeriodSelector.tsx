@@ -16,11 +16,11 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 
 const PERIOD_OPTIONS = [7, 30, 90] as const;
 const ANIMATION_DURATION = 200;
-const CHIP_BACKGROUND_SELECTED = 'rgba(154,72,147,0.25)';
-const CHIP_BACKGROUND_IDLE = 'rgba(255,255,255,0.06)';
-const CHIP_BORDER_SELECTED = 'rgba(154,72,147,0.50)';
-const CHIP_BORDER_IDLE = 'rgba(255,255,255,0.10)';
-const CHIP_TEXT_IDLE = 'rgba(255,255,255,0.60)';
+const CHIP_BACKGROUND_SELECTED = colors.overlay.pulse[25];
+const CHIP_BACKGROUND_IDLE = colors.overlay.plum[6];
+const CHIP_BORDER_SELECTED = colors.overlay.pulse[50];
+const CHIP_BORDER_IDLE = colors.overlay.plum[10];
+const CHIP_TEXT_IDLE = colors.overlay.plum[60];
 
 export type PeriodSelectorValue = (typeof PERIOD_OPTIONS)[number];
 

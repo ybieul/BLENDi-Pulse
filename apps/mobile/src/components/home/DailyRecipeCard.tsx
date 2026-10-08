@@ -39,8 +39,8 @@ export interface DailyRecipeCardProps {
   onStartBlend: (recipe: PulseAiRecipe) => void;
 }
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER = 'rgba(255,255,255,0.10)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER = colors.overlay.plum[10];
 const MACRO_OPACITY = 0.7;
 const META_OPACITY = 0.6;
 

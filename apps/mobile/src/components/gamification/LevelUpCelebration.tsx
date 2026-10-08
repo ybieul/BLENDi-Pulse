@@ -36,14 +36,13 @@ const SHARE_START_DELAY = 300;
 // Transparência embutida na própria cor, não na opacidade animada (ver nota
 // no JSX do backdrop) — 0.82 deixa a tela de trás perceptível como pano de
 // fundo escurecido, sem apagá-la por completo.
-const OVERLAY_COLOR = 'rgba(0,0,0,0.82)';
-const CARD_BACKGROUND_COLOR = '#1C0C1A';
-const CARD_BORDER_COLOR = 'rgba(211,120,203,1)';
-const CARD_SHADOW_COLOR = '#000000';
+const OVERLAY_COLOR = colors.overlay.black[82];
+const CARD_BORDER_COLOR = colors.decorative.levelUpCardBorder;
+const CARD_SHADOW_COLOR = colors.overlay.black[100];
 const PARTICLE_COLORS = [
   colors.brand.pulse,
-  'rgba(245,158,11,0.90)',
-  'rgba(34,197,94,0.80)',
+  colors.overlay.warning[90],
+  colors.overlay.success[80],
 ] as const;
 
 type AnimationEndCallback = NonNullable<Parameters<Animated.CompositeAnimation['start']>[0]>;
@@ -353,8 +352,8 @@ export function LevelUpCelebration() {
 
             <Pressable onPress={() => {}}>
               {/* Sem opacity animada — mesmo motivo do backdrop acima.
-                  CARD_BACKGROUND_COLOR já é opaco de propósito (o card
-                  precisa ser sólido/legível); só a escala é animada. */}
+                  O fundo do card já é opaco de propósito (precisa ser
+                  sólido/legível); só a escala é animada. */}
               <Animated.View
                 style={[
                   styles.card,
@@ -434,7 +433,7 @@ const styles = StyleSheet.create({
     width: 280,
     padding: 32,
     borderRadius: 24,
-    backgroundColor: CARD_BACKGROUND_COLOR,
+    backgroundColor: colors.background.tertiary,
     borderWidth: 1.5,
     borderColor: CARD_BORDER_COLOR,
     alignItems: 'center',

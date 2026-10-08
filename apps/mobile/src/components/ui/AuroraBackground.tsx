@@ -3,13 +3,14 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@blendi/shared';
 
-// Cor de base mais escura para o meio do gradiente vertical
-const AURORA_BASE_MID = '#1a0d1a';
-
 // Cores das auroras (usadas em JSX props — fora de StyleSheet.create)
-const AURORA_1_COLORS = ['rgba(154,72,147,0.18)', 'transparent', 'transparent'] as const;
-const AURORA_2_COLORS = ['transparent', 'rgba(120,40,120,0.12)', 'transparent'] as const;
-const AURORA_3_COLORS = ['transparent', 'transparent', 'rgba(80,20,90,0.15)'] as const;
+const AURORA_1_COLORS = [colors.overlay.pulse[18], 'transparent', 'transparent'] as const;
+const AURORA_2_COLORS = ['transparent', colors.decorative.auroraGlow2, 'transparent'] as const;
+const AURORA_3_COLORS = ['transparent', 'transparent', colors.decorative.auroraGlow3] as const;
+
+// Base escura fixa — usada só pelos cards de compartilhamento (share cards),
+// que devem continuar com o visual escuro independente do tema ao vivo do app.
+export const DARK_AURORA_BASE_COLORS = [colors.brand.plum, colors.decorative.auroraDeep, colors.brand.plum] as const;
 
 const FULL_AURORA_DURATION = 8000;
 const REDUCED_AURORA_DURATION = 14000;
@@ -19,6 +20,8 @@ type AuroraIntensity = 'full' | 'reduced';
 
 export interface AuroraBackgroundProps {
   intensity?: AuroraIntensity;
+  /** Sobrescreve os 3 stops do gradiente base — default: tema ao vivo do app. */
+  baseColors?: readonly [string, string, string];
 }
 
 /**
@@ -26,10 +29,11 @@ export interface AuroraBackgroundProps {
  *
  * Renderiza três fontes de luz púrpura ligeiramente dessincronizadas que
  * se intensificam e diminuem em loop, criando o efeito de aurora boreal
- * sobre o Deep Plum base. pointerEvents="none" garante que não interfere
- * com nenhum toque do usuário.
+ * sobre o fundo base (tema ao vivo do app, ou `baseColors` fixo nos share
+ * cards). pointerEvents="none" garante que não interfere com nenhum toque
+ * do usuário.
  */
-export function AuroraBackground({ intensity = 'full' }: AuroraBackgroundProps) {
+export function AuroraBackground({ intensity = 'full', baseColors }: AuroraBackgroundProps) {
   const progress = useRef(new Animated.Value(0)).current;
   const animationDuration = intensity === 'reduced'
     ? REDUCED_AURORA_DURATION
@@ -81,9 +85,9 @@ export function AuroraBackground({ intensity = 'full' }: AuroraBackgroundProps) 
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-      {/* Camada base — gradiente vertical estático em Deep Plum */}
+      {/* Camada base — gradiente vertical estático */}
       <LinearGradient
-        colors={[colors.background.primary, AURORA_BASE_MID, colors.background.primary]}
+        colors={baseColors ?? [colors.background.primary, colors.background.secondary, colors.background.primary]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFillObject}

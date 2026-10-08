@@ -14,15 +14,15 @@ import { colors, fonts, fontWeights, spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { ShareCardFormat } from './RecipeShareCard';
 
-const BACKDROP_COLOR = 'rgba(0,0,0,0.32)';
-const SHEET_BACKGROUND = 'rgba(21,10,20,0.98)';
-const SHEET_BORDER = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const OPTION_BACKGROUND = 'rgba(255,255,255,0.05)';
-const OPTION_BORDER = 'rgba(255,255,255,0.10)';
-const PREVIEW_FILL = 'rgba(154,72,147,0.18)';
-const PREVIEW_BORDER = 'rgba(154,72,147,0.42)';
-const PREVIEW_FRAME_BACKGROUND = 'rgba(255,255,255,0.04)';
+const BACKDROP_COLOR = colors.overlay.black[32];
+const SHEET_BACKGROUND = colors.decorative.shareSheetBackground;
+const SHEET_BORDER = colors.overlay.white[10];
+const HANDLE_COLOR = colors.overlay.white[22];
+const OPTION_BACKGROUND = colors.overlay.white[5];
+const OPTION_BORDER = colors.overlay.white[10];
+const PREVIEW_FILL = colors.overlay.pulse[18];
+const PREVIEW_BORDER = colors.overlay.pulse[42];
+const PREVIEW_FRAME_BACKGROUND = colors.overlay.white[4];
 
 export interface ShareFormatSheetProps {
   visible: boolean;

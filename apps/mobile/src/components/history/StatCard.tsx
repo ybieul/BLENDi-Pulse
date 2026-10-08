@@ -14,9 +14,9 @@ import {
 
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
-const CARD_BACKGROUND = 'rgba(255,255,255,0.07)';
-const CARD_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const LABEL_COLOR = 'rgba(255,255,255,0.55)';
+const CARD_BACKGROUND = colors.overlay.plum[7];
+const CARD_BORDER_COLOR = colors.overlay.plum[10];
+const LABEL_COLOR = colors.overlay.plum[55];
 const DEFAULT_ICON_COLOR = colors.brand.pulse;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];

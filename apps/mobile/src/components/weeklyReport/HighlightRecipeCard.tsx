@@ -6,12 +6,12 @@ import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
-const PROTEIN_PILL_BACKGROUND = 'rgba(154,72,147,0.25)';
-const CARBS_PILL_BACKGROUND = 'rgba(245,158,11,0.25)';
-const FAT_PILL_BACKGROUND = 'rgba(107,114,128,0.25)';
-const CALORIES_PILL_BACKGROUND = 'rgba(34,197,94,0.25)';
-const STAR_COLOR = 'rgba(245,158,11,0.90)';
-const STAR_EMPTY_COLOR = 'rgba(255,255,255,0.20)';
+const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
+const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
+const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
+const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
+const STAR_COLOR = colors.overlay.warning[90];
+const STAR_EMPTY_COLOR = colors.overlay.plum[20];
 const MAX_RATING = 5;
 
 interface MacroPillProps {

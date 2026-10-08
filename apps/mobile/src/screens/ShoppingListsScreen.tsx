@@ -61,19 +61,19 @@ import { showToast } from '../utils/toast.utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CARD_BG = 'rgba(255,255,255,0.07)';
-const CARD_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const EMPTY_ICON_COLOR = 'rgba(154,72,147,0.35)';
+const CARD_BG = colors.overlay.plum[7];
+const CARD_BORDER_COLOR = colors.overlay.plum[10];
+const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const EMPTY_ICON_SIZE = 64;
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = 'rgba(255,255,255,0.10)';
-const HANDLE_COLOR = 'rgba(255,255,255,0.22)';
-const BACKDROP_COLOR = 'rgba(0,0,0,0.55)';
+const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+const HANDLE_COLOR = colors.overlay.plum[22];
+const BACKDROP_COLOR = colors.overlay.black[55];
 const ARCHIVED_OPACITY = 0.65;
-const SKELETON_BG = 'rgba(255,255,255,0.05)';
-const ARCHIVED_TOGGLE_BORDER = 'rgba(255,255,255,0.08)';
+const SKELETON_BG = colors.overlay.plum[5];
+const ARCHIVED_TOGGLE_BORDER = colors.overlay.plum[8];
 const UPDATED_AT_OPACITY = 0.55;
-const CHEVRON_COLOR = 'rgba(255,255,255,0.45)';
+const CHEVRON_COLOR = colors.overlay.plum[45];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -743,7 +743,7 @@ export function ShoppingListsScreen({
         </View>
       ) : isError ? (
         <View style={styles.centeredContainer}>
-          <Ionicons color="rgba(255,255,255,0.35)" name="wifi-outline" size={40} />
+          <Ionicons color={colors.overlay.plum[35]} name="wifi-outline" size={40} />
           <Text style={styles.errorText}>{t('common.states.error')}</Text>
           <AuthButton
             fullWidth={false}

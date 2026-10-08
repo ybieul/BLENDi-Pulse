@@ -16,8 +16,8 @@ import { createAppStorage } from '../../config/storage';
 import { useAuthStore } from '../../store/auth.store';
 
 const PROFILE_PHOTO_STORAGE = createAppStorage('blendi-pulse');
-const INITIALS_BACKGROUND = 'rgba(154,72,147,0.30)';
-const LOADER_COLOR = 'rgba(255,255,255,0.72)';
+const INITIALS_BACKGROUND = colors.overlay.pulse[30];
+const LOADER_COLOR = colors.overlay.plum[72];
 const MIN_INITIALS_FONT_SIZE = 14;
 const INITIALS_FONT_SCALE = 0.35;
 
