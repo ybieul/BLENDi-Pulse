@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   title: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.display,
     fontSize: 22,
     fontWeight: fontWeights.bold,
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   subtitle: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: 14,
     fontWeight: fontWeights.regular,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: PREVIEW_FILL,
   },
   optionLabel: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: 15,
     fontWeight: fontWeights.medium,

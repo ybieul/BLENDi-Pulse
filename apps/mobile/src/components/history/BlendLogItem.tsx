@@ -13,15 +13,11 @@ import {
 
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { BlendLogEntry as BlendLog } from '../../services/blendLog.service';
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
-const META_COLOR = colors.overlay.plum[55];
 const CARBS_COLOR = colors.feedback.warning;
-const CALORIES_COLOR = colors.overlay.plum[70];
 const STAR_FILLED_COLOR = colors.rating.starFilled;
-const STAR_IDLE_COLOR = colors.overlay.plum[24];
 const STAR_COUNT = 5;
 
 interface BlendLogItemProps {
@@ -29,6 +25,13 @@ interface BlendLogItemProps {
 }
 
 export function BlendLogItem({ item }: BlendLogItemProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+  const META_COLOR = colors.overlay.plum[55];
+  const CALORIES_COLOR = colors.overlay.plum[70];
+  const STAR_IDLE_COLOR = colors.overlay.plum[24];
+
   const { t } = useAppTranslation();
   const { formatDate, formatTime } = useDateFormat();
 
@@ -36,6 +39,67 @@ export function BlendLogItem({ item }: BlendLogItemProps) {
   const gramsUnit = t('common.units.grams');
   const kilocaloriesUnit = t('common.units.kilocalories');
   const rating = typeof item.rating === 'number' ? Math.max(0, Math.min(item.rating, STAR_COUNT)) : 0;
+
+  const styles = StyleSheet.create({
+    card: {
+      height: 82,
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    leftColumn: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: 6,
+    },
+    rightColumn: {
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    recipeName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    dateTime: {
+      color: META_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+    },
+    macrosRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    macroText: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    protein: {
+      color: colors.brand.pulse,
+    },
+    carbs: {
+      color: CARBS_COLOR,
+    },
+    calories: {
+      color: CALORIES_COLOR,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+  });
 
   return (
     <View style={styles.card}>
@@ -71,64 +135,3 @@ export function BlendLogItem({ item }: BlendLogItemProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    height: 82,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  leftColumn: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 6,
-  },
-  rightColumn: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  recipeName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  dateTime: {
-    color: META_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-  },
-  macrosRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  macroText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  protein: {
-    color: colors.brand.pulse,
-  },
-  carbs: {
-    color: CARBS_COLOR,
-  },
-  calories: {
-    color: CALORIES_COLOR,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-});

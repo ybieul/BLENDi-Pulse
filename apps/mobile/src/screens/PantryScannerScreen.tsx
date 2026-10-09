@@ -38,6 +38,7 @@ import {
 import { useAuthStore } from '../store/auth.store';
 import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { IngredientCheckItem } from '../components/pantryScanner/IngredientCheckItem';
@@ -72,6 +73,8 @@ const ANALYZING_STEP_KEYS = [
 const ANALYZING_STEP_INTERVAL_MS = 6000;
 const ANALYZING_FADE_DURATION_MS = 200;
 
+// Overlay da câmera ao vivo — fica sempre com visual escuro fixo, não reage
+// ao tema claro/escuro do app (ver exceção documentada no plano de dark mode).
 const TOP_BAR_BG = colors.overlay.black[45];
 const BOTTOM_BAR_BG = colors.overlay.black[55];
 const CAPTURE_BUTTON_BG = colors.overlay.white[20];
@@ -80,10 +83,8 @@ const GALLERY_BUTTON_BG = colors.overlay.black[45];
 const SCANS_PILL_BG = colors.overlay.black[55];
 const SCANS_PILL_BORDER = colors.overlay.white[15];
 const RENEWS_COLOR = colors.overlay.white[55];
-const INPUT_BG = colors.overlay.plum[6];
-const INPUT_BORDER = colors.overlay.plum[16];
-const GHOST_BORDER = colors.overlay.plum[15];
-const SUBTITLE_COLOR = colors.overlay.plum[60];
+const CAMERA_ICON_COLOR = colors.text.primary;
+const CAMERA_PILL_TEXT_COLOR = colors.text.primary;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,12 @@ function getDaysUntilReset(resetDateStr?: string): number {
 // ─── PantryScannerScreen ──────────────────────────────────────────────────────
 
 export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'PantryScanner'>) {
+  const themeColors = useColors();
+  const INPUT_BG = themeColors.overlay.plum[6];
+  const INPUT_BORDER = themeColors.overlay.plum[16];
+  const GHOST_BORDER = themeColors.overlay.plum[15];
+  const SUBTITLE_COLOR = themeColors.overlay.plum[60];
+
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const { favorites } = useFavorites();
@@ -394,6 +401,232 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setStep('capture');
   }, []);
 
+  const styles = StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: themeColors.background.primary,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+    },
+
+    // ── Permission ────────────────────────────────────────────────────────────
+    permissionContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing['2xl'],
+      gap: spacing.lg,
+    },
+    permissionTitle: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['2xl'],
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    permissionDescription: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    permissionDeniedText: {
+      color: colors.feedback.warning,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginTop: spacing.md,
+    },
+    permissionButton: {
+      marginTop: spacing.md,
+    },
+
+    // ── Capture (overlay sempre escuro, não reage ao tema) ────────────────────
+    cameraOverlay: {
+      justifyContent: 'space-between',
+    },
+    cameraTopBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+      backgroundColor: TOP_BAR_BG,
+    },
+    cameraIconButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scansPillContainer: {
+      alignItems: 'flex-end',
+      gap: spacing.xs,
+    },
+    scansPill: {
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: SCANS_PILL_BORDER,
+      backgroundColor: SCANS_PILL_BG,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: 6,
+    },
+    scansPillText: {
+      color: CAMERA_PILL_TEXT_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    renewsText: {
+      color: RENEWS_COLOR,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      textAlign: 'right',
+      paddingHorizontal: spacing.sm,
+    },
+    cameraCenter: {
+      flex: 1,
+    },
+    cameraBottomBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing['3xl'],
+      paddingVertical: spacing.xl,
+      backgroundColor: BOTTOM_BAR_BG,
+    },
+    galleryButton: {
+      width: 44,
+      height: 44,
+      borderRadius: borderRadius.full,
+      backgroundColor: GALLERY_BUTTON_BG,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    captureButton: {
+      width: CAPTURE_BUTTON_SIZE,
+      height: CAPTURE_BUTTON_SIZE,
+      borderRadius: CAPTURE_BUTTON_SIZE / 2,
+      backgroundColor: CAPTURE_BUTTON_BG,
+      borderWidth: 2,
+      borderColor: CAPTURE_BUTTON_BORDER,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    // ── Analyzing ─────────────────────────────────────────────────────────────
+    analyzingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xl,
+      paddingHorizontal: spacing['2xl'],
+    },
+    logoPlaceholder: {
+      width: LOGO_SIZE,
+      height: LOGO_SIZE,
+    },
+    analyzingText: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 16,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+
+    // ── Shared header (ingredients + recipes) ─────────────────────────────────
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+    },
+    headerBackButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      flex: 1,
+      color: themeColors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    headerPlaceholder: {
+      width: 44,
+    },
+
+    // ── Ingredients ───────────────────────────────────────────────────────────
+    ingredientsScrollContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing['4xl'],
+      gap: spacing.sm,
+    },
+    sectionSubtitle: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+      marginBottom: spacing.sm,
+    },
+    addIngredientInput: {
+      marginTop: spacing.md,
+      backgroundColor: INPUT_BG,
+      borderWidth: 1,
+      borderColor: INPUT_BORDER,
+      borderRadius: borderRadius.md,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    footerContainer: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+      paddingTop: spacing.md,
+    },
+
+    // ── Recipes ───────────────────────────────────────────────────────────────
+    recipesScrollContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing['5xl'],
+      gap: spacing.xl,
+    },
+    recipeSubtitle: {
+      color: SUBTITLE_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: spacing.sm,
+    },
+    ghostButton: {
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: GHOST_BORDER,
+      paddingVertical: spacing.xl,
+      alignItems: 'center',
+      marginTop: spacing.md,
+    },
+    ghostButtonLabel: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   // ─── Step: permission ──────────────────────────────────────────────────────
   if (step === 'permission') {
     return (
@@ -443,7 +676,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               onPress={() => navigation.goBack()}
               style={styles.cameraIconButton}
             >
-              <Ionicons name="close" size={CLOSE_ICON_SIZE} color={colors.text.primary} />
+              <Ionicons name="close" size={CLOSE_ICON_SIZE} color={CAMERA_ICON_COLOR} />
             </Pressable>
 
             {isFreeTier && scansLimit > 0 ? (
@@ -477,7 +710,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               }}
               style={styles.galleryButton}
             >
-              <Ionicons name="images-outline" size={28} color={colors.text.primary} />
+              <Ionicons name="images-outline" size={28} color={CAMERA_ICON_COLOR} />
             </Pressable>
 
             {/* Capture */}
@@ -488,7 +721,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               }}
               style={styles.captureButton}
             >
-              <Ionicons name="camera" size={32} color={colors.text.primary} />
+              <Ionicons name="camera" size={32} color={CAMERA_ICON_COLOR} />
             </Pressable>
 
             {/* Mirror of gallery button to keep capture centered */}
@@ -529,7 +762,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               onPress={() => setStep('capture')}
               style={styles.headerBackButton}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+              <Ionicons name="arrow-back" size={24} color={themeColors.text.primary} />
             </Pressable>
             <Text style={styles.headerTitle}>{t('pantryScanner.ingredientsFound')}</Text>
             <View style={styles.headerPlaceholder} />
@@ -558,7 +791,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               <TextInput
                 style={styles.addIngredientInput}
                 placeholder={t('pantryScanner.addIngredient')}
-                placeholderTextColor={colors.text.tertiary}
+                placeholderTextColor={themeColors.text.tertiary}
                 value={newIngredientText}
                 onChangeText={setNewIngredientText}
                 onSubmitEditing={handleAddIngredient}
@@ -594,7 +827,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             onPress={() => setStep('ingredients')}
             style={styles.headerBackButton}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={24} color={themeColors.text.primary} />
           </Pressable>
           <Text style={styles.headerTitle}>{t('pantryScanner.recipesGenerated')}</Text>
           <View style={styles.headerPlaceholder} />
@@ -631,231 +864,3 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
-
-  // ── Permission ────────────────────────────────────────────────────────────
-  permissionContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
-    gap: spacing.lg,
-  },
-  permissionTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['2xl'],
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  permissionDescription: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  permissionDeniedText: {
-    color: colors.feedback.warning,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: spacing.md,
-  },
-  permissionButton: {
-    marginTop: spacing.md,
-  },
-
-  // ── Capture ───────────────────────────────────────────────────────────────
-  cameraOverlay: {
-    justifyContent: 'space-between',
-  },
-  cameraTopBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    backgroundColor: TOP_BAR_BG,
-  },
-  cameraIconButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scansPillContainer: {
-    alignItems: 'flex-end',
-    gap: spacing.xs,
-  },
-  scansPill: {
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: SCANS_PILL_BORDER,
-    backgroundColor: SCANS_PILL_BG,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 6,
-  },
-  scansPillText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  renewsText: {
-    color: RENEWS_COLOR,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    textAlign: 'right',
-    paddingHorizontal: spacing.sm,
-  },
-  cameraCenter: {
-    flex: 1,
-  },
-  cameraBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing['3xl'],
-    paddingVertical: spacing.xl,
-    backgroundColor: BOTTOM_BAR_BG,
-  },
-  galleryButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: GALLERY_BUTTON_BG,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captureButton: {
-    width: CAPTURE_BUTTON_SIZE,
-    height: CAPTURE_BUTTON_SIZE,
-    borderRadius: CAPTURE_BUTTON_SIZE / 2,
-    backgroundColor: CAPTURE_BUTTON_BG,
-    borderWidth: 2,
-    borderColor: CAPTURE_BUTTON_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // ── Analyzing ─────────────────────────────────────────────────────────────
-  analyzingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xl,
-    paddingHorizontal: spacing['2xl'],
-  },
-  logoPlaceholder: {
-    width: LOGO_SIZE,
-    height: LOGO_SIZE,
-  },
-  analyzingText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-
-  // ── Shared header (ingredients + recipes) ─────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-  },
-  headerBackButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  headerPlaceholder: {
-    width: 44,
-  },
-
-  // ── Ingredients ───────────────────────────────────────────────────────────
-  ingredientsScrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing['4xl'],
-    gap: spacing.sm,
-  },
-  sectionSubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    lineHeight: 20,
-    marginBottom: spacing.sm,
-  },
-  addIngredientInput: {
-    marginTop: spacing.md,
-    backgroundColor: INPUT_BG,
-    borderWidth: 1,
-    borderColor: INPUT_BORDER,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  footerContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.md,
-  },
-
-  // ── Recipes ───────────────────────────────────────────────────────────────
-  recipesScrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing['5xl'],
-    gap: spacing.xl,
-  },
-  recipeSubtitle: {
-    color: SUBTITLE_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  ghostButton: {
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: GHOST_BORDER,
-    paddingVertical: spacing.xl,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  ghostButtonLabel: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-});

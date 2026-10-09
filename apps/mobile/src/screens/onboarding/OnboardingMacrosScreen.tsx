@@ -14,12 +14,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import axios from 'axios';
 
-import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
+import { fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { api } from '../../config/api';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { OnboardingScreenProps } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth.store';
 import { useOnboardingStore } from '../../store/onboarding.store';
@@ -70,6 +71,7 @@ const DEFAULT_GOAL_CONFIG = GOAL_CONFIG.Wellness;
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'OnboardingMacros'>) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const translateKey = (input: string | ValidationIssue) => {
     const raw = typeof input === 'string' ? input : input.message;
@@ -206,6 +208,47 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    topContent: {
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['4xl'],
+      lineHeight: 48,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 24,
+    },
+    fields: {
+      gap: spacing.md,
+    },
+    recommendation: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      lineHeight: 18,
+      paddingHorizontal: spacing.xs,
+    },
+    bottomContent: {
+      gap: spacing.md,
+    },
+    errorText: {
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
       <OnboardingLayout
@@ -279,46 +322,3 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
     </Animated.View>
   );
 }
-
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topContent: {
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['4xl'],
-    lineHeight: 48,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 24,
-  },
-  fields: {
-    gap: spacing.md,
-  },
-  recommendation: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    lineHeight: 18,
-    paddingHorizontal: spacing.xs,
-  },
-  bottomContent: {
-    gap: spacing.md,
-  },
-  errorText: {
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    fontWeight: fontWeights.medium,
-  },
-});

@@ -26,6 +26,7 @@ import { TERMS_URL, PRIVACY_URL } from '../config/legal';
 import { PRICING_CONFIG } from '../config/pricing.config';
 import { usePulseProPurchase } from '../hooks/usePulseProPurchase';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import type { RootStackParamList } from '../navigation/types';
 import type { PurchasePlanId } from '../services/purchase.service';
 import { formatUsdCurrency } from '../utils/pricing.utils';
@@ -33,15 +34,11 @@ const GOLD_GRADIENT = [colors.premium.amberPale, colors.feedback.warning, colors
 const BUTTON_GRADIENT = [colors.rating.starFilled, colors.feedback.warning] as const;
 const HERO_GLOW_TOP = [colors.overlay.warning[18], 'transparent'] as const;
 const HERO_GLOW_BOTTOM = [colors.overlay.pink[14], 'transparent'] as const;
-const CARD_BACKGROUND = colors.overlay.plum[8];
-const CARD_BORDER = colors.overlay.plum[12];
 const CARD_SELECTED_BACKGROUND = colors.overlay.warning[16];
 const CARD_SELECTED_BORDER = colors.overlay.warning[42];
 const BADGE_BACKGROUND = colors.overlay.warning[18];
 const BADGE_BORDER = colors.overlay.warning[34];
 const BENEFIT_ICON_BG = colors.overlay.warning[16];
-const CLOSE_BUTTON_BACKGROUND = colors.overlay.plum[8];
-const CLOSE_BUTTON_BORDER = colors.overlay.plum[12];
 const GOLD_SHADOW = colors.feedback.warning;
 const GOLD_TEXT = colors.premium.goldPale;
 const PRO_BADGE_TEXT = colors.premium.textOnGold;
@@ -70,6 +67,12 @@ interface DisplayPlan {
 }
 
 export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[8];
+  const CARD_BORDER = colors.overlay.plum[12];
+  const CLOSE_BUTTON_BACKGROUND = colors.overlay.plum[8];
+  const CLOSE_BUTTON_BORDER = colors.overlay.plum[12];
+
   const insets = useSafeAreaInsets();
   const { t, locale } = useAppTranslation();
   const {
@@ -199,6 +202,256 @@ export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
     void restoreProAccess({ onActivated: handleClose });
   };
 
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    content: {
+      paddingHorizontal: spacing.xl,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing['2xl'],
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      borderRadius: borderRadius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: CLOSE_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: CLOSE_BUTTON_BORDER,
+    },
+    heroCard: {
+      alignItems: 'center',
+      marginBottom: spacing['2xl'],
+    },
+    proBadge: {
+      width: 92,
+      height: 92,
+      borderRadius: borderRadius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+      shadowColor: GOLD_SHADOW,
+      shadowOpacity: 0.32,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 10,
+    },
+    proBadgeText: {
+      color: PRO_BADGE_TEXT,
+      fontFamily: fonts.display,
+      fontSize: 30,
+      fontWeight: fontWeights.bold,
+      letterSpacing: 0.8,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 30,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      lineHeight: 36,
+    },
+    subtitle: {
+      marginTop: spacing.md,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 24,
+      textAlign: 'center',
+      maxWidth: 340,
+    },
+    benefitsCard: {
+      backgroundColor: CARD_BACKGROUND,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      padding: spacing.xl,
+      gap: spacing.md,
+      marginBottom: spacing.xl,
+    },
+    benefitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    benefitIconShell: {
+      width: 36,
+      height: 36,
+      borderRadius: borderRadius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: BENEFIT_ICON_BG,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+    },
+    benefitText: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 22,
+    },
+    planRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginBottom: spacing.xl,
+    },
+    planCard: {
+      flex: 1,
+      backgroundColor: CARD_BACKGROUND,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      padding: spacing.lg,
+      minHeight: 184,
+    },
+    planCardSelected: {
+      backgroundColor: CARD_SELECTED_BACKGROUND,
+      borderColor: CARD_SELECTED_BORDER,
+      shadowColor: GOLD_SHADOW,
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    planTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    planTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.bold,
+    },
+    planTitleSelected: {
+      color: GOLD_TEXT,
+    },
+    saveBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: BADGE_BACKGROUND,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+      borderRadius: borderRadius.full,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      marginBottom: spacing.md,
+    },
+    saveBadgeText: {
+      color: GOLD_TEXT,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.bold,
+    },
+    planPrice: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      marginBottom: spacing.xs,
+    },
+    planDescription: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+    },
+    planEquivalent: {
+      marginTop: spacing.sm,
+      color: GOLD_TEXT,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+      lineHeight: 18,
+    },
+    ctaSection: {
+      marginBottom: spacing.md,
+    },
+    ctaButtonShell: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      shadowColor: GOLD_SHADOW,
+      shadowOpacity: 0.28,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    ctaButton: {
+      backgroundColor: TRANSPARENT,
+    },
+    restoreDescription: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: spacing.lg,
+    },
+    footerLinks: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    footerLink: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      opacity: LEGAL_OPACITY,
+      textDecorationLine: 'underline',
+    },
+    footerSeparator: {
+      color: colors.text.secondary,
+      opacity: LEGAL_OPACITY,
+    },
+    topGlow: {
+      position: 'absolute',
+      top: -40,
+      left: -20,
+      right: -20,
+      height: 220,
+    },
+    bottomGlow: {
+      position: 'absolute',
+      left: -20,
+      right: -20,
+      bottom: 0,
+      height: 220,
+    },
+    orbPrimary: {
+      position: 'absolute',
+      top: 92,
+      right: -40,
+      width: 180,
+      height: 180,
+      borderRadius: borderRadius.full,
+      backgroundColor: ORB_PRIMARY_BACKGROUND,
+    },
+    orbSecondary: {
+      position: 'absolute',
+      left: -50,
+      bottom: 140,
+      width: 160,
+      height: 160,
+      borderRadius: borderRadius.full,
+      backgroundColor: ORB_SECONDARY_BACKGROUND,
+    },
+  });
+
   return (
     <View style={styles.root}>
       <AuroraBackground intensity="full" />
@@ -323,253 +576,3 @@ export function UpgradeScreen({ navigation }: UpgradeScreenProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  content: {
-    paddingHorizontal: spacing.xl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CLOSE_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: CLOSE_BUTTON_BORDER,
-  },
-  heroCard: {
-    alignItems: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  proBadge: {
-    width: 92,
-    height: 92,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    shadowColor: GOLD_SHADOW,
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
-  },
-  proBadgeText: {
-    color: PRO_BADGE_TEXT,
-    fontFamily: fonts.display,
-    fontSize: 30,
-    fontWeight: fontWeights.bold,
-    letterSpacing: 0.8,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 30,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    lineHeight: 36,
-  },
-  subtitle: {
-    marginTop: spacing.md,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 24,
-    textAlign: 'center',
-    maxWidth: 340,
-  },
-  benefitsCard: {
-    backgroundColor: CARD_BACKGROUND,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    padding: spacing.xl,
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  benefitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  benefitIconShell: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BENEFIT_ICON_BG,
-    borderWidth: 1,
-    borderColor: BADGE_BORDER,
-  },
-  benefitText: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 22,
-  },
-  planRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  planCard: {
-    flex: 1,
-    backgroundColor: CARD_BACKGROUND,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    padding: spacing.lg,
-    minHeight: 184,
-  },
-  planCardSelected: {
-    backgroundColor: CARD_SELECTED_BACKGROUND,
-    borderColor: CARD_SELECTED_BORDER,
-    shadowColor: GOLD_SHADOW,
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
-  },
-  planTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  planTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-  },
-  planTitleSelected: {
-    color: GOLD_TEXT,
-  },
-  saveBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: BADGE_BACKGROUND,
-    borderWidth: 1,
-    borderColor: BADGE_BORDER,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    marginBottom: spacing.md,
-  },
-  saveBadgeText: {
-    color: GOLD_TEXT,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.bold,
-  },
-  planPrice: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    marginBottom: spacing.xs,
-  },
-  planDescription: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    lineHeight: 20,
-  },
-  planEquivalent: {
-    marginTop: spacing.sm,
-    color: GOLD_TEXT,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-    lineHeight: 18,
-  },
-  ctaSection: {
-    marginBottom: spacing.md,
-  },
-  ctaButtonShell: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: GOLD_SHADOW,
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-  },
-  ctaButton: {
-    backgroundColor: TRANSPARENT,
-  },
-  restoreDescription: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  footerLink: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    opacity: LEGAL_OPACITY,
-    textDecorationLine: 'underline',
-  },
-  footerSeparator: {
-    color: colors.text.secondary,
-    opacity: LEGAL_OPACITY,
-  },
-  topGlow: {
-    position: 'absolute',
-    top: -40,
-    left: -20,
-    right: -20,
-    height: 220,
-  },
-  bottomGlow: {
-    position: 'absolute',
-    left: -20,
-    right: -20,
-    bottom: 0,
-    height: 220,
-  },
-  orbPrimary: {
-    position: 'absolute',
-    top: 92,
-    right: -40,
-    width: 180,
-    height: 180,
-    borderRadius: borderRadius.full,
-    backgroundColor: ORB_PRIMARY_BACKGROUND,
-  },
-  orbSecondary: {
-    position: 'absolute',
-    left: -50,
-    bottom: 140,
-    width: 160,
-    height: 160,
-    borderRadius: borderRadius.full,
-    backgroundColor: ORB_SECONDARY_BACKGROUND,
-  },
-});

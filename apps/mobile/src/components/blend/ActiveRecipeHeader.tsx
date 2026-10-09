@@ -17,19 +17,14 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useBlendStore } from '../../store/blend.store';
 
-const HEADER_BACKGROUND = colors.overlay.plum[7];
-const HEADER_BORDER = colors.overlay.plum[10];
-const INGREDIENT_CARD_BACKGROUND = colors.overlay.plum[8];
-const INGREDIENT_CARD_BORDER = colors.overlay.plum[12];
 const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
 const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
 const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
-const HEADER_CLOSE_BACKGROUND = colors.overlay.plum[8];
-const HEADER_CLOSE_BORDER = colors.overlay.plum[12];
 const INGREDIENT_AMOUNT_OPACITY = 0.7;
 const INSTRUCTION_OPACITY = 0.8;
 
@@ -47,6 +42,7 @@ interface MacroPillData {
 }
 
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
+  const colors = useColors();
   const { formatDecimal } = useFormatNumbers();
   const backgroundColor =
     tone === 'protein'
@@ -57,16 +53,48 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
           ? FAT_PILL_BACKGROUND
           : CALORIES_PILL_BACKGROUND;
 
+  const pillStyles = StyleSheet.create({
+    macroPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    macroValue: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    macroUnit: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+      opacity: 0.7,
+    },
+  });
+
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}>
+    <View style={[pillStyles.macroPill, { backgroundColor }]}>
       <Ionicons color={colors.text.primary} name={icon} size={10} />
-      <Text style={styles.macroValue}>{formatDecimal(value)}</Text>
-      <Text style={styles.macroUnit}>{unit}</Text>
+      <Text style={pillStyles.macroValue}>{formatDecimal(value)}</Text>
+      <Text style={pillStyles.macroUnit}>{unit}</Text>
     </View>
   );
 }
 
 export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
+  const colors = useColors();
+  const HEADER_BACKGROUND = colors.overlay.plum[7];
+  const HEADER_BORDER = colors.overlay.plum[10];
+  const INGREDIENT_CARD_BACKGROUND = colors.overlay.plum[8];
+  const INGREDIENT_CARD_BORDER = colors.overlay.plum[12];
+  const HEADER_CLOSE_BACKGROUND = colors.overlay.plum[8];
+  const HEADER_CLOSE_BORDER = colors.overlay.plum[12];
+
   const { t } = useAppTranslation();
   const resetToFree = useBlendStore((state) => state.resetToFree);
 
@@ -123,6 +151,96 @@ export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
     };
   }, [opacity, translateY]);
 
+  const styles = StyleSheet.create({
+    container: {
+      overflow: 'hidden',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: HEADER_BORDER,
+      backgroundColor: HEADER_BACKGROUND,
+      paddingTop: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      paddingHorizontal: spacing.xl,
+    },
+    headerContent: {
+      flex: 1,
+    },
+    recipeTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.4,
+      lineHeight: 24,
+    },
+    macroRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    closeButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: HEADER_CLOSE_BORDER,
+      backgroundColor: HEADER_CLOSE_BACKGROUND,
+    },
+    ingredientsContent: {
+      gap: spacing.md,
+      paddingLeft: 16,
+      paddingTop: spacing.lg,
+    },
+    ingredientCard: {
+      width: 80,
+      minHeight: 80,
+      justifyContent: 'space-between',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: INGREDIENT_CARD_BORDER,
+      backgroundColor: INGREDIENT_CARD_BACKGROUND,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    lastIngredientCard: {
+      marginRight: 16,
+    },
+    ingredientName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+      lineHeight: 16,
+    },
+    ingredientAmount: {
+      marginTop: spacing.sm,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      opacity: INGREDIENT_AMOUNT_OPACITY,
+    },
+    blendInstruction: {
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.xl,
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      fontStyle: 'italic',
+      lineHeight: 19,
+      opacity: INSTRUCTION_OPACITY,
+    },
+  });
+
   return (
     <Animated.View
       style={[
@@ -171,114 +289,3 @@ export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: HEADER_BORDER,
-    backgroundColor: HEADER_BACKGROUND,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  recipeTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.4,
-    lineHeight: 24,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  macroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  macroValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  macroUnit: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-    opacity: 0.7,
-  },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: HEADER_CLOSE_BORDER,
-    backgroundColor: HEADER_CLOSE_BACKGROUND,
-  },
-  ingredientsContent: {
-    gap: spacing.md,
-    paddingLeft: 16,
-    paddingTop: spacing.lg,
-  },
-  ingredientCard: {
-    width: 80,
-    minHeight: 80,
-    justifyContent: 'space-between',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: INGREDIENT_CARD_BORDER,
-    backgroundColor: INGREDIENT_CARD_BACKGROUND,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  lastIngredientCard: {
-    marginRight: 16,
-  },
-  ingredientName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-    lineHeight: 16,
-  },
-  ingredientAmount: {
-    marginTop: spacing.sm,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    opacity: INGREDIENT_AMOUNT_OPACITY,
-  },
-  blendInstruction: {
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    fontStyle: 'italic',
-    lineHeight: 19,
-    opacity: INSTRUCTION_OPACITY,
-  },
-});

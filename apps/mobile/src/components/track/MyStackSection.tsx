@@ -12,18 +12,16 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import {
-  colors,
   fonts,
   fontSizes,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { SupplementStackItem } from '../../services/supplementStack.service';
 import { SupplementCheckItem } from './SupplementCheckItem';
 
-const CARD_BACKGROUND = colors.overlay.plum[6];
-const CARD_BORDER = colors.overlay.plum[8];
 const EMPTY_TEXT_OPACITY = 0.6;
 const PROGRESS_OPACITY = 0.6;
 const COMPLETION_SCALE = 1.15;
@@ -48,8 +46,14 @@ export interface MyStackSectionProps {
 }
 
 function ItemSeparator() {
-  return <View style={styles.separator} />;
+  return <View style={separatorStyles.separator} />;
 }
+
+const separatorStyles = StyleSheet.create({
+  separator: {
+    height: spacing.md,
+  },
+});
 
 export function MyStackSection({
   supplements,
@@ -58,6 +62,10 @@ export function MyStackSection({
   onManage,
   isCheckPending = false,
 }: MyStackSectionProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[6];
+  const CARD_BORDER = colors.overlay.plum[8];
+
   const { t } = useAppTranslation();
   const progressScale = useRef(new Animated.Value(1)).current;
   const wasCompleteRef = useRef(false);
@@ -108,6 +116,74 @@ export function MyStackSection({
     />
   );
 
+  const styles = StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      padding: spacing.xl,
+      gap: spacing.lg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    headerLeft: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: spacing.md,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+      lineHeight: 20,
+    },
+    progressText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      opacity: PROGRESS_OPACITY,
+    },
+    progressTextComplete: {
+      color: colors.feedback.success,
+      opacity: 1,
+    },
+    manageButton: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    emptyState: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    emptyText: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+      opacity: EMPTY_TEXT_OPACITY,
+    },
+    addLink: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -150,74 +226,3 @@ export function MyStackSection({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  headerLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.md,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-    lineHeight: 20,
-  },
-  progressText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    opacity: PROGRESS_OPACITY,
-  },
-  progressTextComplete: {
-    color: colors.feedback.success,
-    opacity: 1,
-  },
-  manageButton: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  emptyState: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  emptyText: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-    opacity: EMPTY_TEXT_OPACITY,
-  },
-  addLink: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  separator: {
-    height: spacing.md,
-  },
-});

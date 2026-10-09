@@ -12,18 +12,15 @@ import * as Haptics from 'expo-haptics';
 
 import {
   borderRadius,
-  colors,
   fonts,
   fontSizes,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { SupplementStackItem } from '../../services/supplementStack.service';
 
-const CONTAINER_BACKGROUND = colors.overlay.plum[6];
-const CONTAINER_BORDER = colors.overlay.plum[8];
-const UNCHECKED_BORDER = colors.overlay.plum[25];
 const SECONDARY_TEXT_OPACITY = 0.6;
 const CHECK_CIRCLE_SIZE = spacing['2xl'] + spacing.md;
 const CHECK_CIRCLE_BORDER_WIDTH = spacing.xs;
@@ -65,6 +62,11 @@ export function SupplementCheckItem({
   onDecrement,
   isCheckPending = false,
 }: SupplementCheckItemProps) {
+  const colors = useColors();
+  const CONTAINER_BACKGROUND = colors.overlay.plum[6];
+  const CONTAINER_BORDER = colors.overlay.plum[8];
+  const UNCHECKED_BORDER = colors.overlay.plum[25];
+
   const { t } = useAppTranslation();
   const rawDailyTargetCount = (supplement as { dailyTargetCount?: unknown }).dailyTargetCount;
   const dailyTargetCount =
@@ -154,6 +156,84 @@ export function SupplementCheckItem({
   const timingLabel = t(TIMING_TRANSLATION_KEYS[supplement.timing]);
   const progressLabel = `${consumedTodayCount}/${dailyTargetCount}`;
 
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: ITEM_HEIGHT,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: CONTAINER_BORDER,
+      backgroundColor: CONTAINER_BACKGROUND,
+      padding: ITEM_PADDING,
+    },
+    leftZone: {
+      width: CHECK_CIRCLE_SIZE,
+      marginRight: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkPressable: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkCircle: {
+      width: CHECK_CIRCLE_SIZE,
+      height: CHECK_CIRCLE_SIZE,
+      borderRadius: CHECK_CIRCLE_SIZE / 2,
+      borderWidth: CHECK_CIRCLE_BORDER_WIDTH,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    countInsideText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: COUNT_INSIDE_SIZE,
+      fontWeight: fontWeights.bold,
+    },
+    contentZone: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: spacing.xs,
+    },
+    nameText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      lineHeight: 18,
+    },
+    metaText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      lineHeight: 16,
+      opacity: SECONDARY_TEXT_OPACITY,
+    },
+    rightZone: {
+      width: RIGHT_ZONE_WIDTH,
+      marginLeft: spacing.md,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    progressCountText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+      opacity: 0.5,
+    },
+    progressCountTextPartial: {
+      color: colors.brand.pulse,
+      opacity: 1,
+    },
+    progressCountTextComplete: {
+      color: colors.feedback.success,
+      opacity: 1,
+    },
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.leftZone}>
@@ -219,81 +299,3 @@ export function SupplementCheckItem({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: ITEM_HEIGHT,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: CONTAINER_BORDER,
-    backgroundColor: CONTAINER_BACKGROUND,
-    padding: ITEM_PADDING,
-  },
-  leftZone: {
-    width: CHECK_CIRCLE_SIZE,
-    marginRight: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkPressable: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkCircle: {
-    width: CHECK_CIRCLE_SIZE,
-    height: CHECK_CIRCLE_SIZE,
-    borderRadius: CHECK_CIRCLE_SIZE / 2,
-    borderWidth: CHECK_CIRCLE_BORDER_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countInsideText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: COUNT_INSIDE_SIZE,
-    fontWeight: fontWeights.bold,
-  },
-  contentZone: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  nameText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    lineHeight: 18,
-  },
-  metaText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    lineHeight: 16,
-    opacity: SECONDARY_TEXT_OPACITY,
-  },
-  rightZone: {
-    width: RIGHT_ZONE_WIDTH,
-    marginLeft: spacing.md,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  progressCountText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    opacity: 0.5,
-  },
-  progressCountTextPartial: {
-    color: colors.brand.pulse,
-    opacity: 1,
-  },
-  progressCountTextComplete: {
-    color: colors.feedback.success,
-    opacity: 1,
-  },
-});

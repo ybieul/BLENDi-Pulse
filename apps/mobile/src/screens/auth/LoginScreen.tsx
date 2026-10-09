@@ -10,13 +10,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { loginSchema } from '@blendi/shared';
 import {
-  colors,
   fonts,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { AuthButton, AuthInput, AuthScreenLayout, GoogleSignInButton } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
@@ -29,10 +29,11 @@ interface ApiErrorResponse {
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
-const DIVIDER_LINE_COLOR = colors.overlay.plum[8];
-const DIVIDER_TEXT_COLOR = colors.overlay.plum[40];
-
 export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
+  const colors = useColors();
+  const DIVIDER_LINE_COLOR = colors.overlay.plum[8];
+  const DIVIDER_TEXT_COLOR = colors.overlay.plum[40];
+
   const { t } = useAppTranslation();
   const login = useAuthStore((state) => state.login);
   const isSubmitting = useAuthStore((state) => state.isLoading);
@@ -156,6 +157,107 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     // O AppNavigator já entra em Home como rota inicial por enquanto.
   };
 
+  const styles = StyleSheet.create({
+    logoContainer: {
+      alignItems: 'center',
+      paddingTop: spacing['2xl'],
+      marginBottom: spacing['5xl'],
+    },
+    logo: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: 4,
+      textTransform: 'uppercase',
+    },
+    headingBlock: {
+      marginBottom: spacing['4xl'],
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: 'center',
+      opacity: 0.6,
+    },
+    formBlock: {
+      gap: spacing.lg,
+    },
+    passwordFieldWrapper: {
+      position: 'relative',
+    },
+    passwordToggle: {
+      position: 'absolute',
+      top: 18,
+      right: spacing.xl,
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+    forgotPasswordLink: {
+      alignSelf: 'flex-end',
+    },
+    forgotPasswordText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    dividerRow: {
+      marginTop: spacing.xl,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: DIVIDER_LINE_COLOR,
+    },
+    dividerText: {
+      color: DIVIDER_TEXT_COLOR,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 12,
+      backgroundColor: colors.background.primary,
+      paddingHorizontal: 12,
+    },
+    formErrorText: {
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    bottomText: {
+      marginTop: spacing.xl,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+    bottomLink: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   const topContent = (
     <View>
       <View style={styles.logoContainer}>
@@ -261,104 +363,3 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  logoContainer: {
-    alignItems: 'center',
-    paddingTop: spacing['2xl'],
-    marginBottom: spacing['5xl'],
-  },
-  logo: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-  },
-  headingBlock: {
-    marginBottom: spacing['4xl'],
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
-  formBlock: {
-    gap: spacing.lg,
-  },
-  passwordFieldWrapper: {
-    position: 'relative',
-  },
-  passwordToggle: {
-    position: 'absolute',
-    top: 18,
-    right: spacing.xl,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  forgotPasswordLink: {
-    alignSelf: 'flex-end',
-  },
-  forgotPasswordText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  dividerRow: {
-    marginTop: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: DIVIDER_LINE_COLOR,
-  },
-  dividerText: {
-    color: DIVIDER_TEXT_COLOR,
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 12,
-    backgroundColor: colors.background.primary,
-    paddingHorizontal: 12,
-  },
-  formErrorText: {
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  bottomText: {
-    marginTop: spacing.xl,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-  bottomLink: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-});

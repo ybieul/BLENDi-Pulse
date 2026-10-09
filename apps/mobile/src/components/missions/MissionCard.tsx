@@ -15,6 +15,7 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { DailyMissionItem } from '../../services/dailyMission.service';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -25,15 +26,17 @@ interface MissionCardProps {
   icon: IoniconName;
 }
 
-const CARD_BACKGROUND_IDLE = colors.overlay.plum[7];
 const CARD_BACKGROUND_COMPLETED = colors.overlay.success[10];
-const CARD_BORDER_IDLE = colors.overlay.plum[10];
 const CARD_BORDER_COMPLETED = colors.overlay.success[30];
-const TRACK_COLOR = colors.overlay.plum[8];
 const TITLE_MARGIN_TOP = 6;
 const PROGRESS_MARGIN_TOP = 8;
 
 export function MissionCard({ mission, icon }: MissionCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND_IDLE = colors.overlay.plum[7];
+  const CARD_BORDER_IDLE = colors.overlay.plum[10];
+  const TRACK_COLOR = colors.overlay.plum[8];
+
   const { t } = useAppTranslation();
   const cardState = useRef(new Animated.Value(mission.completed ? 1 : 0)).current;
   const iconState = useRef(new Animated.Value(mission.completed ? 1 : 0)).current;
@@ -109,6 +112,51 @@ export function MissionCard({ mission, icon }: MissionCardProps) {
     outputRange: ['0%', '100%'],
   });
 
+  const styles = StyleSheet.create({
+    card: {
+      flex: 1,
+      borderRadius: 12,
+      borderWidth: 1,
+      padding: 12,
+    },
+    content: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconContainer: {
+      width: 22,
+      height: 22,
+      position: 'relative',
+    },
+    iconLayer: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      marginTop: TITLE_MARGIN_TOP,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.medium,
+      lineHeight: 14,
+      textAlign: 'center',
+    },
+    progressTrack: {
+      width: '100%',
+      height: 3,
+      borderRadius: 1.5,
+      marginTop: PROGRESS_MARGIN_TOP,
+      backgroundColor: TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 1.5,
+    },
+  });
+
   return (
     <Animated.View style={[styles.card, { backgroundColor, borderColor }]}> 
       <View style={styles.content}>
@@ -133,48 +181,3 @@ export function MissionCard({ mission, icon }: MissionCardProps) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    flex: 1,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconContainer: {
-    width: 22,
-    height: 22,
-    position: 'relative',
-  },
-  iconLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    marginTop: TITLE_MARGIN_TOP,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.medium,
-    lineHeight: 14,
-    textAlign: 'center',
-  },
-  progressTrack: {
-    width: '100%',
-    height: 3,
-    borderRadius: 1.5,
-    marginTop: PROGRESS_MARGIN_TOP,
-    backgroundColor: TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 1.5,
-  },
-});

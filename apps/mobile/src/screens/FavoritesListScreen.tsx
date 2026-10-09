@@ -25,6 +25,7 @@ import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton, RecipeCardSkeleton } from '../components/ui';
 import { StaleDataIndicator } from '../components/ui/StaleDataIndicator';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useFavorites, useRemoveFavorite } from '../hooks/useFavorites';
 import { useNetworkStore } from '../store/network.store';
 import type { AppTabParamList, PulseAIStackParamList } from '../navigation/types';
@@ -39,7 +40,6 @@ type Props = NativeStackScreenProps<PulseAIStackParamList, 'Favorites'>;
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const EMPTY_ICON_SIZE = 64;
 const ERROR_ICON_SIZE = 40;
-const ERROR_ICON_COLOR = colors.overlay.plum[50];
 
 function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
   return {
@@ -59,6 +59,9 @@ function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
 }
 
 export function FavoritesListScreen({ navigation }: Props) {
+  const colors = useColors();
+  const ERROR_ICON_COLOR = colors.overlay.plum[50];
+
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const { favorites, isLoading, isError, refetch, dataUpdatedAt } = useFavorites();
@@ -146,6 +149,101 @@ export function FavoritesListScreen({ navigation }: Props) {
       setIsRefreshing(false);
     }
   }, [refetch]);
+
+  const styles = StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    headerTitleBlock: {
+      position: 'relative',
+      minWidth: 120,
+      minHeight: 34,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+    },
+    headerTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+    },
+    staleIndicatorAnchor: {
+      position: 'relative',
+      width: '100%',
+      minHeight: 12,
+      marginTop: spacing.xs,
+    },
+    skeletonList: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      gap: 12,
+    },
+    centeredContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+    },
+    errorText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      textAlign: 'center',
+    },
+    retryButton: {
+      width: 160,
+      height: 44,
+    },
+    emptyTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: 0.6,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    discoverButton: {
+      width: 200,
+      height: 44,
+    },
+    list: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 24,
+    },
+    separator: {
+      height: 12,
+    },
+  });
 
   const renderContent = () => {
     if (isLoading) {
@@ -245,98 +343,3 @@ export function FavoritesListScreen({ navigation }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  headerTitleBlock: {
-    position: 'relative',
-    minWidth: 120,
-    minHeight: 34,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  headerTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  staleIndicatorAnchor: {
-    position: 'relative',
-    width: '100%',
-    minHeight: 12,
-    marginTop: spacing.xs,
-  },
-  skeletonList: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 12,
-  },
-  centeredContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-  },
-  errorText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-  },
-  retryButton: {
-    width: 160,
-    height: 44,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: 0.6,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  discoverButton: {
-    width: 200,
-    height: 44,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24,
-  },
-  separator: {
-    height: 12,
-  },
-});

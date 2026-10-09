@@ -17,18 +17,16 @@ import {
   fonts,
   fontWeights,
   spacing,
+  type Colors,
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { BadgeStage, UserBadge } from '../../utils/badges.utils';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[30];
 const DESCRIPTION_OPACITY = 0.7;
-const TRACK_COLOR = colors.overlay.plum[8];
-const LOCKED_STAGE_ICON_COLOR = colors.overlay.plum[22];
 const STAGE_LABEL_OPACITY = 0.78;
 const STAGE_REQUIREMENT_OPACITY = 0.6;
 const BRONZE_COLOR = colors.badgeTier.bronzeIcon;
@@ -56,7 +54,7 @@ function getStageLabelKey(stage: UserBadge['currentStage'] | BadgeStage['stage']
   }
 }
 
-function getStageColor(stage: BadgeStage['stage']): string {
+function getStageColor(stage: BadgeStage['stage'], themeColors: Colors): string {
   switch (stage) {
     case 'bronze':
       return BRONZE_COLOR;
@@ -65,7 +63,7 @@ function getStageColor(stage: BadgeStage['stage']): string {
     case 'gold':
       return GOLD_COLOR;
     default:
-      return colors.text.secondary;
+      return themeColors.text.secondary;
   }
 }
 
@@ -84,6 +82,12 @@ function getEstimatedRemainingRequirement(nextLockedStage: BadgeStage, progress:
 
 export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
   const { t } = useAppTranslation();
+  const colors = useColors();
+  const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const TRACK_COLOR = colors.overlay.plum[8];
+  const LOCKED_STAGE_ICON_COLOR = colors.overlay.plum[22];
+
   const { height } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -181,6 +185,114 @@ export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
     };
   }, [nextLockedStage, progressAnimation, renderBadge, visible]);
 
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheetContainer: {
+      alignItems: 'center',
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER_COLOR,
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing['3xl'],
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+    },
+    badgeIcon: {
+      marginTop: spacing.xl,
+    },
+    title: {
+      marginTop: spacing.lg,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.4,
+    },
+    description: {
+      marginTop: spacing.sm,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 21,
+      opacity: DESCRIPTION_OPACITY,
+    },
+    progressionSection: {
+      width: '100%',
+      marginTop: spacing['3xl'],
+    },
+    stagesRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    stageItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    stageIcon: {
+      marginBottom: spacing.sm,
+    },
+    stageTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+      lineHeight: 16,
+      textAlign: 'center',
+      opacity: STAGE_LABEL_OPACITY,
+    },
+    stageRequirement: {
+      marginTop: 4,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      lineHeight: 15,
+      textAlign: 'center',
+      opacity: STAGE_REQUIREMENT_OPACITY,
+    },
+    progressBarSection: {
+      marginTop: spacing.xl,
+    },
+    progressTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 2,
+    },
+    progressLabel: {
+      marginTop: spacing.sm,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+  });
+
   if (!isMounted || !renderBadge) {
     return null;
   }
@@ -201,7 +313,7 @@ export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
     ? translateKey(getStageLabelKey(nextLockedStage.stage))
     : '';
   const progressFillColor = nextLockedStage
-    ? getStageColor(nextLockedStage.stage)
+    ? getStageColor(nextLockedStage.stage, colors)
     : colors.brand.pulse;
   const progressTranslateX = progressAnimation.interpolate({
     inputRange: [0, 1],
@@ -236,7 +348,7 @@ export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
             <View style={styles.progressionSection}>
               <View style={styles.stagesRow}>
                 {renderBadge.stages.map(stage => {
-                  const stageColor = getStageColor(stage.stage);
+                  const stageColor = getStageColor(stage.stage, colors);
 
                   return (
                     <View key={stage.stage} style={styles.stageItem}>
@@ -293,111 +405,3 @@ export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheetContainer: {
-    alignItems: 'center',
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-  },
-  badgeIcon: {
-    marginTop: spacing.xl,
-  },
-  title: {
-    marginTop: spacing.lg,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.4,
-  },
-  description: {
-    marginTop: spacing.sm,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 21,
-    opacity: DESCRIPTION_OPACITY,
-  },
-  progressionSection: {
-    width: '100%',
-    marginTop: spacing['3xl'],
-  },
-  stagesRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  stageItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  stageIcon: {
-    marginBottom: spacing.sm,
-  },
-  stageTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-    lineHeight: 16,
-    textAlign: 'center',
-    opacity: STAGE_LABEL_OPACITY,
-  },
-  stageRequirement: {
-    marginTop: 4,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    lineHeight: 15,
-    textAlign: 'center',
-    opacity: STAGE_REQUIREMENT_OPACITY,
-  },
-  progressBarSection: {
-    marginTop: spacing.xl,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 2,
-  },
-  progressLabel: {
-    marginTop: spacing.sm,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-});

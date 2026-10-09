@@ -20,16 +20,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[55];
-const WHEEL_HIGHLIGHT_BG = colors.overlay.plum[7];
-const WHEEL_HIGHLIGHT_BORDER = colors.overlay.plum[14];
 const ITEM_HEIGHT = 48;
 const VISIBLE_ITEMS = 5;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
@@ -67,6 +64,10 @@ interface WheelColumnProps {
 }
 
 function WheelColumn({ items, initialIndex, onIndexChange, isOpen }: WheelColumnProps) {
+  const colors = useColors();
+  const WHEEL_HIGHLIGHT_BG = colors.overlay.plum[7];
+  const WHEEL_HIGHLIGHT_BORDER = colors.overlay.plum[14];
+
   const scrollRef = useRef<ScrollView>(null);
   const [selectedIndex, setSelectedIndex] = useState(initialIndex);
 
@@ -96,6 +97,48 @@ function WheelColumn({ items, initialIndex, onIndexChange, isOpen }: WheelColumn
     },
     [items.length, onIndexChange],
   );
+
+  const wheelStyles = StyleSheet.create({
+    column: {
+      width: 80,
+      height: WHEEL_HEIGHT,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    centerHighlight: {
+      position: 'absolute',
+      top: ITEM_HEIGHT * 2,
+      left: 0,
+      right: 0,
+      height: ITEM_HEIGHT,
+      backgroundColor: WHEEL_HIGHLIGHT_BG,
+      borderTopWidth: 0.5,
+      borderBottomWidth: 0.5,
+      borderColor: WHEEL_HIGHLIGHT_BORDER,
+      zIndex: 1,
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingVertical: PADDING_VERTICAL,
+    },
+    item: {
+      height: ITEM_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    itemText: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.5,
+    },
+    itemTextDim: {
+      opacity: DIM_OPACITY,
+    },
+  });
 
   return (
     <View style={wheelStyles.column}>
@@ -140,6 +183,10 @@ export function DailyPulseTimeSheet({
   onClose,
 }: DailyPulseTimeSheetProps) {
   const { t } = useAppTranslation();
+  const colors = useColors();
+  const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+  const HANDLE_COLOR = colors.overlay.plum[22];
+
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -218,6 +265,60 @@ export function DailyPulseTimeSheet({
     onClose();
   }, [onConfirm, onClose]);
 
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheet: {
+      backgroundColor: colors.background.secondary,
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER_COLOR,
+      alignItems: 'center',
+      paddingTop: spacing.lg,
+      paddingHorizontal: spacing['3xl'],
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+    },
+    title: {
+      marginTop: spacing.xl,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.bold,
+      opacity: TITLE_OPACITY,
+      letterSpacing: -0.3,
+    },
+    wheelsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.xl,
+    },
+    separator: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      opacity: SEPARATOR_OPACITY,
+      marginBottom: 4,
+    },
+    confirmButton: {
+      width: '100%',
+      marginTop: spacing['3xl'],
+    },
+  });
+
   if (!isMounted) {
     return null;
   }
@@ -272,101 +373,3 @@ export function DailyPulseTimeSheet({
     </Modal>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const wheelStyles = StyleSheet.create({
-  column: {
-    width: 80,
-    height: WHEEL_HEIGHT,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  centerHighlight: {
-    position: 'absolute',
-    top: ITEM_HEIGHT * 2,
-    left: 0,
-    right: 0,
-    height: ITEM_HEIGHT,
-    backgroundColor: WHEEL_HIGHLIGHT_BG,
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderColor: WHEEL_HIGHLIGHT_BORDER,
-    zIndex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingVertical: PADDING_VERTICAL,
-  },
-  item: {
-    height: ITEM_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemText: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.5,
-  },
-  itemTextDim: {
-    opacity: DIM_OPACITY,
-  },
-});
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheet: {
-    backgroundColor: colors.background.secondary,
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    alignItems: 'center',
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing['3xl'],
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-  },
-  title: {
-    marginTop: spacing.xl,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-    opacity: TITLE_OPACITY,
-    letterSpacing: -0.3,
-  },
-  wheelsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
-  separator: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    opacity: SEPARATOR_OPACITY,
-    marginBottom: 4,
-  },
-  confirmButton: {
-    width: '100%',
-    marginTop: spacing['3xl'],
-  },
-});

@@ -13,11 +13,11 @@ import {
 import { colors, fonts, fontWeights } from '@blendi/shared';
 import { api } from '../../config/api';
 import { createAppStorage } from '../../config/storage';
+import { useColors } from '../../hooks/useColors';
 import { useAuthStore } from '../../store/auth.store';
 
 const PROFILE_PHOTO_STORAGE = createAppStorage('blendi-pulse');
 const INITIALS_BACKGROUND = colors.overlay.pulse[30];
-const LOADER_COLOR = colors.overlay.plum[72];
 const MIN_INITIALS_FONT_SIZE = 14;
 const INITIALS_FONT_SCALE = 0.35;
 
@@ -131,6 +131,9 @@ export function ProfilePhoto({
   style,
   imageStyle,
 }: ProfilePhotoProps) {
+  const colors = useColors();
+  const LOADER_COLOR = colors.overlay.plum[72];
+
   const authenticatedUserId = useAuthStore(state => state.user?.id ?? null);
   const resolvedUserId = userId ?? authenticatedUserId;
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -204,6 +207,30 @@ export function ProfilePhoto({
     };
   }, [hasProfilePhoto, normalizedUpdatedAt, resolvedUserId]);
 
+  const styles = StyleSheet.create({
+    container: {
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    initialsCircle: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: INITIALS_BACKGROUND,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initialsText: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+    },
+  });
+
   return (
     <View
       style={[
@@ -256,27 +283,3 @@ export function ProfilePhoto({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  initialsCircle: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: INITIALS_BACKGROUND,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsText: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-  },
-});

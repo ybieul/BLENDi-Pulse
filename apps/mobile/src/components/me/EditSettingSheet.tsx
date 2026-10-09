@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import {
   Animated,
   Easing,
@@ -16,28 +16,21 @@ import { Ionicons } from '@expo/vector-icons';
 
 import {
   borderRadius,
-  colors,
   fontSizes,
   fonts,
   fontWeights,
   spacing,
+  type Colors,
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
 import { AuthInput } from '../ui/AuthInput';
 import { SelectionCard } from '../ui/SelectionCard';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
-const BACKDROP_COLOR = colors.overlay.black[30];
 const SUBTITLE_OPACITY = 0.7;
-const TOGGLE_BACKGROUND = colors.overlay.plum[7];
-const TOGGLE_BORDER = colors.overlay.plum[10];
-const TOGGLE_HIGHLIGHT = colors.overlay.plum[4];
-const TOGGLE_SELECTED_BACKGROUND = colors.overlay.pulse[22];
-const TOGGLE_SELECTED_BORDER = colors.overlay.pulse[55];
 const GOAL_ICON_SIZE = 22;
 
 export type EditSettingType =
@@ -48,7 +41,8 @@ export type EditSettingType =
   | 'calories'
   | 'hydration'
   | 'unitSystem'
-  | 'language';
+  | 'language'
+  | 'theme';
 
 export type EditSettingValue = string | number;
 
@@ -65,6 +59,7 @@ interface EditSettingSheetProps {
 }
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
   model: 'me.edit.modelTitle',
@@ -75,6 +70,7 @@ const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
   hydration: 'me.edit.hydrationTitle',
   unitSystem: 'me.edit.unitSystemTitle',
   language: 'me.edit.languageTitle',
+  theme: 'me.edit.themeTitle',
 };
 
 const MODEL_OPTIONS = [
@@ -95,30 +91,32 @@ const MODEL_OPTIONS = [
   },
 ] as const;
 
+// Nomes de ícone apenas — o elemento <Ionicons> é construído em
+// renderSelectionContent(), onde `colors` (reativo ao tema) está em escopo.
 const GOAL_OPTIONS = [
   {
     value: 'Muscle',
     titleKey: 'onboarding.goalMuscle' as TranslationKey,
     descriptionKey: 'onboarding.goalMuscleDesc' as TranslationKey,
-    icon: <Ionicons name="barbell-outline" size={GOAL_ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'barbell-outline' as IoniconName,
   },
   {
     value: 'Wellness',
     titleKey: 'onboarding.goalWellness' as TranslationKey,
     descriptionKey: 'onboarding.goalWellnessDesc' as TranslationKey,
-    icon: <Ionicons name="heart-outline" size={GOAL_ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'heart-outline' as IoniconName,
   },
   {
     value: 'Energy',
     titleKey: 'onboarding.goalEnergy' as TranslationKey,
     descriptionKey: 'onboarding.goalEnergyDesc' as TranslationKey,
-    icon: <Ionicons name="flash-outline" size={GOAL_ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'flash-outline' as IoniconName,
   },
   {
     value: 'Recovery',
     titleKey: 'onboarding.goalRecovery' as TranslationKey,
     descriptionKey: 'onboarding.goalRecoveryDesc' as TranslationKey,
-    icon: <Ionicons name="moon-outline" size={GOAL_ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'moon-outline' as IoniconName,
   },
 ] as const;
 
@@ -130,20 +128,58 @@ function ToggleButton({
   label,
   selected,
   onPress,
+  colors,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  colors: Colors;
 }) {
+  const toggleStyles = StyleSheet.create({
+    toggleButton: {
+      flex: 1,
+      minHeight: 56,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[7],
+      overflow: 'hidden',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    toggleButtonSelected: {
+      borderColor: colors.overlay.pulse[55],
+      backgroundColor: colors.overlay.pulse[22],
+    },
+    toggleHighlight: {
+      ...StyleSheet.absoluteFillObject,
+      height: '50%',
+      backgroundColor: colors.overlay.plum[4],
+    },
+    toggleLabel: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    toggleLabelSelected: {
+      color: colors.text.primary,
+      fontWeight: fontWeights.bold,
+    },
+  });
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.toggleButton, selected && styles.toggleButtonSelected]}
+      style={[toggleStyles.toggleButton, selected && toggleStyles.toggleButtonSelected]}
     >
-      <View style={styles.toggleHighlight} />
-      <Text style={[styles.toggleLabel, selected && styles.toggleLabelSelected]}>{label}</Text>
+      <View style={toggleStyles.toggleHighlight} />
+      <Text style={[toggleStyles.toggleLabel, selected && toggleStyles.toggleLabelSelected]}>{label}</Text>
     </Pressable>
   );
 }
@@ -155,6 +191,7 @@ export function EditSettingSheet({
   onClose,
 }: EditSettingSheetProps) {
   const { t } = useAppTranslation();
+  const colors = useColors();
   const { height } = useWindowDimensions();
 
   const translateY = useRef(new Animated.Value(height)).current;
@@ -226,6 +263,11 @@ export function EditSettingSheet({
     { value: 'pt-BR', label: t('profile.language.pt_BR') },
   ]), [t]);
 
+  const themeOptions = useMemo<ToggleOption[]>(() => ([
+    { value: 'light', label: t('me.theme.light') },
+    { value: 'dark', label: t('me.theme.dark') },
+  ]), [t]);
+
   const normalizedNumericValue = useMemo(() => {
     if (!isNumericType(type)) {
       return null;
@@ -278,7 +320,7 @@ export function EditSettingSheet({
           {GOAL_OPTIONS.map(option => (
             <SelectionCard
               key={option.value}
-              icon={option.icon}
+              icon={<Ionicons name={option.iconName} size={GOAL_ICON_SIZE} color={colors.text.primary} />}
               onPress={() => { setSelectedValue(option.value); }}
               selected={selectedValue === option.value}
               subtitle={t(option.descriptionKey)}
@@ -297,6 +339,7 @@ export function EditSettingSheet({
       {options.map(option => (
         <ToggleButton
           key={option.value}
+          colors={colors}
           label={option.label}
           onPress={() => { setSelectedValue(option.value); }}
           selected={selectedValue === option.value}
@@ -318,6 +361,10 @@ export function EditSettingSheet({
       return renderToggleContent(languageOptions);
     }
 
+    if (type === 'theme') {
+      return renderToggleContent(themeOptions);
+    }
+
     return (
       <AuthInput
         keyboardType="numeric"
@@ -327,6 +374,70 @@ export function EditSettingSheet({
       />
     );
   };
+
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay.black[30],
+    },
+    kvContainer: {
+      justifyContent: 'flex-end',
+    },
+    sheetContainer: {
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing['3xl'],
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: colors.overlay.plum[22],
+    },
+    title: {
+      marginTop: spacing.lg,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      letterSpacing: -0.3,
+    },
+    subtitle: {
+      marginTop: spacing.sm,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      opacity: SUBTITLE_OPACITY,
+      textAlign: 'center',
+    },
+    scrollView: {
+      marginTop: spacing['3xl'],
+      marginBottom: spacing['3xl'],
+    },
+    scrollContent: {
+      paddingBottom: spacing.sm,
+    },
+    cardList: {
+      gap: spacing.md,
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+  });
 
   return (
     <Modal transparent visible animationType="none" statusBarTranslucent>
@@ -371,100 +482,3 @@ export function EditSettingSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  kvContainer: {
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-  },
-  title: {
-    marginTop: spacing.lg,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    marginTop: spacing.sm,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    opacity: SUBTITLE_OPACITY,
-    textAlign: 'center',
-  },
-  scrollView: {
-    marginTop: spacing['3xl'],
-    marginBottom: spacing['3xl'],
-  },
-  scrollContent: {
-    paddingBottom: spacing.sm,
-  },
-  cardList: {
-    gap: spacing.md,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  toggleButton: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: TOGGLE_BORDER,
-    backgroundColor: TOGGLE_BACKGROUND,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  toggleButtonSelected: {
-    borderColor: TOGGLE_SELECTED_BORDER,
-    backgroundColor: TOGGLE_SELECTED_BACKGROUND,
-  },
-  toggleHighlight: {
-    ...StyleSheet.absoluteFillObject,
-    height: '50%',
-    backgroundColor: TOGGLE_HIGHLIGHT,
-  },
-  toggleLabel: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  toggleLabelSelected: {
-    color: colors.text.primary,
-    fontWeight: fontWeights.bold,
-  },
-});

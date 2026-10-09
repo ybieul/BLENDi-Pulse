@@ -10,8 +10,9 @@ import {
 import { AntDesign } from '@expo/vector-icons';
 import { useNavigation, type NavigationProp, type ParamListBase } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '@blendi/shared';
+import { spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { AuroraBackground } from './AuroraBackground';
 
 const FOOTER_HORIZONTAL_PADDING = spacing['3xl'];
@@ -32,6 +33,7 @@ export function AuthScreenLayout({
   bottomContent,
   showBackButton = false,
 }: AuthScreenLayoutProps) {
+  const colors = useColors();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
@@ -41,6 +43,39 @@ export function AuthScreenLayout({
       navigation.goBack();
     }
   };
+
+  const styles = StyleSheet.create({
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'space-between',
+    },
+    topContentWrapper: {
+      paddingHorizontal: TOP_HORIZONTAL_PADDING,
+    },
+    bottomWrapper: {
+      paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
+      paddingTop: FOOTER_VERTICAL_PADDING,
+    },
+    backButton: {
+      position: 'absolute',
+      left: TOP_HORIZONTAL_PADDING,
+      width: BACK_BUTTON_SIZE,
+      height: BACK_BUTTON_SIZE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+  });
 
   return (
     <KeyboardAvoidingView
@@ -87,36 +122,3 @@ export function AuthScreenLayout({
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'space-between',
-  },
-  topContentWrapper: {
-    paddingHorizontal: TOP_HORIZONTAL_PADDING,
-  },
-  bottomWrapper: {
-    paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
-    paddingTop: FOOTER_VERTICAL_PADDING,
-  },
-  backButton: {
-    position: 'absolute',
-    left: TOP_HORIZONTAL_PADDING,
-    width: BACK_BUTTON_SIZE,
-    height: BACK_BUTTON_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-});

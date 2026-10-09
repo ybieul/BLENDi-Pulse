@@ -13,13 +13,10 @@ import type { PantryIngredient } from '@blendi/shared';
 
 import {
   borderRadius,
-  colors,
   spacing,
 } from '@blendi/shared';
+import { useColors } from '../../hooks/useColors';
 
-const ROW_BACKGROUND = colors.overlay.plum[6];
-const ROW_BORDER = colors.overlay.plum[8];
-const UNCHECKED_BORDER = colors.overlay.plum[25];
 const QUANTITY_OPACITY = 0.55;
 const CHECK_CIRCLE_SIZE = 24;
 const CHECK_CIRCLE_BORDER_WIDTH = spacing.xs;
@@ -50,6 +47,11 @@ export function IngredientCheckItem({
   checked,
   onToggle,
 }: IngredientCheckItemProps) {
+  const colors = useColors();
+  const ROW_BACKGROUND = colors.overlay.plum[6];
+  const ROW_BORDER = colors.overlay.plum[8];
+  const UNCHECKED_BORDER = colors.overlay.plum[25];
+
   const progressValue = useRef(new Animated.Value(checked ? 1 : 0)).current;
   const scaleValue = useRef(new Animated.Value(1)).current;
   const hasMounted = useRef(false);
@@ -102,6 +104,62 @@ export function IngredientCheckItem({
     onToggle();
   };
 
+  const styles = StyleSheet.create({
+    pressable: {
+      minHeight: ROW_MIN_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: ROW_BORDER,
+      backgroundColor: ROW_BACKGROUND,
+      paddingHorizontal: ROW_HORIZONTAL_PADDING,
+      paddingVertical: ROW_VERTICAL_PADDING,
+    },
+    checkCircle: {
+      width: CHECK_CIRCLE_SIZE,
+      height: CHECK_CIRCLE_SIZE,
+      borderRadius: CHECK_CIRCLE_SIZE / 2,
+      borderWidth: CHECK_CIRCLE_BORDER_WIDTH,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: CHECKBOX_GAP,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      minWidth: 0,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minWidth: 0,
+    },
+    nameText: {
+      flexShrink: 1,
+      color: colors.text.primary,
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 14,
+    },
+    mediumConfidenceDot: {
+      width: MEDIUM_CONFIDENCE_DOT_SIZE,
+      height: MEDIUM_CONFIDENCE_DOT_SIZE,
+      borderRadius: MEDIUM_CONFIDENCE_DOT_SIZE / 2,
+      backgroundColor: colors.feedback.warning,
+      marginLeft: spacing.md,
+    },
+    quantityText: {
+      marginLeft: spacing.lg,
+      color: colors.text.primary,
+      opacity: QUANTITY_OPACITY,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 12,
+      textAlign: 'right',
+      flexShrink: 0,
+      maxWidth: 112,
+    },
+  });
+
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -149,59 +207,3 @@ export function IngredientCheckItem({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  pressable: {
-    minHeight: ROW_MIN_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: ROW_BORDER,
-    backgroundColor: ROW_BACKGROUND,
-    paddingHorizontal: ROW_HORIZONTAL_PADDING,
-    paddingVertical: ROW_VERTICAL_PADDING,
-  },
-  checkCircle: {
-    width: CHECK_CIRCLE_SIZE,
-    height: CHECK_CIRCLE_SIZE,
-    borderRadius: CHECK_CIRCLE_SIZE / 2,
-    borderWidth: CHECK_CIRCLE_BORDER_WIDTH,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: CHECKBOX_GAP,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    minWidth: 0,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 0,
-  },
-  nameText: {
-    flexShrink: 1,
-    color: colors.text.primary,
-    fontFamily: 'DMSans_500Medium',
-    fontSize: 14,
-  },
-  mediumConfidenceDot: {
-    width: MEDIUM_CONFIDENCE_DOT_SIZE,
-    height: MEDIUM_CONFIDENCE_DOT_SIZE,
-    borderRadius: MEDIUM_CONFIDENCE_DOT_SIZE / 2,
-    backgroundColor: colors.feedback.warning,
-    marginLeft: spacing.md,
-  },
-  quantityText: {
-    marginLeft: spacing.lg,
-    color: colors.text.primary,
-    opacity: QUANTITY_OPACITY,
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 12,
-    textAlign: 'right',
-    flexShrink: 0,
-    maxWidth: 112,
-  },
-});

@@ -9,12 +9,12 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const DAILY_QUERY_LIMIT = 3;
 const DOT_SIZE = 8;
 const FILLED_DOT_COLOR = colors.overlay.pulse[92];
 const FILLED_DOT_BORDER = colors.brand.pulse;
-const OUTLINED_DOT_BORDER = colors.overlay.plum[26];
 const OUTLINED_DOT_BACKGROUND = 'transparent';
 const TEXT_OPACITY = 0.68;
 const ANIMATION_FADE_START = 0.45;
@@ -42,6 +42,9 @@ function buildDotAnimations(): DotAnimation[] {
 }
 
 export function UsageIndicator({ usageRemaining }: UsageIndicatorProps) {
+  const colors = useColors();
+  const OUTLINED_DOT_BORDER = colors.overlay.plum[26];
+
   const { t } = useAppTranslation();
   const dotAnimations = useRef(buildDotAnimations()).current;
   const previousUsedCount = useRef<number | null>(null);
@@ -94,6 +97,42 @@ export function UsageIndicator({ usageRemaining }: UsageIndicatorProps) {
     previousUsedCount.current = usedCount;
   }, [dotAnimations, usageRemaining, usedCount]);
 
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.sm,
+    },
+    dotsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    dot: {
+      width: DOT_SIZE,
+      height: DOT_SIZE,
+      borderRadius: DOT_SIZE / 2,
+      borderWidth: 1,
+    },
+    dotUsed: {
+      backgroundColor: FILLED_DOT_COLOR,
+      borderColor: FILLED_DOT_BORDER,
+    },
+    dotRemaining: {
+      backgroundColor: OUTLINED_DOT_BACKGROUND,
+      borderColor: OUTLINED_DOT_BORDER,
+    },
+    label: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+      opacity: TEXT_OPACITY,
+    },
+  });
+
   if (!shouldRender) {
     return null;
   }
@@ -127,39 +166,3 @@ export function UsageIndicator({ usageRemaining }: UsageIndicatorProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.sm,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    borderWidth: 1,
-  },
-  dotUsed: {
-    backgroundColor: FILLED_DOT_COLOR,
-    borderColor: FILLED_DOT_BORDER,
-  },
-  dotRemaining: {
-    backgroundColor: OUTLINED_DOT_BACKGROUND,
-    borderColor: OUTLINED_DOT_BORDER,
-  },
-  label: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    opacity: TEXT_OPACITY,
-  },
-});

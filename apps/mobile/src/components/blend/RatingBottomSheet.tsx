@@ -18,16 +18,14 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[30];
 const SUBTITLE_OPACITY = 0.6;
 const SKIP_OPACITY = 0.5;
 const STAR_GAP = 12;
 const STAR_SELECTED_COLOR = colors.rating.starFilled;
-const STAR_IDLE_COLOR = colors.overlay.plum[24];
 
 export interface RatingBottomSheetProps {
   visible: boolean;
@@ -42,6 +40,11 @@ export function RatingBottomSheet({
   onRate,
   onSkip,
 }: RatingBottomSheetProps) {
+  const colors = useColors();
+  const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const STAR_IDLE_COLOR = colors.overlay.plum[24];
+
   const { t } = useAppTranslation();
   const { height } = useWindowDimensions();
 
@@ -162,6 +165,71 @@ export function RatingBottomSheet({
     closeSheet(onSkip);
   };
 
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheetContainer: {
+      alignItems: 'center',
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER_COLOR,
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing['3xl'],
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+    },
+    title: {
+      marginTop: 16,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.4,
+    },
+    subtitle: {
+      marginTop: spacing.sm,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      opacity: SUBTITLE_OPACITY,
+    },
+    starsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: STAR_GAP,
+      marginTop: spacing['4xl'],
+    },
+    skipButton: {
+      marginTop: spacing['3xl'],
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+    },
+    skipLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      opacity: SKIP_OPACITY,
+    },
+  });
+
   if (!isMounted) {
     return null;
   }
@@ -214,68 +282,3 @@ export function RatingBottomSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheetContainer: {
-    alignItems: 'center',
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-  },
-  title: {
-    marginTop: 16,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.4,
-  },
-  subtitle: {
-    marginTop: spacing.sm,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    opacity: SUBTITLE_OPACITY,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: STAR_GAP,
-    marginTop: spacing['4xl'],
-  },
-  skipButton: {
-    marginTop: spacing['3xl'],
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  skipLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    opacity: SKIP_OPACITY,
-  },
-});

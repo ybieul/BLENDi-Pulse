@@ -19,6 +19,7 @@ import {
 } from '@blendi/shared';
 import { useAddFavorite, useRemoveFavorite } from '../../hooks/useFavorites';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
@@ -33,23 +34,16 @@ import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
 const BADGE_BACKGROUND = colors.overlay.pulse[20];
 const BADGE_BORDER = colors.overlay.pulse[35];
 const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
 const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
 const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
-const SEPARATOR_COLOR = colors.overlay.plum[8];
-const SECTION_LABEL_COLOR = colors.overlay.plum[70];
-const BLEND_TEXT_COLOR = colors.overlay.plum[80];
 const SUBSTITUTES_BACKGROUND = colors.overlay.warning[8];
 const SUBSTITUTES_BORDER = colors.overlay.warning[15];
 const TIP_BACKGROUND = colors.overlay.info[8];
 const TIP_BORDER = colors.overlay.info[15];
-const GHOST_BUTTON_BORDER = colors.overlay.plum[15];
-const GHOST_BUTTON_BACKGROUND = colors.overlay.plum[5];
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
 const CART_BUTTON_BORDER = colors.overlay.pulse[20];
 const UNIT_OPACITY = 0.7;
@@ -74,6 +68,7 @@ export interface RecipeCardProps {
 }
 
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
+  const colors = useColors();
   const { formatDecimal } = useFormatNumbers();
   const backgroundColor =
     tone === 'protein'
@@ -84,11 +79,35 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
           ? FAT_PILL_BACKGROUND
           : CALORIES_PILL_BACKGROUND;
 
+  const pillStyles = StyleSheet.create({
+    macroPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    macroValue: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    macroUnit: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+      opacity: UNIT_OPACITY,
+    },
+  });
+
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}>
+    <View style={[pillStyles.macroPill, { backgroundColor }]}>
       <Ionicons name={icon} size={10} color={colors.text.primary} />
-      <Text style={styles.macroValue}>{formatDecimal(value)}</Text>
-      <Text style={styles.macroUnit}>{unit}</Text>
+      <Text style={pillStyles.macroValue}>{formatDecimal(value)}</Text>
+      <Text style={pillStyles.macroUnit}>{unit}</Text>
     </View>
   );
 }
@@ -100,6 +119,15 @@ export function RecipeCard({
   onStartBlend,
   isFromCache = false,
 }: RecipeCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+  const SEPARATOR_COLOR = colors.overlay.plum[8];
+  const SECTION_LABEL_COLOR = colors.overlay.plum[70];
+  const BLEND_TEXT_COLOR = colors.overlay.plum[80];
+  const GHOST_BUTTON_BORDER = colors.overlay.plum[15];
+  const GHOST_BUTTON_BACKGROUND = colors.overlay.plum[5];
+
   const { t } = useAppTranslation();
   const authUser = useAuthStore((state) => state.user);
   const isConnected = useNetworkStore((state) => state.isConnected);
@@ -241,6 +269,204 @@ export function RecipeCard({
     });
   };
 
+  const styles = StyleSheet.create({
+    cardContainer: {
+      position: 'relative',
+    },
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      padding: 16,
+      overflow: 'hidden',
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.lg,
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    badgePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+      backgroundColor: BADGE_BACKGROUND,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    badgeLabel: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.medium,
+    },
+    cacheBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    cacheLabel: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+    },
+    favoriteButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 32,
+      minHeight: 32,
+    },
+    title: {
+      marginBottom: spacing.lg,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.5,
+      lineHeight: 26,
+    },
+    macroScrollContent: {
+      gap: spacing.sm,
+      paddingRight: spacing.xs,
+    },
+    separator: {
+      height: 0.5,
+      marginVertical: spacing.lg,
+      backgroundColor: SEPARATOR_COLOR,
+    },
+    sectionTitle: {
+      marginBottom: spacing.md,
+      color: SECTION_LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    ingredientsList: {
+      gap: spacing.sm,
+    },
+    ingredientRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+    },
+    ingredientDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 999,
+      marginTop: 7,
+      backgroundColor: colors.brand.pulse,
+    },
+    ingredientText: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 19,
+    },
+    blendInstruction: {
+      color: BLEND_TEXT_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      fontStyle: 'italic',
+      lineHeight: 20,
+    },
+    substitutesBox: {
+      marginTop: spacing.lg,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: SUBSTITUTES_BORDER,
+      backgroundColor: SUBSTITUTES_BACKGROUND,
+      padding: spacing.lg,
+    },
+    tipBox: {
+      marginTop: spacing.lg,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: TIP_BORDER,
+      backgroundColor: TIP_BACKGROUND,
+      padding: spacing.lg,
+    },
+    calloutTitle: {
+      marginBottom: spacing.sm,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    calloutBody: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 19,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+    },
+    startBlendButton: {
+      flex: 1,
+      height: 42,
+      borderRadius: 14,
+      minWidth: 0,
+    },
+    startBlendLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    cartButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: CART_BUTTON_BORDER,
+      backgroundColor: CART_BUTTON_BACKGROUND,
+    },
+    shareButton: {
+      width: 42,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: GHOST_BUTTON_BORDER,
+      backgroundColor: GHOST_BUTTON_BACKGROUND,
+    },
+    saveButton: {
+      width: 92,
+      height: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: GHOST_BUTTON_BORDER,
+    },
+    saveButtonLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
@@ -381,222 +607,3 @@ export function RecipeCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  cardContainer: {
-    position: 'relative',
-  },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    overflow: 'hidden',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  badgePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: BADGE_BORDER,
-    backgroundColor: BADGE_BACKGROUND,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  badgeLabel: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.medium,
-  },
-  cacheBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  cacheLabel: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-  },
-  favoriteButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 32,
-    minHeight: 32,
-  },
-  title: {
-    marginBottom: spacing.lg,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.5,
-    lineHeight: 26,
-  },
-  macroScrollContent: {
-    gap: spacing.sm,
-    paddingRight: spacing.xs,
-  },
-  macroPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  macroValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  macroUnit: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-    opacity: UNIT_OPACITY,
-  },
-  separator: {
-    height: 0.5,
-    marginVertical: spacing.lg,
-    backgroundColor: SEPARATOR_COLOR,
-  },
-  sectionTitle: {
-    marginBottom: spacing.md,
-    color: SECTION_LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  ingredientsList: {
-    gap: spacing.sm,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-  },
-  ingredientDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 999,
-    marginTop: 7,
-    backgroundColor: colors.brand.pulse,
-  },
-  ingredientText: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 19,
-  },
-  blendInstruction: {
-    color: BLEND_TEXT_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    fontStyle: 'italic',
-    lineHeight: 20,
-  },
-  substitutesBox: {
-    marginTop: spacing.lg,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: SUBSTITUTES_BORDER,
-    backgroundColor: SUBSTITUTES_BACKGROUND,
-    padding: spacing.lg,
-  },
-  tipBox: {
-    marginTop: spacing.lg,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: TIP_BORDER,
-    backgroundColor: TIP_BACKGROUND,
-    padding: spacing.lg,
-  },
-  calloutTitle: {
-    marginBottom: spacing.sm,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  calloutBody: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 19,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  startBlendButton: {
-    flex: 1,
-    height: 42,
-    borderRadius: 14,
-    minWidth: 0,
-  },
-  startBlendLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  cartButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: CART_BUTTON_BORDER,
-    backgroundColor: CART_BUTTON_BACKGROUND,
-  },
-  shareButton: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: GHOST_BUTTON_BORDER,
-    backgroundColor: GHOST_BUTTON_BACKGROUND,
-  },
-  saveButton: {
-    width: 92,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: GHOST_BUTTON_BORDER,
-  },
-  saveButtonLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-});

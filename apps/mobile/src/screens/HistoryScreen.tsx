@@ -28,27 +28,18 @@ import { StatCard } from '../components/history/StatCard';
 import { SupplementHeatmap } from '../components/history/SupplementHeatmap';
 import { SkeletonLoader } from '../components/ui';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useFormatNumbers } from '../hooks/useFormatNumbers';
 import { useHistoryData, type HistoryPeriod } from '../hooks/useHistoryData';
 import { useUnits } from '../hooks/useUnits';
 import type { TrackStackScreenProps } from '../navigation/types';
 import { useAuthStore } from '../store/auth.store';
 
-const SECTION_HEADER_COLOR = colors.overlay.plum[90];
-const SUBTITLE_COLOR = colors.overlay.plum[65];
 const ERROR_ICON_COLOR = colors.overlay.error[70];
 const HYDRATION_ICON_COLOR = colors.overlay.info[80];
 const SUPPLEMENT_ICON_COLOR = colors.overlay.success[80];
-const LOAD_MORE_BACKGROUND = colors.overlay.plum[5];
-const LOAD_MORE_BORDER = colors.overlay.plum[12];
-const BACK_BUTTON_BACKGROUND = colors.overlay.plum[5];
-const BACK_BUTTON_BORDER = colors.overlay.plum[12];
 const ERROR_BACKGROUND = colors.overlay.error[6];
 const ERROR_BORDER = colors.overlay.error[18];
-const RETRY_BACKGROUND = colors.overlay.plum[7];
-const RETRY_BORDER = colors.overlay.plum[14];
-const EMPTY_STATE_BACKGROUND = colors.overlay.plum[4];
-const EMPTY_STATE_BORDER = colors.overlay.plum[8];
 const EMPTY_STATE_ICON_COLOR = colors.overlay.pulse[40];
 
 const HYDRATION_SCROLL_THRESHOLD = 450;
@@ -59,7 +50,47 @@ interface SectionErrorProps {
 }
 
 function SectionError({ onRetry }: SectionErrorProps) {
+  const colors = useColors();
+  const SUBTITLE_COLOR = colors.overlay.plum[65];
+  const RETRY_BACKGROUND = colors.overlay.plum[7];
+  const RETRY_BORDER = colors.overlay.plum[14];
+
   const { t } = useAppTranslation();
+
+  const errorStyles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      marginTop: 12,
+      backgroundColor: ERROR_BACKGROUND,
+      borderWidth: 1,
+      borderColor: ERROR_BORDER,
+      borderRadius: 12,
+    },
+    message: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      color: SUBTITLE_COLOR,
+    },
+    retryButton: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: RETRY_BACKGROUND,
+      borderWidth: 1,
+      borderColor: RETRY_BORDER,
+      borderRadius: 8,
+    },
+    retryText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 12,
+      color: colors.text.primary,
+    },
+  });
 
   return (
     <View style={errorStyles.container}>
@@ -72,42 +103,17 @@ function SectionError({ onRetry }: SectionErrorProps) {
   );
 }
 
-const errorStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: ERROR_BACKGROUND,
-    borderWidth: 1,
-    borderColor: ERROR_BORDER,
-    borderRadius: 12,
-  },
-  message: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: SUBTITLE_COLOR,
-  },
-  retryButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: RETRY_BACKGROUND,
-    borderWidth: 1,
-    borderColor: RETRY_BORDER,
-    borderRadius: 8,
-  },
-  retryText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-});
-
 export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) {
+  const colors = useColors();
+  const SECTION_HEADER_COLOR = colors.overlay.plum[90];
+  const SUBTITLE_COLOR = colors.overlay.plum[65];
+  const LOAD_MORE_BACKGROUND = colors.overlay.plum[5];
+  const LOAD_MORE_BORDER = colors.overlay.plum[12];
+  const BACK_BUTTON_BACKGROUND = colors.overlay.plum[5];
+  const BACK_BUTTON_BORDER = colors.overlay.plum[12];
+  const EMPTY_STATE_BACKGROUND = colors.overlay.plum[4];
+  const EMPTY_STATE_BORDER = colors.overlay.plum[8];
+
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const { formatCount } = useFormatNumbers();
@@ -244,6 +250,134 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
       })),
     [supplementHistory],
   );
+
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    contentContainer: {
+      paddingHorizontal: 24,
+      paddingBottom: 32,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 4,
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: BACK_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: BACK_BUTTON_BORDER,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 20,
+      color: colors.text.primary,
+    },
+    periodRow: {
+      paddingTop: 16,
+    },
+    section: {
+      marginTop: 24,
+    },
+    sectionSpacing: {
+      marginTop: 32,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 16,
+      color: SECTION_HEADER_COLOR,
+    },
+    statRow: {
+      flexDirection: 'row',
+      marginBottom: 14,
+    },
+    cardGap: {
+      width: 8,
+    },
+    chartContainer: {
+      overflow: 'hidden',
+    },
+    listSubtitle: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 13,
+      color: SUBTITLE_COLOR,
+      marginTop: 16,
+      marginBottom: 10,
+    },
+    emptyStateCard: {
+      marginTop: 4,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: EMPTY_STATE_BORDER,
+      backgroundColor: EMPTY_STATE_BACKGROUND,
+      alignItems: 'center',
+    },
+    emptyStateTitle: {
+      marginTop: 10,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.bold,
+      fontSize: 14,
+      color: colors.text.primary,
+    },
+    emptyStateMessage: {
+      marginTop: 6,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: SUBTITLE_COLOR,
+      textAlign: 'center',
+    },
+    itemGap: {
+      height: 8,
+    },
+    blendItemSkeleton: {
+      height: 82,
+    },
+    loadMoreButton: {
+      marginTop: 12,
+      height: 44,
+      borderRadius: 10,
+      backgroundColor: LOAD_MORE_BACKGROUND,
+      borderWidth: 1,
+      borderColor: LOAD_MORE_BORDER,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadMoreText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 14,
+      color: colors.text.primary,
+    },
+    allLoadedText: {
+      marginTop: 12,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 12,
+      color: SUBTITLE_COLOR,
+      textAlign: 'center',
+    },
+  });
 
   return (
     <View style={styles.root}>
@@ -462,131 +596,3 @@ export function HistoryScreen({ navigation }: TrackStackScreenProps<'History'>) 
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  contentContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 4,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: BACK_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: BACK_BUTTON_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 20,
-    color: colors.text.primary,
-  },
-  periodRow: {
-    paddingTop: 16,
-  },
-  section: {
-    marginTop: 24,
-  },
-  sectionSpacing: {
-    marginTop: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 16,
-    color: SECTION_HEADER_COLOR,
-  },
-  statRow: {
-    flexDirection: 'row',
-    marginBottom: 14,
-  },
-  cardGap: {
-    width: 8,
-  },
-  chartContainer: {
-    overflow: 'hidden',
-  },
-  listSubtitle: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 13,
-    color: SUBTITLE_COLOR,
-    marginTop: 16,
-    marginBottom: 10,
-  },
-  emptyStateCard: {
-    marginTop: 4,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: EMPTY_STATE_BORDER,
-    backgroundColor: EMPTY_STATE_BACKGROUND,
-    alignItems: 'center',
-  },
-  emptyStateTitle: {
-    marginTop: 10,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.bold,
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  emptyStateMessage: {
-    marginTop: 6,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: SUBTITLE_COLOR,
-    textAlign: 'center',
-  },
-  itemGap: {
-    height: 8,
-  },
-  blendItemSkeleton: {
-    height: 82,
-  },
-  loadMoreButton: {
-    marginTop: 12,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: LOAD_MORE_BACKGROUND,
-    borderWidth: 1,
-    borderColor: LOAD_MORE_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadMoreText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  allLoadedText: {
-    marginTop: 12,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 12,
-    color: SUBTITLE_COLOR,
-    textAlign: 'center',
-  },
-});

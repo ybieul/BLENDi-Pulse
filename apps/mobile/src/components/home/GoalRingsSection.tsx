@@ -22,11 +22,11 @@ import {
   HOME_INTERACTION_DELAY,
 } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
 import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 import { GoalRing } from '../ui/GoalRing';
 
-const HYDRATION_TRACK_COLOR = colors.overlay.plum[8];
 const HYDRATION_FILL_COLOR = colors.overlay.info[70];
 const HYDRATION_TEXT_OPACITY = 0.6;
 const HYDRATION_BAR_HEIGHT = 6;
@@ -66,6 +66,9 @@ export function GoalRingsSection({
   hydrationTarget,
   dataUpdatedAt,
 }: GoalRingsSectionProps) {
+  const colors = useColors();
+  const HYDRATION_TRACK_COLOR = colors.overlay.plum[8];
+
   const { t } = useAppTranslation();
   const { displayHydration } = useUnits();
   const [hydrationTrackWidth, setHydrationTrackWidth] = useState(0);
@@ -123,6 +126,63 @@ export function GoalRingsSection({
   const hydrationProgressLabel = t('home.hydrationBar', {
     current: displayHydration(hydrationCurrent),
     target: displayHydration(hydrationTarget),
+  });
+
+  const styles = StyleSheet.create({
+    section: {
+      width: '100%',
+      position: 'relative',
+    },
+    ringsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sideRingSlot: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centerRingSlot: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginHorizontal: spacing.sm,
+    },
+    hydrationRow: {
+      marginTop: HYDRATION_BAR_SPACING,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    hydrationTrackWrapper: {
+      flex: 1,
+      marginLeft: spacing.md,
+      marginRight: spacing.md,
+    },
+    hydrationTrack: {
+      height: HYDRATION_BAR_HEIGHT,
+      borderRadius: HYDRATION_BAR_RADIUS,
+      backgroundColor: HYDRATION_TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    hydrationFill: {
+      height: HYDRATION_BAR_HEIGHT,
+      borderRadius: HYDRATION_BAR_RADIUS,
+      backgroundColor: HYDRATION_FILL_COLOR,
+    },
+    hydrationText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.regular,
+      opacity: HYDRATION_TEXT_OPACITY,
+    },
+    staleIndicatorAnchor: {
+      position: 'relative',
+      alignSelf: 'center',
+      width: '100%',
+      minHeight: spacing.xl,
+      marginTop: spacing.sm,
+    },
   });
 
   return (
@@ -184,60 +244,3 @@ export function GoalRingsSection({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: {
-    width: '100%',
-    position: 'relative',
-  },
-  ringsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sideRingSlot: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerRingSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: spacing.sm,
-  },
-  hydrationRow: {
-    marginTop: HYDRATION_BAR_SPACING,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  hydrationTrackWrapper: {
-    flex: 1,
-    marginLeft: spacing.md,
-    marginRight: spacing.md,
-  },
-  hydrationTrack: {
-    height: HYDRATION_BAR_HEIGHT,
-    borderRadius: HYDRATION_BAR_RADIUS,
-    backgroundColor: HYDRATION_TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  hydrationFill: {
-    height: HYDRATION_BAR_HEIGHT,
-    borderRadius: HYDRATION_BAR_RADIUS,
-    backgroundColor: HYDRATION_FILL_COLOR,
-  },
-  hydrationText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.regular,
-    opacity: HYDRATION_TEXT_OPACITY,
-  },
-  staleIndicatorAnchor: {
-    position: 'relative',
-    alignSelf: 'center',
-    width: '100%',
-    minHeight: spacing.xl,
-    marginTop: spacing.sm,
-  },
-});

@@ -3,6 +3,8 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@blendi/shared';
 
+import { useColors } from '../../hooks/useColors';
+
 // Cores das auroras (usadas em JSX props — fora de StyleSheet.create)
 const AURORA_1_COLORS = [colors.overlay.pulse[18], 'transparent', 'transparent'] as const;
 const AURORA_2_COLORS = ['transparent', colors.decorative.auroraGlow2, 'transparent'] as const;
@@ -34,6 +36,7 @@ export interface AuroraBackgroundProps {
  * do usuário.
  */
 export function AuroraBackground({ intensity = 'full', baseColors }: AuroraBackgroundProps) {
+  const themeColors = useColors();
   const progress = useRef(new Animated.Value(0)).current;
   const animationDuration = intensity === 'reduced'
     ? REDUCED_AURORA_DURATION
@@ -87,7 +90,7 @@ export function AuroraBackground({ intensity = 'full', baseColors }: AuroraBackg
     <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       {/* Camada base — gradiente vertical estático */}
       <LinearGradient
-        colors={baseColors ?? [colors.background.primary, colors.background.secondary, colors.background.primary]}
+        colors={baseColors ?? [themeColors.background.primary, themeColors.background.secondary, themeColors.background.primary]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFillObject}

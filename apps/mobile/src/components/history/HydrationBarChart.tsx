@@ -22,6 +22,7 @@ import {
 } from '@blendi/shared';
 
 import { useDateFormat } from '../../hooks/useDateFormat';
+import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
@@ -31,12 +32,8 @@ const BAR_ANIMATION_DURATION = 800;
 const SVG_WIDTH_OFFSET = 48;
 const BAR_DEFAULT_COLOR = colors.overlay.info[60];
 const BAR_SUCCESS_COLOR = colors.overlay.success[75];
-const EMPTY_BAR_COLOR = colors.overlay.plum[16];
 const EMPTY_BAR_HEIGHT_RATIO = 0.16;
 const TARGET_LINE_COLOR = colors.overlay.success[25];
-const LABEL_COLOR = colors.overlay.plum[55];
-const TOOLTIP_BACKGROUND = colors.overlay.plum[7];
-const TOOLTIP_BORDER = colors.overlay.plum[10];
 const TOOLTIP_WIDTH = 144;
 const TOOLTIP_HEIGHT = 58;
 const TOOLTIP_SPACING = 8;
@@ -162,6 +159,12 @@ export function HydrationBarChart({
   animate = true,
   isLoading = false,
 }: HydrationBarChartProps) {
+  const colors = useColors();
+  const EMPTY_BAR_COLOR = colors.overlay.plum[16];
+  const LABEL_COLOR = colors.overlay.plum[55];
+  const TOOLTIP_BACKGROUND = colors.overlay.plum[7];
+  const TOOLTIP_BORDER = colors.overlay.plum[10];
+
   const { formatWeekdayShort, formatShortDate } = useDateFormat();
   const { displayVolume: displayMetricVolume } = useUnits('metric');
   const { displayVolume: displayImperialVolume } = useUnits('imperial');
@@ -247,6 +250,64 @@ export function HydrationBarChart({
       ),
     };
   }, [chartHeight, tooltipDatum, selectedIndex, slotWidth, svgWidth, yAxisMax]);
+
+  const styles = StyleSheet.create({
+    container: {
+      alignSelf: 'center',
+    },
+    chartStage: {
+      position: 'relative',
+    },
+    dismissLayer: {
+      position: 'absolute',
+      left: 0,
+      zIndex: 1,
+    },
+    tooltip: {
+      position: 'absolute',
+      zIndex: 2,
+      width: TOOLTIP_WIDTH,
+      minHeight: TOOLTIP_HEIGHT,
+      padding: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: TOOLTIP_BORDER,
+      backgroundColor: TOOLTIP_BACKGROUND,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+    },
+    tooltipPrimary: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    tooltipSecondary: {
+      color: LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+    labelsRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginTop: 10,
+    },
+    labelSlot: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    labelText: {
+      color: LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+  });
 
   if (isLoading) {
     return (
@@ -340,61 +401,3 @@ export function HydrationBarChart({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'center',
-  },
-  chartStage: {
-    position: 'relative',
-  },
-  dismissLayer: {
-    position: 'absolute',
-    left: 0,
-    zIndex: 1,
-  },
-  tooltip: {
-    position: 'absolute',
-    zIndex: 2,
-    width: TOOLTIP_WIDTH,
-    minHeight: TOOLTIP_HEIGHT,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: TOOLTIP_BORDER,
-    backgroundColor: TOOLTIP_BACKGROUND,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  tooltipPrimary: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  tooltipSecondary: {
-    color: LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-  labelsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 10,
-  },
-  labelSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  labelText: {
-    color: LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-});

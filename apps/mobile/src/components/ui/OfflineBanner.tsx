@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fontSizes, fontWeights, fonts, spacing } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useNetworkStore } from '../../store/network.store';
 
 const BANNER_HEIGHT = 36;
@@ -28,6 +29,7 @@ const webBackdropStyle: ViewStyle | undefined =
     : undefined;
 
 export function OfflineBanner() {
+  const themeColors = useColors();
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const isConnected = useNetworkStore((state) => state.isConnected);
@@ -135,6 +137,31 @@ export function OfflineBanner() {
   const iconName = isOffline ? 'cloud-offline-outline' : 'checkmark';
   const message = isOffline ? t('common.noConnection') : t('common.backOnline');
 
+  const styles = StyleSheet.create({
+    container: {
+      position: 'absolute',
+      left: 0,
+      width: '100%',
+      height: BANNER_HEIGHT,
+      zIndex: 999,
+    },
+    content: {
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: spacing.xl,
+    },
+    message: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+    },
+  });
+
   return (
     <Animated.View
       pointerEvents="none"
@@ -150,34 +177,9 @@ export function OfflineBanner() {
       ]}
     >
       <View style={styles.content}>
-        <Ionicons name={iconName} size={14} color={colors.text.primary} />
+        <Ionicons name={iconName} size={14} color={themeColors.text.primary} />
         <Text style={styles.message}>{message}</Text>
       </View>
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    width: '100%',
-    height: BANNER_HEIGHT,
-    zIndex: 999,
-  },
-  content: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.xl,
-  },
-  message: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-  },
-});

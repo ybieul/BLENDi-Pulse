@@ -9,14 +9,18 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, fontSizes, fonts, spacing } from '@blendi/shared';
+import type { ComponentProps } from 'react';
+import { fontSizes, fonts, spacing } from '@blendi/shared';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { SelectionCard } from '../../components/ui/SelectionCard';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useOnboardingStore } from '../../store/onboarding.store';
 
 const ICON_SIZE = 22;
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type OnboardingGoalScreenProps = {
   navigation: {
@@ -24,34 +28,40 @@ type OnboardingGoalScreenProps = {
   };
 };
 
-const GOALS = [
+const GOALS: ReadonlyArray<{
+  key: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+  titleKey: 'onboarding.goalMuscle' | 'onboarding.goalWellness' | 'onboarding.goalEnergy' | 'onboarding.goalRecovery';
+  descKey: 'onboarding.goalMuscleDesc' | 'onboarding.goalWellnessDesc' | 'onboarding.goalEnergyDesc' | 'onboarding.goalRecoveryDesc';
+  iconName: IoniconName;
+}> = [
   {
     key: 'Muscle',
     titleKey: 'onboarding.goalMuscle',
     descKey: 'onboarding.goalMuscleDesc',
-    icon: <Ionicons name="barbell-outline" size={ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'barbell-outline',
   },
   {
     key: 'Wellness',
     titleKey: 'onboarding.goalWellness',
     descKey: 'onboarding.goalWellnessDesc',
-    icon: <Ionicons name="heart-outline" size={ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'heart-outline',
   },
   {
     key: 'Energy',
     titleKey: 'onboarding.goalEnergy',
     descKey: 'onboarding.goalEnergyDesc',
-    icon: <Ionicons name="flash-outline" size={ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'flash-outline',
   },
   {
     key: 'Recovery',
     titleKey: 'onboarding.goalRecovery',
     descKey: 'onboarding.goalRecoveryDesc',
-    icon: <Ionicons name="moon-outline" size={ICON_SIZE} color={colors.text.primary} />,
+    iconName: 'moon-outline',
   },
-] as const;
+];
 
 export function OnboardingGoalScreen({ navigation }: OnboardingGoalScreenProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const selectedGoal = useOnboardingStore((state) => state.selectedGoal);
   const setGoal = useOnboardingStore((state) => state.setGoal);
@@ -76,6 +86,31 @@ export function OnboardingGoalScreen({ navigation }: OnboardingGoalScreenProps) 
     ]).start();
   }, [opacity, translateY]);
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    topContent: {
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['4xl'],
+      lineHeight: 48,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 24,
+    },
+    cardList: {
+      gap: spacing.md,
+      paddingTop: spacing.sm,
+    },
+  });
+
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
       <OnboardingLayout
@@ -85,12 +120,12 @@ export function OnboardingGoalScreen({ navigation }: OnboardingGoalScreenProps) 
             <Text style={styles.title}>{t('onboarding.goal.title')}</Text>
             <Text style={styles.subtitle}>{t('onboarding.goal.subtitle')}</Text>
             <View style={styles.cardList}>
-              {GOALS.map(({ key, titleKey, descKey, icon }) => (
+              {GOALS.map(({ key, titleKey, descKey, iconName }) => (
                 <SelectionCard
                   key={key}
                   title={t(titleKey)}
                   subtitle={t(descKey)}
-                  icon={icon}
+                  icon={<Ionicons name={iconName} size={ICON_SIZE} color={colors.text.primary} />}
                   selected={selectedGoal === key}
                   onPress={() => { setGoal(key); }}
                 />
@@ -110,28 +145,3 @@ export function OnboardingGoalScreen({ navigation }: OnboardingGoalScreenProps) 
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topContent: {
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['4xl'],
-    lineHeight: 48,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 24,
-  },
-  cardList: {
-    gap: spacing.md,
-    paddingTop: spacing.sm,
-  },
-});

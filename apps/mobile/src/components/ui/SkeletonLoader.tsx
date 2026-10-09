@@ -9,8 +9,9 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { colors, borderRadius, spacing } from '@blendi/shared';
+import { borderRadius, spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ const ANIMATION_DURATION = 1200; // ms por ciclo completo
 // ─── Componente base ──────────────────────────────────────────────────────────
 
 export function SkeletonLoader(props: SkeletonLoaderProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const opacity = useRef(new Animated.Value(0.3)).current;
 

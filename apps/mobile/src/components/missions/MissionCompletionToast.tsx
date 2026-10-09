@@ -14,6 +14,7 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 interface MissionCompletionToastProps {
   xpAmount: number;
@@ -29,6 +30,7 @@ const EXIT_DURATION = 200;
 const HIDDEN_TRANSLATE_Y = -20;
 
 export function MissionCompletionToast({ xpAmount, visible, onDismiss }: MissionCompletionToastProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(HIDDEN_TRANSLATE_Y)).current;
@@ -118,6 +120,30 @@ export function MissionCompletionToast({ xpAmount, visible, onDismiss }: Mission
     });
   }, [onDismiss, opacity, translateY, visible]);
 
+  const styles = StyleSheet.create({
+    toast: {
+      position: 'absolute',
+      top: TOAST_TOP,
+      alignSelf: 'center',
+      zIndex: 999,
+      borderRadius: 20,
+      backgroundColor: TOAST_BACKGROUND,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    content: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    text: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   if (!visible) {
     return null;
   }
@@ -142,27 +168,3 @@ export function MissionCompletionToast({ xpAmount, visible, onDismiss }: Mission
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  toast: {
-    position: 'absolute',
-    top: TOAST_TOP,
-    alignSelf: 'center',
-    zIndex: 999,
-    borderRadius: 20,
-    backgroundColor: TOAST_BACKGROUND,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  text: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-});

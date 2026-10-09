@@ -17,6 +17,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { markCleaned } from '../../services/user.service';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -53,6 +54,7 @@ function shouldShowReminder(lastCleanedAt?: string | null): boolean {
 }
 
 export function CleaningReminder({ visible }: CleaningReminderProps) {
+  const themeColors = useColors();
   const { t } = useAppTranslation();
   const authState = useAuthStore.getState() as CleaningReminderStoreSnapshot;
   const lastCleanedAt = normalizeLastCleanedAt(authState.user?.lastCleanedAt);
@@ -162,6 +164,36 @@ export function CleaningReminder({ visible }: CleaningReminderProps) {
     return null;
   }
 
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: REMINDER_BORDER,
+      backgroundColor: REMINDER_BACKGROUND,
+      padding: 14,
+    },
+    textContainer: {
+      flex: 1,
+      gap: spacing.sm,
+    },
+    message: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+    },
+    action: {
+      color: colors.feedback.warning,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <Animated.View
       style={[
@@ -184,33 +216,3 @@ export function CleaningReminder({ visible }: CleaningReminderProps) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: REMINDER_BORDER,
-    backgroundColor: REMINDER_BACKGROUND,
-    padding: 14,
-  },
-  textContainer: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  message: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-  },
-  action: {
-    color: colors.feedback.warning,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-});

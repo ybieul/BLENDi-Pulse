@@ -27,6 +27,7 @@ import {
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import type { AppTabParamList } from '../../navigation/types';
 import { getLists, type ShoppingListsResult } from '../../services/shoppingList.service';
 import { appendIngredientsToShoppingList, type ShoppingListIngredientInput } from '../../utils/shoppingListAddItems.utils';
@@ -35,11 +36,6 @@ import { AuthButton } from '../ui/AuthButton';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[55];
-const HANDLE_COLOR = colors.overlay.plum[22];
-const SHEET_BORDER = colors.overlay.plum[10];
-const ROW_BACKGROUND = colors.overlay.plum[6];
-const ROW_BORDER = colors.overlay.plum[8];
-const CHEVRON_COLOR = colors.overlay.plum[45];
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const SUBTITLE_OPACITY = 0.6;
 const META_OPACITY = 0.55;
@@ -55,6 +51,13 @@ export function AddToListSheet({
   ingredients,
   onClose,
 }: AddToListSheetProps) {
+  const colors = useColors();
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const SHEET_BORDER = colors.overlay.plum[10];
+  const ROW_BACKGROUND = colors.overlay.plum[6];
+  const ROW_BORDER = colors.overlay.plum[8];
+  const CHEVRON_COLOR = colors.overlay.plum[45];
+
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -199,6 +202,127 @@ export function AddToListSheet({
 
   const shouldRenderSheet = visible && shouldOpenSheet;
 
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheet: {
+      maxHeight: '78%',
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER,
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: borderRadius.full,
+      backgroundColor: HANDLE_COLOR,
+      marginBottom: spacing.lg,
+    },
+    headerBlock: {
+      gap: spacing.xs,
+      marginBottom: spacing.lg,
+    },
+    sheetTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    sheetSubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      opacity: SUBTITLE_OPACITY,
+      textAlign: 'center',
+    },
+    listContent: {
+      paddingBottom: spacing.lg,
+    },
+    listRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: ROW_BORDER,
+      backgroundColor: ROW_BACKGROUND,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      gap: spacing.md,
+    },
+    listTextBlock: {
+      flex: 1,
+      minWidth: 0,
+      gap: spacing.xs,
+    },
+    listName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    listMeta: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: META_OPACITY,
+    },
+    separator: {
+      height: spacing.md,
+    },
+    createButton: {
+      marginTop: spacing.lg,
+      alignSelf: 'center',
+      minWidth: 180,
+    },
+    centeredState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+      paddingVertical: spacing['4xl'],
+    },
+    errorText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      textAlign: 'center',
+    },
+    retryButton: {
+      width: 160,
+      height: 44,
+    },
+    emptyText: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: SUBTITLE_OPACITY,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+  });
+
   if (!shouldRenderSheet || !isMounted) {
     return null;
   }
@@ -284,124 +408,3 @@ export function AddToListSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheet: {
-    maxHeight: '78%',
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: HANDLE_COLOR,
-    marginBottom: spacing.lg,
-  },
-  headerBlock: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  sheetTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  sheetSubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    opacity: SUBTITLE_OPACITY,
-    textAlign: 'center',
-  },
-  listContent: {
-    paddingBottom: spacing.lg,
-  },
-  listRow: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: ROW_BORDER,
-    backgroundColor: ROW_BACKGROUND,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    gap: spacing.md,
-  },
-  listTextBlock: {
-    flex: 1,
-    minWidth: 0,
-    gap: spacing.xs,
-  },
-  listName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  listMeta: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: META_OPACITY,
-  },
-  separator: {
-    height: spacing.md,
-  },
-  createButton: {
-    marginTop: spacing.lg,
-    alignSelf: 'center',
-    minWidth: 180,
-  },
-  centeredState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing['4xl'],
-  },
-  errorText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-  },
-  retryButton: {
-    width: 160,
-    height: 44,
-  },
-  emptyText: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: SUBTITLE_OPACITY,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-});

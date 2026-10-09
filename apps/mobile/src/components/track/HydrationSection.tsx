@@ -18,6 +18,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { useUnits } from '../../hooks/useUnits';
 import { getDeviceTimezone } from '../../services/timezone.service';
@@ -29,21 +30,15 @@ import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
-const CARD_BACKGROUND = colors.overlay.plum[6];
-const CARD_BORDER = colors.overlay.plum[8];
-const PROGRESS_TRACK = colors.overlay.plum[8];
 const PROGRESS_FILL = colors.overlay.info[70];
 const BAR_DEFAULT_FILL = colors.overlay.info[60];
 const BAR_GOAL_FILL = colors.overlay.success[70];
 const LABEL_OPACITY = 0.5;
-const BUTTON_BACKGROUND = colors.overlay.plum[7];
-const BUTTON_BORDER = colors.overlay.plum[10];
 const WATER_ICON_COLOR = colors.overlay.info[80];
 const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
-const WATER_OFFLINE_ICON_COLOR = colors.overlay.plum[82];
 const WATER_OFFLINE_ICON_SIZE = 10;
 const CARD_RADIUS = 16;
 const PROGRESS_RADIUS = 4;
@@ -113,6 +108,14 @@ export function HydrationSection({
   dataUpdatedAt,
   isLogWaterPending = false,
 }: HydrationSectionProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[6];
+  const CARD_BORDER = colors.overlay.plum[8];
+  const PROGRESS_TRACK = colors.overlay.plum[8];
+  const BUTTON_BACKGROUND = colors.overlay.plum[7];
+  const BUTTON_BORDER = colors.overlay.plum[10];
+  const WATER_OFFLINE_ICON_COLOR = colors.overlay.plum[82];
+
   const { t } = useAppTranslation();
   const { formatWeekdayShort } = useDateFormat();
   const { displayHydration } = useUnits();
@@ -280,6 +283,131 @@ export function HydrationSection({
     void onLogWater();
   };
 
+  const styles = StyleSheet.create({
+    card: {
+      borderRadius: CARD_RADIUS,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      padding: spacing.xl,
+      gap: spacing.lg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    headerBlock: {
+      position: 'relative',
+      paddingBottom: spacing.lg,
+    },
+    title: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+      lineHeight: 20,
+    },
+    progressText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      opacity: 0.85,
+    },
+    staleIndicatorAnchor: {
+      position: 'relative',
+      width: '100%',
+      minHeight: 12,
+    },
+    progressTrack: {
+      height: PROGRESS_HEIGHT,
+      borderRadius: PROGRESS_RADIUS,
+      backgroundColor: PROGRESS_TRACK,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: PROGRESS_RADIUS,
+      backgroundColor: PROGRESS_FILL,
+    },
+    logButton: {
+      height: QUICK_LOG_BUTTON_HEIGHT,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: BUTTON_BORDER,
+      backgroundColor: BUTTON_BACKGROUND,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xl,
+      overflow: 'visible',
+    },
+    logButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
+    },
+    logButtonLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    waterConfirmation: {
+      position: 'absolute',
+      top: -spacing.lg,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    waterConfirmationText: {
+      color: WATER_ICON_COLOR,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.bold,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    metaLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+      opacity: LABEL_OPACITY,
+    },
+    goalReachedLabel: {
+      color: colors.feedback.success,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+    },
+    historyRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    barColumn: {
+      flex: 1,
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    barLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+      opacity: LABEL_OPACITY,
+    },
+  });
+
   return (
     <View style={styles.card}>
       <View style={styles.headerBlock}>
@@ -377,128 +505,3 @@ export function HydrationSection({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: CARD_RADIUS,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  headerBlock: {
-    position: 'relative',
-    paddingBottom: spacing.lg,
-  },
-  title: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-    lineHeight: 20,
-  },
-  progressText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-    opacity: 0.85,
-  },
-  staleIndicatorAnchor: {
-    position: 'relative',
-    width: '100%',
-    minHeight: 12,
-  },
-  progressTrack: {
-    height: PROGRESS_HEIGHT,
-    borderRadius: PROGRESS_RADIUS,
-    backgroundColor: PROGRESS_TRACK,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: PROGRESS_RADIUS,
-    backgroundColor: PROGRESS_FILL,
-  },
-  logButton: {
-    height: QUICK_LOG_BUTTON_HEIGHT,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: BUTTON_BORDER,
-    backgroundColor: BUTTON_BACKGROUND,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    overflow: 'visible',
-  },
-  logButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  logButtonLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-  waterConfirmation: {
-    position: 'absolute',
-    top: -spacing.lg,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  waterConfirmationText: {
-    color: WATER_ICON_COLOR,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.bold,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  metaLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-    opacity: LABEL_OPACITY,
-  },
-  goalReachedLabel: {
-    color: colors.feedback.success,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  barColumn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  barLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-    opacity: LABEL_OPACITY,
-  },
-});

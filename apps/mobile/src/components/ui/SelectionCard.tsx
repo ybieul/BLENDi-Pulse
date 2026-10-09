@@ -18,16 +18,13 @@ import {
   spacing,
 } from '@blendi/shared';
 
+import { useColors } from '../../hooks/useColors';
+
 const CARD_RADIUS = 16;
 const BORDER_ANIMATION_DURATION = 200;
 const CHECK_ANIMATION_DURATION = 150;
 const SCALE_SELECTED = 1.02;
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_HIGHLIGHT = colors.overlay.plum[4];
-const CARD_BORDER_IDLE = colors.overlay.plum[10];
 const CARD_BORDER_SELECTED = colors.overlay.pulse[65];
-const BADGE_BACKGROUND = colors.overlay.plum[8];
-const BADGE_BORDER = colors.overlay.plum[8];
 
 export interface SelectionCardProps extends Pick<PressableProps, 'testID' | 'accessibilityHint'> {
   title: string;
@@ -48,6 +45,13 @@ export function SelectionCard({
   testID,
   accessibilityHint,
 }: SelectionCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_HIGHLIGHT = colors.overlay.plum[4];
+  const CARD_BORDER_IDLE = colors.overlay.plum[10];
+  const BADGE_BACKGROUND = colors.overlay.plum[8];
+  const BADGE_BORDER = colors.overlay.plum[8];
+
   const borderProgress = useRef(new Animated.Value(selected ? 1 : 0)).current;
   const scale = useRef(new Animated.Value(selected ? SCALE_SELECTED : 1)).current;
   const checkOpacity = useRef(new Animated.Value(selected ? 1 : 0)).current;
@@ -83,6 +87,84 @@ export function SelectionCard({
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [CARD_BORDER_IDLE, CARD_BORDER_SELECTED],
+  });
+
+  const styles = StyleSheet.create({
+    pressable: {
+      width: '100%',
+    },
+    cardOuter: {
+      borderRadius: CARD_RADIUS,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    cardInner: {
+      position: 'relative',
+      minHeight: 132,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xl,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    cardHighlight: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '50%',
+      backgroundColor: CARD_HIGHLIGHT,
+    },
+    checkIcon: {
+      position: 'absolute',
+      top: spacing.lg,
+      right: spacing.lg,
+      zIndex: 1,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    iconSlot: {
+      minHeight: 24,
+      minWidth: 24,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    badge: {
+      maxWidth: '80%',
+      alignSelf: 'flex-start',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: 999,
+      backgroundColor: BADGE_BACKGROUND,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+    },
+    badgeText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+    },
+    contentBlock: {
+      gap: spacing.sm,
+      paddingRight: spacing['3xl'],
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.bold,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.regular,
+      lineHeight: 22,
+    },
   });
 
   return (
@@ -130,81 +212,3 @@ export function SelectionCard({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  pressable: {
-    width: '100%',
-  },
-  cardOuter: {
-    borderRadius: CARD_RADIUS,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  cardInner: {
-    position: 'relative',
-    minHeight: 132,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    backgroundColor: CARD_BACKGROUND,
-  },
-  cardHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: CARD_HIGHLIGHT,
-  },
-  checkIcon: {
-    position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
-    zIndex: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  iconSlot: {
-    minHeight: 24,
-    minWidth: 24,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  badge: {
-    maxWidth: '80%',
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 999,
-    backgroundColor: BADGE_BACKGROUND,
-    borderWidth: 1,
-    borderColor: BADGE_BORDER,
-  },
-  badgeText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-  },
-  contentBlock: {
-    gap: spacing.sm,
-    paddingRight: spacing['3xl'],
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.regular,
-    lineHeight: 22,
-  },
-});

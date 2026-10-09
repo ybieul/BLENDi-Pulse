@@ -11,8 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, spacing } from '@blendi/shared';
+import { spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { AuroraBackground } from './AuroraBackground';
 import { AuthProgressDots } from './AuthProgressDots';
 
@@ -56,6 +57,7 @@ export function OnboardingLayout({
   bottomContent,
   onBack,
 }: OnboardingLayoutProps) {
+  const colors = useColors();
   const navigation: OnboardingLayoutNavigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
@@ -81,6 +83,42 @@ export function OnboardingLayout({
       navigation.goBack();
     }
   };
+
+  const styles = StyleSheet.create({
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'space-between',
+    },
+    topContentWrapper: {
+      paddingHorizontal: TOP_HORIZONTAL_PADDING,
+    },
+    progressBlock: {
+      marginBottom: spacing['4xl'],
+    },
+    bottomWrapper: {
+      paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
+      paddingTop: FOOTER_VERTICAL_PADDING,
+    },
+    backButton: {
+      position: 'absolute',
+      left: TOP_HORIZONTAL_PADDING,
+      width: BACK_BUTTON_SIZE,
+      height: BACK_BUTTON_SIZE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2,
+    },
+  });
 
   return (
     <KeyboardAvoidingView
@@ -129,39 +167,3 @@ export function OnboardingLayout({
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'space-between',
-  },
-  topContentWrapper: {
-    paddingHorizontal: TOP_HORIZONTAL_PADDING,
-  },
-  progressBlock: {
-    marginBottom: spacing['4xl'],
-  },
-  bottomWrapper: {
-    paddingHorizontal: FOOTER_HORIZONTAL_PADDING,
-    paddingTop: FOOTER_VERTICAL_PADDING,
-  },
-  backButton: {
-    position: 'absolute',
-    left: TOP_HORIZONTAL_PADDING,
-    width: BACK_BUTTON_SIZE,
-    height: BACK_BUTTON_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-});

@@ -4,6 +4,7 @@ import type { WeeklyReportHighlightRecipe } from '@blendi/shared';
 
 import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
 const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
@@ -11,7 +12,6 @@ const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
 const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
 const STAR_COLOR = colors.overlay.warning[90];
-const STAR_EMPTY_COLOR = colors.overlay.plum[20];
 const MAX_RATING = 5;
 
 interface MacroPillProps {
@@ -21,11 +21,28 @@ interface MacroPillProps {
 }
 
 function MacroPill({ value, unit, backgroundColor }: MacroPillProps) {
+  const colors = useColors();
   const { formatDecimal } = useFormatNumbers();
 
+  const pillStyles = StyleSheet.create({
+    macroPill: {
+      height: 22,
+      borderRadius: 999,
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    macroPillText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.medium,
+      lineHeight: 14,
+    },
+  });
+
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}>
-      <Text style={styles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
+    <View style={[pillStyles.macroPill, { backgroundColor }]}>
+      <Text style={pillStyles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
     </View>
   );
 }
@@ -39,7 +56,32 @@ export interface HighlightRecipeCardProps {
 // "fazer esse blend" ou "salvar nos favoritos" (ambos exigem um PulseAiRecipe
 // completo). Decisão confirmada com o usuário durante a Tarefa 8 do CP3.4.
 export function HighlightRecipeCard({ recipe }: HighlightRecipeCardProps) {
+  const colors = useColors();
+  const STAR_EMPTY_COLOR = colors.overlay.plum[20];
+
   const { t } = useAppTranslation();
+
+  const styles = StyleSheet.create({
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 17,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.3,
+      lineHeight: 22,
+    },
+    macroRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 10,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      gap: 3,
+      marginTop: 10,
+    },
+  });
 
   return (
     <View>
@@ -67,38 +109,3 @@ export function HighlightRecipeCard({ recipe }: HighlightRecipeCardProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 17,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.3,
-    lineHeight: 22,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-  },
-  macroPill: {
-    height: 22,
-    borderRadius: 999,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  macroPillText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.medium,
-    lineHeight: 14,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    gap: 3,
-    marginTop: 10,
-  },
-});

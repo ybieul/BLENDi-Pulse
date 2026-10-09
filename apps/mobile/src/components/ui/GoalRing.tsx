@@ -19,11 +19,11 @@ import {
   GOAL_RING_ANIMATION_DURATION,
   HOME_INTERACTION_DELAY,
 } from '../../config/cache.config';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const TRACK_STROKE = colors.overlay.plum[8];
 const LABEL_OPACITY = 0.6;
 const SEPARATOR_OPACITY = 0.45;
 const CELEBRATION_SCALE = 1.05;
@@ -82,10 +82,13 @@ export function GoalRing({
   color = colors.brand.pulse,
   animate = true,
 }: GoalRingProps) {
+  const themeColors = useColors();
+  const TRACK_STROKE = themeColors.overlay.plum[8];
+
   const { formatDecimal } = useFormatNumbers();
   const progress = clampProgress(current, target);
   const isComplete = progress >= 1;
-  const ringColor = isComplete ? colors.feedback.success : color;
+  const ringColor = isComplete ? themeColors.feedback.success : color;
 
   const center = size / 2;
   const radius = Math.max((size - strokeWidth) / 2, 0);
@@ -156,6 +159,50 @@ export function GoalRing({
   const valueFontSize = Math.max(size * 0.19, fontSizes.xl);
   const targetFontSize = Math.max(size * 0.105, fontSizes.sm);
 
+  const styles = StyleSheet.create({
+    container: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    valueRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      color: themeColors.text.primary,
+      lineHeight: fontSizes['3xl'],
+    },
+    currentValue: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+    },
+    separator: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      opacity: SEPARATOR_OPACITY,
+      marginHorizontal: 2,
+    },
+    targetValue: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      opacity: 0.9,
+    },
+    label: {
+      marginTop: 2,
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      opacity: LABEL_OPACITY,
+    },
+  });
+
   return (
     <Animated.View
       style={[
@@ -208,47 +255,3 @@ export function GoalRing({
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    color: colors.text.primary,
-    lineHeight: fontSizes['3xl'],
-  },
-  currentValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-  },
-  separator: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    opacity: SEPARATOR_OPACITY,
-    marginHorizontal: 2,
-  },
-  targetValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    opacity: 0.9,
-  },
-  label: {
-    marginTop: 2,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    opacity: LABEL_OPACITY,
-  },
-});

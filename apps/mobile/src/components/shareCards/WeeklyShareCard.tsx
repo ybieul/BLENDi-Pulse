@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   weekLabel: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.display,
     fontSize: 28,
     fontWeight: fontWeights.bold,
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     flex: 1,
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: 14,
     fontWeight: fontWeights.medium,

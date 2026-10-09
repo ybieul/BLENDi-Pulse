@@ -19,22 +19,16 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
 
 const GAP = 4;
 const BACKDROP_COLOR = colors.overlay.black[30];
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
-const NO_DATA_COLOR = colors.overlay.plum[6];
-const CIRCLE_BORDER_COLOR = colors.overlay.plum[4];
-const LEGEND_LABEL_COLOR = colors.overlay.plum[60];
-const SHEET_SUBTITLE_COLOR = colors.overlay.plum[65];
 const PARTIAL_COLOR = colors.overlay.warning[45];
 const GOOD_COLOR = colors.overlay.pulse[50];
 const PERFECT_COLOR = colors.overlay.success[70];
 const CHECK_COLOR = colors.overlay.success[90];
 const MISSED_COLOR = colors.decorative.heatmapMissed;
-const LIST_TEXT_MUTED = colors.overlay.plum[65];
 const SHEET_RADIUS = 24;
 
 type PeriodValue = 7 | 30 | 90;
@@ -66,9 +60,9 @@ function hasData(entry: SupplementHeatmapDatum): boolean {
   return entry.checkedSupplements.length > 0 || entry.missedSupplements.length > 0;
 }
 
-function getCircleColor(entry: SupplementHeatmapDatum): string {
+function getCircleColor(entry: SupplementHeatmapDatum, noDataColor: string): string {
   if (!hasData(entry)) {
-    return NO_DATA_COLOR;
+    return noDataColor;
   }
 
   if (entry.adherenceRate < 0.5) {
@@ -91,6 +85,15 @@ function getSheetSubtitle(entry: SupplementHeatmapDatum, noDataLabel: string): s
 }
 
 export function SupplementHeatmap({ data, period }: SupplementHeatmapProps) {
+  const colors = useColors();
+  const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const NO_DATA_COLOR = colors.overlay.plum[6];
+  const CIRCLE_BORDER_COLOR = colors.overlay.plum[4];
+  const LEGEND_LABEL_COLOR = colors.overlay.plum[60];
+  const SHEET_SUBTITLE_COLOR = colors.overlay.plum[65];
+  const LIST_TEXT_MUTED = colors.overlay.plum[65];
+
   const { t } = useAppTranslation();
   const { formatDate } = useDateFormat();
   const { height } = useWindowDimensions();
@@ -187,6 +190,117 @@ export function SupplementHeatmap({ data, period }: SupplementHeatmapProps) {
     });
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      width: '100%',
+    },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: GAP,
+    },
+    circle: {
+      borderWidth: 1,
+      borderColor: CIRCLE_BORDER_COLOR,
+    },
+    legend: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 12,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    legendDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    legendLabel: {
+      color: LEGEND_LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+    },
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheetContainer: {
+      maxHeight: '72%',
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER_COLOR,
+      backgroundColor: colors.background.secondary,
+      paddingTop: 16,
+      paddingHorizontal: 24,
+      paddingBottom: 28,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+    },
+    sheetTitle: {
+      marginTop: 16,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.4,
+      textAlign: 'center',
+    },
+    sheetSubtitle: {
+      marginTop: 6,
+      color: SHEET_SUBTITLE_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    sheetContent: {
+      gap: 16,
+      paddingTop: 20,
+    },
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    listItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    listItemText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+    },
+    emptyText: {
+      color: LIST_TEXT_MUTED,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+    },
+  });
+
   return (
     <>
       <View style={styles.container}>
@@ -202,7 +316,7 @@ export function SupplementHeatmap({ data, period }: SupplementHeatmapProps) {
                   width: circleSize,
                   height: circleSize,
                   borderRadius: circleSize / 2,
-                  backgroundColor: getCircleColor(entry),
+                  backgroundColor: getCircleColor(entry, NO_DATA_COLOR),
                 },
               ]}
             />
@@ -282,114 +396,3 @@ export function SupplementHeatmap({ data, period }: SupplementHeatmapProps) {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GAP,
-  },
-  circle: {
-    borderWidth: 1,
-    borderColor: CIRCLE_BORDER_COLOR,
-  },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendLabel: {
-    color: LEGEND_LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheetContainer: {
-    maxHeight: '72%',
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingTop: 16,
-    paddingHorizontal: 24,
-    paddingBottom: 28,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-  },
-  sheetTitle: {
-    marginTop: 16,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.4,
-    textAlign: 'center',
-  },
-  sheetSubtitle: {
-    marginTop: 6,
-    color: SHEET_SUBTITLE_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  sheetContent: {
-    gap: 16,
-    paddingTop: 20,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  listItemText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-  },
-  emptyText: {
-    color: LIST_TEXT_MUTED,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-  },
-});

@@ -12,13 +12,13 @@ import {
 import { forgotPasswordSchema, verifyOtpSchema } from '@blendi/shared';
 import {
   borderRadius,
-  colors,
   fonts,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { AuthButton, AuthScreenLayout } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { forgotPassword, verifyOtp } from '../../services/auth.service';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import { showToast } from '../../utils/toast.utils';
@@ -50,6 +50,7 @@ function maskEmail(email: string): string {
 }
 
 export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOtp'>) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const inputRef = useRef<TextInput | null>(null);
   const isMountedRef = useRef(true);
@@ -325,6 +326,132 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
     }
   };
 
+  const styles = StyleSheet.create({
+    headingBlock: {
+      alignItems: 'center',
+      marginBottom: spacing['6xl'],
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: 'center',
+      opacity: 0.6,
+    },
+    emailHighlight: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    otpSection: {
+      alignItems: 'center',
+    },
+    otpPressable: {
+      width: '100%',
+      alignItems: 'center',
+    },
+    otpBoxesRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: spacing.md,
+    },
+    otpBox: {
+      position: 'relative',
+      width: 44,
+      height: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    otpBoxBackground: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.text.primary,
+      opacity: 0.05,
+    },
+    otpBoxBorderBase: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.text.primary,
+      opacity: 0.12,
+    },
+    otpBoxBorderActive: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.brand.pulse,
+    },
+    otpBoxBorderError: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.feedback.error,
+    },
+    otpDigit: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 24,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    hiddenInput: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      opacity: 0,
+    },
+    timerBlock: {
+      width: '100%',
+      alignItems: 'center',
+      marginTop: spacing['3xl'],
+      minHeight: 56,
+    },
+    timerText: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+    resendContainer: {
+      marginTop: spacing.md,
+    },
+    resendText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    errorText: {
+      marginTop: spacing.md,
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    disabledButton: {
+      opacity: 0.45,
+    },
+  });
+
   const topContent = (
     <View>
       <View style={styles.headingBlock}>
@@ -424,129 +551,3 @@ export function VerifyOtpScreen({ navigation, route }: AuthScreenProps<'VerifyOt
     />
   );
 }
-
-const styles = StyleSheet.create({
-  headingBlock: {
-    alignItems: 'center',
-    marginBottom: spacing['6xl'],
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
-  emailHighlight: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  otpSection: {
-    alignItems: 'center',
-  },
-  otpPressable: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  otpBoxesRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  otpBox: {
-    position: 'relative',
-    width: 44,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  otpBoxBackground: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.text.primary,
-    opacity: 0.05,
-  },
-  otpBoxBorderBase: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.text.primary,
-    opacity: 0.12,
-  },
-  otpBoxBorderActive: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.brand.pulse,
-  },
-  otpBoxBorderError: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.feedback.error,
-  },
-  otpDigit: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 24,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  hiddenInput: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0,
-  },
-  timerBlock: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: spacing['3xl'],
-    minHeight: 56,
-  },
-  timerText: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-  resendContainer: {
-    marginTop: spacing.md,
-  },
-  resendText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  errorText: {
-    marginTop: spacing.md,
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  disabledButton: {
-    opacity: 0.45,
-  },
-});

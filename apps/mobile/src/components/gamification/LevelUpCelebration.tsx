@@ -18,6 +18,7 @@ import {
 
 import { useAuthStore } from '../../store/auth.store';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { type LevelUpData, useGamificationStore } from '../../store/gamification.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
 import {
@@ -68,6 +69,7 @@ function getParticleColor(index: number): string {
 }
 
 export function LevelUpCelebration() {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const authUser = useAuthStore((state) => state.user);
   const levelUpData = useGamificationStore((state) => state.levelUpData);
@@ -317,6 +319,105 @@ export function LevelUpCelebration() {
     return null;
   }
 
+  const styles = StyleSheet.create({
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 1000,
+      elevation: 1000,
+    },
+    backdrop: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: OVERLAY_COLOR,
+    },
+    centerContent: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    card: {
+      width: 280,
+      padding: 32,
+      borderRadius: 24,
+      backgroundColor: colors.background.tertiary,
+      borderWidth: 1.5,
+      borderColor: CARD_BORDER_COLOR,
+      alignItems: 'center',
+      shadowColor: CARD_SHADOW_COLOR,
+      shadowOffset: {
+        width: 0,
+        height: 16,
+      },
+      shadowOpacity: 0.4,
+      shadowRadius: 24,
+      elevation: 14,
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      width: 28,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    levelNumber: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.display,
+      fontSize: 64,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -4,
+      textAlign: 'center',
+    },
+    levelName: {
+      marginTop: 8,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    levelUpTitle: {
+      marginTop: 4,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 16,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+      opacity: 0.92,
+    },
+    shareButton: {
+      marginTop: 18,
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+    },
+    shareButtonText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    particle: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginTop: -4,
+      marginLeft: -4,
+    },
+  });
+
   return (
     <>
       {levelUpData ? (
@@ -404,102 +505,3 @@ export function LevelUpCelebration() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    elevation: 1000,
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: OVERLAY_COLOR,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  card: {
-    width: 280,
-    padding: 32,
-    borderRadius: 24,
-    backgroundColor: colors.background.tertiary,
-    borderWidth: 1.5,
-    borderColor: CARD_BORDER_COLOR,
-    alignItems: 'center',
-    shadowColor: CARD_SHADOW_COLOR,
-    shadowOffset: {
-      width: 0,
-      height: 16,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 14,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelNumber: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.display,
-    fontSize: 64,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -4,
-    textAlign: 'center',
-  },
-  levelName: {
-    marginTop: 8,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  levelUpTitle: {
-    marginTop: 4,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-    opacity: 0.92,
-  },
-  shareButton: {
-    marginTop: 18,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  shareButtonText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  particle: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: -4,
-    marginLeft: -4,
-  },
-});

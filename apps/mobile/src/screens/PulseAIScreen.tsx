@@ -34,6 +34,7 @@ import {
 } from '@blendi/shared';
 import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useAuthStore } from '../store/auth.store';
 import { useNetworkStore } from '../store/network.store';
 import { usePulseAIStore } from '../store/pulseAi.store';
@@ -56,8 +57,6 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 const DAILY_FREE_LIMIT = 3;
 const MAX_MESSAGES = 20;
 const LOGO_PLACEHOLDER_SIZE = 64;
-const SUGGESTION_BORDER_COLOR = colors.overlay.plum[10];
-const SUGGESTION_BACKGROUND_COLOR = colors.overlay.plum[6];
 
 // Altura estimada do ChatInput acima da tab bar (fade + campo + padding).
 // Usado para garantir que o conteúdo não fique atrás do input fixado.
@@ -147,21 +146,73 @@ interface WelcomeStateProps {
 }
 
 function WelcomeState({ title, subtitle, suggestions, onSuggestionPress }: WelcomeStateProps) {
+  const colors = useColors();
+
+  const welcomeStyles = StyleSheet.create({
+    welcomeContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing['2xl'],
+      paddingBottom: spacing['4xl'],
+      gap: spacing.lg,
+    },
+    logoPlaceholder: {
+      width: LOGO_PLACEHOLDER_SIZE,
+      height: LOGO_PLACEHOLDER_SIZE,
+      marginBottom: spacing.md,
+    },
+    welcomeTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 24,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    welcomeSubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    suggestionRow: {
+      flexDirection: 'column',
+      width: '100%',
+      gap: spacing.md,
+      marginTop: spacing.md,
+    },
+    suggestionChip: {
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[6],
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.xl,
+    },
+    suggestionText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+    },
+  });
+
   return (
-    <View style={styles.welcomeContainer}>
-      <Image source={images.blendiLogo} resizeMode="contain" style={styles.logoPlaceholder} />
-      <Text style={styles.welcomeTitle}>{title}</Text>
-      <Text style={styles.welcomeSubtitle}>{subtitle}</Text>
-      <View style={styles.suggestionRow}>
+    <View style={welcomeStyles.welcomeContainer}>
+      <Image source={images.blendiLogo} resizeMode="contain" style={welcomeStyles.logoPlaceholder} />
+      <Text style={welcomeStyles.welcomeTitle}>{title}</Text>
+      <Text style={welcomeStyles.welcomeSubtitle}>{subtitle}</Text>
+      <View style={welcomeStyles.suggestionRow}>
         {suggestions.map((text, index) => (
           <Pressable
             key={index}
-            style={styles.suggestionChip}
+            style={welcomeStyles.suggestionChip}
             onPress={() => onSuggestionPress(text)}
             accessibilityRole="button"
             accessibilityLabel={text}
           >
-            <Text style={styles.suggestionText} numberOfLines={3}>
+            <Text style={welcomeStyles.suggestionText} numberOfLines={3}>
               {text}
             </Text>
           </Pressable>
@@ -174,6 +225,10 @@ function WelcomeState({ title, subtitle, suggestions, onSuggestionPress }: Welco
 // ─── PulseAIScreen ────────────────────────────────────────────────────────────
 
 export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'PulseAIChat'>) {
+  const colors = useColors();
+  const SUGGESTION_BORDER_COLOR = colors.overlay.plum[10];
+  const SUGGESTION_BACKGROUND_COLOR = colors.overlay.plum[6];
+
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -510,6 +565,128 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     navigation.push('ConversationHistory');
   }, [navigation]);
 
+  const styles = StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerSide: {
+      width: HEADER_SIDE_WIDTH,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    headerLeftActions: {
+      gap: spacing.md,
+    },
+    headerRightActions: {
+      justifyContent: 'flex-end',
+      gap: spacing.md,
+    },
+    headerActionWithBadge: {
+      alignItems: 'center',
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    // Banner de conversa carregada do histórico
+    historyBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: SUGGESTION_BORDER_COLOR,
+      backgroundColor: SUGGESTION_BACKGROUND_COLOR,
+    },
+    historyBannerText: {
+      flex: 1,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+    },
+    historyBannerAction: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.bold,
+    },
+
+    // Badge de favoritos
+    badge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: BADGE_SIZE,
+      height: BADGE_SIZE,
+      borderRadius: BADGE_SIZE / 2,
+      backgroundColor: colors.brand.pulse,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scanBadge: {
+      width: BADGE_SIZE,
+      height: BADGE_SIZE,
+      marginTop: -8,
+      borderRadius: BADGE_SIZE / 2,
+      backgroundColor: SCANNER_BADGE_BACKGROUND,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeText: {
+      color: colors.text.inverse,
+      fontFamily: fonts.body,
+      fontSize: BADGE_FONT_SIZE_NORMAL,
+      fontWeight: fontWeights.bold,
+      lineHeight: BADGE_FONT_SIZE_NORMAL + 2,
+      includeFontPadding: false,
+    },
+    badgeTextOverflow: {
+      fontSize: BADGE_FONT_SIZE_OVERFLOW,
+      lineHeight: BADGE_FONT_SIZE_OVERFLOW + 2,
+    },
+    headerTitle: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+
+    // FlatList
+    listContent: {
+      flexGrow: 1,
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.md,
+      gap: spacing.xl,
+    },
+    takingLongerText: {
+      marginTop: spacing.md,
+      marginHorizontal: spacing.xl,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+    },
+  });
+
   // ── FlatList render ───────────────────────────────────────────────────────
   const renderItem: ListRenderItem<ChatMessageItem> = useCallback(({ item }) => {
     if (item.role === 'user') {
@@ -688,176 +865,3 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerSide: {
-    width: HEADER_SIDE_WIDTH,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerLeftActions: {
-    gap: spacing.md,
-  },
-  headerRightActions: {
-    justifyContent: 'flex-end',
-    gap: spacing.md,
-  },
-  headerActionWithBadge: {
-    alignItems: 'center',
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Banner de conversa carregada do histórico
-  historyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: SUGGESTION_BORDER_COLOR,
-    backgroundColor: SUGGESTION_BACKGROUND_COLOR,
-  },
-  historyBannerText: {
-    flex: 1,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-  },
-  historyBannerAction: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.bold,
-  },
-
-  // Badge de favoritos
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    backgroundColor: colors.brand.pulse,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanBadge: {
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    marginTop: -8,
-    borderRadius: BADGE_SIZE / 2,
-    backgroundColor: SCANNER_BADGE_BACKGROUND,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    color: colors.text.inverse,
-    fontFamily: fonts.body,
-    fontSize: BADGE_FONT_SIZE_NORMAL,
-    fontWeight: fontWeights.bold,
-    lineHeight: BADGE_FONT_SIZE_NORMAL + 2,
-    includeFontPadding: false,
-  },
-  badgeTextOverflow: {
-    fontSize: BADGE_FONT_SIZE_OVERFLOW,
-    lineHeight: BADGE_FONT_SIZE_OVERFLOW + 2,
-  },
-  headerTitle: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // FlatList
-  listContent: {
-    flexGrow: 1,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    gap: spacing.xl,
-  },
-  takingLongerText: {
-    marginTop: spacing.md,
-    marginHorizontal: spacing.xl,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-  },
-
-  // Welcome State
-  welcomeContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['2xl'],
-    paddingBottom: spacing['4xl'],
-    gap: spacing.lg,
-  },
-  logoPlaceholder: {
-    width: LOGO_PLACEHOLDER_SIZE,
-    height: LOGO_PLACEHOLDER_SIZE,
-    marginBottom: spacing.md,
-  },
-  welcomeTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 24,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  suggestionRow: {
-    flexDirection: 'column',
-    width: '100%',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  suggestionChip: {
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: SUGGESTION_BORDER_COLOR,
-    backgroundColor: SUGGESTION_BACKGROUND_COLOR,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-  },
-  suggestionText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    lineHeight: 20,
-  },
-});

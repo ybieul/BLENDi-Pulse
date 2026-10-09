@@ -8,11 +8,12 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fontSizes, fonts, spacing } from '@blendi/shared';
+import { fontSizes, fonts, spacing } from '@blendi/shared';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { SelectionCard } from '../../components/ui/SelectionCard';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useOnboardingStore } from '../../store/onboarding.store';
 
 type OnboardingModelScreenProps = {
@@ -28,6 +29,7 @@ const MODELS = [
 ] as const;
 
 export function OnboardingModelScreen({ navigation }: OnboardingModelScreenProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const selectedModel = useOnboardingStore((state) => state.selectedModel);
   const setModel = useOnboardingStore((state) => state.setModel);
@@ -51,6 +53,31 @@ export function OnboardingModelScreen({ navigation }: OnboardingModelScreenProps
       }),
     ]).start();
   }, [opacity, translateY]);
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    topContent: {
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['4xl'],
+      lineHeight: 48,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 24,
+    },
+    cardList: {
+      gap: spacing.md,
+      paddingTop: spacing.sm,
+    },
+  });
 
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
@@ -86,28 +113,3 @@ export function OnboardingModelScreen({ navigation }: OnboardingModelScreenProps
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topContent: {
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['4xl'],
-    lineHeight: 48,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 24,
-  },
-  cardList: {
-    gap: spacing.md,
-    paddingTop: spacing.sm,
-  },
-});

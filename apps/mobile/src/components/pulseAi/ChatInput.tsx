@@ -19,13 +19,13 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  colors,
   fonts,
   fontSizes,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
 import type { AppTabNavigationProp, RootStackParamList } from '../../navigation/types';
@@ -38,12 +38,7 @@ const SEND_ICON_ANIMATION_DURATION = 150;
 const SEND_ICON_SCALE_START = 0.8;
 const SEND_ICON_SCALE_END = 1;
 const PLACEHOLDER_INTERVAL_MS = 4000;
-const INPUT_BACKGROUND = colors.overlay.plum[6];
-const INPUT_HIGHLIGHT = colors.overlay.plum[3];
-const INPUT_BORDER = colors.overlay.plum[16];
 const INPUT_DISABLED_OPACITY = 0.72;
-const MICROPHONE_COLOR = colors.overlay.plum[30];
-const OFFLINE_ICON_COLOR = colors.overlay.plum[30];
 const KEYBOARD_CLEARANCE = spacing.md;
 const OFFLINE_INPUT_OPACITY = 0.5;
 const RECONNECT_OPACITY_DURATION = 300;
@@ -76,6 +71,13 @@ const INPUT_PLACEHOLDER_FIELDS = [
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   function ChatInput({ onSend, isLoading, usageRemaining }: ChatInputProps, ref) {
+  const colors = useColors();
+  const INPUT_BACKGROUND = colors.overlay.plum[6];
+  const INPUT_HIGHLIGHT = colors.overlay.plum[3];
+  const INPUT_BORDER = colors.overlay.plum[16];
+  const MICROPHONE_COLOR = colors.overlay.plum[30];
+  const OFFLINE_ICON_COLOR = colors.overlay.plum[30];
+
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<AppTabNavigationProp<'PulseAI'>>();
   const { t } = useAppTranslation();
@@ -216,6 +218,89 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     rootNavigation?.navigate('Upgrade');
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingTop: CONTAINER_FADE_HEIGHT,
+      paddingHorizontal: spacing.xl,
+      backgroundColor: colors.background.primary,
+    },
+    fadeGradient: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: CONTAINER_FADE_HEIGHT,
+    },
+    fieldOuter: {
+      position: 'relative',
+      height: CHAT_FIELD_HEIGHT,
+      justifyContent: 'center',
+      borderRadius: CHAT_FIELD_RADIUS,
+      borderWidth: 1,
+      borderColor: INPUT_BORDER,
+      overflow: 'hidden',
+    },
+    fieldBackground: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: INPUT_BACKGROUND,
+    },
+    fieldHighlight: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: CHAT_FIELD_HEIGHT / 2,
+      backgroundColor: INPUT_HIGHLIGHT,
+    },
+    input: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.regular,
+      paddingLeft: 20,
+      paddingRight: 56,
+    },
+    inputDisabled: {
+      opacity: INPUT_DISABLED_OPACITY,
+    },
+    sendButton: {
+      position: 'absolute',
+      right: 16,
+      top: 0,
+      bottom: 0,
+      width: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    limitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      marginTop: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    limitText: {
+      flex: 1,
+      color: colors.feedback.warning,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+      lineHeight: 18,
+    },
+    upgradeText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <View style={[styles.container, { paddingBottom: bottomPadding }]}> 
       <LinearGradient
@@ -285,86 +370,3 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   );
 }
 );
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: CONTAINER_FADE_HEIGHT,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: colors.background.primary,
-  },
-  fadeGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: CONTAINER_FADE_HEIGHT,
-  },
-  fieldOuter: {
-    position: 'relative',
-    height: CHAT_FIELD_HEIGHT,
-    justifyContent: 'center',
-    borderRadius: CHAT_FIELD_RADIUS,
-    borderWidth: 1,
-    borderColor: INPUT_BORDER,
-    overflow: 'hidden',
-  },
-  fieldBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: INPUT_BACKGROUND,
-  },
-  fieldHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: CHAT_FIELD_HEIGHT / 2,
-    backgroundColor: INPUT_HIGHLIGHT,
-  },
-  input: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.regular,
-    paddingLeft: 20,
-    paddingRight: 56,
-  },
-  inputDisabled: {
-    opacity: INPUT_DISABLED_OPACITY,
-  },
-  sendButton: {
-    position: 'absolute',
-    right: 16,
-    top: 0,
-    bottom: 0,
-    width: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  limitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
-  limitText: {
-    flex: 1,
-    color: colors.feedback.warning,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-    lineHeight: 18,
-  },
-  upgradeText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-});

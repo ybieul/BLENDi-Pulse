@@ -36,6 +36,7 @@ import {
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthInput } from '../components/ui/AuthInput';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useNetworkStore } from '../store/network.store';
 import type { SupplementStackItem } from '../services/supplementStack.service';
 import type { TrackStackParamList } from '../navigation/types';
@@ -82,15 +83,9 @@ const TIMING_TRANSLATION_KEYS = {
 } as const;
 
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[45];
-const CARD_BACKGROUND = colors.overlay.plum[6];
-const CARD_BORDER = colors.overlay.plum[8];
 const DELETE_COLOR = colors.overlay.error[70];
 const GHOST_BORDER = colors.overlay.pulse[40];
-const CHIP_BORDER_IDLE = colors.overlay.plum[12];
-const CHIP_BG_IDLE = colors.overlay.plum[5];
 const CHIP_BG_SELECTED = colors.overlay.pulse[15];
 const EMPTY_SUPPLEMENTS: SupplementStackItem[] = [];
 const DEFAULT_DAILY_TARGET_COUNT = '1';
@@ -117,6 +112,7 @@ function SupplementManageItem({
   deleteConfirm,
   deleteCancel,
 }: SupplementManageItemProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
 
   function handleDeletePress() {
@@ -155,18 +151,57 @@ function SupplementManageItem({
     ? `${item.dosage} · ${dailyTargetLabel} · ${timingLabel}`
     : `${dailyTargetLabel} · ${timingLabel}`;
 
+  const itemStyles = StyleSheet.create({
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.overlay.plum[6],
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[8],
+      borderRadius: borderRadius.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      gap: spacing.md,
+    },
+    itemInfo: {
+      flex: 1,
+      gap: 2,
+    },
+    itemName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm + 1, // 14pt
+      fontWeight: fontWeights.medium,
+    },
+    itemSub: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm - 1, // 12pt
+      fontWeight: fontWeights.regular,
+      opacity: 0.7,
+    },
+    itemActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    deleteButton: {
+      padding: spacing.xs,
+    },
+  });
+
   return (
-    <View style={styles.itemRow}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName} numberOfLines={1}>
+    <View style={itemStyles.itemRow}>
+      <View style={itemStyles.itemInfo}>
+        <Text style={itemStyles.itemName} numberOfLines={1}>
           {item.name}
         </Text>
-        <Text style={styles.itemSub} numberOfLines={1}>
+        <Text style={itemStyles.itemSub} numberOfLines={1}>
           {subText}
         </Text>
       </View>
 
-      <View style={styles.itemActions}>
+      <View style={itemStyles.itemActions}>
         <Switch
           value={item.isActive}
           onValueChange={(val) => onToggleActive(item.supplementId, val)}
@@ -181,7 +216,7 @@ function SupplementManageItem({
           accessibilityRole="button"
           hitSlop={8}
           onPress={handleDeletePress}
-          style={styles.deleteButton}
+          style={itemStyles.deleteButton}
         >
           <Ionicons color={DELETE_COLOR} name="trash-outline" size={18} />
         </Pressable>
@@ -200,6 +235,12 @@ export function ManageStackScreen({
   isSaving = false,
   isSaveError = false,
 }: ManageStackScreenProps) {
+  const colors = useColors();
+  const SHEET_BORDER_COLOR = colors.overlay.plum[10];
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const CHIP_BORDER_IDLE = colors.overlay.plum[12];
+  const CHIP_BG_IDLE = colors.overlay.plum[5];
+
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -373,6 +414,151 @@ export function ManageStackScreen({
 
   // ── Render ──────────────────────────────────────────────────────────────
 
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.md,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      flex: 1,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+    },
+    headerRight: {
+      width: 40,
+    },
+
+    // List
+    scrollContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+      gap: spacing.sm,
+    },
+
+    // Ghost add button
+    addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      borderWidth: 1,
+      borderColor: GHOST_BORDER,
+      borderRadius: borderRadius.lg,
+      paddingVertical: spacing.md,
+      marginTop: spacing.sm,
+    },
+    addButtonLabel: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+
+    // Bottom sheet modal
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    kvContainer: {
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: SHEET_BORDER_COLOR,
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing['3xl'],
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['4xl'],
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+      marginBottom: spacing.lg,
+    },
+    sheetTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      marginBottom: spacing.lg,
+    },
+
+    // Form
+    inputSpacing: {
+      marginBottom: spacing.lg,
+    },
+    timingLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+      opacity: 0.7,
+      marginBottom: spacing.sm,
+    },
+    chipsRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      paddingVertical: spacing.xs,
+      paddingRight: spacing.xl,
+    },
+    chip: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    chipText: {
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+
+    // Save button
+    saveButton: {
+      height: 52,
+      backgroundColor: colors.brand.pulse,
+      borderRadius: borderRadius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing['2xl'],
+    },
+    saveButtonLabel: {
+      color: colors.text.inverse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.semibold,
+    },
+  });
+
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom }]}>
       <AuroraBackground intensity="reduced" />
@@ -545,186 +731,3 @@ export function ManageStackScreen({
     </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  headerRight: {
-    width: 40,
-  },
-
-  // List
-  scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-    gap: spacing.sm,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  itemInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  itemName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm + 1, // 14pt
-    fontWeight: fontWeights.medium,
-  },
-  itemSub: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm - 1, // 12pt
-    fontWeight: fontWeights.regular,
-    opacity: 0.7,
-  },
-  itemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  deleteButton: {
-    padding: spacing.xs,
-  },
-
-  // Ghost add button
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: GHOST_BORDER,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  addButtonLabel: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-  },
-
-  // Bottom sheet modal
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  kvContainer: {
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['4xl'],
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-    marginBottom: spacing.lg,
-  },
-  sheetTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    marginBottom: spacing.lg,
-  },
-
-  // Form
-  inputSpacing: {
-    marginBottom: spacing.lg,
-  },
-  timingLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    opacity: 0.7,
-    marginBottom: spacing.sm,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingRight: spacing.xl,
-  },
-  chip: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-
-  // Save button
-  saveButton: {
-    height: 52,
-    backgroundColor: colors.brand.pulse,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing['2xl'],
-  },
-  saveButtonLabel: {
-    color: colors.text.inverse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.semibold,
-  },
-});

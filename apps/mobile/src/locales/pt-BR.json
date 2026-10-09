@@ -636,6 +636,11 @@
     "memberSince": "Membro desde {{date}}",
     "metric": "Métrico",
     "imperial": "Imperial",
+    "theme": {
+      "label": "Tema",
+      "light": "Claro",
+      "dark": "Escuro"
+    },
     "settingCarbs": "Meta de carboidratos",
     "badges": {
       "title": "Conquistas",
@@ -685,6 +690,7 @@
       "hydrationTitle": "Meta de Hidratação Diária",
       "unitSystemTitle": "Unidades",
       "languageTitle": "Idioma",
+      "themeTitle": "Tema",
       "confirm": "Salvar"
     },
     "upgrade": {

@@ -1,11 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableHighlight, View } from 'react-native';
 
-import { colors, fonts, fontWeights, spacing } from '@blendi/shared';
+import { fonts, fontWeights, spacing } from '@blendi/shared';
 
-const UNDERLAY_COLOR = colors.overlay.plum[4];
-const VALUE_COLOR = colors.overlay.plum[55];
-const CHEVRON_COLOR = colors.overlay.plum[30];
+import { useColors } from '../../hooks/useColors';
 
 export interface SettingRowProps {
   label: string;
@@ -14,6 +12,47 @@ export interface SettingRowProps {
 }
 
 export function SettingRow({ label, value, onPress }: SettingRowProps) {
+  const colors = useColors();
+  const UNDERLAY_COLOR = colors.overlay.plum[4];
+  const VALUE_COLOR = colors.overlay.plum[55];
+  const CHEVRON_COLOR = colors.overlay.plum[30];
+
+  const styles = StyleSheet.create({
+    touchable: {
+      borderRadius: 12,
+    },
+    row: {
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      paddingHorizontal: spacing.sm,
+    },
+    label: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      lineHeight: 20,
+    },
+    valueGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      maxWidth: '52%',
+    },
+    value: {
+      color: VALUE_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: 'right',
+    },
+  });
+
   return (
     <TouchableHighlight
       accessibilityRole="button"
@@ -37,39 +76,3 @@ export function SettingRow({ label, value, onPress }: SettingRowProps) {
     </TouchableHighlight>
   );
 }
-
-const styles = StyleSheet.create({
-  touchable: {
-    borderRadius: 12,
-  },
-  row: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  label: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    lineHeight: 20,
-  },
-  valueGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    maxWidth: '52%',
-  },
-  value: {
-    color: VALUE_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: 'right',
-  },
-});

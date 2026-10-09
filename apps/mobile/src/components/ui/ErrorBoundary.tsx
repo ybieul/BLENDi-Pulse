@@ -13,19 +13,23 @@
 
 import { Component, type ErrorInfo, type PropsWithChildren, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
+import { fonts, fontSizes, fontWeights, spacing, type Colors } from '@blendi/shared';
 
 import { AuthButton } from './AuthButton';
 import { useAppTranslation, type UseAppTranslationReturn } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 interface ErrorBoundaryClassProps extends PropsWithChildren {
   t: UseAppTranslationReturn['t'];
+  colors: Colors;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
 }
 
+// Componente de classe — hooks (useColors incluso) não funcionam aqui, por
+// isso `colors` chega via prop do wrapper funcional ErrorBoundary abaixo.
 class ErrorBoundaryClass extends Component<ErrorBoundaryClassProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
 
@@ -53,6 +57,25 @@ class ErrorBoundaryClass extends Component<ErrorBoundaryClassProps, ErrorBoundar
       return this.props.children;
     }
 
+    const { colors } = this.props;
+    const styles = StyleSheet.create({
+      container: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
+        backgroundColor: colors.background.primary,
+      },
+      message: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.md,
+        fontWeight: fontWeights.medium,
+        color: colors.text.primary,
+        textAlign: 'center',
+        marginBottom: spacing['3xl'],
+      },
+    });
+
     return (
       <View style={styles.container}>
         <Text style={styles.message}>{this.props.t('errors.unexpected_error')}</Text>
@@ -74,24 +97,7 @@ class ErrorBoundaryClass extends Component<ErrorBoundaryClassProps, ErrorBoundar
 
 export function ErrorBoundary({ children }: PropsWithChildren): ReactNode {
   const { t } = useAppTranslation();
+  const colors = useColors();
 
-  return <ErrorBoundaryClass t={t}>{children}</ErrorBoundaryClass>;
+  return <ErrorBoundaryClass t={t} colors={colors}>{children}</ErrorBoundaryClass>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    backgroundColor: colors.background.primary,
-  },
-  message: {
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: spacing['3xl'],
-  },
-});

@@ -25,11 +25,11 @@ import {
   colors,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const BUTTON_HEIGHT = 52;
 const PRESS_SCALE = 0.97;
 const LOADING_FADE_DURATION = 150;
-const GOOGLE_BUTTON_BORDER = colors.overlay.plum[15];
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -45,6 +45,9 @@ export interface GoogleSignInButtonProps {
 // ─── Componente ────────────────────────────────────────────────────────────────
 
 export function GoogleSignInButton({ onPress, isLoading }: GoogleSignInButtonProps) {
+  const themeColors = useColors();
+  const GOOGLE_BUTTON_BORDER = themeColors.overlay.plum[15];
+
   const { t } = useAppTranslation();
   const scale = React.useRef(new Animated.Value(1)).current;
   const contentOpacity = React.useRef(new Animated.Value(isLoading ? 0 : 1)).current;
@@ -85,6 +88,37 @@ export function GoogleSignInButton({ onPress, isLoading }: GoogleSignInButtonPro
     animateScale(1);
   };
 
+  const styles = StyleSheet.create({
+    button: {
+      width: '100%',
+      height: BUTTON_HEIGHT,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: GOOGLE_BUTTON_BORDER,
+      overflow: 'hidden',
+    },
+    pressLayer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    label: {
+      color: themeColors.text.primary,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 16,
+    },
+    loader: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+
   return (
     <AnimatedTouchableOpacity
       style={styles.button}
@@ -97,48 +131,16 @@ export function GoogleSignInButton({ onPress, isLoading }: GoogleSignInButtonPro
       accessibilityLabel={t('auth.google_sign_in')}
       accessibilityState={{ busy: isLoading, disabled: isLoading }}
     >
-      <Animated.View style={[styles.pressLayer, { transform: [{ scale }] }]}> 
-        <Animated.View style={[styles.content, { opacity: contentOpacity }]}> 
+      <Animated.View style={[styles.pressLayer, { transform: [{ scale }] }]}>
+        <Animated.View style={[styles.content, { opacity: contentOpacity }]}>
           <AntDesign name="google" size={18} color={colors.thirdParty.google} />
           <Text style={styles.label}>{t('auth.google_sign_in')}</Text>
         </Animated.View>
 
-        <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}> 
-          <ActivityIndicator size="small" color={colors.text.primary} />
+        <Animated.View pointerEvents="none" style={[styles.loader, { opacity: loaderOpacity }]}>
+          <ActivityIndicator size="small" color={themeColors.text.primary} />
         </Animated.View>
       </Animated.View>
     </AnimatedTouchableOpacity>
   );
 }
-
-// ─── Estilos ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  button: {
-    width: '100%',
-    height: BUTTON_HEIGHT,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: GOOGLE_BUTTON_BORDER,
-    overflow: 'hidden',
-  },
-  pressLayer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  label: {
-    color: colors.text.primary,
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 16,
-  },
-  loader: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

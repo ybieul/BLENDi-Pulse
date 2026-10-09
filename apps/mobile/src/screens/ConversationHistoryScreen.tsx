@@ -11,6 +11,7 @@ import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton, SkeletonLoader } from '../components/ui';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { QUERY_KEYS } from '../config/cache.config';
 import {
@@ -23,8 +24,6 @@ import { showToast } from '../utils/toast.utils';
 
 const EMPTY_ICON_SIZE = 48;
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
-const CARD_BACKGROUND = colors.overlay.plum[6];
-const CARD_BORDER = colors.overlay.plum[10];
 const SKELETON_COUNT = 3;
 
 // ─── Card de conversa ───────────────────────────────────────────────────────
@@ -36,6 +35,7 @@ interface ConversationHistoryCardProps {
 }
 
 function ConversationHistoryCard({ item, disabled, onPress }: ConversationHistoryCardProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const { formatTime } = useDateFormat();
 
@@ -50,20 +50,53 @@ function ConversationHistoryCard({ item, disabled, onPress }: ConversationHistor
     relativeTime = t('common.daysAgoN', { days: item.daysAgo });
   }
 
+  const cardStyles = StyleSheet.create({
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[6],
+      padding: 16,
+      gap: spacing.sm,
+    },
+    cardTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 15,
+      fontWeight: fontWeights.bold,
+    },
+    cardFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    cardTime: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    cardMessageCount: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      opacity: 0.4,
+    },
+  });
+
   return (
     <Pressable
-      style={styles.card}
+      style={cardStyles.card}
       disabled={disabled}
       onPress={() => onPress(item)}
       accessibilityRole="button"
       accessibilityLabel={recipeName}
     >
-      <Text style={styles.cardTitle} numberOfLines={1}>
+      <Text style={cardStyles.cardTitle} numberOfLines={1}>
         {recipeName}
       </Text>
-      <View style={styles.cardFooterRow}>
-        <Text style={styles.cardTime}>{relativeTime}</Text>
-        <Text style={styles.cardMessageCount}>{item.messageCount}</Text>
+      <View style={cardStyles.cardFooterRow}>
+        <Text style={cardStyles.cardTime}>{relativeTime}</Text>
+        <Text style={cardStyles.cardMessageCount}>{item.messageCount}</Text>
       </View>
     </Pressable>
   );
@@ -72,10 +105,28 @@ function ConversationHistoryCard({ item, disabled, onPress }: ConversationHistor
 // ─── Skeleton de carregamento ───────────────────────────────────────────────
 
 function ConversationCardSkeleton() {
+  const colors = useColors();
+
+  const skeletonStyles = StyleSheet.create({
+    card: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[6],
+      padding: 16,
+      gap: spacing.sm,
+    },
+    cardFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+  });
+
   return (
-    <View style={styles.card}>
+    <View style={skeletonStyles.card}>
       <SkeletonLoader variant="line" width="60%" height={15} />
-      <View style={styles.cardFooterRow}>
+      <View style={skeletonStyles.cardFooterRow}>
         <SkeletonLoader variant="line" width="30%" height={11} />
         <SkeletonLoader variant="line" width={18} height={11} />
       </View>
@@ -88,6 +139,7 @@ function ConversationCardSkeleton() {
 export function ConversationHistoryScreen({
   navigation,
 }: PulseAIStackScreenProps<'ConversationHistory'>) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const [openingConversationId, setOpeningConversationId] = useState<string | null>(null);
@@ -116,6 +168,77 @@ export function ConversationHistoryScreen({
     },
     [navigation, openingConversationId, t],
   );
+
+  const styles = StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+    headerTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+    },
+    listContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing['2xl'],
+      gap: spacing.md,
+    },
+    separator: {
+      height: spacing.md,
+    },
+    centeredContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+    },
+    errorText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      textAlign: 'center',
+    },
+    retryButton: {
+      width: 160,
+      height: 44,
+    },
+    emptyTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: 0.6,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  });
 
   const renderContent = () => {
     if (isLoading) {
@@ -190,106 +313,3 @@ export function ConversationHistoryScreen({
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
-  },
-  headerTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  listContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing['2xl'],
-    gap: spacing.md,
-  },
-  separator: {
-    height: spacing.md,
-  },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    gap: spacing.sm,
-  },
-  cardTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 15,
-    fontWeight: fontWeights.bold,
-  },
-  cardFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardTime: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  cardMessageCount: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    opacity: 0.4,
-  },
-  centeredContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-  },
-  errorText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-  },
-  retryButton: {
-    width: 160,
-    height: 44,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: 0.6,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});

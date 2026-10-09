@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PulseAiRecipe } from '@blendi/shared';
 
 import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
+import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { RecipeCard } from './RecipeCard';
 
@@ -47,6 +48,7 @@ interface AssistantErrorChatMessageProps extends BaseChatMessageProps {
 export type ChatMessageProps = UserChatMessageProps | AssistantChatMessageProps | AssistantErrorChatMessageProps;
 
 export function ChatMessage(props: ChatMessageProps) {
+  const colors = useColors();
   const { formatTime } = useDateFormat();
   const entryOpacity = useRef(new Animated.Value(0)).current;
   const entryTranslateY = useRef(new Animated.Value(ENTRY_TRANSLATE_Y)).current;
@@ -73,6 +75,66 @@ export function ChatMessage(props: ChatMessageProps) {
       entryTranslateY.stopAnimation();
     };
   }, [entryOpacity, entryTranslateY]);
+
+  const styles = StyleSheet.create({
+    userMessageWrap: {
+      alignSelf: 'flex-end',
+      maxWidth: '82%',
+      marginLeft: spacing['4xl'],
+    },
+    userBubble: {
+      borderRadius: 16,
+      borderBottomRightRadius: 4,
+      borderWidth: 1,
+      borderColor: USER_BUBBLE_BORDER,
+      backgroundColor: USER_BUBBLE_BACKGROUND,
+      padding: 12,
+    },
+    userMessageText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+    },
+    userTimestamp: {
+      alignSelf: 'flex-end',
+      marginTop: spacing.sm,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      opacity: TIMESTAMP_OPACITY,
+    },
+    assistantMessageWrap: {
+      marginRight: 16,
+    },
+    errorBubble: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: ERROR_BUBBLE_BORDER,
+      backgroundColor: ERROR_BUBBLE_BACKGROUND,
+      padding: spacing.lg,
+      marginLeft: spacing.xl,
+      marginRight: spacing.xl,
+    },
+    errorIcon: {
+      marginTop: 1,
+      marginRight: spacing.md,
+      flexShrink: 0,
+    },
+    errorText: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      opacity: 0.85,
+    },
+  });
 
   if (props.role === 'assistant' && props.isError) {
     return (
@@ -137,63 +199,3 @@ export function ChatMessage(props: ChatMessageProps) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  userMessageWrap: {
-    alignSelf: 'flex-end',
-    maxWidth: '82%',
-    marginLeft: spacing['4xl'],
-  },
-  userBubble: {
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
-    borderWidth: 1,
-    borderColor: USER_BUBBLE_BORDER,
-    backgroundColor: USER_BUBBLE_BACKGROUND,
-    padding: 12,
-  },
-  userMessageText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-  },
-  userTimestamp: {
-    alignSelf: 'flex-end',
-    marginTop: spacing.sm,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    opacity: TIMESTAMP_OPACITY,
-  },
-  assistantMessageWrap: {
-    marginRight: 16,
-  },
-  errorBubble: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: ERROR_BUBBLE_BORDER,
-    backgroundColor: ERROR_BUBBLE_BACKGROUND,
-    padding: spacing.lg,
-    marginLeft: spacing.xl,
-    marginRight: spacing.xl,
-  },
-  errorIcon: {
-    marginTop: 1,
-    marginRight: spacing.md,
-    flexShrink: 0,
-  },
-  errorText: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    opacity: 0.85,
-  },
-});

@@ -25,18 +25,13 @@ import {
 
 import { QUERY_KEYS } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { showToast } from '../../utils/toast.utils';
 import { appendIngredientsToShoppingList } from '../../utils/shoppingListAddItems.utils';
 import { AuthButton } from '../ui/AuthButton';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[55];
-const HANDLE_COLOR = colors.overlay.plum[22];
-const SHEET_BORDER = colors.overlay.plum[10];
-const ROW_BACKGROUND = colors.overlay.plum[6];
-const ROW_BORDER = colors.overlay.plum[8];
-const CHECKBOX_BORDER = colors.overlay.plum[25];
-const RECIPE_ROW_CHEVRON = colors.overlay.plum[45];
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const SUBTITLE_OPACITY = 0.6;
 const QUANTITY_OPACITY = 0.55;
@@ -58,6 +53,14 @@ export function ImportFromFavoritesSheet({
   listId,
   onClose,
 }: ImportFromFavoritesSheetProps) {
+  const colors = useColors();
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const SHEET_BORDER = colors.overlay.plum[10];
+  const ROW_BACKGROUND = colors.overlay.plum[6];
+  const ROW_BORDER = colors.overlay.plum[8];
+  const CHECKBOX_BORDER = colors.overlay.plum[25];
+  const RECIPE_ROW_CHEVRON = colors.overlay.plum[45];
+
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -136,6 +139,172 @@ export function ImportFromFavoritesSheet({
     () => selectedRecipe?.ingredients ?? [],
     [selectedRecipe],
   );
+
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheet: {
+      maxHeight: '82%',
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: SHEET_BORDER,
+      backgroundColor: colors.background.secondary,
+      paddingTop: spacing.lg,
+      paddingHorizontal: spacing.xl,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: borderRadius.full,
+      backgroundColor: HANDLE_COLOR,
+      marginBottom: spacing.lg,
+    },
+    headerBlock: {
+      gap: spacing.xs,
+      marginBottom: spacing.lg,
+    },
+    sheetTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    sheetSubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      opacity: SUBTITLE_OPACITY,
+      textAlign: 'center',
+    },
+    recipeHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    recipeHeaderTitle: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    listContent: {
+      paddingBottom: spacing.xl,
+    },
+    recipeRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: ROW_BORDER,
+      backgroundColor: ROW_BACKGROUND,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      gap: spacing.md,
+    },
+    recipeRowLabel: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    ingredientRow: {
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: ROW_BORDER,
+      backgroundColor: ROW_BACKGROUND,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: CHECKBOX_BORDER,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.lg,
+    },
+    checkboxChecked: {
+      borderColor: colors.brand.pulse,
+      backgroundColor: colors.brand.pulse,
+    },
+    ingredientTextBlock: {
+      flex: 1,
+      minWidth: 0,
+    },
+    ingredientName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    ingredientQuantity: {
+      marginLeft: spacing.lg,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: QUANTITY_OPACITY,
+      textAlign: 'right',
+      maxWidth: 120,
+    },
+    footerButton: {
+      marginTop: spacing.md,
+    },
+    separator: {
+      height: spacing.md,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+      paddingVertical: spacing['4xl'],
+    },
+    emptyTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: SUBTITLE_OPACITY,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  });
 
   if (!isMounted) {
     return null;
@@ -333,169 +502,3 @@ export function ImportFromFavoritesSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheet: {
-    maxHeight: '82%',
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER,
-    backgroundColor: colors.background.secondary,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: HANDLE_COLOR,
-    marginBottom: spacing.lg,
-  },
-  headerBlock: {
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  sheetTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  sheetSubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    opacity: SUBTITLE_OPACITY,
-    textAlign: 'center',
-  },
-  recipeHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
-  recipeHeaderTitle: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  listContent: {
-    paddingBottom: spacing.xl,
-  },
-  recipeRow: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: ROW_BORDER,
-    backgroundColor: ROW_BACKGROUND,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    gap: spacing.md,
-  },
-  recipeRowLabel: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  ingredientRow: {
-    minHeight: 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: ROW_BORDER,
-    backgroundColor: ROW_BACKGROUND,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: CHECKBOX_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.lg,
-  },
-  checkboxChecked: {
-    borderColor: colors.brand.pulse,
-    backgroundColor: colors.brand.pulse,
-  },
-  ingredientTextBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-  ingredientName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  ingredientQuantity: {
-    marginLeft: spacing.lg,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: QUANTITY_OPACITY,
-    textAlign: 'right',
-    maxWidth: 120,
-  },
-  footerButton: {
-    marginTop: spacing.md,
-  },
-  separator: {
-    height: spacing.md,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing['4xl'],
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: SUBTITLE_OPACITY,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});

@@ -17,6 +17,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
 import type { AppTabNavigationProp } from '../../navigation/types';
 import { useBlendStore } from '../../store/blend.store';
@@ -26,14 +27,11 @@ import { showToast } from '../../utils/toast.utils';
 const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
 const BUTTON_RADIUS = 14;
-const BUTTON_BACKGROUND = colors.overlay.plum[7];
-const BUTTON_BORDER = colors.overlay.plum[10];
 const WATER_ICON_COLOR = colors.overlay.info[80];
 const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
-const WATER_OFFLINE_ICON_COLOR = colors.overlay.plum[82];
 const WATER_OFFLINE_ICON_SIZE = 10;
 
 export interface QuickActionTriggerProps {
@@ -43,6 +41,11 @@ export interface QuickActionTriggerProps {
 export function QuickActionTrigger({
   onLogWater,
 }: QuickActionTriggerProps) {
+  const colors = useColors();
+  const BUTTON_BACKGROUND = colors.overlay.plum[7];
+  const BUTTON_BORDER = colors.overlay.plum[10];
+  const WATER_OFFLINE_ICON_COLOR = colors.overlay.plum[82];
+
   const { t } = useAppTranslation();
   const { displayVolume } = useUnits();
   const navigation = useNavigation<AppTabNavigationProp<'Home'>>();
@@ -140,6 +143,51 @@ export function QuickActionTrigger({
 
   const waterConfirmationText = displayVolume(WATER_CONFIRMATION_AMOUNT_ML);
 
+  const styles = StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: BUTTON_GAP,
+    },
+    button: {
+      flex: 1,
+      height: BUTTON_HEIGHT,
+      borderRadius: BUTTON_RADIUS,
+      borderWidth: 1,
+      borderColor: BUTTON_BORDER,
+      backgroundColor: BUTTON_BACKGROUND,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xl,
+      overflow: 'visible',
+    },
+    buttonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.md,
+    },
+    buttonLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    waterConfirmation: {
+      position: 'absolute',
+      top: -spacing.lg,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    waterConfirmationText: {
+      color: WATER_ICON_COLOR,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.bold,
+    },
+  });
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -192,48 +240,3 @@ export function QuickActionTrigger({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: BUTTON_GAP,
-  },
-  button: {
-    flex: 1,
-    height: BUTTON_HEIGHT,
-    borderRadius: BUTTON_RADIUS,
-    borderWidth: 1,
-    borderColor: BUTTON_BORDER,
-    backgroundColor: BUTTON_BACKGROUND,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    overflow: 'visible',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  buttonLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-  waterConfirmation: {
-    position: 'absolute',
-    top: -spacing.lg,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  waterConfirmationText: {
-    color: WATER_ICON_COLOR,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.bold,
-  },
-});

@@ -11,7 +11,7 @@ import { enableScreens } from 'react-native-screens';
 // melhorar transições em dispositivos físicos.
 enableScreens();
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
@@ -25,6 +25,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setupAxiosInterceptors, useAuthStore } from './src/store/auth.store';
 import { useBlendStore } from './src/store/blend.store';
 import { useGamificationStore } from './src/store/gamification.store';
+import { useThemeStore } from './src/store/theme.store';
+import { useColors } from './src/hooks/useColors';
 
 // Query cache — client persistido em MMKV
 import { persistOptions, queryClient } from './src/config/queryClient';
@@ -70,8 +72,6 @@ import {
   DMMono_500Medium,
 } from '@expo-google-fonts/dm-mono';
 
-import { colors } from '@blendi/shared';
-
 // Mantém a splash screen visível enquanto as fontes carregam
 // preventAutoHideAsync é fire-and-forget intencional — sem await no módulo
 void SplashScreen.preventAutoHideAsync();
@@ -84,19 +84,6 @@ const ROOT_LEVEL_DEEP_LINK_SCREENS = new Set(['WeeklyReport']);
 function buildHandledNotificationResponseKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
 }
-
-const navigationTheme: Theme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: colors.brand.pulse,
-    background: colors.background.primary,
-    card: colors.background.primary,
-    text: colors.text.primary,
-    border: colors.background.secondary,
-    notification: colors.brand.pulse,
-  },
-};
 
 export default function App() {
   // Aguarda a chave de criptografia do MMKV ANTES de renderizar
@@ -130,6 +117,9 @@ export default function App() {
 }
 
 function AppShell() {
+  const colors = useColors();
+  const themeMode = useThemeStore((state) => state.mode);
+
   // Inicia a assinatura de conectividade antes da lógica de auth/navegação,
   // usando a mesma instância de queryClient provida para o restante do app.
   useNetworkStatus({ netInfoClient: NetInfo, queryClient });
@@ -185,6 +175,26 @@ function AppShell() {
   useEffect(() => {
     void useBlendStore.persist.rehydrate();
   }, []);
+
+  // ── Hidratação manual do theme.store ────────────────────────────────────────
+  // Mesmo padrão do blend.store acima — skipHydration: true, rehydrate
+  // manual aqui dentro de AppShell, já depois do gate isStorageReady.
+  useEffect(() => {
+    void useThemeStore.persist.rehydrate();
+  }, []);
+
+  const navigationTheme = useMemo<Theme>(() => ({
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: colors.brand.pulse,
+      background: colors.background.primary,
+      card: colors.background.primary,
+      text: colors.text.primary,
+      border: colors.background.secondary,
+      notification: colors.brand.pulse,
+    },
+  }), [colors]);
 
   // ── Splash nativa: só some depois que as fontes estiverem resolvidas ───────
   useEffect(() => {
@@ -396,7 +406,7 @@ function AppShell() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-      <StatusBar style="dark" backgroundColor={colors.background.primary} />
+      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background.primary} />
       <RootNavigator />
       <ToastViewport />
     </NavigationContainer>

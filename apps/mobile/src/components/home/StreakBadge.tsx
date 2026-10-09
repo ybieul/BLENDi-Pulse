@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 
 import {
-  colors,
   fontSizes,
   fonts,
   fontWeights,
@@ -18,6 +17,7 @@ import {
 } from '@blendi/shared';
 import { images } from '../../assets';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const SWIRL_SIZE = 28;
 const ENTRY_DURATION = 320;
@@ -40,6 +40,7 @@ function getStageOpacity(streakDays: number): number {
 }
 
 export function StreakBadge({ streakDays }: StreakBadgeProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const entryOpacity = useRef(new Animated.Value(0)).current;
   const entryScale = useRef(new Animated.Value(ENTRY_INITIAL_SCALE)).current;
@@ -107,6 +108,37 @@ export function StreakBadge({ streakDays }: StreakBadgeProps) {
     outputRange: ['0deg', '360deg'],
   });
 
+  const styles = StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+    },
+    swirlPlaceholder: {
+      width: SWIRL_SIZE,
+      height: SWIRL_SIZE,
+    },
+    textBlock: {
+      marginLeft: spacing.md,
+      gap: spacing.xs,
+    },
+    streakValue: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 24,
+      fontWeight: fontWeights.bold,
+      lineHeight: 28,
+    },
+    streakLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.regular,
+      opacity: LABEL_OPACITY,
+      lineHeight: 18,
+    },
+  });
+
   const swirlPlaceholder = (
     <Image
       source={images.swirl}
@@ -141,34 +173,3 @@ export function StreakBadge({ streakDays }: StreakBadgeProps) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-  },
-  swirlPlaceholder: {
-    width: SWIRL_SIZE,
-    height: SWIRL_SIZE,
-  },
-  textBlock: {
-    marginLeft: spacing.md,
-    gap: spacing.xs,
-  },
-  streakValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 24,
-    fontWeight: fontWeights.bold,
-    lineHeight: 28,
-  },
-  streakLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.regular,
-    opacity: LABEL_OPACITY,
-    lineHeight: 18,
-  },
-});

@@ -10,20 +10,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import {
-  colors,
   fonts,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const CARD_WIDTH = 140;
 const CARD_HEIGHT = 80;
 const CARD_RADIUS = 14;
 const CARD_GAP = 12;
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
-const CARD_HIGHLIGHT = colors.overlay.plum[4];
 
 type ProtocolIconName = 'barbell-outline' | 'heart-outline' | 'wine-outline' | 'airplane-outline';
 
@@ -39,6 +36,11 @@ export interface QuickProtocolCardsProps {
 }
 
 export function QuickProtocolCards({ onProtocolSelect }: QuickProtocolCardsProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+  const CARD_HIGHLIGHT = colors.overlay.plum[4];
+
   const { t } = useAppTranslation();
 
   const protocols = useMemo<QuickProtocol[]>(() => [
@@ -67,6 +69,39 @@ export function QuickProtocolCards({ onProtocolSelect }: QuickProtocolCardsProps
       prompt: t('home.protocolPrompts.travel'),
     },
   ], [t]);
+
+  const styles = StyleSheet.create({
+    contentContainer: {
+      paddingRight: spacing.xs,
+    },
+    card: {
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      borderRadius: CARD_RADIUS,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      justifyContent: 'space-between',
+      overflow: 'hidden',
+    },
+    cardHighlight: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '48%',
+      backgroundColor: CARD_HIGHLIGHT,
+    },
+    cardTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      lineHeight: 18,
+    },
+  });
 
   const renderItem: ListRenderItem<QuickProtocol> = ({ item }) => (
     <Pressable
@@ -97,41 +132,11 @@ export function QuickProtocolCards({ onProtocolSelect }: QuickProtocolCardsProps
 }
 
 function CardSeparator() {
-  return <View style={styles.separator} />;
+  return <View style={separatorStyles.separator} />;
 }
 
-const styles = StyleSheet.create({
-  contentContainer: {
-    paddingRight: spacing.xs,
-  },
+const separatorStyles = StyleSheet.create({
   separator: {
     width: CARD_GAP,
-  },
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: CARD_RADIUS,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  cardHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '48%',
-    backgroundColor: CARD_HIGHLIGHT,
-  },
-  cardTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-    lineHeight: 18,
   },
 });

@@ -25,7 +25,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
-  colors,
   fontSizes,
   fonts,
   fontWeights,
@@ -34,6 +33,7 @@ import {
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 
 import {
   logWater,
@@ -69,9 +69,6 @@ const DEFAULT_HYDRATION_TARGET_ML = 2500;
 const SHOPPING_LIST_BADGE_SIZE = 16;
 const SHOPPING_LIST_BADGE_FONT_SIZE = 10;
 const SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW = 8;
-const RETRY_BUTTON_BORDER_COLOR = colors.overlay.plum[15];
-const HISTORY_BUTTON_BACKGROUND = colors.overlay.plum[5];
-const HISTORY_BUTTON_BORDER_COLOR = colors.overlay.plum[12];
 
 type TrackHydrationHistoryQueryKey = readonly [...typeof QUERY_KEYS.hydrationHistory, string, '7days'];
 
@@ -155,6 +152,11 @@ function toHydrationHistoryFetcher(
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) {
+  const colors = useColors();
+  const RETRY_BUTTON_BORDER_COLOR = colors.overlay.plum[15];
+  const HISTORY_BUTTON_BACKGROUND = colors.overlay.plum[5];
+  const HISTORY_BUTTON_BORDER_COLOR = colors.overlay.plum[12];
+
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
@@ -421,6 +423,140 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    content: {
+      paddingBottom: 24,
+    },
+    header: {
+      paddingHorizontal: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    title: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 24,
+      fontWeight: fontWeights.bold,
+    },
+    headerRightActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    headerActionWithBadge: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    shoppingListBadge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: SHOPPING_LIST_BADGE_SIZE,
+      height: SHOPPING_LIST_BADGE_SIZE,
+      borderRadius: SHOPPING_LIST_BADGE_SIZE / 2,
+      backgroundColor: colors.brand.pulse,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    shoppingListBadgeText: {
+      color: colors.text.inverse,
+      fontFamily: fonts.body,
+      fontSize: SHOPPING_LIST_BADGE_FONT_SIZE,
+      fontWeight: fontWeights.bold,
+      lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE + 2,
+      includeFontPadding: false,
+    },
+    shoppingListBadgeTextOverflow: {
+      fontSize: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW,
+      lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW + 2,
+    },
+
+    // Sections
+    sectionSpacing: {
+      paddingHorizontal: 16,
+      marginTop: 20,
+    },
+    sectionSpacingSmall: {
+      paddingHorizontal: 16,
+      marginTop: 16,
+    },
+    historyButtonSection: {
+      paddingHorizontal: 16,
+      marginTop: 20,
+    },
+    historyButton: {
+      width: '100%',
+      height: 52,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: HISTORY_BUTTON_BORDER_COLOR,
+      backgroundColor: HISTORY_BUTTON_BACKGROUND,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    historyButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    historyButtonLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+
+    // Skeleton
+    skeletonContainer: {
+      paddingHorizontal: 16,
+      marginTop: 20,
+    },
+    skeletonSpacer: {
+      height: 16,
+    },
+
+    // Error
+    errorContainer: {
+      paddingHorizontal: 24,
+      marginTop: 48,
+      alignItems: 'center',
+      gap: spacing.lg,
+    },
+    errorText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      textAlign: 'center',
+      opacity: 0.8,
+    },
+    retryButton: {
+      paddingHorizontal: spacing['2xl'],
+      paddingVertical: spacing.md,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: RETRY_BUTTON_BORDER_COLOR,
+    },
+    retryLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <View style={styles.root}>
       <AuroraBackground intensity="reduced" />
@@ -540,139 +676,3 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  content: {
-    paddingBottom: 24,
-  },
-  header: {
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  title: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 24,
-    fontWeight: fontWeights.bold,
-  },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerActionWithBadge: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shoppingListBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: SHOPPING_LIST_BADGE_SIZE,
-    height: SHOPPING_LIST_BADGE_SIZE,
-    borderRadius: SHOPPING_LIST_BADGE_SIZE / 2,
-    backgroundColor: colors.brand.pulse,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shoppingListBadgeText: {
-    color: colors.text.inverse,
-    fontFamily: fonts.body,
-    fontSize: SHOPPING_LIST_BADGE_FONT_SIZE,
-    fontWeight: fontWeights.bold,
-    lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE + 2,
-    includeFontPadding: false,
-  },
-  shoppingListBadgeTextOverflow: {
-    fontSize: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW,
-    lineHeight: SHOPPING_LIST_BADGE_FONT_SIZE_OVERFLOW + 2,
-  },
-
-  // Sections
-  sectionSpacing: {
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  sectionSpacingSmall: {
-    paddingHorizontal: 16,
-    marginTop: 16,
-  },
-  historyButtonSection: {
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  historyButton: {
-    width: '100%',
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: HISTORY_BUTTON_BORDER_COLOR,
-    backgroundColor: HISTORY_BUTTON_BACKGROUND,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  historyButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  historyButtonLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-
-  // Skeleton
-  skeletonContainer: {
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  skeletonSpacer: {
-    height: 16,
-  },
-
-  // Error
-  errorContainer: {
-    paddingHorizontal: 24,
-    marginTop: 48,
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  errorText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-    opacity: 0.8,
-  },
-  retryButton: {
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing.md,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: RETRY_BUTTON_BORDER_COLOR,
-  },
-  retryLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-  },
-});

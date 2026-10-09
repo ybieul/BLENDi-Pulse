@@ -24,6 +24,7 @@ import {
 } from '../../components/ui';
 import { TERMS_URL, PRIVACY_URL } from '../../config/legal';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
@@ -38,8 +39,6 @@ const SEGMENT_ACTIVE_COLORS = [
   colors.feedback.warning,
   colors.feedback.success,
 ] as const;
-
-const SEGMENT_INACTIVE_COLOR = colors.overlay.plum[10];
 
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
@@ -57,6 +56,9 @@ interface ApiErrorResponse {
 }
 
 function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
+  const colors = useColors();
+  const SEGMENT_INACTIVE_COLOR = colors.overlay.plum[10];
+
   const { t } = useAppTranslation();
 
   const criteria = useMemo(
@@ -115,9 +117,30 @@ function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
     ],
   });
 
+  const meterStyles = StyleSheet.create({
+    passwordStrengthBlock: {
+      gap: spacing.md,
+    },
+    passwordStrengthSegments: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    passwordStrengthSegment: {
+      flex: 1,
+      height: 3,
+      borderRadius: 2,
+    },
+    passwordStrengthLabel: {
+      minHeight: 14,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
-    <View style={styles.passwordStrengthBlock}>
-      <View style={styles.passwordStrengthSegments}>
+    <View style={meterStyles.passwordStrengthBlock}>
+      <View style={meterStyles.passwordStrengthSegments}>
         {segmentAnimations.map((animation, index) => {
           const backgroundColor = animation.interpolate({
             inputRange: [0, 1],
@@ -127,13 +150,13 @@ function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
           return (
             <Animated.View
               key={`password-strength-${index}`}
-              style={[styles.passwordStrengthSegment, { backgroundColor }]}
+              style={[meterStyles.passwordStrengthSegment, { backgroundColor }]}
             />
           );
         })}
       </View>
 
-      <Animated.Text style={[styles.passwordStrengthLabel, { color: labelColor }]}> 
+      <Animated.Text style={[meterStyles.passwordStrengthLabel, { color: labelColor }]}>
         {strengthLabel}
       </Animated.Text>
     </View>
@@ -141,6 +164,7 @@ function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
 }
 
 export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
+  const colors = useColors();
   const { t, locale } = useAppTranslation();
   const register = useAuthStore((state) => state.register);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -387,6 +411,76 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     }
   };
 
+  const styles = StyleSheet.create({
+    progressBlock: {
+      marginBottom: spacing['4xl'],
+    },
+    headingBlock: {
+      marginBottom: spacing['4xl'],
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: 'center',
+      opacity: 0.6,
+    },
+    formBlock: {
+      gap: spacing.lg,
+    },
+    passwordFieldGroup: {
+      gap: spacing.md,
+    },
+    bottomText: {
+      marginTop: spacing.xl,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+    formError: {
+      marginBottom: spacing.lg,
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+    bottomLink: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    termsText: {
+      marginTop: spacing.lg,
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      lineHeight: 16,
+      textAlign: 'center',
+    },
+    termsLink: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   const topContent = (
     <View>
       <View style={styles.progressBlock}>
@@ -517,91 +611,3 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  progressBlock: {
-    marginBottom: spacing['4xl'],
-  },
-  headingBlock: {
-    marginBottom: spacing['4xl'],
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
-  formBlock: {
-    gap: spacing.lg,
-  },
-  passwordFieldGroup: {
-    gap: spacing.md,
-  },
-  passwordStrengthBlock: {
-    gap: spacing.md,
-  },
-  passwordStrengthSegments: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  passwordStrengthSegment: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-  },
-  passwordStrengthLabel: {
-    minHeight: 14,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.medium,
-  },
-  bottomText: {
-    marginTop: spacing.xl,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-  formError: {
-    marginBottom: spacing.lg,
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-  },
-  bottomLink: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  termsText: {
-    marginTop: spacing.lg,
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    lineHeight: 16,
-    textAlign: 'center',
-  },
-  termsLink: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.medium,
-  },
-});

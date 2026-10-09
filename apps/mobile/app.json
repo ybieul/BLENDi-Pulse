@@ -16,14 +16,17 @@
       "resizeMode": "contain",
       "backgroundColor": "#2b1429"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "bundleIdentifier": "com.blendi.pulse",
       "buildNumber": "1",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
-        "NSPhotoLibraryUsageDescription": "BLENDi Pulse needs photo access to analyze your pantry ingredients"
+        "NSPhotoLibraryUsageDescription": "BLENDi Pulse needs photo access to analyze your pantry ingredients",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

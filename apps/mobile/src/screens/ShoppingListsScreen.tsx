@@ -43,6 +43,7 @@ import {
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useNetworkStore } from '../store/network.store';
 import {
@@ -61,19 +62,12 @@ import { showToast } from '../utils/toast.utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CARD_BG = colors.overlay.plum[7];
-const CARD_BORDER_COLOR = colors.overlay.plum[10];
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
 const EMPTY_ICON_SIZE = 64;
 const SHEET_RADIUS = 24;
-const SHEET_BORDER_COLOR = colors.overlay.plum[10];
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[55];
 const ARCHIVED_OPACITY = 0.65;
-const SKELETON_BG = colors.overlay.plum[5];
-const ARCHIVED_TOGGLE_BORDER = colors.overlay.plum[8];
 const UPDATED_AT_OPACITY = 0.55;
-const CHEVRON_COLOR = colors.overlay.plum[45];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +93,7 @@ function ShoppingListCard({
   onPressOptions,
   dimmed = false,
 }: ShoppingListCardProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const { formatDate } = useDateFormat();
 
@@ -109,30 +104,78 @@ function ShoppingListCard({
   const pendingColor =
     list.pendingItems === 0 ? colors.feedback.success : colors.brand.pulse;
 
+  const cardStyles = StyleSheet.create({
+    card: {
+      backgroundColor: colors.overlay.plum[7],
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      borderRadius: 14,
+      padding: spacing.xl,
+      gap: 6,
+    },
+    cardDimmed: {
+      opacity: ARCHIVED_OPACITY,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    cardName: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+    },
+    cardOptionsButton: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardDate: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: UPDATED_AT_OPACITY,
+    },
+    cardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: spacing.xs,
+    },
+    cardBadge: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={[styles.card, dimmed && styles.cardDimmed]}
+      style={[cardStyles.card, dimmed && cardStyles.cardDimmed]}
     >
-      <View style={styles.cardHeader}>
-        <Text numberOfLines={1} style={styles.cardName}>
+      <View style={cardStyles.cardHeader}>
+        <Text numberOfLines={1} style={cardStyles.cardName}>
           {list.name}
         </Text>
         <Pressable
           accessibilityRole="button"
           hitSlop={{ bottom: 8, left: 8, right: 0, top: 8 }}
           onPress={onPressOptions}
-          style={styles.cardOptionsButton}
+          style={cardStyles.cardOptionsButton}
         >
           <Ionicons color={colors.text.secondary} name="ellipsis-horizontal" size={18} />
         </Pressable>
       </View>
 
-      <Text style={styles.cardDate}>{formatDate(list.updatedAt)}</Text>
+      <Text style={cardStyles.cardDate}>{formatDate(list.updatedAt)}</Text>
 
-      <View style={styles.cardFooter}>
-        <Text style={[styles.cardBadge, { color: pendingColor }]}>
+      <View style={cardStyles.cardFooter}>
+        <Text style={[cardStyles.cardBadge, { color: pendingColor }]}>
           {pendingText}
         </Text>
       </View>
@@ -161,20 +204,53 @@ function ArchivedSection({
   onPressCard,
   onPressOptions,
 }: ArchivedSectionProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
 
+  const archivedStyles = StyleSheet.create({
+    archivedSection: {
+      marginTop: spacing['3xl'],
+    },
+    archivedToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.lg,
+      paddingHorizontal: spacing.xl,
+      borderTopWidth: 1,
+      borderColor: colors.overlay.plum[8],
+    },
+    archivedToggleLabel: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    archivedStatusText: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: 'center',
+      paddingVertical: spacing.lg,
+    },
+    archivedList: {
+      gap: 10,
+      marginTop: spacing.md,
+    },
+  });
+
   return (
-    <View style={styles.archivedSection}>
+    <View style={archivedStyles.archivedSection}>
       <Pressable
         accessibilityRole="button"
         onPress={onToggle}
-        style={styles.archivedToggle}
+        style={archivedStyles.archivedToggle}
       >
-        <Text style={styles.archivedToggleLabel}>
+        <Text style={archivedStyles.archivedToggleLabel}>
           {t('shoppingList.archivedSection')}
         </Text>
         <Ionicons
-          color={CHEVRON_COLOR}
+          color={colors.overlay.plum[45]}
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
           size={16}
         />
@@ -182,11 +258,11 @@ function ArchivedSection({
 
       {isExpanded ? (
         isLoading ? (
-          <Text style={styles.archivedStatusText}>{t('common.states.loading')}</Text>
+          <Text style={archivedStyles.archivedStatusText}>{t('common.states.loading')}</Text>
         ) : isError ? (
-          <Text style={styles.archivedStatusText}>{t('common.states.error')}</Text>
+          <Text style={archivedStyles.archivedStatusText}>{t('common.states.error')}</Text>
         ) : lists.length === 0 ? null : (
-          <View style={styles.archivedList}>
+          <View style={archivedStyles.archivedList}>
             {lists.map((list) => (
               <ShoppingListCard
                 key={list.id}
@@ -222,6 +298,7 @@ function ListNameSheet({
   onConfirm,
   onClose,
 }: ListNameSheetProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const { height } = useWindowDimensions();
 
@@ -295,28 +372,71 @@ function ListNameSheet({
     mode === 'create' ? t('shoppingList.createList') : t('common.actions.save');
   const trimmedName = name.trim();
 
+  const sheetStyles = StyleSheet.create({
+    sheetModalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    sheetKeyboardContainer: {
+      justifyContent: 'flex-end',
+    },
+    sheetBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheetContainer: {
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      borderTopWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing['3xl'],
+      paddingTop: spacing.lg,
+      paddingBottom: spacing['5xl'],
+    },
+    sheetHandle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.overlay.plum[22],
+      marginBottom: spacing.lg,
+    },
+    sheetTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      marginBottom: spacing['2xl'],
+    },
+    sheetInputWrapper: {
+      marginBottom: spacing['2xl'],
+    },
+  });
+
   return (
     <Modal animationType="none" statusBarTranslucent transparent visible={isMounted}>
-      <View style={styles.sheetModalRoot}>
+      <View style={sheetStyles.sheetModalRoot}>
         <Pressable
           accessibilityRole="button"
           onPress={onClose}
           style={StyleSheet.absoluteFillObject}
         >
-          <Animated.View style={[styles.sheetBackdrop, { opacity: backdropOpacity }]} />
+          <Animated.View style={[sheetStyles.sheetBackdrop, { opacity: backdropOpacity }]} />
         </Pressable>
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.sheetKeyboardContainer}
+          style={sheetStyles.sheetKeyboardContainer}
         >
-          <Animated.View style={[styles.sheetContainer, { transform: [{ translateY }] }]}
+          <Animated.View style={[sheetStyles.sheetContainer, { transform: [{ translateY }] }]}
           >
-            <View style={styles.sheetHandle} />
+            <View style={sheetStyles.sheetHandle} />
 
-            <Text style={styles.sheetTitle}>{title}</Text>
+            <Text style={sheetStyles.sheetTitle}>{title}</Text>
 
-            <View style={styles.sheetInputWrapper}>
+            <View style={sheetStyles.sheetInputWrapper}>
               <AuthInput
                 autoFocus
                 onChangeText={setName}
@@ -349,6 +469,7 @@ function ListNameSheet({
 export function ShoppingListsScreen({
   navigation,
 }: TrackStackScreenProps<'ShoppingLists'>) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -646,6 +767,110 @@ export function ShoppingListsScreen({
 
   // ── Render helpers ────────────────────────────────────────────────────────
 
+  const styles = StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+
+    // Header
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerAddButtonDisabled: {
+      opacity: 0.45,
+    },
+    headerTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+    },
+
+    // Skeleton
+    skeletonContainer: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.lg,
+      gap: 12,
+    },
+    skeletonCard: {
+      height: 96,
+      borderRadius: 14,
+      backgroundColor: colors.overlay.plum[5],
+    },
+
+    // Error / centered
+    centeredContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+    },
+    errorText: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      textAlign: 'center',
+    },
+    retryButton: {
+      width: 160,
+      height: 44,
+    },
+
+    // FlatList
+    listContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: spacing['3xl'],
+    },
+    listContentEmpty: {
+      flexGrow: 1,
+    },
+    separator: {
+      height: 10,
+    },
+
+    // Empty state
+    emptyContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.lg,
+      paddingHorizontal: spacing['2xl'],
+      paddingVertical: spacing['4xl'],
+    },
+    emptyTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: 0.6,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    emptyButton: {
+      width: 200,
+      height: 44,
+    },
+  });
+
   const renderItem = useCallback(
     ({ item }: { item: ShoppingListSummary }) => (
       <ShoppingListCard
@@ -672,7 +897,7 @@ export function ShoppingListsScreen({
         </AuthButton>
       </View>
     ),
-    [handlePressAdd, t],
+    [handlePressAdd, styles, t],
   );
 
   const renderFooter = useCallback(
@@ -790,230 +1015,3 @@ export function ShoppingListsScreen({
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAddButtonDisabled: {
-    opacity: 0.45,
-  },
-  headerTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-
-  // Skeleton
-  skeletonContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    gap: 12,
-  },
-  skeletonCard: {
-    height: 96,
-    borderRadius: 14,
-    backgroundColor: SKELETON_BG,
-  },
-
-  // Error / centered
-  centeredContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-  },
-  errorText: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    textAlign: 'center',
-  },
-  retryButton: {
-    width: 160,
-    height: 44,
-  },
-
-  // FlatList
-  listContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing['3xl'],
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-  },
-  separator: {
-    height: 10,
-  },
-
-  // Empty state
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
-    paddingVertical: spacing['4xl'],
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 20,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: 0.6,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyButton: {
-    width: 200,
-    height: 44,
-  },
-
-  // ShoppingListCard
-  card: {
-    backgroundColor: CARD_BG,
-    borderWidth: 1,
-    borderColor: CARD_BORDER_COLOR,
-    borderRadius: 14,
-    padding: spacing.xl,
-    gap: 6,
-  },
-  cardDimmed: {
-    opacity: ARCHIVED_OPACITY,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  cardName: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-  },
-  cardOptionsButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardDate: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: UPDATED_AT_OPACITY,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.xs,
-  },
-  cardBadge: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-
-  // Archived section
-  archivedSection: {
-    marginTop: spacing['3xl'],
-  },
-  archivedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    borderTopWidth: 1,
-    borderColor: ARCHIVED_TOGGLE_BORDER,
-  },
-  archivedToggleLabel: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-  archivedStatusText: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: 'center',
-    paddingVertical: spacing.lg,
-  },
-  archivedList: {
-    gap: 10,
-    marginTop: spacing.md,
-  },
-
-  // Bottom sheets — shared
-  sheetModalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheetKeyboardContainer: {
-    justifyContent: 'flex-end',
-  },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheetContainer: {
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    borderTopWidth: 1,
-    borderColor: SHEET_BORDER_COLOR,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing['3xl'],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing['5xl'],
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: HANDLE_COLOR,
-    marginBottom: spacing.lg,
-  },
-  sheetTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  sheetInputWrapper: {
-    marginBottom: spacing['2xl'],
-  },
-
-});

@@ -8,17 +8,15 @@
 // ─── Cores ───────────────────────────────────────────────────────────────────
 
 /**
- * Cores da marca BLENDi Pulse.
- * O app usa fundo manila (#f5ede4) como base — texto e superfícies foram
- * calibrados para este contexto.
+ * Cores da marca BLENDi Pulse. Fixas — não mudam entre tema claro/escuro.
  */
 const brand = {
   pulse: '#9a4893',   // Roxo vibrante — CTA, acentos, Goal Rings
-  plum: '#2b1429',    // Deep Plum — texto principal, ícone/splash/share cards (mantidos escuros)
+  plum: '#2b1429',    // Deep Plum — ícone/splash/share cards (sempre escuros)
   light: '#f4e9f3',   // Lilac Mist — backgrounds claros, chips, badges
 } as const;
 
-/** Cores semânticas de feedback ao usuário. */
+/** Cores semânticas de feedback ao usuário. Fixas nos dois temas. */
 const feedback = {
   success: '#22c55e', // Verde — metas atingidas, confirmações
   warning: '#f59e0b', // Âmbar — alertas, atenção
@@ -27,7 +25,7 @@ const feedback = {
 } as const;
 
 /**
- * Escala de neutros seguindo convenção Tailwind (50–900).
+ * Escala de neutros seguindo convenção Tailwind (50–900). Fixa nos dois temas.
  * Use para borders, dividers, placeholders e backgrounds secundários.
  */
 const neutral = {
@@ -43,101 +41,161 @@ const neutral = {
   900: '#171717',
 } as const;
 
+// ─── Famílias que variam por tema ──────────────────────────────────────────
+// Tipadas como interface (não `as const`) de propósito: `as const` fixaria
+// os valores literais e impediria light/dark de terem strings diferentes
+// sob o mesmo formato.
+
+interface TextPalette {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  inverse: string;
+}
+
+interface BackgroundPalette {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+}
+
+type OverlayAlphaKey =
+  | 3 | 4 | 5 | 6 | 7 | 8 | 10 | 12 | 14 | 15 | 16 | 18 | 20 | 22 | 24 | 25
+  | 26 | 28 | 30 | 35 | 40 | 45 | 50 | 55 | 60 | 65 | 70 | 72 | 78 | 80 | 82
+  | 90 | 92 | 95;
+type OverlayScale = Record<OverlayAlphaKey, string>;
+
 /**
- * Cores de texto otimizadas para o fundo manila (#f5ede4).
- * primary → titulos e labels principais
- * secondary → corpo de texto, descrições
- * tertiary → metadados, timestamps, labels desabilitados
+ * Cores de texto.
+ * light: otimizado pro fundo manila (#f5ede4) — primary escuro.
+ * dark: tema original (Deep Plum) — primary claro.
+ * inverse é fixo nos dois: texto/ícone sobre superfícies sempre coloridas
+ * sólidas (botão roxo, toast, badges) que não acompanham o tema do app.
  */
-const text = {
+const lightText: TextPalette = {
   primary: '#2b1429',   // Deep Plum — headings, valores em destaque
   secondary: '#6b4a67', // Plum suave — corpo de texto
   tertiary: '#9a4893',  // Pulse Purple — metadados, placeholders
-  inverse: '#ffffff',   // Texto/ícone sobre superfícies escuras ou coloridas sólidas (botão roxo, toast, badges) — oposto de primary
-} as const;
+  inverse: '#ffffff',
+};
+
+const darkText: TextPalette = {
+  primary: '#ffffff',   // Branco — headings, valores em destaque
+  secondary: '#e2d5e1', // Lavender Mist — corpo de texto
+  tertiary: '#a888a5',  // Muted Plum — metadados, placeholders
+  inverse: '#ffffff',
+};
 
 /**
- * Níveis de superfície do app (fundo manila layered).
- * primary → tela de fundo (Manila)
- * secondary → cards e painéis elevados
- * tertiary → inputs, modais e sheets
+ * Níveis de superfície do app.
+ * light: fundo manila layered (primary → tela de fundo, secondary → cards,
+ * tertiary → inputs/modais/sheets).
+ * dark: fundo Deep Plum layered — tema original do app, antes da migração
+ * pro claro.
  */
-const background = {
+const lightBackground: BackgroundPalette = {
   primary: '#f5ede4',   // Manila — fundo base
   secondary: '#efe4d8', // Manila Mid — cards, listas
   tertiary: '#e8dbc9',  // Manila Deep — inputs, bottom sheets
-} as const;
+};
+
+const darkBackground: BackgroundPalette = {
+  primary: '#2b1429',   // Deep Plum — fundo base
+  secondary: '#3d1f3b', // Plum Mid — cards, listas
+  tertiary: '#4f2a4d',  // Plum Light — inputs, bottom sheets
+};
 
 /**
  * Overlays translúcidos — fundo/borda de cards, inputs, badges, pills e
- * backdrops. Cada família é uma cor base em várias opacidades; a chave é a
- * opacidade em porcentagem inteira (6 = 6%, 55 = 55%...).
+ * backdrops. Chave = opacidade em porcentagem inteira (6 = 6%, 55 = 55%...).
  * NENHUM componente deve escrever rgba(...)/hex solto — sempre usar uma
  * chave daqui. Se faltar um nível, adicione a chave aqui, nunca como
  * literal solto no componente.
+ *
+ * `plum`/`white` trocam de direção por tema (ver lightColors/darkColors
+ * abaixo): no tema claro, `.plum` é a escala escura sobre fundo claro; no
+ * tema escuro, `.plum` passa a resolver pra escala branca sobre fundo
+ * escuro — os componentes continuam escrevendo `colors.overlay.plum[N]`
+ * sem saber qual tema está ativo. As demais famílias (pulse, warning,
+ * success, error, info, black, neutralGray, pink) são cores semânticas ou
+ * de marca — fixas, não trocam de direção.
  */
-const overlay = {
-  /** Base Deep Plum (texto escuro) — overlay sobre o fundo claro. */
-  plum: {
-    3: 'rgba(43,20,41,0.03)',
-    4: 'rgba(43,20,41,0.04)',
-    5: 'rgba(43,20,41,0.05)',
-    6: 'rgba(43,20,41,0.06)',
-    7: 'rgba(43,20,41,0.07)',
-    8: 'rgba(43,20,41,0.08)',
-    10: 'rgba(43,20,41,0.1)',
-    12: 'rgba(43,20,41,0.12)',
-    14: 'rgba(43,20,41,0.14)',
-    15: 'rgba(43,20,41,0.15)',
-    16: 'rgba(43,20,41,0.16)',
-    18: 'rgba(43,20,41,0.18)',
-    20: 'rgba(43,20,41,0.2)',
-    22: 'rgba(43,20,41,0.22)',
-    24: 'rgba(43,20,41,0.24)',
-    25: 'rgba(43,20,41,0.25)',
-    26: 'rgba(43,20,41,0.26)',
-    28: 'rgba(43,20,41,0.28)',
-    30: 'rgba(43,20,41,0.3)',
-    35: 'rgba(43,20,41,0.35)',
-    40: 'rgba(43,20,41,0.4)',
-    45: 'rgba(43,20,41,0.45)',
-    50: 'rgba(43,20,41,0.5)',
-    55: 'rgba(43,20,41,0.55)',
-    60: 'rgba(43,20,41,0.6)',
-    65: 'rgba(43,20,41,0.65)',
-    70: 'rgba(43,20,41,0.7)',
-    72: 'rgba(43,20,41,0.72)',
-    80: 'rgba(43,20,41,0.8)',
-    82: 'rgba(43,20,41,0.82)',
-    90: 'rgba(43,20,41,0.9)',
-    92: 'rgba(43,20,41,0.92)',
-    95: 'rgba(43,20,41,0.95)',
-  },
-  /** Base branco — legítimo sobre superfícies que continuam escuras (barras de câmera, cards de compartilhamento, celebração de nível). */
-  white: {
-    4: 'rgba(255,255,255,0.04)',
-    5: 'rgba(255,255,255,0.05)',
-    6: 'rgba(255,255,255,0.06)',
-    7: 'rgba(255,255,255,0.07)',
-    8: 'rgba(255,255,255,0.08)',
-    10: 'rgba(255,255,255,0.1)',
-    12: 'rgba(255,255,255,0.12)',
-    14: 'rgba(255,255,255,0.14)',
-    15: 'rgba(255,255,255,0.15)',
-    16: 'rgba(255,255,255,0.16)',
-    20: 'rgba(255,255,255,0.2)',
-    22: 'rgba(255,255,255,0.22)',
-    25: 'rgba(255,255,255,0.25)',
-    26: 'rgba(255,255,255,0.26)',
-    35: 'rgba(255,255,255,0.35)',
-    40: 'rgba(255,255,255,0.4)',
-    50: 'rgba(255,255,255,0.5)',
-    55: 'rgba(255,255,255,0.55)',
-    60: 'rgba(255,255,255,0.6)',
-    70: 'rgba(255,255,255,0.7)',
-    72: 'rgba(255,255,255,0.72)',
-    78: 'rgba(255,255,255,0.78)',
-  },
+const overlayPlumBase: OverlayScale = {
+  3: 'rgba(43,20,41,0.03)',
+  4: 'rgba(43,20,41,0.04)',
+  5: 'rgba(43,20,41,0.05)',
+  6: 'rgba(43,20,41,0.06)',
+  7: 'rgba(43,20,41,0.07)',
+  8: 'rgba(43,20,41,0.08)',
+  10: 'rgba(43,20,41,0.1)',
+  12: 'rgba(43,20,41,0.12)',
+  14: 'rgba(43,20,41,0.14)',
+  15: 'rgba(43,20,41,0.15)',
+  16: 'rgba(43,20,41,0.16)',
+  18: 'rgba(43,20,41,0.18)',
+  20: 'rgba(43,20,41,0.2)',
+  22: 'rgba(43,20,41,0.22)',
+  24: 'rgba(43,20,41,0.24)',
+  25: 'rgba(43,20,41,0.25)',
+  26: 'rgba(43,20,41,0.26)',
+  28: 'rgba(43,20,41,0.28)',
+  30: 'rgba(43,20,41,0.3)',
+  35: 'rgba(43,20,41,0.35)',
+  40: 'rgba(43,20,41,0.4)',
+  45: 'rgba(43,20,41,0.45)',
+  50: 'rgba(43,20,41,0.5)',
+  55: 'rgba(43,20,41,0.55)',
+  60: 'rgba(43,20,41,0.6)',
+  65: 'rgba(43,20,41,0.65)',
+  70: 'rgba(43,20,41,0.7)',
+  72: 'rgba(43,20,41,0.72)',
+  78: 'rgba(43,20,41,0.78)',
+  80: 'rgba(43,20,41,0.8)',
+  82: 'rgba(43,20,41,0.82)',
+  90: 'rgba(43,20,41,0.9)',
+  92: 'rgba(43,20,41,0.92)',
+  95: 'rgba(43,20,41,0.95)',
+};
+
+const overlayWhiteBase: OverlayScale = {
+  3: 'rgba(255,255,255,0.03)',
+  4: 'rgba(255,255,255,0.04)',
+  5: 'rgba(255,255,255,0.05)',
+  6: 'rgba(255,255,255,0.06)',
+  7: 'rgba(255,255,255,0.07)',
+  8: 'rgba(255,255,255,0.08)',
+  10: 'rgba(255,255,255,0.1)',
+  12: 'rgba(255,255,255,0.12)',
+  14: 'rgba(255,255,255,0.14)',
+  15: 'rgba(255,255,255,0.15)',
+  16: 'rgba(255,255,255,0.16)',
+  18: 'rgba(255,255,255,0.18)',
+  20: 'rgba(255,255,255,0.2)',
+  22: 'rgba(255,255,255,0.22)',
+  24: 'rgba(255,255,255,0.24)',
+  25: 'rgba(255,255,255,0.25)',
+  26: 'rgba(255,255,255,0.26)',
+  28: 'rgba(255,255,255,0.28)',
+  30: 'rgba(255,255,255,0.3)',
+  35: 'rgba(255,255,255,0.35)',
+  40: 'rgba(255,255,255,0.4)',
+  45: 'rgba(255,255,255,0.45)',
+  50: 'rgba(255,255,255,0.5)',
+  55: 'rgba(255,255,255,0.55)',
+  60: 'rgba(255,255,255,0.6)',
+  65: 'rgba(255,255,255,0.65)',
+  70: 'rgba(255,255,255,0.7)',
+  72: 'rgba(255,255,255,0.72)',
+  78: 'rgba(255,255,255,0.78)',
+  80: 'rgba(255,255,255,0.8)',
+  82: 'rgba(255,255,255,0.82)',
+  90: 'rgba(255,255,255,0.9)',
+  92: 'rgba(255,255,255,0.92)',
+  95: 'rgba(255,255,255,0.95)',
+};
+
+/** Famílias de overlay semânticas/de marca — fixas, não trocam por tema. */
+const sharedOverlay = {
   /** Base Pulse Purple — badges, chips, bordas de destaque roxas. */
   pulse: {
     10: 'rgba(154,72,147,0.1)',
@@ -231,7 +289,7 @@ const overlay = {
   },
 } as const;
 
-/** Brilho de borda por tier de conquista (bronze/prata/ouro) nos cards de badge. */
+/** Brilho de borda por tier de conquista (bronze/prata/ouro) nos cards de badge. Fixo nos dois temas. */
 const badgeTier = {
   bronzeGlow: 'rgba(205,127,50,0.40)',
   bronzeIcon: 'rgba(205,127,50,0.90)',
@@ -255,7 +313,7 @@ const premium = {
   textOnGold: '#2D1600',
 } as const;
 
-/** Estrela de avaliação (RatingBottomSheet, BlendLogItem). */
+/** Estrela de avaliação (RatingBottomSheet, BlendLogItem). Fixa nos dois temas. */
 const rating = {
   starFilled: '#facc15',
 } as const;
@@ -268,6 +326,7 @@ const thirdParty = {
 /**
  * Acentos decorativos de uso único — efeitos visuais específicos de um
  * componente (aurora, confete de level-up, balão de erro do chat, toast).
+ * Fixos nos dois temas.
  */
 const decorative = {
   toastBorder: 'rgba(255,107,107,0.22)',   // ToastViewport (iOS) — mesmo estilo pra todo toast, não só erro
@@ -283,19 +342,61 @@ const decorative = {
   heatmapMissed: 'rgba(248,113,113,0.88)', // SupplementHeatmap — dia de suplemento perdido
 } as const;
 
-export const colors = {
+export interface Colors {
+  brand: typeof brand;
+  feedback: typeof feedback;
+  neutral: typeof neutral;
+  text: TextPalette;
+  background: BackgroundPalette;
+  overlay: typeof sharedOverlay & { plum: OverlayScale; white: OverlayScale };
+  badgeTier: typeof badgeTier;
+  premium: typeof premium;
+  rating: typeof rating;
+  thirdParty: typeof thirdParty;
+  decorative: typeof decorative;
+}
+
+/** Tema claro (manila) — padrão do app hoje. */
+export const lightColors: Colors = {
   brand,
   feedback,
   neutral,
-  text,
-  background,
-  overlay,
   badgeTier,
   premium,
   rating,
   thirdParty,
   decorative,
-} as const;
+  text: lightText,
+  background: lightBackground,
+  overlay: { ...sharedOverlay, plum: overlayPlumBase, white: overlayWhiteBase },
+};
+
+/** Tema escuro (Deep Plum) — visual original do app, antes da migração pro claro. */
+export const darkColors: Colors = {
+  brand,
+  feedback,
+  neutral,
+  badgeTier,
+  premium,
+  rating,
+  thirdParty,
+  decorative,
+  text: darkText,
+  background: darkBackground,
+  // Direção invertida: no escuro, `.plum` passa a resolver pra escala branca
+  // (overlay claro sobre fundo escuro) e vice-versa.
+  overlay: { ...sharedOverlay, plum: overlayWhiteBase, white: overlayPlumBase },
+};
+
+/**
+ * Export estático — resolve sempre pro tema claro. Usado só pelos poucos
+ * arquivos que ficam com visual fixo independente do tema ativo do app
+ * (share cards, ShareFormatSheet, AuthButton, overlay de câmera do
+ * PantryScannerScreen). Todo o resto do app deve usar o hook `useColors()`
+ * (apps/mobile/src/hooks/useColors.ts), que escolhe entre `lightColors` e
+ * `darkColors` conforme a preferência de tema do usuário.
+ */
+export const colors: Colors = lightColors;
 
 // ─── Fontes ──────────────────────────────────────────────────────────────────
 
@@ -406,7 +507,6 @@ export const tokens = {
 
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
-export type Colors = typeof colors;
 export type Fonts = typeof fonts;
 export type FontSizes = typeof fontSizes;
 export type FontWeights = typeof fontWeights;

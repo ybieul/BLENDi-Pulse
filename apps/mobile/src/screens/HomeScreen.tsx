@@ -46,6 +46,7 @@ import { api } from '../config/api';
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import { LevelDetailSheet } from '../components/gamification/LevelDetailSheet';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useAuthStore } from '../store/auth.store';
 import { useGamificationStore } from '../store/gamification.store';
@@ -73,11 +74,8 @@ const FADE_DURATION = 300;
 const HYDRATION_TARGET_ML = 2500;
 const BADGE_HEIGHT = 24;
 const BADGE_PADDING_H = 10;
-const BADGE_FREE_BACKGROUND = colors.overlay.plum[8];
-const BADGE_FREE_BORDER = colors.overlay.plum[12];
 const BADGE_PRO_BACKGROUND = colors.overlay.pulse[25];
 const BADGE_PRO_BORDER = colors.overlay.pulse[40];
-const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[10];
 const LEVEL_PROGRESS_BAR_WIDTH = 40;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -145,6 +143,11 @@ function getGreetingKey(): 'home.greeting_morning' | 'home.greeting_afternoon' |
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
+  const colors = useColors();
+  const BADGE_FREE_BACKGROUND = colors.overlay.plum[8];
+  const BADGE_FREE_BORDER = colors.overlay.plum[12];
+  const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[10];
+
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const { formatDate } = useDateFormat();
@@ -294,6 +297,152 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   }, [navigation]);
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    content: {
+      paddingBottom: 24,
+    },
+
+    // ── Skeleton ────────────────────────────────────────────────────────────────
+    skeletonContainer: {
+      paddingHorizontal: 24,
+    },
+    skeletonHeader: {
+      marginBottom: 20,
+    },
+    skeletonSpacer: {
+      height: 20,
+    },
+
+    // ── Greeting ────────────────────────────────────────────────────────────────
+    greetingContainer: {
+      paddingHorizontal: 24,
+    },
+    headerActions: {
+      position: 'absolute',
+      top: 0,
+      right: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    greetingText: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+    },
+    greetingDate: {
+      marginTop: 4,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    levelIndicatorButton: {
+      marginRight: 8,
+    },
+    levelIndicatorContent: {
+      alignItems: 'center',
+    },
+    levelIndicatorText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.bold,
+    },
+    levelIndicatorTrack: {
+      marginTop: 3,
+      width: LEVEL_PROGRESS_BAR_WIDTH,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    levelIndicatorFill: {
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: colors.brand.pulse,
+    },
+
+    // ── Badge Free / Pro ─────────────────────────────────────────────────────────
+    badge: {
+      height: BADGE_HEIGHT,
+      paddingHorizontal: BADGE_PADDING_H,
+      borderRadius: BADGE_HEIGHT / 2,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeFree: {
+      backgroundColor: BADGE_FREE_BACKGROUND,
+      borderColor: BADGE_FREE_BORDER,
+    },
+    badgePro: {
+      backgroundColor: BADGE_PRO_BACKGROUND,
+      borderColor: BADGE_PRO_BORDER,
+    },
+    badgeText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.semibold,
+    },
+
+    // ── Section title ────────────────────────────────────────────────────────────
+    sectionTitle: {
+      paddingHorizontal: 24,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+    },
+
+    // ── Layout helpers ──────────────────────────────────────────────────────────
+    rowPad: {
+      paddingHorizontal: 24,
+    },
+    protocolsWrapper: {
+      paddingLeft: 24,
+    },
+
+    // ── Spacers ──────────────────────────────────────────────────────────────────
+    spacer8: { height: 8 },
+    spacer12: { height: 12 },
+    spacer20: { height: 20 },
+    spacer24: { height: 24 },
+
+    // ── Missions ─────────────────────────────────────────────────────────────────
+    missionsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    missionsHeaderTitle: {
+      flex: 1,
+      marginLeft: 8,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    missionsHeaderBadge: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.bold,
+    },
+    missionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    missionCardSkeleton: {
+      flex: 1,
+      height: 80,
+    },
+  });
 
   return (
     <View style={styles.root}>
@@ -469,151 +618,3 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  content: {
-    paddingBottom: 24,
-  },
-
-  // ── Skeleton ────────────────────────────────────────────────────────────────
-  skeletonContainer: {
-    paddingHorizontal: 24,
-  },
-  skeletonHeader: {
-    marginBottom: 20,
-  },
-  skeletonSpacer: {
-    height: 20,
-  },
-
-  // ── Greeting ────────────────────────────────────────────────────────────────
-  greetingContainer: {
-    paddingHorizontal: 24,
-  },
-  headerActions: {
-    position: 'absolute',
-    top: 0,
-    right: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  greetingText: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-  },
-  greetingDate: {
-    marginTop: 4,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  levelIndicatorButton: {
-    marginRight: 8,
-  },
-  levelIndicatorContent: {
-    alignItems: 'center',
-  },
-  levelIndicatorText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.bold,
-  },
-  levelIndicatorTrack: {
-    marginTop: 3,
-    width: LEVEL_PROGRESS_BAR_WIDTH,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  levelIndicatorFill: {
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.brand.pulse,
-  },
-
-  // ── Badge Free / Pro ─────────────────────────────────────────────────────────
-  badge: {
-    height: BADGE_HEIGHT,
-    paddingHorizontal: BADGE_PADDING_H,
-    borderRadius: BADGE_HEIGHT / 2,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeFree: {
-    backgroundColor: BADGE_FREE_BACKGROUND,
-    borderColor: BADGE_FREE_BORDER,
-  },
-  badgePro: {
-    backgroundColor: BADGE_PRO_BACKGROUND,
-    borderColor: BADGE_PRO_BORDER,
-  },
-  badgeText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.semibold,
-  },
-
-  // ── Section title ────────────────────────────────────────────────────────────
-  sectionTitle: {
-    paddingHorizontal: 24,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-  },
-
-  // ── Layout helpers ──────────────────────────────────────────────────────────
-  rowPad: {
-    paddingHorizontal: 24,
-  },
-  protocolsWrapper: {
-    paddingLeft: 24,
-  },
-
-  // ── Spacers ──────────────────────────────────────────────────────────────────
-  spacer8: { height: 8 },
-  spacer12: { height: 12 },
-  spacer20: { height: 20 },
-  spacer24: { height: 24 },
-
-  // ── Missions ─────────────────────────────────────────────────────────────────
-  missionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  missionsHeaderTitle: {
-    flex: 1,
-    marginLeft: 8,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  missionsHeaderBadge: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.bold,
-  },
-  missionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  missionCardSkeleton: {
-    flex: 1,
-    height: 80,
-  },
-});

@@ -17,9 +17,9 @@ import {
   spacing,
 } from '@blendi/shared';
 
+import { useColors } from '../../hooks/useColors';
+
 const FIELD_HEIGHT = 56;
-const FIELD_BG_COLOR = colors.overlay.plum[6];
-const FIELD_HIGHLIGHT_COLOR = colors.overlay.plum[3];
 const LABEL_IDLE_TRANSLATE_Y = 12;
 const LABEL_FLOAT_FONT_SIZE = 11;
 const LABEL_IDLE_FONT_SIZE = 15;
@@ -31,6 +31,7 @@ const HORIZONTAL_PADDING = spacing.xl;
 const ICON_SLOT_SIZE = 20;
 const LEADING_GAP = spacing.lg;
 const TRAILING_SLOT_WIDTH = 28;
+const BORDER_SELECTED_COLOR = colors.overlay.pulse[65];
 
 type TextInputFocusEvent = Parameters<NonNullable<TextInputProps['onFocus']>>[0];
 type TextInputBlurEvent = Parameters<NonNullable<TextInputProps['onBlur']>>[0];
@@ -56,6 +57,10 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
   },
   ref
 ) {
+  const colors = useColors();
+  const FIELD_BG_COLOR = colors.overlay.plum[6];
+  const FIELD_HIGHLIGHT_COLOR = colors.overlay.plum[3];
+
   const [isFocused, setIsFocused] = useState(false);
   const [internalValue, setInternalValue] = useState(defaultValue ?? '');
   const [visibleError, setVisibleError] = useState<string | null>(error ?? null);
@@ -167,7 +172,95 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
 
   const animatedBorderColor = borderProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [colors.overlay.plum[16], colors.overlay.pulse[65]],
+    outputRange: [colors.overlay.plum[16], BORDER_SELECTED_COLOR],
+  });
+
+  const styles = StyleSheet.create({
+    wrapper: {
+      width: '100%',
+    },
+    fieldOuter: {
+      position: 'relative',
+      height: FIELD_HEIGHT,
+      borderRadius: 14,
+      overflow: 'hidden',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    fieldDisabled: {
+      opacity: 0.7,
+    },
+    fieldBg: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: FIELD_BG_COLOR,
+    },
+    fieldHighlight: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: FIELD_HEIGHT / 2,
+      backgroundColor: FIELD_HIGHLIGHT_COLOR,
+    },
+    leftIcon: {
+      position: 'absolute',
+      left: HORIZONTAL_PADDING,
+      top: 18,
+      width: ICON_SLOT_SIZE,
+      height: ICON_SLOT_SIZE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1,
+    },
+    label: {
+      position: 'absolute',
+      top: 10,
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      zIndex: 1,
+    },
+    input: {
+      flex: 1,
+      height: '100%',
+      paddingRight: HORIZONTAL_PADDING + TRAILING_SLOT_WIDTH,
+      color: colors.text.primary,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: fontSizes.md,
+    },
+    inputWithLeadingIcon: {
+      paddingLeft: HORIZONTAL_PADDING + ICON_SLOT_SIZE + LEADING_GAP,
+    },
+    inputWithoutLeadingIcon: {
+      paddingLeft: HORIZONTAL_PADDING,
+    },
+    inputWithLabel: {
+      paddingTop: 24,
+      paddingBottom: 10,
+    },
+    inputWithoutLabel: {
+      paddingTop: 0,
+      paddingBottom: 0,
+      textAlignVertical: 'center',
+    },
+    checkIcon: {
+      position: 'absolute',
+      right: HORIZONTAL_PADDING,
+      top: 19,
+      width: 18,
+      height: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    errorContainer: {
+      marginTop: spacing.md,
+    },
+    errorText: {
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.regular,
+    },
   });
 
   return (
@@ -241,92 +334,4 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
       ) : null}
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  wrapper: {
-    width: '100%',
-  },
-  fieldOuter: {
-    position: 'relative',
-    height: FIELD_HEIGHT,
-    borderRadius: 14,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  fieldDisabled: {
-    opacity: 0.7,
-  },
-  fieldBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: FIELD_BG_COLOR,
-  },
-  fieldHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: FIELD_HEIGHT / 2,
-    backgroundColor: FIELD_HIGHLIGHT_COLOR,
-  },
-  leftIcon: {
-    position: 'absolute',
-    left: HORIZONTAL_PADDING,
-    top: 18,
-    width: ICON_SLOT_SIZE,
-    height: ICON_SLOT_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  label: {
-    position: 'absolute',
-    top: 10,
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    zIndex: 1,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    paddingRight: HORIZONTAL_PADDING + TRAILING_SLOT_WIDTH,
-    color: colors.text.primary,
-    fontFamily: 'DMSans_400Regular',
-    fontSize: fontSizes.md,
-  },
-  inputWithLeadingIcon: {
-    paddingLeft: HORIZONTAL_PADDING + ICON_SLOT_SIZE + LEADING_GAP,
-  },
-  inputWithoutLeadingIcon: {
-    paddingLeft: HORIZONTAL_PADDING,
-  },
-  inputWithLabel: {
-    paddingTop: 24,
-    paddingBottom: 10,
-  },
-  inputWithoutLabel: {
-    paddingTop: 0,
-    paddingBottom: 0,
-    textAlignVertical: 'center',
-  },
-  checkIcon: {
-    position: 'absolute',
-    right: HORIZONTAL_PADDING,
-    top: 19,
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorContainer: {
-    marginTop: spacing.md,
-  },
-  errorText: {
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.regular,
-  },
 });

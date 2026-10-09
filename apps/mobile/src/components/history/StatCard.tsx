@@ -12,11 +12,9 @@ import {
   fontWeights,
 } from '@blendi/shared';
 
+import { useColors } from '../../hooks/useColors';
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER_COLOR = colors.overlay.plum[10];
-const LABEL_COLOR = colors.overlay.plum[55];
 const DEFAULT_ICON_COLOR = colors.brand.pulse;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -38,8 +36,48 @@ export function StatCard({
   flex = 1,
   isLoading = false,
 }: StatCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER_COLOR = colors.overlay.plum[10];
+  const LABEL_COLOR = colors.overlay.plum[55];
+
+  const styles = StyleSheet.create({
+    card: {
+      minHeight: 96,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: CARD_BORDER_COLOR,
+      backgroundColor: CARD_BACKGROUND,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    icon: {
+      marginBottom: 8,
+    },
+    valueSkeleton: {
+      marginBottom: 6,
+    },
+    value: {
+      marginBottom: 6,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 22,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.5,
+      textAlign: 'center',
+    },
+    label: {
+      color: LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+  });
+
   return (
-    <View style={[styles.card, { flex }]}> 
+    <View style={[styles.card, { flex }]}>
       {icon ? <Ionicons name={icon} size={16} color={iconColor} style={styles.icon} /> : null}
 
       {isLoading ? (
@@ -54,38 +92,3 @@ export function StatCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    minHeight: 96,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: CARD_BORDER_COLOR,
-    backgroundColor: CARD_BACKGROUND,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: {
-    marginBottom: 8,
-  },
-  valueSkeleton: {
-    marginBottom: 6,
-  },
-  value: {
-    marginBottom: 6,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 22,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.5,
-    textAlign: 'center',
-  },
-  label: {
-    color: LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-});

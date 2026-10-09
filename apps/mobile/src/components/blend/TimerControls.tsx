@@ -11,12 +11,11 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
 import type { TimerCircleStatus } from './TimerCircle';
 
 const ADJUST_BUTTON_SIZE = 44;
-const ADJUST_BUTTON_BACKGROUND = colors.overlay.plum[8];
-const ADJUST_BUTTON_BORDER = colors.overlay.plum[12];
 const STOP_BUTTON_BACKGROUND = colors.overlay.error[20];
 const STOP_BUTTON_BORDER = colors.overlay.error[40];
 
@@ -42,12 +41,61 @@ export function TimerControls({
   onStart,
   onStop,
 }: TimerControlsProps) {
+  const colors = useColors();
+  const ADJUST_BUTTON_BACKGROUND = colors.overlay.plum[8];
+  const ADJUST_BUTTON_BORDER = colors.overlay.plum[12];
+
   const { t } = useAppTranslation();
 
   const handleAdjust = async (deltaSeconds: 5 | -5) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onAdjust(deltaSeconds);
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      width: '100%',
+      gap: spacing.xl,
+    },
+    adjustRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xl,
+    },
+    adjustButton: {
+      width: ADJUST_BUTTON_SIZE,
+      height: ADJUST_BUTTON_SIZE,
+      borderRadius: ADJUST_BUTTON_SIZE / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: ADJUST_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: ADJUST_BUTTON_BORDER,
+    },
+    durationLabel: {
+      minWidth: 88,
+      textAlign: 'center',
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.6,
+    },
+    stopButton: {
+      backgroundColor: STOP_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: STOP_BUTTON_BORDER,
+      borderRadius: borderRadius.lg,
+    },
+    stopButtonLabel: {
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: 16,
+      fontWeight: fontWeights.medium,
+      letterSpacing: 0.5,
+    },
+  });
 
   if (status === 'completed') {
     return null;
@@ -95,48 +143,3 @@ export function TimerControls({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    gap: spacing.xl,
-  },
-  adjustRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xl,
-  },
-  adjustButton: {
-    width: ADJUST_BUTTON_SIZE,
-    height: ADJUST_BUTTON_SIZE,
-    borderRadius: ADJUST_BUTTON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: ADJUST_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: ADJUST_BUTTON_BORDER,
-  },
-  durationLabel: {
-    minWidth: 88,
-    textAlign: 'center',
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.6,
-  },
-  stopButton: {
-    backgroundColor: STOP_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: STOP_BUTTON_BORDER,
-    borderRadius: borderRadius.lg,
-  },
-  stopButtonLabel: {
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: 16,
-    fontWeight: fontWeights.medium,
-    letterSpacing: 0.5,
-  },
-});

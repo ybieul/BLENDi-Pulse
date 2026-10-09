@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { forgotPasswordSchema } from '@blendi/shared';
-import { colors, fonts, fontWeights, spacing } from '@blendi/shared';
+import { fonts, fontWeights, spacing } from '@blendi/shared';
 import { AuthButton, AuthInput, AuthScreenLayout } from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { forgotPassword } from '../../services/auth.service';
 import type { AuthScreenProps } from '../../navigation/types';
 
@@ -15,6 +16,7 @@ type ValidationIssue = { message: string; code?: string; minimum?: number | bigi
 type ForgotPasswordRequest = (input: { email: string }) => Promise<void>;
 
 export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPassword'>) {
+  const colors = useColors();
   const { t } = useAppTranslation();
   const isMountedRef = useRef(true);
   const requestForgotPassword: ForgotPasswordRequest = forgotPassword;
@@ -107,6 +109,37 @@ export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPass
     navigation.navigate('VerifyOtp', { email: parsed.data.email });
   };
 
+  const styles = StyleSheet.create({
+    iconBlock: {
+      alignItems: 'center',
+      marginBottom: spacing['4xl'],
+    },
+    headingBlock: {
+      marginBottom: spacing['4xl'],
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 28,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: 'center',
+      opacity: 0.6,
+    },
+    formBlock: {
+      marginTop: spacing['4xl'],
+    },
+  });
+
   const topContent = (
     <View>
       <View style={styles.iconBlock}>
@@ -151,34 +184,3 @@ export function ForgotPasswordScreen({ navigation }: AuthScreenProps<'ForgotPass
     />
   );
 }
-
-const styles = StyleSheet.create({
-  iconBlock: {
-    alignItems: 'center',
-    marginBottom: spacing['4xl'],
-  },
-  headingBlock: {
-    marginBottom: spacing['4xl'],
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 28,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: 'center',
-    opacity: 0.6,
-  },
-  formBlock: {
-    marginTop: spacing['4xl'],
-  },
-});

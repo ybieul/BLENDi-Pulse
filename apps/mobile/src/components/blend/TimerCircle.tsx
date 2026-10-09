@@ -10,20 +10,16 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, G } from 'react-native-svg';
 
 import {
-  colors,
   fonts,
   fontWeights,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const DEFAULT_SIZE = 220;
 const STROKE_WIDTH = 12;
-const READY_RING_COLOR = colors.overlay.plum[20];
-const RUNNING_TRACK_COLOR = colors.overlay.plum[12];
-const SUBLABEL_READY_COLOR = colors.overlay.plum[50];
-const SUBLABEL_STOPPED_COLOR = colors.overlay.plum[50];
 const COMPLETION_ICON_SCALE_OVERSHOOT = 1.2;
 const DASH_ANIMATION_DURATION_MS = 220;
 const NUMBER_PULSE_DURATION_MS = 100;
@@ -50,6 +46,12 @@ export function TimerCircle({
   onComplete,
   size = DEFAULT_SIZE,
 }: TimerCircleProps) {
+  const colors = useColors();
+  const READY_RING_COLOR = colors.overlay.plum[20];
+  const RUNNING_TRACK_COLOR = colors.overlay.plum[12];
+  const SUBLABEL_READY_COLOR = colors.overlay.plum[50];
+  const SUBLABEL_STOPPED_COLOR = colors.overlay.plum[50];
+
   const { t } = useAppTranslation();
 
   const [remainingSeconds, setRemainingSeconds] = useState(duration);
@@ -222,8 +224,35 @@ export function TimerCircle({
 
   const iconSize = Math.round(size * 0.28);
 
+  const styles = StyleSheet.create({
+    container: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    timerValue: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 52,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -2,
+      lineHeight: 58,
+    },
+    statusLabel: {
+      marginTop: 8,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      letterSpacing: 0.2,
+    },
+  });
+
   return (
-    <View style={[styles.container, { width: size, height: size }]}> 
+    <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <G rotation={-90} originX={center} originY={center}>
           <Circle
@@ -264,30 +293,3 @@ export function TimerCircle({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timerValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 52,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -2,
-    lineHeight: 58,
-  },
-  statusLabel: {
-    marginTop: 8,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    letterSpacing: 0.2,
-  },
-});

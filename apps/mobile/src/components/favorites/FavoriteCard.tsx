@@ -10,6 +10,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useAuthStore } from '../../store/auth.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
@@ -22,8 +23,6 @@ import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
 const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
 const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
 const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
@@ -34,8 +33,6 @@ const REMOVE_BUTTON_BORDER = colors.overlay.error[25];
 const REMOVE_ICON_COLOR = colors.feedback.error;
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
 const CART_BUTTON_BORDER = colors.overlay.pulse[20];
-const SHARE_BUTTON_BACKGROUND = colors.overlay.plum[5];
-const SHARE_BUTTON_BORDER = colors.overlay.plum[15];
 
 interface MacroPillProps {
   value: number;
@@ -50,11 +47,28 @@ export interface FavoriteCardProps {
 }
 
 function MacroPill({ value, unit, backgroundColor }: MacroPillProps) {
+  const colors = useColors();
   const { formatDecimal } = useFormatNumbers();
 
+  const pillStyles = StyleSheet.create({
+    macroPill: {
+      height: 22,
+      borderRadius: 999,
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    macroPillText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.medium,
+      lineHeight: 14,
+    },
+  });
+
   return (
-    <View style={[styles.macroPill, { backgroundColor }]}>
-      <Text style={styles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
+    <View style={[pillStyles.macroPill, { backgroundColor }]}>
+      <Text style={pillStyles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
     </View>
   );
 }
@@ -77,6 +91,12 @@ function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
 }
 
 export function FavoriteCard({ item, onStartBlend, onRemove }: FavoriteCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+  const SHARE_BUTTON_BACKGROUND = colors.overlay.plum[5];
+  const SHARE_BUTTON_BORDER = colors.overlay.plum[15];
+
   const { t } = useAppTranslation();
   const authUser = useAuthStore((state) => state.user);
   const shareCardRef = useRef<RecipeShareCardHandle | null>(null);
@@ -114,6 +134,95 @@ export function FavoriteCard({ item, onStartBlend, onRemove }: FavoriteCardProps
       clearTimeout(timeoutId);
     };
   }, [pendingShareFormat]);
+
+  const styles = StyleSheet.create({
+    cardContainer: {
+      position: 'relative',
+    },
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      padding: 16,
+      gap: spacing.md,
+    },
+    sectionStack: {
+      gap: spacing.sm,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 17,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.3,
+      lineHeight: 22,
+    },
+    macroRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    ingredientsPreview: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+      opacity: INGREDIENTS_OPACITY,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    startBlendButton: {
+      flex: 1,
+      height: 40,
+      minWidth: 0,
+      borderRadius: 12,
+      paddingHorizontal: spacing.md,
+    },
+    startBlendLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    removeButton: {
+      width: 40,
+      height: 40,
+      minWidth: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: REMOVE_BUTTON_BORDER,
+      backgroundColor: REMOVE_BUTTON_BACKGROUND,
+    },
+    cartButton: {
+      width: 40,
+      height: 40,
+      minWidth: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: CART_BUTTON_BORDER,
+      backgroundColor: CART_BUTTON_BACKGROUND,
+    },
+    shareButton: {
+      width: 40,
+      height: 40,
+      minWidth: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: SHARE_BUTTON_BORDER,
+      backgroundColor: SHARE_BUTTON_BACKGROUND,
+    },
+  });
 
   return (
     <View style={styles.cardContainer}>
@@ -194,105 +303,3 @@ export function FavoriteCard({ item, onStartBlend, onRemove }: FavoriteCardProps
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  cardContainer: {
-    position: 'relative',
-  },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    gap: spacing.md,
-  },
-  sectionStack: {
-    gap: spacing.sm,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 17,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.3,
-    lineHeight: 22,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  macroPill: {
-    height: 22,
-    borderRadius: 999,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  macroPillText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.medium,
-    lineHeight: 14,
-  },
-  ingredientsPreview: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-    opacity: INGREDIENTS_OPACITY,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  startBlendButton: {
-    flex: 1,
-    height: 40,
-    minWidth: 0,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-  },
-  startBlendLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-  removeButton: {
-    width: 40,
-    height: 40,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: REMOVE_BUTTON_BORDER,
-    backgroundColor: REMOVE_BUTTON_BACKGROUND,
-  },
-  cartButton: {
-    width: 40,
-    height: 40,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: CART_BUTTON_BORDER,
-    backgroundColor: CART_BUTTON_BACKGROUND,
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: SHARE_BUTTON_BORDER,
-    backgroundColor: SHARE_BUTTON_BACKGROUND,
-  },
-});

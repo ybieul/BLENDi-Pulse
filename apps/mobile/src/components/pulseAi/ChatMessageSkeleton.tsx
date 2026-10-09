@@ -4,13 +4,49 @@
 
 import { StyleSheet, View } from 'react-native';
 
-import { borderRadius, colors, spacing } from '@blendi/shared';
+import { borderRadius, spacing } from '@blendi/shared';
+import { useColors } from '../../hooks/useColors';
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
 const CARD_HEIGHT = 220;
-const SKELETON_CARD_BORDER = colors.overlay.plum[7];
 
 export function ChatMessageSkeleton() {
+  const colors = useColors();
+  const SKELETON_CARD_BORDER = colors.overlay.plum[7];
+
+  const styles = StyleSheet.create({
+    wrapper: {
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.xl,
+      marginTop: spacing.md,
+    },
+    subtitleRow: {
+      marginTop: spacing.md,
+    },
+    card: {
+      marginTop: spacing.lg,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: SKELETON_CARD_BORDER,
+      backgroundColor: colors.background.secondary,
+      padding: spacing.xl,
+      minHeight: CARD_HEIGHT,
+      justifyContent: 'flex-start',
+    },
+    cardRow: {
+      marginTop: spacing.md,
+    },
+    macroRow: {
+      flexDirection: 'row',
+      marginTop: spacing['2xl'],
+      gap: spacing.md,
+      flexWrap: 'wrap',
+    },
+    macroPill: {
+      borderRadius: borderRadius.full,
+    },
+  });
+
   return (
     <View style={styles.wrapper}>
       {/* Título e subtítulo do card */}
@@ -53,36 +89,3 @@ export function ChatMessageSkeleton() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.xl,
-    marginTop: spacing.md,
-  },
-  subtitleRow: {
-    marginTop: spacing.md,
-  },
-  card: {
-    marginTop: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: SKELETON_CARD_BORDER,
-    backgroundColor: colors.background.secondary,
-    padding: spacing.xl,
-    minHeight: CARD_HEIGHT,
-    justifyContent: 'flex-start',
-  },
-  cardRow: {
-    marginTop: spacing.md,
-  },
-  macroRow: {
-    flexDirection: 'row',
-    marginTop: spacing['2xl'],
-    gap: spacing.md,
-    flexWrap: 'wrap',
-  },
-  macroPill: {
-    borderRadius: borderRadius.full,
-  },
-});

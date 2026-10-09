@@ -54,6 +54,7 @@ import {
   fontWeights,
 } from "@blendi/shared";
 
+import { useColors } from "../hooks/useColors";
 import { api } from "../config/api";
 import { CACHE_CONFIG, QUERY_KEYS } from "../config/cache.config";
 import { PRICING_CONFIG } from "../config/pricing.config";
@@ -80,6 +81,7 @@ import {
   type EditSettingValue,
 } from "../components/me/EditSettingSheet";
 import { calculateUserBadges, type UserBadge } from "../utils/badges.utils";
+import { useThemeStore, type ThemeMode } from "../store/theme.store";
 import {
   useNotificationPreferences,
   type NotificationPrefKey,
@@ -105,21 +107,12 @@ import axios from "axios";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
-const DIVIDER_COLOR = colors.overlay.plum[6];
 const SWITCH_TRACK_FALSE = colors.overlay.pulse[30];
-const SWITCH_UNDERLAY = colors.overlay.plum[4];
-const VALUE_COLOR = colors.overlay.plum[55];
-const CHEVRON_COLOR = colors.overlay.plum[30];
-const PLAN_BADGE_FREE_BG = colors.overlay.plum[8];
-const PLAN_BADGE_FREE_BORDER = colors.overlay.plum[12];
 const PLAN_BADGE_PRO_BG = colors.overlay.pulse[25];
 const PLAN_BADGE_PRO_BORDER = colors.overlay.pulse[40];
 const UPGRADE_CARD_BG = colors.overlay.pulse[12];
 const UPGRADE_CARD_BORDER = colors.overlay.pulse[35];
 const LONGEST_STREAK_COLOR = colors.overlay.warning[90];
-const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[8];
 const LEVEL_NEXT_COPY_OPACITY = 0.6;
 const LABEL_OPACITY = 0.55;
 const VERSION_OPACITY = 0.35;
@@ -133,10 +126,6 @@ const PROFILE_PHOTO_COMPRESSION = 0.7;
 const PROFILE_PHOTO_MAX_FILE_BYTES = 300 * 1024;
 const PROFILE_PHOTO_FILE_TYPE = "jpeg" as const;
 const PROFILE_PHOTO_MIME_TYPE = "image/jpeg";
-const HEADER_ACTION_BACKGROUND = colors.overlay.plum[6];
-const HEADER_ACTION_BORDER = colors.overlay.plum[12];
-const HEADER_ACTION_ICON_COLOR = colors.overlay.plum[92];
-const PROFILE_PHOTO_LOADING_OVERLAY = colors.overlay.plum[28];
 const WEEKLY_SHARE_DELAY = 240;
 
 const ONBOARDING_KEY = "onboarding_completed";
@@ -170,6 +159,38 @@ interface SwitchRowProps {
 }
 
 function SwitchRow({ label, description, value, onValueChange }: SwitchRowProps) {
+  const colors = useColors();
+
+  const switchRowStyles = StyleSheet.create({
+    row: {
+      minHeight: 68,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      gap: 12,
+    },
+    content: {
+      flex: 1,
+      gap: 2,
+    },
+    label: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      lineHeight: 20,
+    },
+    description: {
+      color: colors.overlay.plum[55],
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 18,
+    },
+  });
+
   return (
     <View style={switchRowStyles.row}>
       <View style={switchRowStyles.content}>
@@ -187,36 +208,6 @@ function SwitchRow({ label, description, value, onValueChange }: SwitchRowProps)
     </View>
   );
 }
-
-const switchRowStyles = StyleSheet.create({
-  row: {
-    minHeight: 68,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    gap: 12,
-  },
-  content: {
-    flex: 1,
-    gap: 2,
-  },
-  label: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    lineHeight: 20,
-  },
-  description: {
-    color: VALUE_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    lineHeight: 18,
-  },
-});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -440,6 +431,7 @@ function getProfilePhotoActionCopy(
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, locale, changeLocale } = useAppTranslation();
   const { formatCount } = useFormatNumbers();
@@ -465,6 +457,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const levelProgressAnim = useRef(new Animated.Value(levelInfo.progress)).current;
 
   // ── Local state ──────────────────────────────────────────────────────────
+
+  const themeMode = useThemeStore((state) => state.mode);
+  const setThemeMode = useThemeStore((state) => state.setMode);
 
   const [editingType, setEditingType] = useState<EditSettingType | null>(null);
   const [selectedBadge, setSelectedBadge] = useState<UserBadge | null>(null);
@@ -667,6 +662,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         return displayUnitSystem;
       case "language":
         return displayLanguage;
+      case "theme":
+        return themeMode;
     }
   }
 
@@ -675,6 +672,15 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const handleConfirmEdit = useCallback(
     async (nextValue: EditSettingValue) => {
       if (!editingType) return;
+
+      // Tema é preferência 100% local — sem campo no backend (ver
+      // updateUserSchema em packages/shared/src/schemas/user.ts) e sem
+      // chamada de API, ao contrário de unitSystem/language.
+      if (editingType === "theme") {
+        setThemeMode(nextValue as ThemeMode);
+        setEditingType(null);
+        return;
+      }
 
       let body: Record<string, unknown>;
       switch (editingType) {
@@ -762,7 +768,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         setEditingType(null);
       }
     },
-    [editingType, queryClient, updateUserProfile, changeLocale, t],
+    [editingType, queryClient, updateUserProfile, changeLocale, t, setThemeMode],
   );
 
   const handleUploadProcessedProfilePhoto = useCallback(
@@ -1051,6 +1057,435 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     weeklySupplementQueryKey,
   ]);
 
+  // ── Cores dependentes de tema ────────────────────────────────────────────
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+  const DIVIDER_COLOR = colors.overlay.plum[6];
+  const SWITCH_UNDERLAY = colors.overlay.plum[4];
+  const VALUE_COLOR = colors.overlay.plum[55];
+  const CHEVRON_COLOR = colors.overlay.plum[30];
+  const PLAN_BADGE_FREE_BG = colors.overlay.plum[8];
+  const PLAN_BADGE_FREE_BORDER = colors.overlay.plum[12];
+  const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[8];
+  const HEADER_ACTION_BACKGROUND = colors.overlay.plum[6];
+  const HEADER_ACTION_BORDER = colors.overlay.plum[12];
+  const HEADER_ACTION_ICON_COLOR = colors.overlay.plum[92];
+  const PROFILE_PHOTO_LOADING_OVERLAY = colors.overlay.plum[28];
+
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    scrollContent: {
+      paddingBottom: 48,
+    },
+
+    // ── Header
+    header: {
+      paddingHorizontal: 24,
+      width: "100%",
+      alignItems: "center",
+    },
+    headerActionsRow: {
+      width: "100%",
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      marginBottom: 12,
+    },
+    headerActionsLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    headerActionButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: HEADER_ACTION_BACKGROUND,
+      borderWidth: 1,
+      borderColor: HEADER_ACTION_BORDER,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerActionButtonPressed: {
+      opacity: 0.8,
+    },
+    headerActionButtonDisabled: {
+      opacity: 0.72,
+    },
+    photoWrapper: {
+      width: 116,
+      height: 96,
+      alignSelf: "center",
+      alignItems: "center",
+      justifyContent: "flex-start",
+    },
+    photoTouchable: {
+      width: PROFILE_PHOTO_SIZE,
+      height: PROFILE_PHOTO_SIZE,
+    },
+    photo: {
+      width: PROFILE_PHOTO_SIZE,
+      height: PROFILE_PHOTO_SIZE,
+      borderRadius: PROFILE_PHOTO_SIZE / 2,
+      borderWidth: 2,
+      borderColor: colors.brand.pulse,
+    },
+    photoLoadingOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      width: PROFILE_PHOTO_SIZE,
+      height: PROFILE_PHOTO_SIZE,
+      borderRadius: PROFILE_PHOTO_SIZE / 2,
+      backgroundColor: PROFILE_PHOTO_LOADING_OVERLAY,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    photoCameraBadge: {
+      position: "absolute",
+      right: 0,
+      bottom: 0,
+      width: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
+      height: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
+      borderRadius: PROFILE_PHOTO_CAMERA_BADGE_SIZE / 2,
+      backgroundColor: colors.brand.pulse,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    planBadge: {
+      position: "absolute",
+      right: 0,
+      bottom: 4,
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderWidth: 1,
+    },
+    planBadgeFree: {
+      backgroundColor: PLAN_BADGE_FREE_BG,
+      borderColor: PLAN_BADGE_FREE_BORDER,
+    },
+    planBadgePro: {
+      backgroundColor: PLAN_BADGE_PRO_BG,
+      borderColor: PLAN_BADGE_PRO_BORDER,
+    },
+    planBadgeText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.medium,
+    },
+    displayName: {
+      marginTop: 12,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.xl,
+      fontWeight: fontWeights.bold,
+      textAlign: "center",
+    },
+    displayEmail: {
+      marginTop: 4,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      textAlign: "center",
+    },
+    memberSince: {
+      marginTop: 4,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      textAlign: "center",
+      opacity: LABEL_OPACITY,
+    },
+
+    // ── Stats
+    statsSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    statsGrid: {
+      gap: 10,
+    },
+    statsRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+
+    // ── Level progress
+    levelSection: {
+      marginTop: 16,
+      paddingHorizontal: 16,
+    },
+    levelCard: {
+      backgroundColor: CARD_BACKGROUND,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      borderRadius: 16,
+      padding: 16,
+    },
+    levelCardName: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+    },
+    levelProgressTrack: {
+      marginTop: 10,
+      width: '100%',
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    levelProgressFill: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.brand.pulse,
+    },
+    levelNextCopy: {
+      marginTop: 6,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      opacity: LEVEL_NEXT_COPY_OPACITY,
+    },
+
+    // ── Badges
+    badgesSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    sectionTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.bold,
+    },
+    badgesSubtitle: {
+      marginTop: 4,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      opacity: LABEL_OPACITY,
+    },
+    badgeList: {
+      marginTop: 12,
+    },
+    badgeColumnWrapper: {
+      gap: 10,
+      marginBottom: 10,
+    },
+
+    // ── Notification preferences
+    notificationsSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    notificationsSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 8,
+    },
+    notificationsSectionTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+    },
+    timeRowTouchable: {
+      borderRadius: 12,
+    },
+    timeRow: {
+      minHeight: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      paddingHorizontal: 12,
+    },
+    timeRowLabel: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      lineHeight: 20,
+    },
+    timeRowValue: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      maxWidth: "52%",
+    },
+    timeRowValueText: {
+      color: VALUE_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.regular,
+      lineHeight: 20,
+      textAlign: "right",
+    },
+
+    // ── Settings
+    settingsSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    settingsCard: {
+      backgroundColor: CARD_BACKGROUND,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      borderRadius: borderRadius.lg,
+      overflow: "hidden",
+    },
+    settingsTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.bold,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    divider: {
+      height: 0.5,
+      backgroundColor: DIVIDER_COLOR,
+      marginHorizontal: 16,
+    },
+
+    // ── Upgrade
+    upgradeSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    upgradeCard: {
+      backgroundColor: UPGRADE_CARD_BG,
+      borderWidth: 1,
+      borderColor: UPGRADE_CARD_BORDER,
+      borderRadius: borderRadius.lg,
+      padding: 20,
+      gap: 12,
+    },
+    upgradeTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+    },
+    benefitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    benefitText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      flex: 1,
+    },
+    upgradePrice: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      opacity: PRICE_OPACITY,
+    },
+    restoreButton: {
+      alignSelf: "center",
+      paddingTop: 2,
+      paddingBottom: 4,
+      paddingHorizontal: 8,
+    },
+    restoreButtonText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+
+    // ── Pro card
+    proSection: {
+      marginTop: 24,
+      paddingHorizontal: 16,
+    },
+    proCard: {
+      backgroundColor: CARD_BACKGROUND,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      borderRadius: borderRadius.lg,
+      padding: 16,
+    },
+    proRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    proTextBlock: {
+      flex: 1,
+    },
+    proTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+    proDescription: {
+      marginTop: 2,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      opacity: LABEL_OPACITY,
+    },
+
+    // ── Footer
+    footer: {
+      marginTop: 32,
+      paddingHorizontal: 24,
+      alignItems: "center",
+    },
+    signOutButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    signOutText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+    versionText: {
+      marginTop: 24,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: VERSION_OPACITY,
+    },
+    legalRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    legalLink: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: TERMS_OPACITY,
+      textDecorationLine: "underline",
+    },
+    legalSeparator: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: TERMS_OPACITY,
+    },
+  });
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -1337,6 +1772,13 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               value={languageDisplayName}
               onPress={() => { setEditingType("language"); }}
             />
+            <View style={styles.divider} />
+
+            <SettingRow
+              label={t("me.theme.label")}
+              value={t(themeMode === "dark" ? "me.theme.dark" : "me.theme.light")}
+              onPress={() => { setEditingType("theme"); }}
+            />
           </View>
         </View>
 
@@ -1559,418 +2001,3 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  scrollContent: {
-    paddingBottom: 48,
-  },
-
-  // ── Header
-  header: {
-    paddingHorizontal: 24,
-    width: "100%",
-    alignItems: "center",
-  },
-  headerActionsRow: {
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    marginBottom: 12,
-  },
-  headerActionsLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  headerActionButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: HEADER_ACTION_BACKGROUND,
-    borderWidth: 1,
-    borderColor: HEADER_ACTION_BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerActionButtonPressed: {
-    opacity: 0.8,
-  },
-  headerActionButtonDisabled: {
-    opacity: 0.72,
-  },
-  photoWrapper: {
-    width: 116,
-    height: 96,
-    alignSelf: "center",
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  photoTouchable: {
-    width: PROFILE_PHOTO_SIZE,
-    height: PROFILE_PHOTO_SIZE,
-  },
-  photo: {
-    width: PROFILE_PHOTO_SIZE,
-    height: PROFILE_PHOTO_SIZE,
-    borderRadius: PROFILE_PHOTO_SIZE / 2,
-    borderWidth: 2,
-    borderColor: colors.brand.pulse,
-  },
-  photoLoadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: PROFILE_PHOTO_SIZE,
-    height: PROFILE_PHOTO_SIZE,
-    borderRadius: PROFILE_PHOTO_SIZE / 2,
-    backgroundColor: PROFILE_PHOTO_LOADING_OVERLAY,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  photoCameraBadge: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    width: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
-    height: PROFILE_PHOTO_CAMERA_BADGE_SIZE,
-    borderRadius: PROFILE_PHOTO_CAMERA_BADGE_SIZE / 2,
-    backgroundColor: colors.brand.pulse,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  planBadge: {
-    position: "absolute",
-    right: 0,
-    bottom: 4,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-  },
-  planBadgeFree: {
-    backgroundColor: PLAN_BADGE_FREE_BG,
-    borderColor: PLAN_BADGE_FREE_BORDER,
-  },
-  planBadgePro: {
-    backgroundColor: PLAN_BADGE_PRO_BG,
-    borderColor: PLAN_BADGE_PRO_BORDER,
-  },
-  planBadgeText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.medium,
-  },
-  displayName: {
-    marginTop: 12,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.xl,
-    fontWeight: fontWeights.bold,
-    textAlign: "center",
-  },
-  displayEmail: {
-    marginTop: 4,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    textAlign: "center",
-  },
-  memberSince: {
-    marginTop: 4,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    textAlign: "center",
-    opacity: LABEL_OPACITY,
-  },
-
-  // ── Stats
-  statsSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  statsGrid: {
-    gap: 10,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-
-  // ── Level progress
-  levelSection: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-  },
-  levelCard: {
-    backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    borderRadius: 16,
-    padding: 16,
-  },
-  levelCardName: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-  },
-  levelProgressTrack: {
-    marginTop: 10,
-    width: '100%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  levelProgressFill: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.brand.pulse,
-  },
-  levelNextCopy: {
-    marginTop: 6,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    opacity: LEVEL_NEXT_COPY_OPACITY,
-  },
-
-  // ── Badges
-  badgesSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-  },
-  badgesSubtitle: {
-    marginTop: 4,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    opacity: LABEL_OPACITY,
-  },
-  badgeList: {
-    marginTop: 12,
-  },
-  badgeColumnWrapper: {
-    gap: 10,
-    marginBottom: 10,
-  },
-
-  // ── Notification preferences
-  notificationsSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  notificationsSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  notificationsSectionTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-  },
-  timeRowTouchable: {
-    borderRadius: 12,
-  },
-  timeRow: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 12,
-  },
-  timeRowLabel: {
-    flex: 1,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    lineHeight: 20,
-  },
-  timeRowValue: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    maxWidth: "52%",
-  },
-  timeRowValueText: {
-    color: VALUE_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.regular,
-    lineHeight: 20,
-    textAlign: "right",
-  },
-
-  // ── Settings
-  settingsSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  settingsCard: {
-    backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    borderRadius: borderRadius.lg,
-    overflow: "hidden",
-  },
-  settingsTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.bold,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: DIVIDER_COLOR,
-    marginHorizontal: 16,
-  },
-
-  // ── Upgrade
-  upgradeSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  upgradeCard: {
-    backgroundColor: UPGRADE_CARD_BG,
-    borderWidth: 1,
-    borderColor: UPGRADE_CARD_BORDER,
-    borderRadius: borderRadius.lg,
-    padding: 20,
-    gap: 12,
-  },
-  upgradeTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-  },
-  benefitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  benefitText: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    flex: 1,
-  },
-  upgradePrice: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    opacity: PRICE_OPACITY,
-  },
-  restoreButton: {
-    alignSelf: "center",
-    paddingTop: 2,
-    paddingBottom: 4,
-    paddingHorizontal: 8,
-  },
-  restoreButtonText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.medium,
-  },
-
-  // ── Pro card
-  proSection: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  proCard: {
-    backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    borderRadius: borderRadius.lg,
-    padding: 16,
-  },
-  proRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  proTextBlock: {
-    flex: 1,
-  },
-  proTitle: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-  },
-  proDescription: {
-    marginTop: 2,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    opacity: LABEL_OPACITY,
-  },
-
-  // ── Footer
-  footer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-    alignItems: "center",
-  },
-  signOutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  signOutText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    fontWeight: fontWeights.medium,
-  },
-  versionText: {
-    marginTop: 24,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: VERSION_OPACITY,
-  },
-  legalRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  legalLink: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: TERMS_OPACITY,
-    textDecorationLine: "underline",
-  },
-  legalSeparator: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: TERMS_OPACITY,
-  },
-});

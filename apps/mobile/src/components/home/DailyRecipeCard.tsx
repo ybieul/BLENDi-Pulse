@@ -3,7 +3,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { PulseAiRecipe } from '@blendi/shared';
 
 import {
-  colors,
   fontSizes,
   fonts,
   fontWeights,
@@ -11,6 +10,7 @@ import {
 } from '@blendi/shared';
 import { AuthButton } from '../ui/AuthButton';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
@@ -39,8 +39,6 @@ export interface DailyRecipeCardProps {
   onStartBlend: (recipe: PulseAiRecipe) => void;
 }
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
 const MACRO_OPACITY = 0.7;
 const META_OPACITY = 0.6;
 
@@ -103,6 +101,10 @@ const DAILY_RECIPES: Record<UserGoal, DailyRecipe> = {
 const SECONDS_PER_MINUTE = 60;
 
 export function DailyRecipeCard({ goal, onStartBlend }: DailyRecipeCardProps) {
+  const colors = useColors();
+  const CARD_BACKGROUND = colors.overlay.plum[7];
+  const CARD_BORDER = colors.overlay.plum[10];
+
   const { t } = useAppTranslation();
   const recipe = DAILY_RECIPES[goal];
 
@@ -127,6 +129,64 @@ export function DailyRecipeCard({ goal, onStartBlend }: DailyRecipeCardProps) {
 
     onStartBlend(pulseAiRecipe);
   }, [onStartBlend, recipe, t]);
+
+  const styles = StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+      padding: spacing.xl,
+      overflow: 'hidden',
+    },
+    badge: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+      marginBottom: spacing.md,
+    },
+    recipeName: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      lineHeight: 24,
+      marginBottom: spacing.md,
+    },
+    macrosRow: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      opacity: MACRO_OPACITY,
+      lineHeight: 18,
+      marginBottom: spacing.sm,
+    },
+    timeEstimate: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      opacity: META_OPACITY,
+      lineHeight: 18,
+    },
+    footer: {
+      marginTop: spacing.lg,
+      alignItems: 'flex-end',
+    },
+    ctaButton: {
+      height: 36,
+      paddingHorizontal: spacing.lg,
+      minWidth: 132,
+    },
+    ctaLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
 
   return (
     <View style={styles.card}>
@@ -158,61 +218,3 @@ export function DailyRecipeCard({ goal, onStartBlend }: DailyRecipeCardProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: spacing.xl,
-    overflow: 'hidden',
-  },
-  badge: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-    marginBottom: spacing.md,
-  },
-  recipeName: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    lineHeight: 24,
-    marginBottom: spacing.md,
-  },
-  macrosRow: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    opacity: MACRO_OPACITY,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  timeEstimate: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.regular,
-    opacity: META_OPACITY,
-    lineHeight: 18,
-  },
-  footer: {
-    marginTop: spacing.lg,
-    alignItems: 'flex-end',
-  },
-  ctaButton: {
-    height: 36,
-    paddingHorizontal: spacing.lg,
-    minWidth: 132,
-  },
-  ctaLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.medium,
-  },
-});

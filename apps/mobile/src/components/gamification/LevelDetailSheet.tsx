@@ -18,13 +18,12 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useGamificationStore } from '../../store/gamification.store';
 
 const SHEET_RADIUS = 24;
-const HANDLE_COLOR = colors.overlay.plum[22];
 const BACKDROP_COLOR = colors.overlay.black[30];
-const TRACK_COLOR = colors.overlay.plum[8];
 const TOTAL_XP_OPACITY = 0.65;
 const XP_RANGE_OPACITY = 0.45;
 const NEXT_LEVEL_COPY_OPACITY = 0.6;
@@ -35,6 +34,10 @@ export interface LevelDetailSheetProps {
 }
 
 export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
+  const colors = useColors();
+  const HANDLE_COLOR = colors.overlay.plum[22];
+  const TRACK_COLOR = colors.overlay.plum[8];
+
   const { t } = useAppTranslation();
   const { formatCount } = useFormatNumbers();
   const { height } = useWindowDimensions();
@@ -122,6 +125,98 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
     };
   }, [levelInfo.progress, progressAnimation, visible]);
 
+  const styles = StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: BACKDROP_COLOR,
+    },
+    sheetContainer: {
+      borderTopLeftRadius: SHEET_RADIUS,
+      borderTopRightRadius: SHEET_RADIUS,
+      backgroundColor: colors.background.secondary,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: HANDLE_COLOR,
+      marginTop: 16,
+    },
+    content: {
+      padding: 24,
+      alignItems: 'center',
+    },
+    levelNumber: {
+      marginTop: 16,
+      color: colors.brand.pulse,
+      fontFamily: fonts.display,
+      fontSize: 52,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -3,
+      textAlign: 'center',
+    },
+    levelName: {
+      marginTop: 6,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    totalXP: {
+      marginTop: 12,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+      opacity: TOTAL_XP_OPACITY,
+    },
+    progressSection: {
+      marginTop: 16,
+      width: '100%',
+    },
+    progressTrack: {
+      width: '100%',
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: TRACK_COLOR,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.brand.pulse,
+    },
+    xpRangeRow: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    xpRangeLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 11,
+      fontWeight: fontWeights.regular,
+      opacity: XP_RANGE_OPACITY,
+    },
+    nextLevelCopy: {
+      marginTop: 12,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+      opacity: NEXT_LEVEL_COPY_OPACITY,
+    },
+  });
+
   if (!isMounted) {
     return null;
   }
@@ -146,7 +241,7 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
           <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} />
         </Pressable>
 
-        <Animated.View style={[styles.sheetContainer, { transform: [{ translateY }] }]}> 
+        <Animated.View style={[styles.sheetContainer, { transform: [{ translateY }] }]}>
           <View style={styles.handle} />
 
           <View style={styles.content}>
@@ -178,95 +273,3 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: BACKDROP_COLOR,
-  },
-  sheetContainer: {
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    backgroundColor: colors.background.secondary,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: HANDLE_COLOR,
-    marginTop: 16,
-  },
-  content: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  levelNumber: {
-    marginTop: 16,
-    color: colors.brand.pulse,
-    fontFamily: fonts.display,
-    fontSize: 52,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -3,
-    textAlign: 'center',
-  },
-  levelName: {
-    marginTop: 6,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  totalXP: {
-    marginTop: 12,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-    textAlign: 'center',
-    opacity: TOTAL_XP_OPACITY,
-  },
-  progressSection: {
-    marginTop: 16,
-    width: '100%',
-  },
-  progressTrack: {
-    width: '100%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: TRACK_COLOR,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.brand.pulse,
-  },
-  xpRangeRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  xpRangeLabel: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 11,
-    fontWeight: fontWeights.regular,
-    opacity: XP_RANGE_OPACITY,
-  },
-  nextLevelCopy: {
-    marginTop: 12,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-    opacity: NEXT_LEVEL_COPY_OPACITY,
-  },
-});

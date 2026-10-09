@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   title: {
     alignSelf: 'center',
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.display,
     fontWeight: fontWeights.bold,
     letterSpacing: -1.4,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   macroValue: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontWeight: fontWeights.bold,
   },
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     flex: 1,
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontFamily: fonts.body,
     fontSize: 14,
     fontWeight: fontWeights.medium,

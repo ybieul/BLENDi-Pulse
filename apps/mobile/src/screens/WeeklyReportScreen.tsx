@@ -20,6 +20,7 @@ import {
   type WeeklyShareCardProps,
 } from '../components/shareCards/WeeklyShareCard';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { useDateFormat } from '../hooks/useDateFormat';
 import { useUnits } from '../hooks/useUnits';
 import { QUERY_KEYS } from '../config/cache.config';
@@ -33,27 +34,17 @@ type WeeklyReportScreenProps = NativeStackScreenProps<RootStackParamList, 'Weekl
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 type PendingShare = Omit<WeeklyShareCardProps, 'user'>;
 
-const CARD_BACKGROUND = colors.overlay.plum[7];
-const CARD_BORDER = colors.overlay.plum[10];
-const SUBTITLE_COLOR = colors.overlay.plum[65];
 const HYDRATION_ICON_COLOR = colors.overlay.info[80];
 const SUPPLEMENT_ICON_COLOR = colors.overlay.success[80];
 const GAMIFICATION_ICON_COLOR = colors.overlay.warning[85];
 const LEVEL_UP_BACKGROUND = colors.overlay.pulse[15];
-const EMPTY_ICON_COLOR = colors.overlay.plum[35];
 const POSITIVE_COLOR = colors.overlay.success[95];
 const NEGATIVE_COLOR = colors.overlay.warning[95];
-const PROGRESS_TRACK_COLOR = colors.overlay.plum[8];
 const CHEVRON_DISABLED_OPACITY = 0.3;
 const SHARE_DELAY_MS = 300;
 const PAYWALL_BORDER_COLOR = colors.overlay.warning[60];
-const PAYWALL_BACKGROUND = colors.overlay.plum[95];
 const PAYWALL_BADGE_BACKGROUND = colors.feedback.warning;
 const PAYWALL_BADGE_TEXT_COLOR = colors.premium.textOnGold;
-const SUBTLE_BUTTON_BACKGROUND = colors.overlay.plum[5];
-const SUBTLE_BUTTON_BORDER = colors.overlay.plum[12];
-const SHARE_BUTTON_BACKGROUND = colors.overlay.plum[6];
-const RETRY_BUTTON_BORDER = colors.overlay.plum[14];
 const ERROR_BACKGROUND = colors.overlay.error[6];
 const ERROR_BORDER = colors.overlay.error[18];
 
@@ -78,16 +69,55 @@ interface SectionCardProps {
 }
 
 function SectionCard({ icon, iconColor, title, children }: SectionCardProps) {
+  const colors = useColors();
+
+  const cardStyles = StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[7],
+      padding: 16,
+      marginBottom: 12,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    cardTitle: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 15,
+      color: colors.text.primary,
+    },
+  });
+
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
+    <View style={cardStyles.card}>
+      <View style={cardStyles.cardHeader}>
         <Ionicons name={icon} size={18} color={iconColor} />
-        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={cardStyles.cardTitle}>{title}</Text>
       </View>
       {children}
     </View>
   );
 }
+
+const noThemeStyles = StyleSheet.create({
+  comparisonText: {
+    fontFamily: fonts.body,
+    fontWeight: fontWeights.medium,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  skeletonCard: {
+    height: 140,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+});
 
 function ComparisonRow({ deltaPercent }: { deltaPercent: number }) {
   const { t } = useAppTranslation();
@@ -95,7 +125,7 @@ function ComparisonRow({ deltaPercent }: { deltaPercent: number }) {
   const roundedAbs = Math.round(Math.abs(deltaPercent));
 
   return (
-    <Text style={[styles.comparisonText, { color: isPositive ? POSITIVE_COLOR : NEGATIVE_COLOR }]}>
+    <Text style={[noThemeStyles.comparisonText, { color: isPositive ? POSITIVE_COLOR : NEGATIVE_COLOR }]}>
       {isPositive
         ? t('weeklyReport.comparisonUp', { amount: `${roundedAbs}%` })
         : t('weeklyReport.comparisonDown', { amount: `-${roundedAbs}%` })}
@@ -106,9 +136,9 @@ function ComparisonRow({ deltaPercent }: { deltaPercent: number }) {
 function ReportSkeleton() {
   return (
     <View>
-      <SkeletonLoader variant="card" style={styles.skeletonCard} />
-      <SkeletonLoader variant="card" style={styles.skeletonCard} />
-      <SkeletonLoader variant="card" style={styles.skeletonCard} />
+      <SkeletonLoader variant="card" style={noThemeStyles.skeletonCard} />
+      <SkeletonLoader variant="card" style={noThemeStyles.skeletonCard} />
+      <SkeletonLoader variant="card" style={noThemeStyles.skeletonCard} />
     </View>
   );
 }
@@ -119,11 +149,42 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ title, subtitle }: EmptyStateProps) {
+  const colors = useColors();
+
+  const emptyStyles = StyleSheet.create({
+    emptyState: {
+      marginTop: 24,
+      paddingVertical: 32,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[7],
+      alignItems: 'center',
+    },
+    emptyTitle: {
+      marginTop: 14,
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    emptySubtitle: {
+      marginTop: 6,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.overlay.plum[65],
+      textAlign: 'center',
+    },
+  });
+
   return (
-    <View style={styles.emptyState}>
-      <Ionicons name="bar-chart-outline" size={48} color={EMPTY_ICON_COLOR} />
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySubtitle}>{subtitle}</Text>
+    <View style={emptyStyles.emptyState}>
+      <Ionicons name="bar-chart-outline" size={48} color={colors.overlay.plum[35]} />
+      <Text style={emptyStyles.emptyTitle}>{title}</Text>
+      <Text style={emptyStyles.emptySubtitle}>{subtitle}</Text>
     </View>
   );
 }
@@ -133,20 +194,64 @@ interface ErrorStateProps {
 }
 
 function ErrorState({ onRetry }: ErrorStateProps) {
+  const colors = useColors();
   const { t } = useAppTranslation();
 
+  const errorStyles = StyleSheet.create({
+    errorState: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      marginTop: 12,
+      backgroundColor: ERROR_BACKGROUND,
+      borderWidth: 1,
+      borderColor: ERROR_BORDER,
+      borderRadius: 12,
+    },
+    errorText: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      color: colors.overlay.plum[65],
+    },
+    retryButton: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      backgroundColor: colors.overlay.plum[7],
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[14],
+      borderRadius: 8,
+    },
+    retryText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 12,
+      color: colors.text.primary,
+    },
+  });
+
   return (
-    <View style={styles.errorState}>
+    <View style={errorStyles.errorState}>
       <Ionicons name="alert-circle-outline" size={20} color={NEGATIVE_COLOR} />
-      <Text style={styles.errorText}>{t('history.loadError')}</Text>
-      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-        <Text style={styles.retryText}>{t('common.actions.retry')}</Text>
+      <Text style={errorStyles.errorText}>{t('history.loadError')}</Text>
+      <Pressable accessibilityRole="button" onPress={onRetry} style={errorStyles.retryButton}>
+        <Text style={errorStyles.retryText}>{t('common.actions.retry')}</Text>
       </Pressable>
     </View>
   );
 }
 
 export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
+  const colors = useColors();
+  const SUBTITLE_COLOR = colors.overlay.plum[65];
+  const PROGRESS_TRACK_COLOR = colors.overlay.plum[8];
+  const PAYWALL_BACKGROUND = colors.overlay.plum[95];
+  const SUBTLE_BUTTON_BACKGROUND = colors.overlay.plum[5];
+  const SUBTLE_BUTTON_BORDER = colors.overlay.plum[12];
+  const SHARE_BUTTON_BACKGROUND = colors.overlay.plum[6];
+
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const { formatShortDate, formatWeekdayShort } = useDateFormat();
@@ -267,6 +372,202 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
   const showEmptyNoReports = !datesQuery.isLoading && dates.length === 0;
   const showReportNotFound = reportQuery.isError && isNotFoundError(reportQuery.error);
   const showReportError = reportQuery.isError && !isNotFoundError(reportQuery.error);
+
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    contentContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 32,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 16,
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: SUBTLE_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: SUBTLE_BUTTON_BORDER,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 18,
+      color: colors.text.primary,
+    },
+    weekSelector: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    chevronButton: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chevronDisabled: {
+      opacity: CHEVRON_DISABLED_OPACITY,
+    },
+    weekRangeText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 14,
+      color: colors.text.primary,
+    },
+    bigNumber: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 28,
+      color: colors.text.primary,
+    },
+    bigNumberLabel: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 13,
+      color: SUBTITLE_COLOR,
+      marginBottom: 10,
+    },
+    detailText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 13,
+      color: colors.text.primary,
+      opacity: 0.85,
+      marginBottom: 6,
+    },
+    progressTrack: {
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: PROGRESS_TRACK_COLOR,
+      overflow: 'hidden',
+      marginBottom: 10,
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: colors.brand.pulse,
+    },
+    chartContainer: {
+      overflow: 'hidden',
+      marginBottom: 10,
+      alignItems: 'center',
+    },
+    supplementRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    supplementInfo: {
+      flex: 1,
+    },
+    levelUpCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 4,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: LEVEL_UP_BACKGROUND,
+    },
+    levelUpText: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 13,
+      color: colors.text.primary,
+    },
+    streakBrokenText: {
+      marginTop: 8,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 12,
+      color: SUBTITLE_COLOR,
+    },
+    shareButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      height: 48,
+      borderRadius: 12,
+      backgroundColor: SHARE_BUTTON_BACKGROUND,
+      borderWidth: 1,
+      borderColor: SUBTLE_BUTTON_BORDER,
+      marginTop: 4,
+    },
+    shareButtonLocked: {
+      opacity: 0.4,
+    },
+    shareButtonText: {
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.medium,
+      fontSize: 14,
+      color: colors.text.primary,
+    },
+    blurredCluster: {
+      position: 'relative',
+    },
+    paywallOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    paywallCard: {
+      width: '100%',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: PAYWALL_BORDER_COLOR,
+      backgroundColor: PAYWALL_BACKGROUND,
+      padding: 24,
+      alignItems: 'center',
+    },
+    paywallBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: PAYWALL_BADGE_BACKGROUND,
+      marginBottom: 12,
+    },
+    paywallBadgeText: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 14,
+      color: PAYWALL_BADGE_TEXT_COLOR,
+    },
+    paywallTitle: {
+      fontFamily: fonts.display,
+      fontWeight: fontWeights.bold,
+      fontSize: 18,
+      color: colors.text.primary,
+      textAlign: 'center',
+    },
+    paywallSubtitle: {
+      marginTop: 8,
+      marginBottom: 16,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.regular,
+      fontSize: 14,
+      color: colors.text.primary,
+      opacity: 0.7,
+      textAlign: 'center',
+    },
+    paywallButton: {
+      width: '100%',
+    },
+  });
 
   const restCards = report ? (
     <>
@@ -486,288 +787,3 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  contentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: SUBTLE_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: SUBTLE_BUTTON_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 18,
-    color: colors.text.primary,
-  },
-  weekSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  chevronButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chevronDisabled: {
-    opacity: CHEVRON_DISABLED_OPACITY,
-  },
-  weekRangeText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    padding: 16,
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 15,
-    color: colors.text.primary,
-  },
-  bigNumber: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 28,
-    color: colors.text.primary,
-  },
-  bigNumberLabel: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 13,
-    color: SUBTITLE_COLOR,
-    marginBottom: 10,
-  },
-  detailText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 13,
-    color: colors.text.primary,
-    opacity: 0.85,
-    marginBottom: 6,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: PROGRESS_TRACK_COLOR,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: colors.brand.pulse,
-  },
-  comparisonText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  chartContainer: {
-    overflow: 'hidden',
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  supplementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  supplementInfo: {
-    flex: 1,
-  },
-  levelUpCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: LEVEL_UP_BACKGROUND,
-  },
-  levelUpText: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
-  streakBrokenText: {
-    marginTop: 8,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 12,
-    color: SUBTITLE_COLOR,
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: SHARE_BUTTON_BACKGROUND,
-    borderWidth: 1,
-    borderColor: SUBTLE_BUTTON_BORDER,
-    marginTop: 4,
-  },
-  shareButtonLocked: {
-    opacity: 0.4,
-  },
-  shareButtonText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  skeletonCard: {
-    height: 140,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  emptyState: {
-    marginTop: 24,
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: CARD_BORDER,
-    backgroundColor: CARD_BACKGROUND,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    marginTop: 14,
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  emptySubtitle: {
-    marginTop: 6,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 13,
-    lineHeight: 18,
-    color: SUBTITLE_COLOR,
-    textAlign: 'center',
-  },
-  errorState: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: ERROR_BACKGROUND,
-    borderWidth: 1,
-    borderColor: ERROR_BORDER,
-    borderRadius: 12,
-  },
-  errorText: {
-    flex: 1,
-    fontFamily: fonts.body,
-    fontSize: 13,
-    color: SUBTITLE_COLOR,
-  },
-  retryButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: CARD_BACKGROUND,
-    borderWidth: 1,
-    borderColor: RETRY_BUTTON_BORDER,
-    borderRadius: 8,
-  },
-  retryText: {
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.medium,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-  blurredCluster: {
-    position: 'relative',
-  },
-  paywallOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  paywallCard: {
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: PAYWALL_BORDER_COLOR,
-    backgroundColor: PAYWALL_BACKGROUND,
-    padding: 24,
-    alignItems: 'center',
-  },
-  paywallBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: PAYWALL_BADGE_BACKGROUND,
-    marginBottom: 12,
-  },
-  paywallBadgeText: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 14,
-    color: PAYWALL_BADGE_TEXT_COLOR,
-  },
-  paywallTitle: {
-    fontFamily: fonts.display,
-    fontWeight: fontWeights.bold,
-    fontSize: 18,
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
-  paywallSubtitle: {
-    marginTop: 8,
-    marginBottom: 16,
-    fontFamily: fonts.body,
-    fontWeight: fontWeights.regular,
-    fontSize: 14,
-    color: colors.text.primary,
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  paywallButton: {
-    width: '100%',
-  },
-});

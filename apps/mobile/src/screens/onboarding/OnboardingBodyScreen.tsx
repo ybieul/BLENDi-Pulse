@@ -29,6 +29,7 @@ import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
 import { useOnboardingStore } from '../../store/onboarding.store';
 
@@ -54,8 +55,6 @@ const FIELD_HEIGHT = 56;
 
 // Afasta o label de unidade do ícone de check que fica em right: 16 (tamanho 18)
 const UNIT_LABEL_RIGHT = spacing['5xl']; // 40
-const CHIP_BORDER_COLOR = `${colors.text.primary}26`;
-const CHIP_BACKGROUND_COLOR = `${colors.text.primary}0d`;
 const CHIP_SELECTED_BACKGROUND_COLOR = `${colors.brand.pulse}26`;
 
 type ActivityConfig = {
@@ -88,6 +87,10 @@ function getDefaultUnitSystem(): 'metric' | 'imperial' {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) {
+  const colors = useColors();
+  const CHIP_BORDER_COLOR = `${colors.text.primary}26`;
+  const CHIP_BACKGROUND_COLOR = `${colors.text.primary}0d`;
+
   const { t } = useAppTranslation();
   const selectedGoal = useOnboardingStore((state) => state.selectedGoal);
   const selectedUnitSystem = useOnboardingStore((state) => state.unitSystem);
@@ -246,6 +249,126 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     ? t('onboarding.heightPlaceholderImperial')
     : t('onboarding.heightPlaceholderMetric');
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    topContent: {
+      gap: spacing.lg,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['4xl'],
+      lineHeight: 48,
+    },
+    subtitle: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      lineHeight: 24,
+    },
+    fields: {
+      gap: spacing.md,
+    },
+    inputContainer: {
+      position: 'relative',
+    },
+    unitOverlay: {
+      position: 'absolute',
+      right: UNIT_LABEL_RIGHT,
+      top: 0,
+      height: FIELD_HEIGHT,
+      justifyContent: 'center',
+    },
+    unitText: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.mono,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+    },
+    imcContainer: {
+      minHeight: spacing['4xl'],
+      justifyContent: 'center',
+      paddingHorizontal: spacing.xs,
+    },
+    imcContent: {
+      gap: spacing.xs,
+    },
+    imcValue: {
+      color: colors.text.primary,
+      fontFamily: fonts.mono,
+      fontSize: fontSizes.lg,
+      fontWeight: fontWeights.semibold,
+    },
+    imcClassification: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    imcErrorContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    imcErrorText: {
+      flexShrink: 1,
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    imcRetryText: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.semibold,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    chip: {
+      flex: 1,
+      minWidth: 70,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      borderRadius: spacing['4xl'],
+      borderWidth: 1,
+      borderColor: CHIP_BORDER_COLOR,
+      backgroundColor: CHIP_BACKGROUND_COLOR,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chipSelected: {
+      borderColor: colors.brand.pulse,
+      backgroundColor: CHIP_SELECTED_BACKGROUND_COLOR,
+    },
+    chipLabel: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      textAlign: 'center',
+    },
+    chipLabelSelected: {
+      color: colors.text.primary,
+      fontWeight: fontWeights.medium,
+    },
+    bottomContent: {
+      gap: spacing.lg,
+    },
+    skipLink: {
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+    },
+    skipText: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+  });
+
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
       <OnboardingLayout
@@ -356,128 +479,3 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topContent: {
-    gap: spacing.lg,
-  },
-  title: {
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: fontSizes['4xl'],
-    lineHeight: 48,
-  },
-  subtitle: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.md,
-    lineHeight: 24,
-  },
-  fields: {
-    gap: spacing.md,
-  },
-  // Wrapper relativo para sobrepor o label de unidade sobre o AuthInput
-  inputContainer: {
-    position: 'relative',
-  },
-  // Label de unidade — absoluto dentro de inputContainer,
-  // alinhado à altura do fieldOuter (56px). Posicionado a 40px da direita
-  // para não colidir com o ícone de check (right: 16, tamanho 18).
-  unitOverlay: {
-    position: 'absolute',
-    right: UNIT_LABEL_RIGHT,
-    top: 0,
-    height: FIELD_HEIGHT,
-    justifyContent: 'center',
-  },
-  unitText: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.mono,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-  },
-  imcContainer: {
-    minHeight: spacing['4xl'],
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
-  },
-  imcContent: {
-    gap: spacing.xs,
-  },
-  imcValue: {
-    color: colors.text.primary,
-    fontFamily: fonts.mono,
-    fontSize: fontSizes.lg,
-    fontWeight: fontWeights.semibold,
-  },
-  // Classificação em cor secundária — sem cores alarmistas
-  imcClassification: {
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  imcErrorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  imcErrorText: {
-    flexShrink: 1,
-    color: colors.feedback.error,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-  imcRetryText: {
-    color: colors.brand.pulse,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-    fontWeight: fontWeights.semibold,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  chip: {
-    flex: 1,
-    minWidth: 70,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: spacing['4xl'],
-    borderWidth: 1,
-    borderColor: CHIP_BORDER_COLOR,
-    backgroundColor: CHIP_BACKGROUND_COLOR,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipSelected: {
-    borderColor: colors.brand.pulse,
-    backgroundColor: CHIP_SELECTED_BACKGROUND_COLOR,
-  },
-  chipLabel: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    textAlign: 'center',
-  },
-  chipLabelSelected: {
-    color: colors.text.primary,
-    fontWeight: fontWeights.medium,
-  },
-  bottomContent: {
-    gap: spacing.lg,
-  },
-  skipLink: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  skipText: {
-    color: colors.text.tertiary,
-    fontFamily: fonts.body,
-    fontSize: fontSizes.sm,
-  },
-});

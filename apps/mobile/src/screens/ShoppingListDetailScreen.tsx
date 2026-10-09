@@ -31,6 +31,7 @@ import { QUERY_KEYS } from '../config/cache.config';
 import { ImportFromFavoritesSheet } from '../components/shoppingList/ImportFromFavoritesSheet';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import type { TrackStackParamList } from '../navigation/types';
 import {
   clearCheckedItems,
@@ -43,19 +44,8 @@ import { markListDirty } from '../utils/shoppingListSync.utils';
 import { showToast } from '../utils/toast.utils';
 
 const DETAIL_STALE_TIME_MS = 30_000;
-const SKELETON_BG = colors.overlay.plum[5];
-const SKELETON_BORDER = colors.overlay.plum[8];
-const ROW_BACKGROUND = colors.overlay.plum[6];
-const ROW_BORDER = colors.overlay.plum[8];
 const EMPTY_ICON_COLOR = colors.overlay.pulse[35];
-const SECTION_TEXT_COLOR = colors.overlay.plum[50];
-const INPUT_BG = colors.overlay.plum[6];
-const INPUT_BORDER = colors.overlay.plum[18];
-const INPUT_PLACEHOLDER = colors.overlay.plum[35];
 const DELETE_ICON_COLOR = colors.overlay.error[65];
-const UNCHECKED_BORDER = colors.overlay.plum[25];
-const FOOTER_BORDER = colors.overlay.plum[8];
-const HEADER_ICON_COLOR = colors.overlay.plum[70];
 
 interface ShoppingListItemRowProps {
   item: ShoppingListItem;
@@ -64,6 +54,11 @@ interface ShoppingListItemRowProps {
 }
 
 function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowProps) {
+  const colors = useColors();
+  const ROW_BACKGROUND = colors.overlay.plum[6];
+  const ROW_BORDER = colors.overlay.plum[8];
+  const UNCHECKED_BORDER = colors.overlay.plum[25];
+
   const fillProgress = useRef(new Animated.Value(item.checked ? 1 : 0)).current;
   const iconScale = useRef(new Animated.Value(item.checked ? 1 : 0)).current;
 
@@ -87,18 +82,69 @@ function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowPr
 
   const quantity = item.quantity?.trim() ?? '';
 
+  const itemStyles = StyleSheet.create({
+    itemRowContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: ROW_BORDER,
+      backgroundColor: ROW_BACKGROUND,
+      padding: 14,
+    },
+    itemRowContainerChecked: {
+      opacity: 0.5,
+    },
+    itemCheckboxTouch: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    itemCheckbox: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    itemTextBlock: {
+      flex: 1,
+      marginHorizontal: spacing.lg,
+      minWidth: 0,
+    },
+    itemName: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.medium,
+    },
+    itemNameChecked: {
+      textDecorationLine: 'line-through',
+    },
+    itemQuantity: {
+      marginTop: spacing.xs,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      opacity: 0.55,
+    },
+    deleteButton: {
+      padding: spacing.md,
+      marginRight: -spacing.sm,
+    },
+  });
+
   return (
     <TouchableOpacity activeOpacity={0.88} onPress={() => onToggle(item.itemId)}>
-      <View style={[styles.itemRowContainer, item.checked && styles.itemRowContainerChecked]}>
+      <View style={[itemStyles.itemRowContainer, item.checked && itemStyles.itemRowContainerChecked]}>
         <TouchableOpacity
           accessibilityRole="button"
           activeOpacity={0.88}
           onPress={() => onToggle(item.itemId)}
-          style={styles.itemCheckboxTouch}
+          style={itemStyles.itemCheckboxTouch}
         >
           <Animated.View
             style={[
-              styles.itemCheckbox,
+              itemStyles.itemCheckbox,
               {
                 backgroundColor: fillProgress.interpolate({
                   inputRange: [0, 1],
@@ -121,13 +167,13 @@ function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowPr
           </Animated.View>
         </TouchableOpacity>
 
-        <View style={styles.itemTextBlock}>
-          <Text numberOfLines={1} style={[styles.itemName, item.checked && styles.itemNameChecked]}>
+        <View style={itemStyles.itemTextBlock}>
+          <Text numberOfLines={1} style={[itemStyles.itemName, item.checked && itemStyles.itemNameChecked]}>
             {item.name}
           </Text>
 
           {quantity.length > 0 && !item.checked ? (
-            <Text numberOfLines={1} style={styles.itemQuantity}>
+            <Text numberOfLines={1} style={itemStyles.itemQuantity}>
               {quantity}
             </Text>
           ) : null}
@@ -137,7 +183,7 @@ function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowPr
           accessibilityRole="button"
           activeOpacity={0.8}
           onPress={() => onDelete(item.itemId)}
-          style={styles.deleteButton}
+          style={itemStyles.deleteButton}
         >
           <Ionicons color={DELETE_ICON_COLOR} name="trash-outline" size={16} />
         </TouchableOpacity>
@@ -147,6 +193,10 @@ function ShoppingListItemRow({ item, onToggle, onDelete }: ShoppingListItemRowPr
 }
 
 function ShoppingListLoadingPlaceholder() {
+  const colors = useColors();
+  const SKELETON_BG = colors.overlay.plum[5];
+  const SKELETON_BORDER = colors.overlay.plum[8];
+
   const pulseOpacity = useRef(new Animated.Value(0.55)).current;
 
   useEffect(() => {
@@ -172,10 +222,24 @@ function ShoppingListLoadingPlaceholder() {
     };
   }, [pulseOpacity]);
 
+  const skeletonStyles = StyleSheet.create({
+    skeletonContainer: {
+      paddingHorizontal: spacing.xl,
+      gap: 6,
+    },
+    skeletonCard: {
+      height: 60,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: SKELETON_BORDER,
+      backgroundColor: SKELETON_BG,
+    },
+  });
+
   return (
-    <View style={styles.skeletonContainer}>
+    <View style={skeletonStyles.skeletonContainer}>
       {[0, 1, 2].map((index) => (
-        <Animated.View key={index} style={[styles.skeletonCard, { opacity: pulseOpacity }]} />
+        <Animated.View key={index} style={[skeletonStyles.skeletonCard, { opacity: pulseOpacity }]} />
       ))}
     </View>
   );
@@ -193,6 +257,14 @@ function sortItemsByAddedAtDesc(items: ShoppingListItem[]): ShoppingListItem[] {
 }
 
 export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDetailScreenProps) {
+  const colors = useColors();
+  const SECTION_TEXT_COLOR = colors.overlay.plum[50];
+  const INPUT_BG = colors.overlay.plum[6];
+  const INPUT_BORDER = colors.overlay.plum[18];
+  const INPUT_PLACEHOLDER = colors.overlay.plum[35];
+  const FOOTER_BORDER = colors.overlay.plum[8];
+  const HEADER_ICON_COLOR = colors.overlay.plum[70];
+
   const { t } = useAppTranslation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -486,13 +558,157 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
     [handleDeleteItem, handleToggleCheck],
   );
 
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    headerBackButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      flex: 1,
+      marginHorizontal: spacing.lg,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 16,
+      fontWeight: fontWeights.bold,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xl,
+    },
+    headerIconButton: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    listContent: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      paddingBottom: 120,
+    },
+    listContentEmpty: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    sectionHeader: {
+      paddingVertical: spacing.md,
+    },
+    sectionHeaderText: {
+      color: SECTION_TEXT_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    sectionSeparator: {
+      height: spacing.md,
+    },
+    itemSeparator: {
+      height: 6,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing['4xl'],
+    },
+    emptyStateTitle: {
+      marginTop: spacing.xl,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 18,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    emptyStateSubtitle: {
+      marginTop: spacing.md,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      opacity: 0.6,
+      textAlign: 'center',
+    },
+    footer: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.background.primary,
+      paddingTop: spacing.lg,
+      paddingHorizontal: spacing.xl,
+      borderTopWidth: 0.5,
+      borderTopColor: FOOTER_BORDER,
+    },
+    footerGradient: {
+      position: 'absolute',
+      top: -20,
+      left: 0,
+      right: 0,
+      height: 20,
+    },
+    footerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    nameInput: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: INPUT_BORDER,
+      backgroundColor: INPUT_BG,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+    },
+    quantityInput: {
+      width: 80,
+      minHeight: 44,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: INPUT_BORDER,
+      backgroundColor: INPUT_BG,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+    },
+    addButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.brand.pulse,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addButtonDisabled: {
+      opacity: 0.6,
+    },
+  });
+
   const renderSectionHeader = useCallback(
     ({ section }: { section: { title: string; data: ShoppingListItem[] } }) => (
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionHeaderText}>{section.title}</Text>
       </View>
     ),
-    [],
+    [styles],
   );
 
   return (
@@ -630,206 +846,3 @@ export function ShoppingListDetailScreen({ navigation, route }: ShoppingListDeta
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  headerBackButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    marginHorizontal: spacing.lg,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 16,
-    fontWeight: fontWeights.bold,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xl,
-  },
-  headerIconButton: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skeletonContainer: {
-    paddingHorizontal: spacing.xl,
-    gap: 6,
-  },
-  skeletonCard: {
-    height: 60,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: SKELETON_BORDER,
-    backgroundColor: SKELETON_BG,
-  },
-  listContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: 120,
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  sectionHeader: {
-    paddingVertical: spacing.md,
-  },
-  sectionHeaderText: {
-    color: SECTION_TEXT_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  sectionSeparator: {
-    height: spacing.md,
-  },
-  itemSeparator: {
-    height: 6,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing['4xl'],
-  },
-  emptyStateTitle: {
-    marginTop: spacing.xl,
-    color: colors.text.primary,
-    fontFamily: fonts.display,
-    fontSize: 18,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  emptyStateSubtitle: {
-    marginTop: spacing.md,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    opacity: 0.6,
-    textAlign: 'center',
-  },
-  itemRowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: ROW_BORDER,
-    backgroundColor: ROW_BACKGROUND,
-    padding: 14,
-  },
-  itemRowContainerChecked: {
-    opacity: 0.5,
-  },
-  itemCheckboxTouch: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemCheckbox: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemTextBlock: {
-    flex: 1,
-    marginHorizontal: spacing.lg,
-    minWidth: 0,
-  },
-  itemName: {
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-    fontWeight: fontWeights.medium,
-  },
-  itemNameChecked: {
-    textDecorationLine: 'line-through',
-  },
-  itemQuantity: {
-    marginTop: spacing.xs,
-    color: colors.text.secondary,
-    fontFamily: fonts.body,
-    fontSize: 12,
-    opacity: 0.55,
-  },
-  deleteButton: {
-    padding: spacing.md,
-    marginRight: -spacing.sm,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.background.primary,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    borderTopWidth: 0.5,
-    borderTopColor: FOOTER_BORDER,
-  },
-  footerGradient: {
-    position: 'absolute',
-    top: -20,
-    left: 0,
-    right: 0,
-    height: 20,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  nameInput: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: INPUT_BORDER,
-    backgroundColor: INPUT_BG,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
-  quantityInput: {
-    width: 80,
-    minHeight: 44,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: INPUT_BORDER,
-    backgroundColor: INPUT_BG,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: colors.text.primary,
-    fontFamily: fonts.body,
-    fontSize: 14,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.brand.pulse,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonDisabled: {
-    opacity: 0.6,
-  },
-});

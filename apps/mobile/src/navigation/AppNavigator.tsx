@@ -11,13 +11,13 @@ import { TrackNavigator } from './TrackNavigator';
 
 import {
   borderRadius,
-  colors,
   fontSizes,
   fonts,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import type { AppTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
@@ -41,7 +41,37 @@ const TAB_LABELS = {
 } as const;
 
 export function AppNavigator() {
+  const colors = useColors();
   const { t } = useAppTranslation();
+
+  const styles = StyleSheet.create({
+    tabBar: {
+      height: 88,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.background.secondary,
+      backgroundColor: colors.background.primary,
+    },
+    tabItem: {
+      paddingVertical: spacing.sm,
+    },
+    tabBarLabel: {
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      fontWeight: fontWeights.medium,
+    },
+    blendIconShell: {
+      minWidth: 56,
+      minHeight: 56,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      backgroundColor: colors.background.secondary,
+      marginTop: -6,
+    },
+  });
 
   return (
     <Tab.Navigator
@@ -83,32 +113,3 @@ export function AppNavigator() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    height: 88,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.background.secondary,
-    backgroundColor: colors.background.primary,
-  },
-  tabItem: {
-    paddingVertical: spacing.sm,
-  },
-  tabBarLabel: {
-    fontFamily: fonts.body,
-    fontSize: fontSizes.xs,
-    fontWeight: fontWeights.medium,
-  },
-  blendIconShell: {
-    minWidth: 56,
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    backgroundColor: colors.background.secondary,
-    marginTop: -6,
-  },
-});

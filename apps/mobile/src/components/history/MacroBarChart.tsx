@@ -22,6 +22,7 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { SkeletonLoader } from '../ui/SkeletonLoader';
 
@@ -29,16 +30,11 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 const BAR_ANIMATION_DURATION = 800;
 const SVG_WIDTH_OFFSET = 48;
-const CARD_LABEL_COLOR = colors.overlay.plum[55];
 const PROTEIN_COLOR = colors.overlay.pulse[75];
 const CARBS_COLOR = colors.overlay.warning[70];
 const TOOLTIP_CARBS_COLOR = colors.feedback.warning;
 const REMAINING_COLOR = colors.overlay.neutralGray[35];
-const EMPTY_BAR_COLOR = colors.overlay.plum[16];
 const EMPTY_BAR_HEIGHT_RATIO = 0.16;
-const TARGET_LINE_COLOR = colors.overlay.plum[20];
-const TOOLTIP_BACKGROUND = colors.overlay.plum[7];
-const TOOLTIP_BORDER = colors.overlay.plum[10];
 const TOOLTIP_WIDTH = 132;
 const TOOLTIP_HEIGHT = 78;
 const TOOLTIP_SPACING = 8;
@@ -173,6 +169,13 @@ export function MacroBarChart({
   animate = true,
   isLoading = false,
 }: MacroBarChartProps) {
+  const colors = useColors();
+  const CARD_LABEL_COLOR = colors.overlay.plum[55];
+  const EMPTY_BAR_COLOR = colors.overlay.plum[16];
+  const TARGET_LINE_COLOR = colors.overlay.plum[20];
+  const TOOLTIP_BACKGROUND = colors.overlay.plum[7];
+  const TOOLTIP_BORDER = colors.overlay.plum[10];
+
   const { t } = useAppTranslation();
   const { formatWeekdayShort, formatShortDate } = useDateFormat();
   const progress = useMemo(() => new Animated.Value(0), []);
@@ -263,6 +266,63 @@ export function MacroBarChart({
   }, [height, tooltipDatum, selectedIndex, slotWidth, svgWidth, yAxisMax]);
 
   const targetLineY = height - ((Math.min(normalizedTarget, yAxisMax) / yAxisMax) * height);
+
+  const styles = StyleSheet.create({
+    container: {
+      alignSelf: 'center',
+    },
+    chartStage: {
+      position: 'relative',
+    },
+    dismissLayer: {
+      position: 'absolute',
+      left: 0,
+      zIndex: 1,
+    },
+    tooltip: {
+      position: 'absolute',
+      zIndex: 2,
+      width: TOOLTIP_WIDTH,
+      minHeight: TOOLTIP_HEIGHT,
+      padding: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: TOOLTIP_BORDER,
+      backgroundColor: TOOLTIP_BACKGROUND,
+      justifyContent: 'center',
+      gap: 4,
+    },
+    tooltipText: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.medium,
+    },
+    tooltipProtein: {
+      color: colors.brand.pulse,
+    },
+    tooltipCarbs: {
+      color: TOOLTIP_CARBS_COLOR,
+    },
+    tooltipCalories: {
+      color: colors.text.primary,
+    },
+    labelsRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginTop: 10,
+    },
+    labelSlot: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    labelText: {
+      color: CARD_LABEL_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.regular,
+      textAlign: 'center',
+    },
+  });
 
   if (isLoading) {
     return (
@@ -412,60 +472,3 @@ export function MacroBarChart({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'center',
-  },
-  chartStage: {
-    position: 'relative',
-  },
-  dismissLayer: {
-    position: 'absolute',
-    left: 0,
-    zIndex: 1,
-  },
-  tooltip: {
-    position: 'absolute',
-    zIndex: 2,
-    width: TOOLTIP_WIDTH,
-    minHeight: TOOLTIP_HEIGHT,
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: TOOLTIP_BORDER,
-    backgroundColor: TOOLTIP_BACKGROUND,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  tooltipText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    fontWeight: fontWeights.medium,
-  },
-  tooltipProtein: {
-    color: colors.brand.pulse,
-  },
-  tooltipCarbs: {
-    color: TOOLTIP_CARBS_COLOR,
-  },
-  tooltipCalories: {
-    color: colors.text.primary,
-  },
-  labelsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 10,
-  },
-  labelSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  labelText: {
-    color: CARD_LABEL_COLOR,
-    fontFamily: fonts.body,
-    fontSize: 10,
-    fontWeight: fontWeights.regular,
-    textAlign: 'center',
-  },
-});

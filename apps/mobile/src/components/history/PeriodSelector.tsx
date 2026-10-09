@@ -13,14 +13,12 @@ import {
 } from '@blendi/shared';
 
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useColors } from '../../hooks/useColors';
 
 const PERIOD_OPTIONS = [7, 30, 90] as const;
 const ANIMATION_DURATION = 200;
 const CHIP_BACKGROUND_SELECTED = colors.overlay.pulse[25];
-const CHIP_BACKGROUND_IDLE = colors.overlay.plum[6];
 const CHIP_BORDER_SELECTED = colors.overlay.pulse[50];
-const CHIP_BORDER_IDLE = colors.overlay.plum[10];
-const CHIP_TEXT_IDLE = colors.overlay.plum[60];
 
 export type PeriodSelectorValue = (typeof PERIOD_OPTIONS)[number];
 
@@ -37,6 +35,11 @@ interface PeriodChipProps {
 }
 
 function PeriodChip({ label, value, selected, onPress }: PeriodChipProps) {
+  const colors = useColors();
+  const CHIP_BACKGROUND_IDLE = colors.overlay.plum[6];
+  const CHIP_BORDER_IDLE = colors.overlay.plum[10];
+  const CHIP_TEXT_IDLE = colors.overlay.plum[60];
+
   const progress = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
   useEffect(() => {

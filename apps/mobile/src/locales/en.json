@@ -636,6 +636,11 @@
     "memberSince": "Member since {{date}}",
     "metric": "Metric",
     "imperial": "Imperial",
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "settingCarbs": "Carbs target",
     "badges": {
       "title": "Achievements",
@@ -685,6 +690,7 @@
       "hydrationTitle": "Daily Hydration Target",
       "unitSystemTitle": "Units",
       "languageTitle": "Language",
+      "themeTitle": "Theme",
       "confirm": "Save"
     },
     "upgrade": {

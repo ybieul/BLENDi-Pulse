@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { colors } from '@blendi/shared';
+import { useColors } from '../../hooks/useColors';
 
 const DOT_SIZE = 6;
 const DOT_GAP = 6;
@@ -27,6 +27,7 @@ function resolveDotState(index: number, currentStep: number): 0 | 1 | 2 {
 }
 
 export function AuthProgressDots({ currentStep, totalSteps }: AuthProgressDotsProps) {
+  const colors = useColors();
   const clampedTotalSteps = Math.max(0, totalSteps);
   const clampedCurrentStep = clampedTotalSteps === 0
     ? 0
