@@ -93,7 +93,13 @@ export async function forgotPassword(
     if (!user) return;
 
     const otp = await createOtpRecord(email);
-    await emailService.sendPasswordResetEmail(user.name, email, otp, user.locale);
+
+    try {
+      await emailService.sendPasswordResetEmail(user.name, email, otp, user.locale);
+    } catch (err) {
+      // Resposta 200 já foi enviada — só logar. Nunca tentar responder de novo.
+      console.error('[forgotPassword] Failed to send password reset email:', err);
+    }
   } catch (err) {
     next(err);
   }

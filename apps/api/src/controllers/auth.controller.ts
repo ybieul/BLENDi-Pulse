@@ -116,7 +116,7 @@ export async function register(
     const refreshToken = generateRefreshToken(user.id as string, user.tokenVersion);
 
     // 5. Disparar e-mail de boas-vindas (não bloqueia — falha silenciosa)
-    void emailService.sendWelcomeEmail(user.name, user.email);
+    void emailService.sendWelcomeEmail(user.name, user.email, user.locale);
 
     // 6. Retornar 201 com dados públicos do usuário + tokens
     res.status(201).json({

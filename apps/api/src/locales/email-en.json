@@ -1,4 +1,28 @@
 {
+  "welcome": {
+    "subject": "Welcome to BLENDi Pulse!",
+    "greeting": "Hi, {name}!",
+    "opening": "Your BLENDi Pulse account is ready. Let's get started.",
+    "steps": [
+      "Set your goals in your profile",
+      "Make your first Blend — let Pulse AI suggest the perfect recipe",
+      "Track your hydration and macros in the Track tab",
+      "Come back every week to see your Weekly Report and unlock achievements"
+    ],
+    "features_heading": "Discover what you can do",
+    "features": [
+      {
+        "name": "Pulse AI",
+        "description": "Describe what you want, and the AI builds the perfect blend recipe for you, instantly."
+      },
+      {
+        "name": "Pantry Scanner",
+        "description": "Snap a photo of your fridge or pantry, and the AI identifies your ingredients to suggest recipes with what you already have."
+      }
+    ],
+    "more_text": "And there's a lot more waiting for you in the app.",
+    "closing": "Just open the app and start blending."
+  },
   "password_reset": {
     "subject": "Reset your BLENDi Pulse password",
     "greeting": "Hi {name},",

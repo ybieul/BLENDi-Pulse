@@ -1,18 +1,22 @@
 // apps/api/src/services/email.service.ts
 //
 // ╔══════════════════════════════════════════════════════════════════════╗
-// ║  DEVELOPMENT STUB — DO NOT USE IN PRODUCTION AS-IS                  ║
+// ║  sendWelcomeEmail e sendPasswordResetEmail enviam de verdade via SMTP ║
+// ║  (Google Workspace) quando ENABLE_DEV_EMAIL_LOG=false. Com a flag    ║
+// ║  true, continuam só logando no console (ver config/env.ts).          ║
 // ║                                                                      ║
-// ║  This service currently logs emails to the console instead of        ║
-// ║  sending them. It must be replaced with Resend in Phase 4, when      ║
-// ║  the Golden Ticket email sequence is implemented.                    ║
+// ║  sendVerificationEmail permanece um stub — nenhuma rota do backend   ║
+// ║  o chama hoje (ver diagnóstico de 2026-10-09).                       ║
 // ║                                                                      ║
-// ║  The public interface (IEmailService) MUST NOT change when Resend    ║
-// ║  is plugged in — only the internal implementation changes.           ║
-// ║  Controllers import EmailService, never the transport layer.         ║
+// ║  Controllers importam EmailService, nunca o transporter.             ║
 // ╚══════════════════════════════════════════════════════════════════════╝
 
+import nodemailer, { type Transporter } from 'nodemailer';
+import { createElement } from 'react';
+import { render } from '@react-email/render';
 import { env } from '../config/env';
+import { WelcomeEmail, type WelcomeEmailContent } from './email-templates/welcomeEmail';
+import { PasswordResetEmail } from './email-templates/passwordResetEmail';
 
 // ─── Locale templates ─────────────────────────────────────────────────────────
 // Todos os textos de e-mail ficam nos arquivos de locale — nenhum hardcode aqui.
@@ -29,12 +33,44 @@ const EMAIL_TEMPLATES: Record<string, EmailLocale> = {
   'pt-BR': emailPtBr,
 };
 
+/** Resolve o locale do usuário para o template correspondente. Fallback: inglês. */
+function resolveEmailTemplate(locale: string): EmailLocale {
+  return EMAIL_TEMPLATES[locale] ?? emailEn;
+}
+
 /**
  * Substitui placeholders `{key}` no template pelo valor correspondente em `vars`.
  * Placeholders sem correspondência são mantidos intactos.
  */
 function interpolate(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? `{${key}}`);
+}
+
+// ─── Transporter SMTP ──────────────────────────────────────────────────────────
+// Criado de forma lazy (só quando um envio real é de fato tentado) e
+// memoizado — reaproveita a mesma conexão/pool entre chamadas.
+
+let cachedTransporter: Transporter | null = null;
+
+/** Retorna o transporter SMTP, ou `null` se alguma variável obrigatória estiver ausente. */
+function getSmtpTransporter(): Transporter | null {
+  if (cachedTransporter) return cachedTransporter;
+
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS || !env.EMAIL_FROM) {
+    return null;
+  }
+
+  cachedTransporter = nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT ?? 465,
+    secure: true,
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+    },
+  });
+
+  return cachedTransporter;
 }
 
 // ─── Interface pública ────────────────────────────────────────────────────────
@@ -45,10 +81,13 @@ function interpolate(template: string, vars: Record<string, string>): string {
 export interface IEmailService {
   /**
    * Envia o e-mail de boas-vindas após o registro.
-   * @param name  - Nome de exibição do destinatário
-   * @param email - Endereço de e-mail do destinatário
+   * O idioma do e-mail é determinado pelo locale do usuário.
+   *
+   * @param name   - Nome de exibição do destinatário
+   * @param email  - Endereço de e-mail do destinatário
+   * @param locale - Locale do usuário (ex: 'en', 'pt-BR'). Fallback: 'en'
    */
-  sendWelcomeEmail(name: string, email: string): Promise<void>;
+  sendWelcomeEmail(name: string, email: string, locale: string): Promise<void>;
 
   /**
    * Envia o e-mail com o código de verificação de conta.
@@ -74,27 +113,60 @@ export interface IEmailService {
 
 export class EmailService implements IEmailService {
   /**
-   * Simula o envio do e-mail de boas-vindas logando no console.
-   * Não lança exceção — falha de e-mail nunca deve bloquear o registro do usuário.
-   *
-   * TODO (Phase 4): replace with Resend transactional email + welcome template.
+   * Envia o e-mail de boas-vindas. O conteúdo vem do locale do usuário, mesma
+   * resolução usada em sendPasswordResetEmail. Com ENABLE_DEV_EMAIL_LOG=true,
+   * só loga no console. Não lança exceção — falha de e-mail nunca deve
+   * bloquear o registro.
    */
-  async sendWelcomeEmail(name: string, email: string): Promise<void> {
+  async sendWelcomeEmail(name: string, email: string, locale: string): Promise<void> {
+    const templates = resolveEmailTemplate(locale);
+    const t = templates.welcome;
+    const vars: Record<string, string> = { name };
+
+    const subject = interpolate(t.subject, vars);
+    const content: WelcomeEmailContent = {
+      greeting: interpolate(t.greeting, vars),
+      opening: t.opening,
+      steps: t.steps,
+      featuresHeading: t.features_heading,
+      features: t.features,
+      moreText: t.more_text,
+      closing: t.closing,
+    };
+
     try {
-      if (env.NODE_ENV !== 'production') {
+      if (env.ENABLE_DEV_EMAIL_LOG) {
         console.log('\n📧  [EmailService] Welcome email would be sent to:');
         console.log(`    To:      ${name} <${email}>`);
-        console.log(`    Subject: Welcome to BLENDi Pulse!`);
-        console.log(`    Body:    Hi ${name}, your account is ready. Start blending! 🥤\n`);
+        console.log(`    Subject: ${subject}`);
+        console.log(`    ${content.greeting}`);
+        console.log(`    ${content.opening}`);
+        content.steps.forEach((step, i) => console.log(`    ${i + 1}. ${step}`));
+        console.log(`    ${content.featuresHeading}:`);
+        content.features.forEach(f => console.log(`      - ${f.name}: ${f.description}`));
+        console.log(`    ${content.moreText}`);
+        console.log(`    ${content.closing}\n`);
         return;
       }
 
-      // Phase 4 placeholder:
-      // const resend = new Resend(env.RESEND_API_KEY);
-      // await resend.emails.send({ from: 'noreply@blendipulse.com', to: email, ... });
-      console.warn(
-        `[EmailService] Email provider not configured — welcome email NOT sent to ${email}`
-      );
+      const transporter = getSmtpTransporter();
+      if (!transporter) {
+        console.warn(
+          `[EmailService] Email provider not configured — welcome email NOT sent to ${email}`
+        );
+        return;
+      }
+
+      const element = createElement(WelcomeEmail, { content });
+      const [html, text] = await Promise.all([render(element), render(element, { plainText: true })]);
+
+      await transporter.sendMail({
+        from: env.EMAIL_FROM,
+        to: email,
+        subject,
+        text,
+        html,
+      });
     } catch (err) {
       // Falha silenciosa: o usuário já foi criado. Não propagar erro para o controller.
       console.error('[EmailService] Failed to send welcome email:', err);
@@ -131,13 +203,12 @@ export class EmailService implements IEmailService {
   }
 
   /**
-   * Simula o envio do e-mail com código OTP de redefinição de senha.
+   * Envia o e-mail com código OTP de redefinição de senha.
    *
    * O conteúdo é carregado do arquivo de locale correspondente ao idioma do usuário
    * (apps/api/src/locales/email-{locale}.json). Fallback automático para inglês.
    * Nenhum texto é hardcoded aqui — toda string vem do template de locale.
-   *
-   * Fase 4: substituir pelo envio via Resend com o template bilíngue renderizado.
+   * Com ENABLE_DEV_EMAIL_LOG=true, só loga no console (não envia de verdade).
    */
   async sendPasswordResetEmail(
     name: string,
@@ -146,7 +217,7 @@ export class EmailService implements IEmailService {
     locale: string
   ): Promise<void> {
     try {
-      const templates = EMAIL_TEMPLATES[locale] ?? emailEn;
+      const templates = resolveEmailTemplate(locale);
       const t = templates.password_reset;
       const vars: Record<string, string> = { name, code };
 
@@ -172,17 +243,27 @@ export class EmailService implements IEmailService {
         return;
       }
 
-      // Phase 4 placeholder:
-      // const resend = new Resend(env.RESEND_API_KEY);
-      // await resend.emails.send({
-      //   from: 'noreply@blendipulse.com',
-      //   to: email,
-      //   subject,
-      //   text: [greeting, body, `${codeLabel}: ${code}`, expires, ignore].join('\n\n'),
-      // });
-      console.warn(
-        `[EmailService] Email provider not configured — password reset email NOT sent to ${email}`
-      );
+      const transporter = getSmtpTransporter();
+      if (!transporter) {
+        console.warn(
+          `[EmailService] Email provider not configured — password reset email NOT sent to ${email}`
+        );
+        return;
+      }
+
+      const element = createElement(PasswordResetEmail, {
+        content: { greeting, body, codeLabel, expires, ignore },
+        code,
+      });
+      const [html, text] = await Promise.all([render(element), render(element, { plainText: true })]);
+
+      await transporter.sendMail({
+        from: env.EMAIL_FROM,
+        to: email,
+        subject,
+        text,
+        html,
+      });
     } catch (err) {
       // Falha silenciosa: o cliente já recebeu 200. Não vazar detalhes internos.
       console.error('[EmailService] Failed to send password reset email:', err);

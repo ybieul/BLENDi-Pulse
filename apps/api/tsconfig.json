@@ -6,7 +6,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "react-jsx"
   },
   "include": ["src/**/*"],
   "references": [{ "path": "../../packages/shared" }],

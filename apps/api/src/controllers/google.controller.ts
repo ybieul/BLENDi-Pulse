@@ -192,7 +192,7 @@ export async function handleGoogleCallback(
 
         isNewUser = true;
         // E-mail de boas-vindas — disparo não bloqueante, falha silenciosa
-        void emailService.sendWelcomeEmail(user.name, user.email);
+        void emailService.sendWelcomeEmail(user.name, user.email, user.locale);
       }
     }
 

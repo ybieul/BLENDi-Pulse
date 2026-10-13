@@ -99,6 +99,22 @@ const envSchema = z.object({
   // NUNCA definir como 'true' em produção.
   ENABLE_DEV_EMAIL_LOG: booleanFlag(false),
 
+  // SMTP (envio real de e-mail — Google Workspace). Opcionais: se algum
+  // estiver ausente quando ENABLE_DEV_EMAIL_LOG=false, o EmailService
+  // (ver services/email.service.ts) loga um erro e não envia, em vez de
+  // impedir o boot do servidor — mesmo padrão do RevenueCat (ver
+  // REVENUECAT_API_KEY) para integrações externas configuráveis depois.
+  SMTP_HOST: optionalString(),
+  SMTP_PORT: z.preprocess(
+    value =>
+      typeof value === 'string' && value.trim().length > 0 ? Number(value.trim()) : undefined,
+    z.number().int().min(1).max(65535).optional()
+  ),
+  SMTP_USER: optionalString(),
+  SMTP_PASS: optionalString(),
+  // Remetente exibido (ex: "BLENDi Pulse <info@blendiblender.com>").
+  EMAIL_FROM: optionalString(),
+
   // MongoDB
   MONGODB_URI: z
     .string()
