@@ -15,6 +15,7 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 import {
+  calculateFatTargetFromCalories,
   calculateMacroTargets,
   calculateWeightTargetEta,
   evaluateManualMacroEditWarnings,
@@ -229,6 +230,8 @@ export async function getMe(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
           dailyCalorieTarget: user.dailyCalorieTarget,
+          dailyFatTarget:
+            user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
           dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
           isPro: user.isPro ?? false,
           subscriptionId: user.subscriptionId ?? null,
@@ -1015,7 +1018,8 @@ export async function updateMe(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
-          dailyFatTarget: user.dailyFatTarget,
+          dailyFatTarget:
+            user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
           dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
           isPro: user.isPro ?? false,
           longestStreak: user.longestStreak ?? 0,

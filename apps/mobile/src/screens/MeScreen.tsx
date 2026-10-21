@@ -226,6 +226,7 @@ interface UserProfileData {
   dailyProteinTarget: number;
   dailyCarbTarget: number;
   dailyCalorieTarget: number;
+  dailyFatTarget?: number;
   dailyHydrationTarget: number;
   profilePhoto?: string;
   hasProfilePhoto?: boolean;
@@ -656,6 +657,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         return (
           profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 2000
         );
+      case "fat":
+        return profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 67;
       case "hydration":
         return profile?.dailyHydrationTarget ?? 2500;
       case "unitSystem":
@@ -699,6 +702,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         case "calories":
           body = { dailyCalorieTarget: Number(nextValue) };
           break;
+        case "fat":
+          body = { dailyFatTarget: Number(nextValue) };
+          break;
         case "hydration":
           body = { dailyHydrationTarget: Number(nextValue) };
           break;
@@ -731,6 +737,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             break;
           case "calories":
             updateUserProfile({ dailyCalorieTarget: Number(nextValue) });
+            break;
+          case "fat":
+            updateUserProfile({ dailyFatTarget: Number(nextValue) });
             break;
           case "hydration":
             updateUserProfile({ dailyHydrationTarget: Number(nextValue) });
@@ -1746,6 +1755,13 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               label={t("profile.fields.calories_target")}
               value={formatCount(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) + " " + t("common.units.kilocalories")}
               onPress={() => { setEditingType("calories"); }}
+            />
+            <View style={styles.divider} />
+
+            <SettingRow
+              label={t("profile.fields.fat_target")}
+              value={formatCount(profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 0) + t("common.units.grams")}
+              onPress={() => { setEditingType("fat"); }}
             />
             <View style={styles.divider} />
 

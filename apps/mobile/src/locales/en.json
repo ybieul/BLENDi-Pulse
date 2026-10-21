@@ -358,7 +358,8 @@
       "model": "My BLENDi",
       "goal": "Goal",
       "protein_target": "Protein target",
-      "calories_target": "Calorie target"
+      "calories_target": "Calorie target",
+      "fat_target": "Fat target"
     },
     "language": {
       "label": "Language",
@@ -687,6 +688,7 @@
       "proteinTitle": "Daily Protein Target",
       "carbsTitle": "Daily Carbs Target",
       "caloriesTitle": "Daily Calorie Target",
+      "fatTitle": "Daily Fat Target",
       "hydrationTitle": "Daily Hydration Target",
       "unitSystemTitle": "Units",
       "languageTitle": "Language",

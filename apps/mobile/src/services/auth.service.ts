@@ -37,6 +37,7 @@ export interface AuthUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget: number;
+  dailyFatTarget?: number;
   dailyHydrationTarget?: number;
   isPro?: boolean;
   subscriptionId?: string | null;

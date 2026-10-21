@@ -79,6 +79,7 @@ interface CurrentUserProfileResponse {
       dailyProteinTarget: number;
       dailyCalorieTarget: number;
       dailyCarbTarget: number;
+      dailyFatTarget?: number;
       dailyHydrationTarget?: number;
       isPro: boolean;
       subscriptionId?: string | null;
@@ -126,6 +127,7 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
     dailyCarbTarget: user.dailyCarbTarget,
+    dailyFatTarget: user.dailyFatTarget,
     dailyHydrationTarget: user.dailyHydrationTarget,
     isPro: user.isPro,
     subscriptionId: user.subscriptionId ?? null,

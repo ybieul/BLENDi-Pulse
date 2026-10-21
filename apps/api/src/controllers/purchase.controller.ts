@@ -15,6 +15,7 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
+import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 
@@ -99,6 +100,7 @@ function buildPurchaseProfileResponse(user: PurchaseProfileUser) {
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
     dailyCarbTarget: user.dailyCarbTarget ?? 200,
+    dailyFatTarget: user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
     dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
     isPro: user.isPro ?? false,
     subscriptionId: user.subscriptionId ?? null,

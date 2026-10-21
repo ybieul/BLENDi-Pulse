@@ -36,6 +36,7 @@ import {
 import { EmailService } from '../services/email.service';
 import { env } from '../config/env';
 import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
+import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
 
 // Instância única compartilhada pelos handlers
 const emailService = new EmailService();
@@ -193,6 +194,7 @@ export async function handleGoogleCallback(
           goal: 'Wellness',
           dailyProteinTarget: 150,
           dailyCalorieTarget: 2000,
+          dailyFatTarget: calculateFatTargetFromCalories(2000),
           scanCount: 0,
           scanResetDate: addMonths(new Date(), 1),
           ...getAccountCreationBodyProfileDefaults(),
@@ -226,6 +228,8 @@ export async function handleGoogleCallback(
         dailyProteinTarget: user.dailyProteinTarget,
         dailyCalorieTarget: user.dailyCalorieTarget,
         dailyCarbTarget: user.dailyCarbTarget ?? 200,
+        dailyFatTarget:
+          user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
         longestStreak: user.longestStreak ?? 0,
         createdAt: user.createdAt,
       })

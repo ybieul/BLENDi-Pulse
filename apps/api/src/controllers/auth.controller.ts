@@ -23,6 +23,7 @@ import {
 } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
 import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
+import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -112,6 +113,7 @@ export async function register(
       timezone,
       dailyProteinTarget,
       dailyCalorieTarget,
+      dailyFatTarget: calculateFatTargetFromCalories(dailyCalorieTarget),
       ...getAccountCreationBodyProfileDefaults(),
     });
 
@@ -142,6 +144,8 @@ export async function register(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
+          dailyFatTarget:
+            user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
           longestStreak: user.longestStreak ?? 0,
           createdAt: user.createdAt,
         },
@@ -221,6 +225,8 @@ export async function login(
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
+          dailyFatTarget:
+            user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
           longestStreak: user.longestStreak ?? 0,
           createdAt: user.createdAt,
         },

@@ -39,6 +39,7 @@ export type EditSettingType =
   | 'protein'
   | 'carbs'
   | 'calories'
+  | 'fat'
   | 'hydration'
   | 'unitSystem'
   | 'language'
@@ -67,6 +68,7 @@ const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
   protein: 'me.edit.proteinTitle',
   carbs: 'me.edit.carbsTitle',
   calories: 'me.edit.caloriesTitle',
+  fat: 'me.edit.fatTitle',
   hydration: 'me.edit.hydrationTitle',
   unitSystem: 'me.edit.unitSystemTitle',
   language: 'me.edit.languageTitle',
@@ -121,7 +123,13 @@ const GOAL_OPTIONS = [
 ] as const;
 
 function isNumericType(type: EditSettingType): boolean {
-  return type === 'protein' || type === 'carbs' || type === 'calories' || type === 'hydration';
+  return (
+    type === 'protein' ||
+    type === 'carbs' ||
+    type === 'calories' ||
+    type === 'fat' ||
+    type === 'hydration'
+  );
 }
 
 function ToggleButton({

@@ -358,7 +358,8 @@
       "model": "Meu BLENDi",
       "goal": "Objetivo",
       "protein_target": "Meta de proteína",
-      "calories_target": "Meta de calorias"
+      "calories_target": "Meta de calorias",
+      "fat_target": "Meta de gordura"
     },
     "language": {
       "label": "Idioma",
@@ -687,6 +688,7 @@
       "proteinTitle": "Meta de Proteína Diária",
       "carbsTitle": "Meta de Carboidratos Diária",
       "caloriesTitle": "Meta de Calorias Diária",
+      "fatTitle": "Meta de Gordura Diária",
       "hydrationTitle": "Meta de Hidratação Diária",
       "unitSystemTitle": "Unidades",
       "languageTitle": "Idioma",

@@ -208,7 +208,9 @@ export function calculateMacroTargets(
   // dailyFatTarget é só a mesma dailyFatCalories (já usada acima pro resto de
   // carboidrato) convertida de kcal pra gramas (9 kcal/g) — não muda em nada
   // o cálculo de dailyCarbTarget, que continua lendo dailyFatCalories direto.
-  const dailyFatTarget = Math.round(dailyFatCalories / 9);
+  // Reaproveita calculateFatTargetFromCalories (mesma fórmula, fonte única)
+  // em vez de repetir a conta aqui.
+  const dailyFatTarget = calculateFatTargetFromCalories(dailyCalorieTarget);
 
   return {
     imc,
@@ -221,6 +223,20 @@ export function calculateMacroTargets(
     bmr: Math.round(basalMetabolism),
     tdee,
   };
+}
+
+/**
+ * Meta de gordura derivada só de dailyCalorieTarget (30% das calorias,
+ * 9 kcal/g) — extraída de dentro de calculateMacroTargets pra ser
+ * reaproveitada onde os outros inputs físicos (peso/altura/idade/sexo) não
+ * estão disponíveis: criação de conta (auth/google) e fallback de leitura
+ * pra contas sem dailyFatTarget salvo (ver
+ * docs/fixes/cp-a.8-dailyfattarget-criacao-de-conta-e-campo-mobile.md).
+ * Resultado sempre dentro de DAILY_FAT_TARGET_MIN/MAX (0-600), já que
+ * dailyCalorieTarget é clampado em 300-15000 (15000×0,3÷9=500).
+ */
+export function calculateFatTargetFromCalories(dailyCalorieTarget: number): number {
+  return Math.round((dailyCalorieTarget * 0.3) / 9);
 }
 
 // ─── Avisos de edição manual de proteína/calorias (CP-A.2, Tarefa 6) ────────

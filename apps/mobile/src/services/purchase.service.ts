@@ -40,6 +40,7 @@ interface PurchaseVerifiedUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget: number;
+  dailyFatTarget?: number;
   dailyHydrationTarget: number;
   isPro: boolean;
   subscriptionId?: string | null;
