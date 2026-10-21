@@ -14,32 +14,15 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
+import {
+  calculateMacroTargets,
+  calculateWeightTargetEta,
+  evaluateManualMacroEditWarnings,
+  type MacroEditWarning,
+} from '../utils/macroCalculation.utils';
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 const MAX_PROFILE_PHOTO_BASE64_LENGTH = 530_000;
-
-const ASSUMED_AGE = 30;
-
-const ACTIVITY_MULTIPLIERS = {
-  sedentary: 1.2,
-  lightlyActive: 1.375,
-  moderatelyActive: 1.55,
-  veryActive: 1.725,
-} as const;
-
-const CALORIE_ADJUSTMENTS = {
-  Muscle: 300,
-  Wellness: 0,
-  Energy: -150,
-  Recovery: 0,
-} as const;
-
-const PROTEIN_MULTIPLIERS = {
-  Muscle: 2.0,
-  Wellness: 1.6,
-  Energy: 1.8,
-  Recovery: 2.2,
-} as const;
 
 const POUNDS_PER_KILOGRAM = 2.205;
 const CENTIMETERS_PER_INCH = 2.54;
@@ -140,10 +123,6 @@ type UserPhotoProfileResponse = {
   profilePhotoUpdatedAt?: Date | null;
   updatedAt?: Date | null;
 };
-
-function roundToOneDecimal(value: number): number {
-  return Math.round(value * 10) / 10;
-}
 
 function normalizeNotificationPreferences(
   preferences: Partial<NotificationPreferencesState> | null | undefined
@@ -803,33 +782,212 @@ export async function updateMe(
     const {
       blendiModel,
       goal,
+      weightGoal,
       dailyProteinTarget,
       dailyCalorieTarget,
       dailyCarbTarget,
+      dailyFatTarget,
       dailyHydrationTarget,
       weight,
       height,
+      targetWeight,
+      activityLevel,
+      birthDate,
+      biologicalSex,
       preferredLanguage,
       unitSystem,
     } = parsed.data;
 
-    const updates = {
+    const updates: Record<string, unknown> = {
       ...(blendiModel !== undefined && { blendiModel }),
       ...(goal !== undefined && { goal }),
+      ...(weightGoal !== undefined && { weightGoal }),
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
       ...(dailyCalorieTarget !== undefined && { dailyCalorieTarget }),
       ...(dailyCarbTarget !== undefined && { dailyCarbTarget }),
+      ...(dailyFatTarget !== undefined && { dailyFatTarget }),
       ...(dailyHydrationTarget !== undefined && { dailyHydrationTarget }),
       ...(weight !== undefined && { weight }),
       ...(height !== undefined && { height }),
+      ...(targetWeight !== undefined && { targetWeight }),
+      ...(activityLevel !== undefined && { activityLevel }),
+      ...(birthDate !== undefined && { birthDate }),
+      ...(biologicalSex !== undefined && { biologicalSex }),
       ...(preferredLanguage !== undefined && { locale: preferredLanguage }),
       ...(unitSystem !== undefined && { unitSystem }),
     };
 
-    const user = await UserModel.findByIdAndUpdate(userId, updates, {
-      new: true,
-      runValidators: true,
-    }).lean();
+    // Buscado incondicionalmente (não só quando um campo-gatilho vem no
+    // body) porque a previsão de prazo (targetWeight) precisa do estado
+    // atual de weight/weightGoal mesmo quando nenhuma meta de macro está
+    // sendo recalculada neste request. A leitura continua incondicional —
+    // só os campos foram reduzidos (CP-A.2.1) à lista exata usada abaixo
+    // (mergedX e a comparação de weightHistoryEntry), auditada por grep,
+    // mais _id (incluído por padrão pelo Mongoose, não excluído aqui).
+    const currentUser = await UserModel.findById(userId)
+      .select({
+        weight: 1,
+        height: 1,
+        birthDate: 1,
+        biologicalSex: 1,
+        activityLevel: 1,
+        weightGoal: 1,
+        goal: 1,
+        targetWeight: 1,
+      })
+      .lean();
+
+    if (!currentUser) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    const mergedWeight = weight ?? currentUser.weight;
+    const mergedHeight = height ?? currentUser.height;
+    const mergedBirthDate = birthDate ?? currentUser.birthDate;
+    const mergedBiologicalSex = biologicalSex ?? currentUser.biologicalSex;
+    const mergedActivityLevel = activityLevel ?? currentUser.activityLevel;
+    const mergedWeightGoal = weightGoal ?? currentUser.weightGoal;
+    const mergedGoal = goal ?? currentUser.goal;
+    const mergedTargetWeight = targetWeight ?? currentUser.targetWeight;
+
+    // Gatilhos de recálculo automático das 3 metas — ver diagnostico-macros.md
+    // (Tarefa 8) e cp-a-macros.md (achado 3, Tarefa 6): `goal` (proposta do
+    // blend) não afeta mais dailyCalorieTarget (isso migrou pra weightGoal),
+    // mas ainda alimenta PROTEIN_MULTIPLIERS — por isso também é gatilho:
+    // trocar só `goal` recalcula proteína/carboidrato, calorias não muda.
+    const shouldRecalculateMacroTargets =
+      weight !== undefined ||
+      height !== undefined ||
+      activityLevel !== undefined ||
+      weightGoal !== undefined ||
+      birthDate !== undefined ||
+      biologicalSex !== undefined ||
+      goal !== undefined;
+
+    // Preenchido só quando o recálculo de fato acontece — usado pra incluir
+    // o IMC atualizado na resposta (Tarefa 3 do CP-A.2: IMC sempre derivado
+    // na hora, nunca armazenado, mas retornado também por updateMe, não só
+    // por calculateMacros).
+    let recalculatedMacros: ReturnType<typeof calculateMacroTargets> | null = null;
+
+    // Só recalcula se TODO dado necessário já existir (ex.: weight/height
+    // continuam opcionais até o onboarding os preencher) — sem isso,
+    // aplica só os campos que vieram no body, sem recalcular nada.
+    if (
+      shouldRecalculateMacroTargets &&
+      typeof mergedWeight === 'number' &&
+      typeof mergedHeight === 'number' &&
+      mergedBirthDate &&
+      mergedBiologicalSex &&
+      mergedActivityLevel &&
+      mergedWeightGoal &&
+      mergedGoal
+    ) {
+      const recalculated = calculateMacroTargets({
+        weight: mergedWeight,
+        height: mergedHeight,
+        birthDate: mergedBirthDate,
+        biologicalSex: mergedBiologicalSex,
+        activityLevel: mergedActivityLevel,
+        goal: mergedGoal,
+        weightGoal: mergedWeightGoal,
+      });
+      recalculatedMacros = recalculated;
+
+      // O valor recalculado prevalece sobre um valor manual de
+      // dailyProteinTarget/dailyCalorieTarget/dailyCarbTarget enviado no
+      // MESMO request (ex.: weight e dailyProteinTarget juntos no body) —
+      // decisão explícita do prompt desta correção, não alterada aqui.
+      updates.dailyProteinTarget = recalculated.dailyProteinTarget;
+      updates.dailyCalorieTarget = recalculated.dailyCalorieTarget;
+      updates.dailyCarbTarget = recalculated.dailyCarbTarget;
+      updates.dailyFatTarget = recalculated.dailyFatTarget;
+    }
+
+    // Previsão de prazo (targetWeight) — independente de
+    // shouldRecalculateMacroTargets, porque depende só de weight/weightGoal/
+    // targetWeight já salvos ou recém-patchados, nunca da meta de macro em
+    // si. Omitida inteiramente (undefined) se targetWeight não existir.
+    const weightTargetEta =
+      typeof mergedWeight === 'number' && typeof mergedTargetWeight === 'number' && mergedWeightGoal
+        ? calculateWeightTargetEta(mergedWeight, mergedTargetWeight, mergedWeightGoal)
+        : undefined;
+
+    // Avisos de edição manual de proteína/calorias/carboidrato/gordura
+    // (CP-A.2 Tarefa 6; carboidrato adicionado no CP-A.2.3; gordura nesta
+    // correção) — só quando NENHUM campo-gatilho vem no mesmo body. Se
+    // viesse, o valor recalculado prevaleceria (ver acima) e o manual nem
+    // chegaria a ser salvo — avaliar aqui seria avaliar um valor que não
+    // vai pro banco.
+    const isManualMacroEdit =
+      !shouldRecalculateMacroTargets &&
+      (dailyProteinTarget !== undefined ||
+        dailyCalorieTarget !== undefined ||
+        dailyCarbTarget !== undefined ||
+        dailyFatTarget !== undefined);
+
+    let macroEditWarnings: MacroEditWarning[] = [];
+
+    if (isManualMacroEdit) {
+      // Mesma lógica/função de BMR+TDEE já existente — não duplicada. Como
+      // shouldRecalculateMacroTargets é false aqui, os 7 campos abaixo são
+      // exatamente os valores já salvos (mergedX === currentUser.X neste
+      // caminho, já que nenhum deles veio no body).
+      const currentBmrAndTdee =
+        typeof mergedWeight === 'number' &&
+        typeof mergedHeight === 'number' &&
+        mergedBirthDate &&
+        mergedBiologicalSex &&
+        mergedActivityLevel &&
+        mergedWeightGoal &&
+        mergedGoal
+          ? calculateMacroTargets({
+              weight: mergedWeight,
+              height: mergedHeight,
+              birthDate: mergedBirthDate,
+              biologicalSex: mergedBiologicalSex,
+              activityLevel: mergedActivityLevel,
+              goal: mergedGoal,
+              weightGoal: mergedWeightGoal,
+            })
+          : null;
+
+      macroEditWarnings = evaluateManualMacroEditWarnings({
+        dailyProteinTarget,
+        dailyCalorieTarget,
+        dailyCarbTarget,
+        dailyFatTarget,
+        currentWeight: mergedWeight,
+        bmr: currentBmrAndTdee?.bmr,
+        tdee: currentBmrAndTdee?.tdee,
+      });
+    }
+
+    // Histórico de peso — uma entrada nova só quando `weight` vem no body E
+    // é diferente do valor atualmente salvo (currentUser.weight, de ANTES
+    // deste PATCH). `weight !== currentUser.weight` já cobre a primeira
+    // definição também, já que undefined !== qualquer número.
+    const weightHistoryEntry =
+      weight !== undefined && weight !== currentUser.weight
+        ? { weight, recordedAt: new Date() }
+        : null;
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      {
+        $set: updates,
+        ...(weightHistoryEntry && { $push: { weightHistory: weightHistoryEntry } }),
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
 
     if (!user) {
       sendErrorResponse(res, {
@@ -850,21 +1008,72 @@ export async function updateMe(
           profilePhoto: user.profilePhoto,
           blendiModel: user.blendiModel,
           goal: user.goal,
+          weightGoal: user.weightGoal,
           locale: user.locale,
           unitSystem: user.unitSystem,
           timezone: user.timezone,
           dailyProteinTarget: user.dailyProteinTarget,
           dailyCalorieTarget: user.dailyCalorieTarget,
           dailyCarbTarget: user.dailyCarbTarget ?? 200,
+          dailyFatTarget: user.dailyFatTarget,
           dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
           isPro: user.isPro ?? false,
           longestStreak: user.longestStreak ?? 0,
           weight: user.weight,
           height: user.height,
+          targetWeight: user.targetWeight,
+          activityLevel: user.activityLevel,
+          birthDate: user.birthDate,
+          biologicalSex: user.biologicalSex,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
+          ...(recalculatedMacros && {
+            imc: recalculatedMacros.imc,
+            imcUnit: recalculatedMacros.imcUnit,
+            imcClassification: recalculatedMacros.imcClassification,
+          }),
+          ...(weightTargetEta && { weightTargetEta }),
+          ...(macroEditWarnings.length > 0 && { warnings: macroEditWarnings }),
         },
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getWeightHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findById(userId).select({ weightHistory: 1 }).lean();
+
+    if (!user) {
+      sendErrorResponse(res, {
+        statusCode: 404,
+        code: 'resource/not-found',
+        message: 'User not found.',
+      });
+      return;
+    }
+
+    // Ordenado explicitamente por recordedAt ascendente — não confia só na
+    // ordem de inserção do $push, embora na prática já saia nessa ordem.
+    const weightHistory = [...(user.weightHistory ?? [])].sort(
+      (a, b) => a.recordedAt.getTime() - b.recordedAt.getTime()
+    );
+
+    res.status(200).json({
+      success: true,
+      data: { weightHistory },
     });
   } catch (err) {
     next(err);
@@ -877,42 +1086,94 @@ export async function calculateMacros(
   next: NextFunction
 ): Promise<void> {
   try {
-    const parsed = calculateMacrosSchema.safeParse(req.body);
+    // Stopgap até o CP-B coletar birthDate/biologicalSex/weightGoal numa
+    // tela própria do onboarding mobile (ver
+    // docs/fixes/cp-a.7-fallback-onboarding-calculate-macros.md). Hoje
+    // OnboardingBodyScreen não envia esses 3 campos, e os 3 são obrigatórios
+    // em calculateMacrosSchema — sem este fallback, toda chamada real do
+    // mobile recebe 400. Um valor realmente enviado no corpo (mesmo
+    // diferente do salvo) sempre prevalece; o perfil salvo só entra quando o
+    // campo vem undefined.
+    const needsProfileFallback =
+      req.body?.birthDate === undefined ||
+      req.body?.biologicalSex === undefined ||
+      req.body?.weightGoal === undefined;
+
+    let body: unknown = req.body;
+
+    if (needsProfileFallback) {
+      const userId = req.user?.sub;
+      if (!userId) {
+        sendUnauthorized(res);
+        return;
+      }
+
+      const user = await UserModel.findById(userId)
+        .select({ birthDate: 1, biologicalSex: 1, weightGoal: 1 })
+        .lean();
+
+      if (!user) {
+        sendErrorResponse(res, {
+          statusCode: 404,
+          code: 'resource/not-found',
+          message: 'User not found.',
+        });
+        return;
+      }
+
+      body = {
+        ...req.body,
+        birthDate:
+          req.body?.birthDate !== undefined
+            ? req.body.birthDate
+            : user.birthDate.toISOString().slice(0, 10),
+        biologicalSex:
+          req.body?.biologicalSex !== undefined ? req.body.biologicalSex : user.biologicalSex,
+        weightGoal: req.body?.weightGoal !== undefined ? req.body.weightGoal : user.weightGoal,
+      };
+    }
+
+    const parsed = calculateMacrosSchema.safeParse(body);
     if (!parsed.success) {
       sendValidationError(res, parsed.error);
       return;
     }
 
-    const { weight, height, activityLevel, goal, unitSystem } = parsed.data;
+    const { weight, height, birthDate, biologicalSex, activityLevel, goal, weightGoal, targetWeight, unitSystem } =
+      parsed.data;
 
     const metricWeight = unitSystem === 'imperial' ? weight / POUNDS_PER_KILOGRAM : weight;
     const metricHeight = unitSystem === 'imperial' ? height * CENTIMETERS_PER_INCH : height;
+    const metricTargetWeight =
+      targetWeight === undefined
+        ? undefined
+        : unitSystem === 'imperial'
+          ? targetWeight / POUNDS_PER_KILOGRAM
+          : targetWeight;
 
-    const heightInMeters = metricHeight / 100;
-    const imc = roundToOneDecimal(metricWeight / (heightInMeters * heightInMeters));
+    const result = calculateMacroTargets({
+      weight: metricWeight,
+      height: metricHeight,
+      birthDate,
+      biologicalSex,
+      activityLevel,
+      goal,
+      weightGoal,
+    });
 
-    const imcClassification =
-      imc < 18.5 ? 'underweight' : imc < 25 ? 'normal' : imc < 30 ? 'overweight' : 'obese';
-
-    const basalMetabolism = (10 * metricWeight) + (6.25 * metricHeight) - (5 * ASSUMED_AGE) + 5;
-    const tdee = Math.round(basalMetabolism * ACTIVITY_MULTIPLIERS[activityLevel]);
-    const dailyCalorieTarget = Math.round(tdee + CALORIE_ADJUSTMENTS[goal]);
-    const dailyProteinTarget = Math.round(metricWeight * PROTEIN_MULTIPLIERS[goal]);
-    const dailyFatCalories = dailyCalorieTarget * 0.3;
-    const dailyCarbTarget = Math.round(
-      (dailyCalorieTarget - (dailyProteinTarget * 4) - dailyFatCalories) / 4
-    );
+    // O fallback de perfil acima (quando usado) cobre só birthDate/
+    // biologicalSex/weightGoal — nunca o peso. Por isso a previsão de prazo
+    // continua existindo só quando o próprio payload traz targetWeight.
+    const weightTargetEta =
+      metricTargetWeight === undefined
+        ? undefined
+        : calculateWeightTargetEta(metricWeight, metricTargetWeight, weightGoal);
 
     res.status(200).json({
       success: true,
       data: {
-        imc,
-        imcUnit: 'kg/m²',
-        imcClassification,
-        dailyCalorieTarget,
-        dailyProteinTarget,
-        dailyCarbTarget,
-        tdee,
+        ...result,
+        ...(weightTargetEta && { weightTargetEta }),
       },
     });
   } catch (err) {

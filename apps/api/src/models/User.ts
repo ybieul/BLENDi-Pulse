@@ -4,10 +4,47 @@ import { randomUUID } from 'node:crypto';
 import mongoose, { type Document, type Model } from 'mongoose';
 import argon2 from 'argon2';
 
+// Exceção pontual à convenção deste arquivo de não importar de
+// @blendi/shared (os outros tipos redeclarados aqui — UserGoal, BlendiModel
+// etc. — continuam como estão). Só pros limites numéricos de validação dos
+// campos de macro, centralizados no Zod desde o CP-A.1/CP-A.2.2 — evita uma
+// cópia solta dos mesmos números só neste arquivo. DAILY_PROTEIN_TARGET_
+// VALIDATION_MIN/MAX (não DAILY_PROTEIN_TARGET_MIN/MAX — esse par é o clamp
+// automático, usado só em macroCalculation.utils.ts, nunca na validação do
+// schema) é a correção do CP-A.2.2: desacopla a validação de edição manual
+// do clamp do cálculo automático.
+import {
+  DAILY_CALORIE_TARGET_MAX,
+  DAILY_CALORIE_TARGET_MIN,
+  DAILY_CARB_TARGET_MAX,
+  DAILY_CARB_TARGET_MIN,
+  DAILY_FAT_TARGET_MAX,
+  DAILY_FAT_TARGET_MIN,
+  DAILY_PROTEIN_TARGET_VALIDATION_MAX,
+  DAILY_PROTEIN_TARGET_VALIDATION_MIN,
+  MAX_PLAUSIBLE_AGE_YEARS,
+  MIN_PLAUSIBLE_AGE_YEARS,
+} from '@blendi/shared';
+
+// Reaproveitada pelo validador de idade plausível de `birthDate` (abaixo) —
+// sem risco de ciclo real: macroCalculation.utils.ts só importa TIPOS deste
+// arquivo (`import type {...}`), que são erased na compilação, então o
+// grafo de módulos em runtime é só User.ts -> macroCalculation.utils.ts,
+// nunca os dois sentidos (CP-A.2.4, confirmado via tsc --noEmit).
+import { calculateAge } from '../utils/macroCalculation.utils';
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+export type BiologicalSex = 'male' | 'female';
+export type WeightGoal = 'lose' | 'maintain' | 'gain';
+export type ActivityLevel =
+  | 'sedentary'
+  | 'lightlyActive'
+  | 'moderatelyActive'
+  | 'veryActive'
+  | 'extremelyActive';
 export type UserLocale = 'en' | 'pt-BR';
 export type UserUnitSystem = 'metric' | 'imperial';
 export type SupplementTiming = 'morning' | 'preWorkout' | 'postWorkout' | 'evening' | 'withMeal';
@@ -41,6 +78,11 @@ export interface IUserLastLevelUp {
   awardedAt: Date;
 }
 
+export interface IUserWeightHistoryEntry {
+  weight: number;
+  recordedAt: Date;
+}
+
 export interface IUser {
   email: string;
   /**
@@ -64,6 +106,12 @@ export interface IUser {
   name: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
+  /**
+   * Objetivo de peso corporal (perder/manter/ganhar) — independente de
+   * `goal`, que é só a proposta do blend/conteúdo do Pulse AI. Único campo
+   * que controla o ajuste calórico do TDEE em `calculateMacros`.
+   */
+  weightGoal: WeightGoal;
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   /**
@@ -80,6 +128,13 @@ export interface IUser {
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget?: number;
+  /**
+   * Meta diária de gordura em gramas — derivada de dailyFatCalories (30% das
+   * calorias) em calculateMacroTargets. Opcional: contas criadas antes desta
+   * adição (ou que nunca passaram por um recálculo de updateMe) não têm esse
+   * campo até a primeira vez que a meta for recalculada.
+   */
+  dailyFatTarget?: number;
   dailyHydrationTarget: number;
   supplementStack: IUserSupplement[];
   currentStreak: number;
@@ -92,6 +147,37 @@ export interface IUser {
   weight?: number;
   /** Altura em centímetros. Opcional até o onboarding coletar o valor. */
   height?: number;
+  /**
+   * Peso-alvo em quilogramas — opcional, nunca obrigatório. Usado só pra
+   * calcular `weightTargetEta` (ver `calculateWeightTargetEta`); não afeta
+   * nenhuma meta de macro em si.
+   */
+  targetWeight?: number;
+  /**
+   * Histórico de peso — uma entrada por valor de `weight` efetivamente
+   * diferente do já salvo, gravada em `updateMe` (ver `PATCH /users/me`).
+   * Nunca há entrada duplicada para o mesmo valor consecutivo. A primeira
+   * entrada é criada pela mesma primeira definição de `weight` (hoje, só
+   * via PATCH /users/me — `calculateMacros` é stateless e nunca grava no
+   * usuário). Lida via `GET /users/me/weight-history`.
+   */
+  weightHistory: IUserWeightHistoryEntry[];
+  /**
+   * Data de nascimento. Usada para derivar a idade real no momento do
+   * cálculo de BMR/TDEE (ver `calculateMacros`) — a idade nunca é
+   * armazenada como número, porque ficaria desatualizada com o tempo
+   * sem que nada precisasse escrevê-la de novo.
+   */
+  birthDate: Date;
+  /** Sexo biológico — usado só para a constante da fórmula de Mifflin-St Jeor (+5 / −161). */
+  biologicalSex: BiologicalSex;
+  /**
+   * Nível de atividade usado no multiplicador de TDEE. Precisa ficar
+   * persistido (e não só transitar no payload de `calculateMacros`) para
+   * que `updateMe` saiba recalcular a meta mesmo quando o PATCH só traz
+   * outro campo-gatilho (ex.: `weightGoal` sozinho).
+   */
+  activityLevel: ActivityLevel;
   /**
    * Quantos scans do Pantry Scanner já foram consumidos no mês corrente.
    * Usado pelo rate limiting atômico do free tier e do Pro.
@@ -296,6 +382,24 @@ const userLastLevelUpSchema = new mongoose.Schema<IUserLastLevelUp>(
   }
 );
 
+const userWeightHistorySchema = new mongoose.Schema<IUserWeightHistoryEntry>(
+  {
+    weight: {
+      type: Number,
+      required: [true, 'errors.validation.required'],
+      min: [20, 'errors.validation.number_range'],
+      max: [300, 'errors.validation.number_range'],
+    },
+    recordedAt: {
+      type: Date,
+      required: [true, 'errors.validation.required'],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
@@ -354,6 +458,11 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       enum: ['Muscle', 'Wellness', 'Energy', 'Recovery'] satisfies UserGoal[],
       required: [true, 'errors.validation.required'],
     },
+    weightGoal: {
+      type: String,
+      enum: ['lose', 'maintain', 'gain'] satisfies WeightGoal[],
+      required: [true, 'errors.validation.required'],
+    },
     locale: {
       type: String,
       enum: ['en', 'pt-BR'] satisfies UserLocale[],
@@ -388,21 +497,27 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     dailyProteinTarget: {
       type: Number,
       required: [true, 'errors.validation.required'],
-      min: [10, 'errors.validation.number_range'],
-      max: [400, 'errors.validation.number_range'],
+      min: [DAILY_PROTEIN_TARGET_VALIDATION_MIN, 'errors.validation.number_range'],
+      max: [DAILY_PROTEIN_TARGET_VALIDATION_MAX, 'errors.validation.number_range'],
     },
     dailyCalorieTarget: {
       type: Number,
       required: [true, 'errors.validation.required'],
-      min: [500, 'errors.validation.number_range'],
-      max: [10000, 'errors.validation.number_range'],
+      min: [DAILY_CALORIE_TARGET_MIN, 'errors.validation.number_range'],
+      max: [DAILY_CALORIE_TARGET_MAX, 'errors.validation.number_range'],
     },
     dailyCarbTarget: {
       type: Number,
       required: false,
       default: 200,
-      min: [50, 'errors.validation.number_range'],
-      max: [800, 'errors.validation.number_range'],
+      min: [DAILY_CARB_TARGET_MIN, 'errors.validation.number_range'],
+      max: [DAILY_CARB_TARGET_MAX, 'errors.validation.number_range'],
+    },
+    dailyFatTarget: {
+      type: Number,
+      required: false,
+      min: [DAILY_FAT_TARGET_MIN, 'errors.validation.number_range'],
+      max: [DAILY_FAT_TARGET_MAX, 'errors.validation.number_range'],
     },
     dailyHydrationTarget: {
       type: Number,
@@ -473,6 +588,51 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: false,
       min: [100, 'errors.validation.number_range'],
       max: [250, 'errors.validation.number_range'],
+    },
+    targetWeight: {
+      type: Number,
+      required: false,
+      min: [20, 'errors.validation.number_range'],
+      max: [300, 'errors.validation.number_range'],
+    },
+    weightHistory: {
+      type: [userWeightHistorySchema],
+      default: [],
+    },
+    birthDate: {
+      type: Date,
+      required: [true, 'errors.validation.required'],
+      // Idade plausível (13-120), não só formato — reaproveita calculateAge
+      // (../utils/macroCalculation.utils.ts), a mesma função usada pelo
+      // cálculo de BMR/TDEE. Ao contrário do .refine() equivalente em
+      // packages/shared/src/schemas/user.ts (que precisa duplicar o
+      // algoritmo porque packages/shared não pode importar de apps/api),
+      // este validador já está DENTRO de apps/api — sem motivo de
+      // dependência circular pra duplicar aqui (CP-A.2.4: confirmado que
+      // a duplicação original era desnecessária, corrigida).
+      validate: {
+        validator: function (value: Date) {
+          const age = calculateAge(value, new Date());
+          return age >= MIN_PLAUSIBLE_AGE_YEARS && age <= MAX_PLAUSIBLE_AGE_YEARS;
+        },
+        message: 'errors.validation.number_range',
+      },
+    },
+    biologicalSex: {
+      type: String,
+      enum: ['male', 'female'] satisfies BiologicalSex[],
+      required: [true, 'errors.validation.required'],
+    },
+    activityLevel: {
+      type: String,
+      enum: [
+        'sedentary',
+        'lightlyActive',
+        'moderatelyActive',
+        'veryActive',
+        'extremelyActive',
+      ] satisfies ActivityLevel[],
+      required: [true, 'errors.validation.required'],
     },
     scanCount: {
       type: Number,

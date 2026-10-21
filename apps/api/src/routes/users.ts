@@ -4,6 +4,7 @@ import {
   deleteProfilePhoto,
   getMe,
   getMyProfilePhoto,
+  getWeightHistory,
   markCleaned,
   uploadProfilePhoto,
   updateDailyPulseTime,
@@ -26,6 +27,14 @@ usersRouter.get('/me', authenticate, getMe);
  * Retorna apenas a foto de perfil pesada do usuário autenticado.
  */
 usersRouter.get('/me/photo', authenticate, getMyProfilePhoto);
+
+/**
+ * GET /users/me/weight-history  🔒 autenticado
+ * Retorna o histórico de peso do usuário, ordenado por recordedAt
+ * ascendente. Sem paginação — volume esperado é baixo (uma entrada por
+ * mudança real de peso, não por request).
+ */
+usersRouter.get('/me/weight-history', authenticate, getWeightHistory);
 
 /**
  * PATCH /users/me  🔒 autenticado

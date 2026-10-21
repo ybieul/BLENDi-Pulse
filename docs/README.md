@@ -88,6 +88,19 @@ To be documented as phases are implemented.
 
 To be documented as phases are implemented.
 
+### Fixes — Macro Calculation Correction Track
+
+A lettered track (CP-A, CP-A.1, CP-A.2, ...) parallel to the numbered phase roadmap, scoped to correcting the pre-launch macro/BMR calculation bug (idade e sexo reais, `weightGoal` separado de `goal`, recálculo automático, avisos de edição manual). Documents for this track live in `docs/fixes/` instead of a `phase-N` folder.
+
+| Checkpoint | Document | Description |
+|---|---|---|
+| CP-A.2 | [fixes/cp-a.2-macros-complementares.md](fixes/cp-a.2-macros-complementares.md) | `dailyFatTarget` exposed, `extremelyActive` activity level, consistent IMC in `updateMe`, `targetWeight` with ETA prediction, weight history endpoint, and non-blocking manual-edit warnings for protein/calories. Revised in place by CP-A.2.2 (full numeric-limit audit, widened `dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget`, decoupled `dailyProteinTarget` validation from the automatic clamp) by CP-A.2.3 (plausible-age validation on `birthDate`, symmetric carb warning, 1,200kcal floor on the automatic calorie suggestion, and budget-based protein reclamp guaranteeing non-negative carbs by construction), and by CP-A.2.4 (verified the `dailyFatTarget` import, the `targetWeight` finding's chronology, and removed a duplicated age calculation in the Mongoose validator by reusing `calculateAge`) |
+| CP-A.2.1 | [fixes/cp-a.2.1-overlap-select.md](fixes/cp-a.2.1-overlap-select.md) | Confirmed with a real test that `warnings` and `weightTargetEta` can appear together in the same `updateMe` response (only `imc` is mutually exclusive with `warnings`), corrected the CP-A.2 doc, and added a field-projected `.select()` to the already-unconditional `currentUser` read |
+| CP-A.3 | [fixes/cp-a.3-targetweight-piso-e-gordura-manual.md](fixes/cp-a.3-targetweight-piso-e-gordura-manual.md) | `calculateMacrosSchema.targetWeight` floor/ceiling (20-300, matching `updateUserSchema`), and manual `dailyFatTarget` editing with the same sanity limit and non-blocking warning mechanism already used by protein/calories/carbs |
+| CP-A.4 | [fixes/cp-a.4-registro-de-conta-e-historico-de-peso.md](fixes/cp-a.4-registro-de-conta-e-historico-de-peso.md) | Root cause of account registration being broken on both paths (direct signup and Google OAuth) since CP-A — `UserModel.create()` never supplied the 4 fields required since the real BMR/TDEE fix — fixed with reused placeholder defaults; weight history growth audited and found structurally capped at one entry per account under the current UI, pagination deliberately not implemented with the decision documented |
+
+CP-A and CP-A.1 (idade/sexo reais, `weightGoal`, recálculo automático em `updateMe`, `goal` como gatilho, clamp de proteína) predate this folder and have their own root-level reports: [cp-a-macros.md](../cp-a-macros.md) and [cp-a1-macros.md](../cp-a1-macros.md).
+
 ---
 
 ## Key Decisions
@@ -118,6 +131,7 @@ To be documented as phases are implemented.
 - Macro validation tolerance set to 15%: accommodates real-world macro variance across brands, ingredient ripeness, and preparation method — below that threshold, the math is considered to reconcile for practical purposes.
 - `XPLog` and `DailyMission` TTL increased to 90 days: the original 48h TTL was designed only for old-log cleanup, since idempotency is guaranteed by the unique index rather than the TTL itself; the increase was required so the weekly report cron can aggregate the full previous week of data.
 - Weekly report streak data derived from `BlendLog` instead of stored snapshots: `streakAtStart` and `streakAtEnd` were replaced by `blendDaysInWeek` and `streakBrokenOnDate`, removing the need for historical streak snapshots without losing informational value.
+- Weight history left unpaginated for now (CP-A.4): growth is structurally capped at one entry per account under the current UI (no screen allows editing weight after onboarding), confirmed against real data (3 total accounts, 0 entries each) — revisit only if a future feature allows editing weight repeatedly after onboarding, since that changes the growth model entirely.
 
 ---
 

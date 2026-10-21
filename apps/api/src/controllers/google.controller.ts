@@ -35,6 +35,7 @@ import {
 } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
 import { env } from '../config/env';
+import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
 
 // Instância única compartilhada pelos handlers
 const emailService = new EmailService();
@@ -175,6 +176,12 @@ export async function handleGoogleCallback(
         // Caso 3: primeiro acesso via Google → cria nova conta
         // Valores padrão de onboarding — o app mobile pedirá os dados reais
         // na tela de onboarding logo após o primeiro login
+        //
+        // weightGoal/biologicalSex/activityLevel/birthDate (getAccountCreationBodyProfileDefaults)
+        // são placeholders pelo mesmo motivo de auth.controller.ts (register):
+        // obrigatórios no modelo desde cp-a-macros.md, mas o Google OAuth não
+        // fornece nenhum deles — sem isso, esta chamada sempre falhava com
+        // ValidationError (causa raiz do cadastro via Google quebrado).
         user = await UserModel.create({
           email: userInfo.email,
           name: userInfo.name,
@@ -188,6 +195,7 @@ export async function handleGoogleCallback(
           dailyCalorieTarget: 2000,
           scanCount: 0,
           scanResetDate: addMonths(new Date(), 1),
+          ...getAccountCreationBodyProfileDefaults(),
         });
 
         isNewUser = true;

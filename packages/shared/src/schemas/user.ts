@@ -21,6 +21,112 @@ import { rangeErrorMessage } from '../utils/validationRange.utils';
 const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
 const unitSystemValues = ['metric', 'imperial'] as const;
+const biologicalSexValues = ['male', 'female'] as const;
+const weightGoalValues = ['lose', 'maintain', 'gain'] as const;
+const activityLevelValues = [
+  'sedentary',
+  'lightlyActive',
+  'moderatelyActive',
+  'veryActive',
+  'extremelyActive',
+] as const;
+const weightTargetEtaUnavailableReasonValues = ['weightGoal_is_maintain', 'contradictory_direction'] as const;
+
+// Limites do CLAMP automático de dailyProteinTarget (calculateMacroTargets,
+// apps/api/src/utils/macroCalculation.utils.ts) — 10-400, decisão do CP-A.1,
+// INTOCADA pelo CP-A.2.2. Deliberadamente DESACOPLADO (desde o CP-A.2.2) do
+// limite de VALIDAÇÃO do schema (ver DAILY_PROTEIN_TARGET_VALIDATION_MIN/MAX
+// abaixo) — o clamp nunca participa do caminho de edição manual pura (sem
+// campo-gatilho no body de PATCH /users/me), então travar a validação do
+// schema no mesmo par do clamp rejeitava uma edição manual legítima acima de
+// 400g (ex. meta prescrita por nutricionista) com ValidationError, mesmo o
+// clamp nunca tendo chance de agir nesse caminho.
+export const DAILY_PROTEIN_TARGET_MIN = 10;
+export const DAILY_PROTEIN_TARGET_MAX = 400;
+
+// Limites de VALIDAÇÃO de dailyProteinTarget (Zod e Mongoose) — deliberadamente
+// mais largos que o clamp acima. Piso igual ao do clamp (sem motivo pra
+// mudar); teto (800) confirmado por calculo: maior peso aceito pelo schema
+// (300kg) × maior multiplicador de PROTEIN_MULTIPLIERS (Recovery, 2.2g/kg)
+// = 660g — 800 fica acima com margem, mesmo numa edição manual extrema.
+export const DAILY_PROTEIN_TARGET_VALIDATION_MIN = 10;
+export const DAILY_PROTEIN_TARGET_VALIDATION_MAX = 800;
+
+// Limites de dailyCalorieTarget/dailyCarbTarget/dailyFatTarget — única fonte
+// pros três schemas (Zod ×2 + Mongoose). Alargados no CP-A.2.2: os limites
+// antigos (500-10.000 / 50-800) rejeitavam perfis plausíveis, não só dados
+// quebrados (ex.: mulher 40kg/150cm/70 anos sedentária weightGoal 'lose' —
+// meta real de 492kcal, abaixo do piso antigo de 500). Filosofia explícita:
+// este piso/teto é só proteção de sanidade contra dado obviamente quebrado
+// (negativo, NaN, erro de digitação) — a orientação de "dieta saudável" já
+// existe à parte, no aviso suave não-bloqueante (evaluateManualMacroEditWarnings,
+// CP-A.2 Tarefa 6), que não muda aqui.
+export const DAILY_CALORIE_TARGET_MIN = 300;
+export const DAILY_CALORIE_TARGET_MAX = 15_000;
+export const DAILY_CARB_TARGET_MIN = 0;
+export const DAILY_CARB_TARGET_MAX = 1_500;
+// dailyFatTarget: já tinha um limite (0-500, só no Mongoose, nunca unificado)
+// — alargado pra 0-600, margem segura acima do que a fórmula produz mesmo no
+// novo teto de calorias (15.000×0,3÷9=500).
+export const DAILY_FAT_TARGET_MIN = 0;
+export const DAILY_FAT_TARGET_MAX = 600;
+
+// Piso de sanidade só da SUGESTÃO automática de dailyCalorieTarget
+// (calculateMacroTargets) — CP-A.2.3. Não é um limite de validação de
+// schema (esse continua DAILY_CALORIE_TARGET_MIN/MAX, 300-15.000, sem
+// mudança): uma edição MANUAL entre 300 e 1.200 continua aceita
+// normalmente. Nome deliberadamente diferente pra não confundir os dois.
+export const AUTO_CALORIE_TARGET_MIN_SUGGESTION = 1_200;
+
+// Idade plausível derivada de birthDate — CP-A.2.3. Confirmado na auditoria
+// do CP-A.2.2 que nunca existiu nenhum limite de idade em lugar nenhum (só
+// formato de data). 13-120: biologicamente plausível e compatível com um
+// app de nutrição/suplementação (não um produto infantil).
+export const MIN_PLAUSIBLE_AGE_YEARS = 13;
+export const MAX_PLAUSIBLE_AGE_YEARS = 120;
+
+// Mesmo algoritmo de apps/api/src/utils/macroCalculation.utils.ts
+// (calculateAge) — duplicado deliberadamente aqui, não importado: a direção
+// de dependência do monorepo é só apps/* -> packages/shared, nunca o
+// inverso, e esta validação precisa rodar nos dois lados (mobile e
+// backend) que consomem este schema Zod.
+function calculatePlausibleAgeFromBirthDate(birthDate: Date, now: Date): number {
+  let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
+
+  const birthdayNotYetReachedThisYear =
+    now.getUTCMonth() < birthDate.getUTCMonth() ||
+    (now.getUTCMonth() === birthDate.getUTCMonth() && now.getUTCDate() < birthDate.getUTCDate());
+
+  if (birthdayNotYetReachedThisYear) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+// Data de nascimento — usada por calculateMacrosSchema e updateUserSchema para
+// derivar a idade real no momento do cálculo (ver calculateMacros no backend).
+// Aceita só o formato de data pura ISO 8601 (YYYY-MM-DD, sem hora/fuso — uma
+// data de nascimento não tem componente de hora) e transforma em Date. Não usa
+// z.date()/z.coerce.date() porque nenhum dos dois preserva as chaves de i18n
+// customizadas em todos os casos de erro (z.date() exige um objeto Date já
+// desserializado, que nunca chega assim via JSON; z.coerce.date() aceita
+// null/boolean/number e os converte silenciosamente em datas bogus, e usa a
+// mensagem hardcoded "Invalid date" — não uma chave — para string malformada).
+const birthDateSchema = z
+  .string({
+    required_error: 'errors.validation.required',
+    invalid_type_error: 'errors.validation.required',
+  })
+  .date('errors.validation.invalid_option')
+  .transform(value => new Date(value))
+  .refine(
+    date => {
+      const age = calculatePlausibleAgeFromBirthDate(date, new Date());
+      return age >= MIN_PLAUSIBLE_AGE_YEARS && age <= MAX_PLAUSIBLE_AGE_YEARS;
+    },
+    rangeErrorMessage(MIN_PLAUSIBLE_AGE_YEARS, MAX_PLAUSIBLE_AGE_YEARS)
+  );
 
 export const notificationPreferencesSchema = z.object({
   dailyPulse: z.boolean().optional(),
@@ -63,32 +169,56 @@ export const updateUserSchema = z
       message: 'errors.validation.invalid_option',
     }),
 
+    weightGoal: z.enum(weightGoalValues, {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
+    activityLevel: z.enum(activityLevelValues, {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
     dailyProteinTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(10, 400),
+        invalid_type_error: rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX),
       })
       .int('errors.validation.integer')
-      .min(10, rangeErrorMessage(10, 400))
-      .max(400, rangeErrorMessage(10, 400)),
+      .min(DAILY_PROTEIN_TARGET_VALIDATION_MIN, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX))
+      .max(DAILY_PROTEIN_TARGET_VALIDATION_MAX, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX)),
 
     dailyCalorieTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(500, 10_000),
+        invalid_type_error: rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX),
       })
       .int('errors.validation.integer')
-      .min(500, rangeErrorMessage(500, 10_000))
-      .max(10_000, rangeErrorMessage(500, 10_000)),
+      .min(DAILY_CALORIE_TARGET_MIN, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX))
+      .max(DAILY_CALORIE_TARGET_MAX, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX)),
 
     dailyCarbTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(50, 800),
+        invalid_type_error: rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX),
       })
       .int('errors.validation.integer')
-      .min(50, rangeErrorMessage(50, 800))
-      .max(800, rangeErrorMessage(50, 800)),
+      .min(DAILY_CARB_TARGET_MIN, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX))
+      .max(DAILY_CARB_TARGET_MAX, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX)),
+
+    // Editável manualmente desde esta correção — mesmo padrão de
+    // dailyProteinTarget/dailyCalorieTarget/dailyCarbTarget acima. Reaproveita
+    // DAILY_FAT_TARGET_MIN/MAX (0-600), o limite de sanidade que já existia
+    // só no Mongoose (CP-A.2, Tarefa 1) pro valor calculado automaticamente —
+    // agora estendido pra também validar este caminho de edição manual.
+    dailyFatTarget: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX),
+      })
+      .int('errors.validation.integer')
+      .min(DAILY_FAT_TARGET_MIN, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX))
+      .max(DAILY_FAT_TARGET_MAX, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX)),
 
     dailyHydrationTarget: z
       .number({
@@ -114,6 +244,25 @@ export const updateUserSchema = z
       })
       .min(100, rangeErrorMessage(100, 250))
       .max(250, rangeErrorMessage(100, 250)),
+
+    // Peso-alvo (kg) — opcional, ao contrário de weight/height/birthDate/
+    // biologicalSex/weightGoal/activityLevel (obrigatórios desde o CP-A).
+    // Mesma faixa física de `weight`, já que representa o mesmo tipo de
+    // valor, só que como meta em vez de estado atual.
+    targetWeight: z
+      .number({
+        required_error: 'errors.validation.required',
+        invalid_type_error: rangeErrorMessage(20, 300),
+      })
+      .min(20, rangeErrorMessage(20, 300))
+      .max(300, rangeErrorMessage(20, 300)),
+
+    birthDate: birthDateSchema,
+
+    biologicalSex: z.enum(biologicalSexValues, {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
 
     scanCount: z
       .number({
@@ -166,12 +315,46 @@ export const calculateMacrosSchema = z.object({
     })
     .positive('errors.validation.number_range'),
 
-  activityLevel: z.enum(['sedentary', 'lightlyActive', 'moderatelyActive', 'veryActive'], {
+  // Opcional — calculateMacros é stateless (não lê o perfil do usuário), então
+  // a previsão de prazo só aparece na resposta se o próprio payload trouxer
+  // targetWeight. Piso/teto (20-300) alinhados com updateUserSchema.targetWeight
+  // abaixo — mesmos números, mesma unidade (kg). Antes só `.positive()`, o que
+  // deixava este endpoint aceitar um peso-alvo absurdamente baixo (ex.: 0,5kg),
+  // já que calculateMacros nunca salva o perfil e por isso nunca passava pela
+  // validação de updateUserSchema. Nota: igual a `weight`/`height` abaixo, esta
+  // checagem assume o valor já em kg — o único caller real hoje
+  // (OnboardingBodyScreen, mobile) sempre converte pra métrico e envia
+  // `unitSystem: 'metric'` antes de chamar este endpoint; um `unitSystem:
+  // 'imperial'` com `targetWeight` em libras (ambos aceitos pelo schema) só
+  // seria convertido pro métrico DEPOIS desta validação, no controller
+  // (`calculateMacros`, user.controller.ts) — mesma limitação pré-existente
+  // de `weight`/`height` neste schema, não introduzida aqui.
+  targetWeight: z
+    .number({
+      invalid_type_error: rangeErrorMessage(20, 300),
+    })
+    .min(20, rangeErrorMessage(20, 300))
+    .max(300, rangeErrorMessage(20, 300))
+    .optional(),
+
+  birthDate: birthDateSchema,
+
+  biologicalSex: z.enum(biologicalSexValues, {
+    required_error: 'errors.validation.required',
+    message: 'errors.validation.invalid_option',
+  }),
+
+  activityLevel: z.enum(activityLevelValues, {
     required_error: 'errors.validation.required',
     message: 'errors.validation.invalid_option',
   }),
 
   goal: z.enum(userGoalValues, {
+    required_error: 'errors.validation.required',
+    message: 'errors.validation.invalid_option',
+  }),
+
+  weightGoal: z.enum(weightGoalValues, {
     required_error: 'errors.validation.required',
     message: 'errors.validation.invalid_option',
   }),
@@ -188,39 +371,39 @@ export const macroTargetSchema = z.object({
   dailyCalorieTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(500, 10_000),
+      invalid_type_error: rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX),
     })
     .int('errors.validation.integer')
-    .min(500, rangeErrorMessage(500, 10_000))
-    .max(10_000, rangeErrorMessage(500, 10_000)),
+    .min(DAILY_CALORIE_TARGET_MIN, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX))
+    .max(DAILY_CALORIE_TARGET_MAX, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX)),
 
   dailyProteinTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(10, 400),
+      invalid_type_error: rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX),
     })
     .int('errors.validation.integer')
-    .min(10, rangeErrorMessage(10, 400))
-    .max(400, rangeErrorMessage(10, 400)),
+    .min(DAILY_PROTEIN_TARGET_VALIDATION_MIN, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX))
+    .max(DAILY_PROTEIN_TARGET_VALIDATION_MAX, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX)),
 
   dailyCarbTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(50, 800),
+      invalid_type_error: rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX),
     })
     .int('errors.validation.integer')
-    .min(50, rangeErrorMessage(50, 800))
-    .max(800, rangeErrorMessage(50, 800))
+    .min(DAILY_CARB_TARGET_MIN, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX))
+    .max(DAILY_CARB_TARGET_MAX, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX))
     .optional(),
 
   dailyFatTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(0, 500),
+      invalid_type_error: rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX),
     })
     .int('errors.validation.integer')
-    .min(0, rangeErrorMessage(0, 500))
-    .max(500, rangeErrorMessage(0, 500))
+    .min(DAILY_FAT_TARGET_MIN, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX))
+    .max(DAILY_FAT_TARGET_MAX, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX))
     .optional(),
 });
 
@@ -246,6 +429,15 @@ export const timezoneSchema = z.object({
     .refine(isValidIanaTimezone, 'errors.validation.timezone_invalid'),
 });
 
+// Previsão de prazo pra atingir targetWeight — presente na resposta só
+// quando targetWeight foi informado (payload de calculateMacros ou perfil
+// já salvo, no caso do recálculo de updateMe). `etaDays` é `null` nos dois
+// casos descritos em `etaUnavailableReason`; nunca bloqueia o PATCH/POST.
+export const weightTargetEtaSchema = z.object({
+  etaDays: z.number().int().nullable(),
+  etaUnavailableReason: z.enum(weightTargetEtaUnavailableReasonValues).optional(),
+});
+
 export const calculateMacrosResponseSchema = z.object({
   imc: z.number(),
   imcUnit: z.literal('kg/m²'),
@@ -253,7 +445,9 @@ export const calculateMacrosResponseSchema = z.object({
   dailyCalorieTarget: z.number().int(),
   dailyProteinTarget: z.number().int(),
   dailyCarbTarget: z.number().int(),
+  dailyFatTarget: z.number().int(),
   tdee: z.number().int(),
+  weightTargetEta: weightTargetEtaSchema.optional(),
 });
 
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────

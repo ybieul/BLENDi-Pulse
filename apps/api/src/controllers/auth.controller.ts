@@ -22,6 +22,7 @@ import {
   isTokenExpiredError,
 } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
+import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -95,6 +96,12 @@ export async function register(
     }
 
     // 3. Criar usuário — a senha é hasheada pelo pre-save hook do modelo (Argon2id)
+    //
+    // weightGoal/biologicalSex/activityLevel/birthDate (getAccountCreationBodyProfileDefaults)
+    // são placeholders: o mobile ainda não tem tela que colete esses 4
+    // dados, e são obrigatórios no modelo desde cp-a-macros.md — sem eles,
+    // esta chamada sempre falhava com ValidationError (causa raiz do
+    // registro quebrado). Sobrescritos pelo primeiro PATCH /users/me real.
     const user = await UserModel.create({
       email,
       password,
@@ -105,6 +112,7 @@ export async function register(
       timezone,
       dailyProteinTarget,
       dailyCalorieTarget,
+      ...getAccountCreationBodyProfileDefaults(),
     });
 
     user.scanCount = 0;
