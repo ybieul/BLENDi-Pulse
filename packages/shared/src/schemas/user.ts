@@ -264,6 +264,14 @@ export const updateUserSchema = z
       message: 'errors.validation.invalid_option',
     }),
 
+    // Sinal explícito e transiente (CP-B.1) — nunca persistido no schema do
+    // Mongoose. Marca que este PATCH específico é o fluxo real de conclusão
+    // do onboarding de corpo (OnboardingMacrosScreen/CompleteProfileScreen),
+    // não uma edição pontual de um campo isolado (ex.: MeScreen). É o único
+    // jeito do backend saber quando setar `hasRealBodyProfile` — nunca por
+    // inferência de quais campos vieram no corpo.
+    completingBodyOnboarding: z.literal(true),
+
     scanCount: z
       .number({
         required_error: 'errors.validation.required',

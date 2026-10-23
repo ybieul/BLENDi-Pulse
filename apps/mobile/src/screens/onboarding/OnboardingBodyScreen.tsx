@@ -22,7 +22,7 @@ import {
 import { getLocales } from 'expo-localization';
 
 import type { CalculateMacrosResponse } from '@blendi/shared';
-import { colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
+import { calculateMacrosSchema, colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { api } from '../../config/api';
 import { UnitSystemToggle } from '../../components/ui/UnitSystemToggle';
 import { AuthButton } from '../../components/ui/AuthButton';
@@ -32,11 +32,19 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
 import { useOnboardingStore } from '../../store/onboarding.store';
+import {
+  BIRTH_DATE_MASKED_LENGTH,
+  birthDateInputToIso,
+  maskBirthDateInput,
+  translateBirthDateError,
+} from '../../utils/birthDate.utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ActivityLevel = 'sedentary' | 'lightlyActive' | 'moderatelyActive' | 'veryActive';
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+type BiologicalSex = 'male' | 'female';
+type WeightGoalOption = 'lose' | 'maintain' | 'gain';
 
 type OnboardingBodyScreenProps = {
   navigation: {
@@ -73,6 +81,27 @@ const ACTIVITY_LEVELS: ActivityConfig[] = [
   { key: 'veryActive', labelKey: 'onboarding.activityVery' },
 ];
 
+type BiologicalSexConfig = {
+  key: BiologicalSex;
+  labelKey: 'onboarding.biologicalSexMale' | 'onboarding.biologicalSexFemale';
+};
+
+const BIOLOGICAL_SEX_OPTIONS: BiologicalSexConfig[] = [
+  { key: 'male', labelKey: 'onboarding.biologicalSexMale' },
+  { key: 'female', labelKey: 'onboarding.biologicalSexFemale' },
+];
+
+type WeightGoalConfig = {
+  key: WeightGoalOption;
+  labelKey: 'onboarding.weightGoalLose' | 'onboarding.weightGoalMaintain' | 'onboarding.weightGoalGain';
+};
+
+const WEIGHT_GOAL_OPTIONS: WeightGoalConfig[] = [
+  { key: 'lose', labelKey: 'onboarding.weightGoalLose' },
+  { key: 'maintain', labelKey: 'onboarding.weightGoalMaintain' },
+  { key: 'gain', labelKey: 'onboarding.weightGoalGain' },
+];
+
 const IMC_CLASS_KEYS = {
   underweight: 'onboarding.imcUnderweight',
   normal: 'onboarding.imcNormal',
@@ -104,6 +133,9 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
 
   const [weightText, setWeightText] = useState('');
   const [heightText, setHeightText] = useState('');
+  const [birthDateText, setBirthDateText] = useState('');
+  const [biologicalSex, setBiologicalSex] = useState<BiologicalSex | null>(null);
+  const [weightGoal, setWeightGoal] = useState<WeightGoalOption | null>(null);
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<CalculateMacrosResponse | null>(null);
@@ -123,7 +155,22 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const storageHeight = toStorageHeight(rawHeightNum);
   const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
   const heightValid = typeof storageHeight === 'number' && storageHeight >= 100 && storageHeight <= 250;
-  const canFetch = weightValid && heightValid;
+
+  // birthDate validado pelo mesmo schema Zod do backend (calculateMacrosSchema.
+  // shape.birthDate, packages/shared/src/schemas/user.ts) — reaproveita a
+  // faixa de idade plausível (13-120) já estabelecida ali, sem duplicar a
+  // constante nem a lógica de cálculo de idade aqui.
+  const birthDateIso = birthDateInputToIso(birthDateText);
+  const birthDateValidation = birthDateIso
+    ? calculateMacrosSchema.shape.birthDate.safeParse(birthDateIso)
+    : null;
+  const birthDateValid = birthDateValidation?.success === true;
+  const birthDateError =
+    birthDateText.length === BIRTH_DATE_MASKED_LENGTH && birthDateValidation && !birthDateValidation.success
+      ? translateBirthDateError(t, birthDateValidation.error.issues[0]?.message ?? '')
+      : undefined;
+
+  const canFetch = weightValid && heightValid && birthDateValid && biologicalSex !== null && weightGoal !== null;
 
   // Requisição de cálculo de macros — usada tanto pelo debounce automático
   // quanto pelo retry manual. calculationRequestIdRef substitui o antigo
@@ -148,8 +195,11 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
         {
           weight: storageWeight,
           height: storageHeight,
+          birthDate: birthDateIso,
+          biologicalSex,
           activityLevel,
           goal,
+          weightGoal,
           unitSystem: 'metric',
         },
       );
@@ -167,7 +217,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
         setIsCalculating(false);
       }
     }
-  }, [activityLevel, canFetch, selectedGoal, storageHeight, storageWeight]);
+  }, [activityLevel, biologicalSex, birthDateIso, canFetch, selectedGoal, storageHeight, storageWeight, weightGoal]);
 
   // Debounced auto-cálculo — dispara runMacrosCalculation 600ms após a
   // última mudança de peso/altura/atividade/objetivo.
@@ -213,8 +263,22 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   }, [opacity, translateY]);
 
   const handleContinue = () => {
-    if (!result || typeof storageWeight !== 'number' || typeof storageHeight !== 'number') return;
-    setBodyData({ weight: storageWeight, height: storageHeight, activityLevel });
+    if (
+      !result ||
+      typeof storageWeight !== 'number' ||
+      typeof storageHeight !== 'number' ||
+      !birthDateIso ||
+      !biologicalSex ||
+      !weightGoal
+    ) return;
+    setBodyData({
+      weight: storageWeight,
+      height: storageHeight,
+      activityLevel,
+      birthDate: birthDateIso,
+      biologicalSex,
+      weightGoal,
+    });
     setUnitSystem(effectiveUnitSystem);
     setCalculatedMacros({
       calculatedProtein: result.dailyProteinTarget,
@@ -355,6 +419,12 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       color: colors.text.primary,
       fontWeight: fontWeights.medium,
     },
+    sectionLabel: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      paddingHorizontal: spacing.xs,
+    },
     bottomContent: {
       gap: spacing.lg,
     },
@@ -412,6 +482,16 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                   <Text style={styles.unitText}>{inputHeightUnit}</Text>
                 </View>
               </View>
+
+              <AuthInput
+                value={birthDateText}
+                onChangeText={(text) => { setBirthDateText(maskBirthDateInput(text)); }}
+                placeholder={t('onboarding.birthDatePlaceholder')}
+                error={birthDateError}
+                keyboardType="number-pad"
+                maxLength={BIRTH_DATE_MASKED_LENGTH}
+                returnKeyType="done"
+              />
             </View>
 
             {/* IMC em tempo real */}
@@ -455,6 +535,42 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                   accessibilityState={{ selected: activityLevel === key }}
                 >
                   <Text style={[styles.chipLabel, activityLevel === key && styles.chipLabelSelected]}>
+                    {t(labelKey)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Seletor de sexo biológico */}
+            <Text style={styles.sectionLabel}>{t('onboarding.biologicalSexLabel')}</Text>
+            <View style={styles.chipRow}>
+              {BIOLOGICAL_SEX_OPTIONS.map(({ key, labelKey }) => (
+                <Pressable
+                  key={key}
+                  onPress={() => { setBiologicalSex(key); }}
+                  style={[styles.chip, biologicalSex === key && styles.chipSelected]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: biologicalSex === key }}
+                >
+                  <Text style={[styles.chipLabel, biologicalSex === key && styles.chipLabelSelected]}>
+                    {t(labelKey)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Seletor de objetivo de peso */}
+            <Text style={styles.sectionLabel}>{t('onboarding.weightGoalLabel')}</Text>
+            <View style={styles.chipRow}>
+              {WEIGHT_GOAL_OPTIONS.map(({ key, labelKey }) => (
+                <Pressable
+                  key={key}
+                  onPress={() => { setWeightGoal(key); }}
+                  style={[styles.chip, weightGoal === key && styles.chipSelected]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: weightGoal === key }}
+                >
+                  <Text style={[styles.chipLabel, weightGoal === key && styles.chipLabelSelected]}>
                     {t(labelKey)}
                   </Text>
                 </Pressable>

@@ -25,6 +25,7 @@ export type RootStackParamList = {
   AppFlow: NavigatorScreenParams<AppTabParamList> | undefined;
   Upgrade: undefined;
   WeeklyReport: undefined;
+  CompleteProfile: undefined;
 };
 
 export type PulseAIStackParamList = {

@@ -112,6 +112,8 @@ const PLAN_BADGE_PRO_BG = colors.overlay.pulse[25];
 const PLAN_BADGE_PRO_BORDER = colors.overlay.pulse[40];
 const UPGRADE_CARD_BG = colors.overlay.pulse[12];
 const UPGRADE_CARD_BORDER = colors.overlay.pulse[35];
+const COMPLETE_PROFILE_CARD_BG = colors.overlay.warning[12];
+const COMPLETE_PROFILE_CARD_BORDER = colors.overlay.warning[34];
 const LONGEST_STREAK_COLOR = colors.overlay.warning[90];
 const LEVEL_NEXT_COPY_OPACITY = 0.6;
 const LABEL_OPACITY = 0.55;
@@ -237,6 +239,7 @@ interface UserProfileData {
   totalXP: number;
   isPro: boolean;
   createdAt: string;
+  hasRealBodyProfile?: boolean;
 }
 
 interface LocalImageSize {
@@ -552,6 +555,11 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   // isPro: campo direto da API (Part 2) ou derivado do modelo local
   const isPro: boolean =
     profile?.isPro ?? authUser?.isPro ?? false;
+
+  // CP-B.1 — flag sticky de perfil completo, só via getMe (sem reavaliar
+  // nenhum campo individual). Nunca presente em authUser (AuthUser não
+  // modela esse campo) — só profile (getMe).
+  const hasRealBodyProfile = profile?.hasRealBodyProfile ?? false;
 
   const createdAt = profile?.createdAt ?? authUser?.createdAt ?? "";
   const displayHasProfilePhoto = authUser?.hasProfilePhoto ?? profile?.hasProfilePhoto ?? false;
@@ -1367,6 +1375,37 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       marginHorizontal: 16,
     },
 
+    // ── Complete profile (CP-B.1)
+    completeProfileSection: {
+      marginTop: 20,
+      paddingHorizontal: 16,
+    },
+    completeProfileCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: COMPLETE_PROFILE_CARD_BG,
+      borderWidth: 1,
+      borderColor: COMPLETE_PROFILE_CARD_BORDER,
+      borderRadius: borderRadius.lg,
+      padding: 16,
+    },
+    completeProfileTextBlock: {
+      flex: 1,
+      gap: 2,
+    },
+    completeProfileTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontWeight: fontWeights.semibold,
+      fontSize: fontSizes.sm,
+    },
+    completeProfileDescription: {
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+    },
+
     // ── Upgrade
     upgradeSection: {
       marginTop: 24,
@@ -1619,6 +1658,27 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           ) : null}
         </View>
 
+        {/* ── Complete profile (CP-B.1) ──────────────────────────────────── */}
+        {!hasRealBodyProfile ? (
+          <View style={styles.completeProfileSection}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.85}
+              onPress={() => {
+                navigation.getParent<RootNavigationProp<"CompleteProfile">>()?.navigate("CompleteProfile");
+              }}
+              style={styles.completeProfileCard}
+            >
+              <Ionicons name="alert-circle-outline" size={22} color={colors.feedback.warning} />
+              <View style={styles.completeProfileTextBlock}>
+                <Text style={styles.completeProfileTitle}>{t("me.completeProfile.title")}</Text>
+                <Text style={styles.completeProfileDescription}>{t("me.completeProfile.description")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* ── Stats ───────────────────────────────────────────────────────── */}
         <View style={styles.statsSection}>
           <View style={styles.statsGrid}>
@@ -1758,12 +1818,23 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             />
             <View style={styles.divider} />
 
-            <SettingRow
-              label={t("profile.fields.fat_target")}
-              value={formatCount(profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 0) + t("common.units.grams")}
-              onPress={() => { setEditingType("fat"); }}
-            />
-            <View style={styles.divider} />
+            {/*
+              Meta de gordura escondida até o consumo de gordura ser
+              rastreado em algum lugar do app — hoje nenhum anel/card/gráfico
+              mostra progresso contra essa meta, ao contrário de
+              proteína/carboidrato/calorias (ver
+              docs/fixes/cp-a.8-dailyfattarget-criacao-de-conta-e-campo-mobile.md).
+              Backend (dailyFatTarget calculado/validado/editável via
+              EditSettingSheet) continua intacto; só esta entrada de UI foi
+              retirada. Descomentar quando o consumo existir.
+
+              <SettingRow
+                label={t("profile.fields.fat_target")}
+                value={formatCount(profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 0) + t("common.units.grams")}
+                onPress={() => { setEditingType("fat"); }}
+              />
+              <View style={styles.divider} />
+            */}
 
             <SettingRow
               label={t("track.hydration")}

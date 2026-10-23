@@ -103,6 +103,9 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const unitSystem       = useOnboardingStore((state) => state.unitSystem);
   const weight           = useOnboardingStore((state) => state.weight);
   const height           = useOnboardingStore((state) => state.height);
+  const birthDate        = useOnboardingStore((state) => state.birthDate);
+  const biologicalSex    = useOnboardingStore((state) => state.biologicalSex);
+  const weightGoal       = useOnboardingStore((state) => state.weightGoal);
   const calculatedProtein  = useOnboardingStore((state) => state.calculatedProtein);
   const calculatedCalories = useOnboardingStore((state) => state.calculatedCalories);
   const calculatedCarbs    = useOnboardingStore((state) => state.calculatedCarbs);
@@ -177,6 +180,18 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
       if (weight  !== null) payload['weight']  = weight;
       if (height  !== null) payload['height']  = height;
+      if (birthDate !== null) payload['birthDate'] = birthDate;
+      if (biologicalSex !== null) payload['biologicalSex'] = biologicalSex;
+      if (weightGoal !== null) payload['weightGoal'] = weightGoal;
+
+      // CP-B.1 — sinal explícito de "perfil completo" (hasRealBodyProfile).
+      // Enviado só quando os 5 campos acima vieram de verdade do onboarding
+      // de corpo (não do link "Pular por agora", que deixa todos null) —
+      // nunca incondicionalmente, já que este handleFinish é o mesmo ponto
+      // de chegada dos dois caminhos (OnboardingBodyScreen.tsx:337-339).
+      if (weight !== null && height !== null && birthDate !== null && biologicalSex !== null && weightGoal !== null) {
+        payload['completingBodyOnboarding'] = true;
+      }
 
       await api.patch('/users/me', payload);
 

@@ -14,6 +14,9 @@ interface OnboardingState {
   weight: number | null;
   height: number | null;
   activityLevel: string | null;
+  birthDate: string | null;
+  biologicalSex: string | null;
+  weightGoal: string | null;
   calculatedProtein: number | null;
   calculatedCalories: number | null;
   calculatedCarbs: number | null;
@@ -24,6 +27,9 @@ interface SetBodyDataInput {
   weight: number;
   height: number;
   activityLevel: string;
+  birthDate: string;
+  biologicalSex: string;
+  weightGoal: string;
 }
 
 interface SetCalculatedMacrosInput {
@@ -49,6 +55,9 @@ const initialState: OnboardingState = {
   weight: null,
   height: null,
   activityLevel: null,
+  birthDate: null,
+  biologicalSex: null,
+  weightGoal: null,
   calculatedProtein: null,
   calculatedCalories: null,
   calculatedCarbs: null,
@@ -70,8 +79,8 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
     set({ unitSystem });
   },
 
-  setBodyData: ({ weight, height, activityLevel }) => {
-    set({ weight, height, activityLevel });
+  setBodyData: ({ weight, height, activityLevel, birthDate, biologicalSex, weightGoal }) => {
+    set({ weight, height, activityLevel, birthDate, biologicalSex, weightGoal });
   },
 
   setCalculatedMacros: ({ calculatedProtein, calculatedCalories, calculatedCarbs, imc }) => {

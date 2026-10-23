@@ -179,6 +179,16 @@ export interface IUser {
    */
   activityLevel: ActivityLevel;
   /**
+   * Flag sticky de "perfil completo" (CP-B.1) — true só quando o usuário de
+   * fato passou pelo fluxo real de conclusão do onboarding de corpo
+   * (OnboardingMacrosScreen/CompleteProfileScreen, mobile), nunca inferido a
+   * partir dos valores salvos (um usuário real de 30 anos/male/maintain é
+   * indistinguível dos placeholders do CP-A.4). Setado só em `updateMe`
+   * quando o sinal explícito `completingBodyOnboarding` vem no corpo do
+   * PATCH — nunca resetado para false depois de true.
+   */
+  hasRealBodyProfile: boolean;
+  /**
    * Quantos scans do Pantry Scanner já foram consumidos no mês corrente.
    * Usado pelo rate limiting atômico do free tier e do Pro.
    */
@@ -633,6 +643,10 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
         'extremelyActive',
       ] satisfies ActivityLevel[],
       required: [true, 'errors.validation.required'],
+    },
+    hasRealBodyProfile: {
+      type: Boolean,
+      default: false,
     },
     scanCount: {
       type: Number,

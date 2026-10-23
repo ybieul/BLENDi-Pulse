@@ -84,6 +84,15 @@
     "activityLight": "Leve",
     "activityModerate": "Moderado",
     "activityVery": "Muito Ativo",
+    "birthDatePlaceholder": "Data de nascimento (DD/MM/AAAA)",
+    "birthDateFormatError": "Insira uma data válida no formato DD/MM/AAAA.",
+    "biologicalSexLabel": "Sexo biológico",
+    "biologicalSexMale": "Masculino",
+    "biologicalSexFemale": "Feminino",
+    "weightGoalLabel": "Objetivo de peso",
+    "weightGoalLose": "Perder peso",
+    "weightGoalMaintain": "Manter peso",
+    "weightGoalGain": "Ganhar peso",
     "imcLabel": "IMC",
     "imcUnderweight": "Abaixo do peso",
     "imcNormal": "Peso normal",
@@ -730,6 +739,10 @@
     },
     "isPro": "Você está no Pulse Pro ✓",
     "isProDescription": "Aproveite o Pulse AI ilimitado e todos os recursos premium",
+    "completeProfile": {
+      "title": "Complete seu perfil",
+      "description": "Adicione seus dados corporais reais para metas de macro precisas"
+    },
     "signOut": {
       "title": "Sair?",
       "message": "Você precisará entrar novamente para acessar sua conta",
@@ -753,6 +766,12 @@
         "done": "Confirmar"
       }
     }
+  },
+  "completeProfile": {
+    "title": "Complete seu perfil",
+    "subtitle": "Confirme seus dados corporais reais para calcularmos metas de macro precisas.",
+    "activityLevelLabel": "Nível de atividade",
+    "success": "Perfil atualizado"
   },
   "weeklyReport": {
     "title": "Relatório Semanal",

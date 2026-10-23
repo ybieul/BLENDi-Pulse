@@ -221,6 +221,14 @@ export async function getMe(
           profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
           blendiModel: user.blendiModel,
           goal: user.goal,
+          weightGoal: user.weightGoal,
+          weight: user.weight,
+          height: user.height,
+          targetWeight: user.targetWeight,
+          activityLevel: user.activityLevel,
+          birthDate: user.birthDate,
+          biologicalSex: user.biologicalSex,
+          hasRealBodyProfile: user.hasRealBodyProfile ?? false,
           preferredLanguage: user.locale,
           unitSystem: user.unitSystem,
           timezone: user.timezone,
@@ -799,6 +807,7 @@ export async function updateMe(
       biologicalSex,
       preferredLanguage,
       unitSystem,
+      completingBodyOnboarding,
     } = parsed.data;
 
     const updates: Record<string, unknown> = {
@@ -818,6 +827,11 @@ export async function updateMe(
       ...(biologicalSex !== undefined && { biologicalSex }),
       ...(preferredLanguage !== undefined && { locale: preferredLanguage }),
       ...(unitSystem !== undefined && { unitSystem }),
+      // CP-B.1 — flag sticky de "perfil completo". Só setada para true, nunca
+      // resetada: a ausência do sinal (qualquer PATCH que não seja o fluxo
+      // real de conclusão do onboarding de corpo) simplesmente não toca neste
+      // campo, igual a todo outro campo acima.
+      ...(completingBodyOnboarding === true && { hasRealBodyProfile: true }),
     };
 
     // Buscado incondicionalmente (não só quando um campo-gatilho vem no
@@ -1029,6 +1043,7 @@ export async function updateMe(
           activityLevel: user.activityLevel,
           birthDate: user.birthDate,
           biologicalSex: user.biologicalSex,
+          hasRealBodyProfile: user.hasRealBodyProfile ?? false,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           ...(recalculatedMacros && {

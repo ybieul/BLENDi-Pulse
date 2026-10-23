@@ -165,6 +165,59 @@ DELETE_RESULT: {"acknowledged":true,"deletedCount":1}
 
 **Confirmado:** a chave já nasce presente no documento (ao contrário da Tarefa 1), e as 3 rotas que um app mobile normalmente usa pra popular o perfil (registro, login, `getMe`) devolvem o valor certo — inclusive `getMe`, que antes da correção não devolvia esse campo em hipótese alguma. Conta de teste removida ao final; confirmação independente de limpeza, em processo separado, de 0 remanescentes.
 
+## Tarefa 6 — Campo de edição escondido: ausência total de rastreamento de consumo
+
+Depois de publicada, uma revisão manual do usuário (análise da tela, não de código) levantou a dúvida: existe algum lugar no app que mostre quanto de gordura o usuário já consumiu, como contraponto à meta recém-exposta? Investigação confirmou que **não** — e que isso é bem diferente de proteína/carboidrato/calorias, que têm o pipeline completo (agregação diária real → anel de progresso na Home → card/gráfico no histórico → agregado no relatório semanal → XP por bater a meta).
+
+### 6.1 — Evidência de que o consumo de gordura nunca foi implementado, em nenhuma camada
+
+**Agregação do dia (`GET /blend-logs/today`, alimenta a HomeScreen)** — `apps/api/src/controllers/blendLog.controller.ts`. O `reduce` que soma os logs do dia (linhas 532-539, retorno em 546-548) soma `totalProtein`/`totalCarbs`/`totalCalories` — `fat` não entra nessa soma, embora `log.fat` exista no documento.
+
+**Agregação do histórico (`GET /blend-logs/history`)** — mesmo arquivo. O `$facet.summary` **soma sim** `totalFat` (`$sum: '$fat'`, linha 652, projetado na linha 662) — mas as médias finais (linhas 728-729) só produzem `averageDailyProtein`/`averageDailyCalories`, nunca `averageDailyFat` nem `averageDailyCarbs`. `totalFat` é calculado e fica órfão — nenhum consumidor no mobile sequer lê esse campo.
+
+**Relatório semanal** — `apps/api/src/services/weeklyReportGenerator.service.ts`. O `$group` que monta `dailyTotals` só soma `protein`/`calories` (linhas 122-123); `carbs`/`fat` só aparecem dentro de `topRated` (linhas 149-152, 197-200) — o macro de uma única receita de destaque, não consumo agregado do período.
+
+**XP/missão por bater meta diária** — `packages/shared/src/utils/level.utils.ts:62-63`: só existem `proteinGoal: 8` e `calorieGoal: 5` em `DAILY_BLEND_GOAL_XP_AMOUNTS` — nenhum `fatGoal`/`carbGoal`.
+
+**`HomeScreen` / `GoalRingsSection` (mobile)** — `apps/mobile/src/components/home/GoalRingsSection.tsx:38-48`, interface `GoalRingsSectionProps`: só `protein`/`carbs`/`calories`/`hydration` (current+target). Nenhum slot reservado pra fat — o componente desenha 3 anéis, não 4.
+
+**`MacroBarChart` (histórico) — o caso mais enganoso, por isso vale destacar.** `apps/mobile/src/components/history/MacroBarChart.tsx` TEM um campo `fat` tipado (linha 49) e até soma por semana (`chunkIntoWeeks`, linha 96: `fat: weekSlice.reduce((sum, item) => sum + item.fat, 0)`), parecendo à primeira vista que existe rastreamento. Mas o único caller (`HistoryScreen.tsx:194`) alimenta esse campo com `fat: 0` fixo, e o render das barras (`MacroBarChart.tsx:375-420`) só desenha 3 segmentos — protein, carbs e "remaining" — sem nenhum segmento de gordura. É código morto: soma um valor que nunca é real e nunca é desenhado.
+
+**`TrackScreen.tsx` e `WeeklyReportScreen.tsx`**: zero menções a "fat" nos dois arquivos (`grep -ci` confirmando 0 em ambos).
+
+Busca por qualquer equivalente de "consumido/meta" específico de gordura (`fatCurrent`, `fatProgress`, `fatConsumed`, `hitFatGoal`, `averageDailyFat`) em `apps/api/src`, `apps/mobile/src` e `packages/shared/src`: zero ocorrências — nem como código morto, nem parcial.
+
+### 6.2 — Decisão: esconder a entrada de UI, manter o backend
+
+Dado que hoje não existe **nenhum** lugar no app que mostre progresso contra `dailyFatTarget` (nem anel, nem card, nem gráfico, nem texto "Xg / Yg"), manter o campo de edição visível criaria uma meta que o usuário define e nunca mais vê referenciada — inconsistente com os outros 3 macros. Decisão: comentar só a entrada de UI na tela de settings, mantendo intacto todo o resto (backend calculado/validado/editável via API, tipos TS, `EditSettingSheet`, switches em `MeScreen`) — para reativar com uma única linha quando o consumo de gordura for implementado.
+
+Alteração — `apps/mobile/src/screens/MeScreen.tsx`, bloco de `<SettingRow>` de gordura (antes nas linhas 1762-1764) envolto em comentário JSX, entre a linha do card de calorias e a de hidratação:
+
+```diff
+-            <SettingRow
+-              label={t("profile.fields.fat_target")}
+-              value={formatCount(profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 0) + t("common.units.grams")}
+-              onPress={() => { setEditingType("fat"); }}
+-            />
+-            <View style={styles.divider} />
++            {/*
++              Meta de gordura escondida até o consumo de gordura ser
++              rastreado em algum lugar do app (ver Tarefa 6 deste documento).
++              Backend continua intacto; só esta entrada de UI foi retirada.
++
++              <SettingRow
++                label={t("profile.fields.fat_target")}
++                value={formatCount(profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 0) + t("common.units.grams")}
++                onPress={() => { setEditingType("fat"); }}
++              />
++              <View style={styles.divider} />
++            */}
+```
+
+Nenhum outro arquivo da Tarefa 3 foi revertido — tipos (`AuthUser`, `UserProfileData` etc.), `EditSettingType`/`TITLE_KEYS`/`isNumericType` em `EditSettingSheet.tsx`, e os 3 switches de `editingType` em `MeScreen.tsx` continuam existindo, só nunca são alcançados porque a UI não oferece mais nenhum caminho pra `setEditingType("fat")`. Typecheck (`pnpm --filter @blendi/mobile typecheck`) e lint (`pnpm --filter @blendi/mobile lint`) confirmados limpos depois da alteração — os 7 erros de lint pré-existentes no pacote (`assets/index.ts`, `StreakBadge.tsx`, `PantryScannerScreen.tsx`, `PulseAIScreen.tsx`) são de outros arquivos, não relacionados.
+
+**O que fica pendente pra reativar o campo no futuro:** implementar consumo real de gordura em pelo menos um ponto do pipeline (idealmente todos, espelhando proteína/carboidrato/calorias) — soma diária em `getTodayLogs`, `averageDailyFat` em `getBlendHistory`, segmento real no `MacroBarChart` (a infraestrutura de soma semanal já existe, só falta o render e parar de alimentar com `0` fixo), e opcionalmente `fatGoal` em XP/missões.
+
 ## Limpeza e verificação de ambiente
 
 Durante esta correção, foi identificado e corrigido um achado à parte, não relacionado ao escopo funcional: processos `tsx watch` órfãos de **sessões anteriores** (duas gerações, de conversas passadas) continuavam rodando em segundo plano sem nunca terem sido encerrados — violando a própria convenção já estabelecida nesta linha de correções (encerrar o servidor de dev e confirmar `lsof -i :3000` vazio ao final de cada tarefa). Todos finalizados junto com o servidor usado nesta correção. `git status` final idêntico ao esperado — só os arquivos desta correção modificados/criados, nenhum script temporário remanescente.
@@ -179,7 +232,7 @@ Durante esta correção, foi identificado e corrigido um achado à parte, não r
 | Criação de conta (registro direto e Google) passa a setar `dailyFatTarget` corretamente | **Confirmado** — Tarefa 5, `HAS_dailyFatTarget_KEY: true` e `MATCHES_FORMULA: true` numa conta nova |
 | Toda resposta de API que expõe o perfil do usuário devolve `dailyFatTarget` (inclusive `getMe`, que antes nem incluía a chave) | **Confirmado** — Tarefa 5, os 3 testes (`REGISTER`/`LOGIN`/`GETME`) devolveram o valor certo |
 | Contas já existentes sem o campo corrigidas, sem sobrescrever nenhum valor já salvo | **Confirmado** — Tarefa 4.2, 3 de 3 contas corrigidas, valores batendo exatamente com a fórmula aplicada ao `dailyCalorieTarget` real de cada uma |
-| Campo de edição de meta de gordura existe no app mobile, seguindo exatamente o mesmo padrão de proteína/carboidratos/calorias | **Confirmado** — Tarefa 3, typecheck limpo em `@blendi/mobile` |
+| Campo de edição de meta de gordura construído no app mobile, seguindo exatamente o mesmo padrão de proteína/carboidratos/calorias | **Confirmado, depois escondido** — Tarefa 3 construiu o campo e confirmou typecheck limpo; Tarefa 6 o escondeu deliberadamente (não exibido na UI hoje) por falta de qualquer rastreamento de consumo pra mostrar progresso contra a meta — backend e plumbing seguem intactos, reativação é 1 linha |
 | Nenhuma regressão nos outros macros (proteína/carboidrato/calorias/hidratação) | **Confirmado** — nenhuma lógica pré-existente alterada, só adições; typecheck limpo nos 3 pacotes (`@blendi/shared`, `@blendi/api`, `@blendi/mobile`) |
 
 ## Fora de escopo (decisão explícita, não um esquecimento)
@@ -191,3 +244,5 @@ Durante esta correção, foi identificado e corrigido um achado à parte, não r
 ## Resumo
 
 `dailyFatTarget` nunca era setado na criação de conta (nem registro direto, nem Google) e o schema não tinha `default` pra ele — diferente de `dailyCarbTarget` (`default: 200`). Corrigido computando o valor real a partir da `dailyCalorieTarget` de cada conta (fórmula já existente, `30% ÷ 9 kcal/g`, extraída como `calculateFatTargetFromCalories`), tanto na criação quanto em 7 pontos de resposta de API — resolvendo o bug tanto para contas novas quanto para as já existentes, sem depender de backfill (ainda que o backfill tenha sido rodado mesmo assim, pra deixar o dado persistido e não só computado na leitura). No mobile, o campo de edição foi adicionado ao `MeScreen` seguindo exatamente o mesmo padrão de proteína/carboidratos/calorias — tipos TS, sheet de edição, `SettingRow` e i18n em en/pt-BR. Nenhum comportamento pré-existente de outros macros foi alterado.
+
+**Atualização (Tarefa 6):** o `SettingRow` de gordura foi escondido (comentado em JSX) depois de confirmar que o consumo de gordura nunca é rastreado em nenhuma camada do app (backend ou mobile) — diferente de proteína/carboidrato/calorias, que têm agregação diária, anel de progresso, gráfico e XP por meta batida. Expor uma meta editável sem nenhum progresso associado seria inconsistente. Todo o resto construído nesta correção (backend calculado/validado/editável, tipos, `EditSettingSheet`, switches) continua intacto e pronto pra reativar assim que o consumo de gordura for implementado em algum lugar do pipeline.

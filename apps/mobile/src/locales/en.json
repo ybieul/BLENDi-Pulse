@@ -84,6 +84,15 @@
     "activityLight": "Light",
     "activityModerate": "Moderate",
     "activityVery": "Very Active",
+    "birthDatePlaceholder": "Date of birth (DD/MM/YYYY)",
+    "birthDateFormatError": "Enter a valid date in DD/MM/YYYY format.",
+    "biologicalSexLabel": "Biological sex",
+    "biologicalSexMale": "Male",
+    "biologicalSexFemale": "Female",
+    "weightGoalLabel": "Weight goal",
+    "weightGoalLose": "Lose weight",
+    "weightGoalMaintain": "Maintain weight",
+    "weightGoalGain": "Gain weight",
     "imcLabel": "BMI",
     "imcUnderweight": "Underweight",
     "imcNormal": "Normal weight",
@@ -730,6 +739,10 @@
     },
     "isPro": "You're on Pulse Pro ✓",
     "isProDescription": "Enjoy unlimited Pulse AI and all premium features",
+    "completeProfile": {
+      "title": "Complete your profile",
+      "description": "Add your real body details for accurate macro targets"
+    },
     "signOut": {
       "title": "Sign Out?",
       "message": "You'll need to sign in again to access your account",
@@ -753,6 +766,12 @@
         "done": "Done"
       }
     }
+  },
+  "completeProfile": {
+    "title": "Complete your profile",
+    "subtitle": "Confirm your real body details so we can calculate accurate macro targets.",
+    "activityLevelLabel": "Activity level",
+    "success": "Profile updated"
   },
   "weeklyReport": {
     "title": "Weekly Report",
