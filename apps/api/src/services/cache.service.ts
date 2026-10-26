@@ -12,6 +12,10 @@ export interface CacheKeyInput {
   goal: string;
   language: string;
   unitSystem: string;
+  // Opcional (default 'none'): mesmo motivo de PulseAiPromptUserContext.weightGoal
+  // ser opcional em promptBuilder.service.ts — contas sem esse campo persistido
+  // ainda geram uma cacheKey determinística.
+  weightGoal?: string;
   aiProvider: string;
   aiModel: string;
   rawMessage: string;
@@ -46,7 +50,7 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 
 /**
  * Entrada: metadados determinísticos da query do usuário.
- * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:aiProvider:aiModel:messageHash:dietaryFlagsHash.
+ * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:weightGoal:aiProvider:aiModel:messageHash:dietaryFlagsHash.
  */
 export function generateCacheKey({
   userId,
@@ -54,6 +58,7 @@ export function generateCacheKey({
   goal,
   language,
   unitSystem,
+  weightGoal = 'none',
   aiProvider,
   aiModel,
   rawMessage,
@@ -68,6 +73,7 @@ export function generateCacheKey({
     goal.trim(),
     language.trim(),
     unitSystem.trim(),
+    weightGoal.trim(),
     aiProvider.trim(),
     aiModel.trim(),
     messageHash,
@@ -107,6 +113,7 @@ export async function setInCache({
   goal,
   language,
   unitSystem,
+  weightGoal = 'none',
   aiProvider,
   aiModel,
   rawMessage,
@@ -119,6 +126,7 @@ export async function setInCache({
     goal,
     language,
     unitSystem,
+    weightGoal,
     aiProvider,
     aiModel,
     rawMessage,

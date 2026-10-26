@@ -21,6 +21,7 @@ import {
   type UserGoal,
   type UserLocale,
   type UserUnitSystem,
+  type WeightGoal,
 } from '../models/User';
 import {
   buildPulseAiPrompt,
@@ -71,6 +72,7 @@ interface PulseAiUserProfile {
   id: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
+  weightGoal?: WeightGoal;
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   timezone: string;
@@ -230,6 +232,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     .select({
       blendiModel: 1,
       goal: 1,
+      weightGoal: 1,
       locale: 1,
       unitSystem: 1,
       timezone: 1,
@@ -251,6 +254,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     id: String(user._id),
     blendiModel: user.blendiModel as BlendiModel,
     goal: user.goal as UserGoal,
+    weightGoal: user.weightGoal as WeightGoal | undefined,
     locale: user.locale as UserLocale,
     unitSystem: user.unitSystem as UserUnitSystem,
     timezone: user.timezone,
@@ -525,13 +529,14 @@ async function runPulseAiChat(params: {
     goal: currentUser.goal,
     language: effectiveLanguage,
     unitSystem: currentUser.unitSystem,
+    weightGoal: currentUser.weightGoal,
     aiProvider: env.AI_PROVIDER,
     aiModel: env.AI_MODEL,
     rawMessage: normalizedMessage,
   });
 
   const cacheKeyParts = cacheKey.split(':');
-  if (cacheKeyParts[7] !== normalizedMessageHash) {
+  if (cacheKeyParts[8] !== normalizedMessageHash) {
     throw new Error('[pulseAi.controller] cacheKey hash mismatch');
   }
 
@@ -587,6 +592,7 @@ async function runPulseAiChat(params: {
   const prompt = buildPulseAiPrompt({
     blendiModel: currentUser.blendiModel,
     goal: currentUser.goal,
+    weightGoal: currentUser.weightGoal,
     language: requestedLanguage,
     locale: currentUser.locale,
     unitSystem: currentUser.unitSystem,
@@ -684,6 +690,7 @@ async function runPulseAiChat(params: {
       goal: currentUser.goal,
       language: effectiveLanguage,
       unitSystem: currentUser.unitSystem,
+      weightGoal: currentUser.weightGoal,
       aiProvider: aiResponse.provider,
       aiModel: aiResponse.model,
       rawMessage: normalizedMessage,

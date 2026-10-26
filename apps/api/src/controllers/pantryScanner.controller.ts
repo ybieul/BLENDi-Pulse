@@ -19,6 +19,7 @@ import {
   type UserGoal,
   type UserLocale,
   type UserUnitSystem,
+  type WeightGoal,
 } from '../models/User';
 import {
   AiProviderRequestError,
@@ -33,6 +34,10 @@ import {
   type BuildPulseAiPromptResult,
 } from '../services/promptBuilder.service';
 import { sendErrorResponse } from '../utils/error.utils';
+import {
+  buildProteinGuardrailRetryMessage,
+  validateProteinGuardrail,
+} from '../utils/blenderGuardrail.utils';
 import {
   buildMacroInconsistencyRetryMessage,
   validateMacroConsistency,
@@ -50,6 +55,7 @@ interface PantryScannerUserProfile {
   id: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
+  weightGoal?: WeightGoal;
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   timezone: string;
@@ -269,6 +275,53 @@ function parsePantryRecipe(content: string): PulseAiRecipe | null {
   }
 }
 
+// Camada 2 do guardrail físico de proteína (blenderGuardrail.utils.ts), mesma
+// rede de segurança já aplicada às receitas do chat do Pulse AI
+// (pulseAi.controller.ts, ensureBlenderGuardrail) — aqui replicada por
+// receita individual, mesmo padrão de ensurePantryRecipeMacroConsistency
+// abaixo (callAi direto, maxTokens 2000, um único retry). Antes desta função,
+// o Pantry Scanner nunca rodava essa camada — uma receita podia declarar
+// proteína acima do limite físico do blender sem nenhuma correção automática.
+async function ensurePantryRecipeProteinGuardrail(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  blendiModel: BlendiModel
+): Promise<PulseAiRecipe> {
+  const initialGuardrail = validateProteinGuardrail(recipe, blendiModel);
+
+  if (initialGuardrail.withinGuardrail) {
+    return recipe;
+  }
+
+  console.info('[pantryScanner] protein guardrail exceeded, retrying', {
+    blendiModel,
+    discrepancy: initialGuardrail.discrepancy,
+  });
+
+  try {
+    const retryMessage = buildProteinGuardrailRetryMessage(initialGuardrail.discrepancy);
+    const retryResponse = await callAi({
+      systemPrompt: prompt.systemPrompt,
+      messages: [
+        ...prompt.messages,
+        { role: 'assistant', content: JSON.stringify(recipe) },
+        { role: 'user', content: retryMessage },
+      ],
+      maxTokens: 2000,
+    });
+    const retriedRecipe = parsePantryRecipe(retryResponse.content);
+
+    return retriedRecipe ?? recipe;
+  } catch (error) {
+    console.error('[pantryScanner] protein guardrail retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return recipe;
+  }
+}
+
 // Camada 3 de validação matemática de macros (protein×4 + carbs×4 + fat×9 ≈
 // calories), mesma rede de segurança já aplicada às receitas do chat do Pulse
 // AI (pulseAi.controller.ts, ensureMacroConsistency) — aqui replicada por
@@ -328,6 +381,7 @@ async function findPantryScannerUserProfile(
     .select({
       blendiModel: 1,
       goal: 1,
+      weightGoal: 1,
       locale: 1,
       unitSystem: 1,
       timezone: 1,
@@ -349,6 +403,7 @@ async function findPantryScannerUserProfile(
     id: String(user._id),
     blendiModel: user.blendiModel as BlendiModel,
     goal: user.goal as UserGoal,
+    weightGoal: user.weightGoal as WeightGoal | undefined,
     locale: user.locale as UserLocale,
     unitSystem: user.unitSystem as UserUnitSystem,
     timezone: user.timezone,
@@ -481,6 +536,7 @@ async function generatePantryRecipes(
   const prompt = buildPantryRecipePrompt({
     blendiModel: user.blendiModel,
     goal: user.goal,
+    weightGoal: user.weightGoal,
     locale: user.locale,
     language: user.locale,
     unitSystem: user.unitSystem,
@@ -504,7 +560,14 @@ async function generatePantryRecipes(
     const recipes = parsePantryRecipes(aiResponse.content);
 
     return await Promise.all(
-      recipes.map(recipe => ensurePantryRecipeMacroConsistency(recipe, prompt))
+      recipes.map(async recipe => {
+        const proteinGuardedRecipe = await ensurePantryRecipeProteinGuardrail(
+          recipe,
+          prompt,
+          user.blendiModel
+        );
+        return ensurePantryRecipeMacroConsistency(proteinGuardedRecipe, prompt);
+      })
     );
   } catch (error) {
     console.error('[pantryScanner] recipe generation failed', {

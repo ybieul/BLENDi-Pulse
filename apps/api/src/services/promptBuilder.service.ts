@@ -2,7 +2,13 @@ import type { PulseAiChatInput } from '@blendi/shared';
 
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
-import type { BlendiModel, UserGoal, UserLocale, UserUnitSystem } from '../models/User';
+import type {
+  BlendiModel,
+  UserGoal,
+  UserLocale,
+  UserUnitSystem,
+  WeightGoal,
+} from '../models/User';
 
 type PulseAiApiMessageRole = 'user' | 'assistant';
 type PulseAiResponseMode = 'single-recipe' | 'recipe-array';
@@ -16,6 +22,13 @@ interface PulseAiModelContext {
 export interface PulseAiPromptUserContext {
   blendiModel: BlendiModel;
   goal: UserGoal;
+  /**
+   * Objetivo de peso corporal (lose/maintain/gain) — opcional porque contas
+   * criadas antes da coleta deste campo no onboarding podem não tê-lo
+   * persistido ainda (mesmo padrão de `dailyCarbTarget`/`recentBlendRecipeNames`
+   * nesta mesma interface).
+   */
+  weightGoal?: WeightGoal;
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   dailyProteinTarget: number;
@@ -196,6 +209,36 @@ function buildRecipeScopeSection(): string {
   ].join('\n');
 }
 
+// Preferência qualitativa de composição, não um guardrail físico — por isso
+// fica posicionada antes de buildBlenderGuardrailsSection, que continua sendo
+// a última seção e a autoridade final sobre volume/proteína. O texto do
+// 'gain' abaixo referencia essa ordem explicitamente ("below").
+const WEIGHT_GOAL_GUIDANCE: Record<WeightGoal, string[]> = {
+  lose: [
+    'Weight goal guidance (lose):',
+    '- Favor ingredients with a high protein-to-calorie and fiber-to-calorie ratio.',
+    '- Prefer lower-calorie-density liquid bases (water, unsweetened plant milk) over denser ones (whole milk, fruit juice).',
+    '- Avoid adding high-calorie-density, low-satiety ingredients (honey, added sugar, excess peanut butter, dried fruit) unless the user explicitly asks for them.',
+  ],
+  maintain: [
+    'Weight goal guidance (maintain):',
+    '- Apply no special bias from this goal. Build the recipe with the same standard, balanced proportions you would use without a weight goal in context.',
+  ],
+  gain: [
+    'Weight goal guidance (gain):',
+    '- Favor high-calorie-density ingredients (peanut butter, oats, banana, whole milk, nuts) to increase the calorie density of the recipe without increasing its volume beyond what the blender can handle.',
+    "- The blender's physical volume and protein limits below still apply and take priority over this guidance.",
+  ],
+};
+
+function buildWeightGoalSection(weightGoal: WeightGoal | undefined): string {
+  if (!weightGoal) {
+    return '';
+  }
+
+  return WEIGHT_GOAL_GUIDANCE[weightGoal].join('\n');
+}
+
 function buildBlenderGuardrailsSection(
   blendiModel: BlendiModel,
   unitSystem: UserUnitSystem
@@ -235,6 +278,7 @@ function buildResponseFormatRequirements(
 function buildSystemPrompt({
   blendiModel,
   goal,
+  weightGoal,
   language,
   locale,
   unitSystem,
@@ -310,10 +354,15 @@ function buildSystemPrompt({
     '',
     buildCalorieEquationCheckSection(),
     '',
-    buildRecipeScopeSection(),
-    '',
-    buildBlenderGuardrailsSection(blendiModel, unitSystem)
+    buildRecipeScopeSection()
   );
+
+  const weightGoalSection = buildWeightGoalSection(weightGoal);
+  if (weightGoalSection) {
+    sections.push('', weightGoalSection);
+  }
+
+  sections.push('', buildBlenderGuardrailsSection(blendiModel, unitSystem));
 
   return sections.join('\n');
 }
