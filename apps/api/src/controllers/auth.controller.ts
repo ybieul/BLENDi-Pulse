@@ -54,6 +54,10 @@ function sendValidationError(res: Response, err: ZodError): void {
   });
 }
 
+function isDuplicateKeyError(err: unknown): err is { code: number } {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === 11000;
+}
+
 // ─── Register ─────────────────────────────────────────────────────────────────
 
 /**
@@ -103,19 +107,39 @@ export async function register(
     // dados, e são obrigatórios no modelo desde cp-a-macros.md — sem eles,
     // esta chamada sempre falhava com ValidationError (causa raiz do
     // registro quebrado). Sobrescritos pelo primeiro PATCH /users/me real.
-    const user = await UserModel.create({
-      email,
-      password,
-      name,
-      blendiModel,
-      goal,
-      locale: preferredLanguage,
-      timezone,
-      dailyProteinTarget,
-      dailyCalorieTarget,
-      dailyFatTarget: calculateFatTargetFromCalories(dailyCalorieTarget),
-      ...getAccountCreationBodyProfileDefaults(),
-    });
+    let user;
+    try {
+      user = await UserModel.create({
+        email,
+        password,
+        name,
+        blendiModel,
+        goal,
+        locale: preferredLanguage,
+        timezone,
+        dailyProteinTarget,
+        dailyCalorieTarget,
+        dailyFatTarget: calculateFatTargetFromCalories(dailyCalorieTarget),
+        ...getAccountCreationBodyProfileDefaults(),
+      });
+    } catch (err) {
+      // Corrida entre a pré-checagem (linha 89) e este create: outra requisição
+      // cadastrou o mesmo email no meio-tempo. Sem este catch, o MongoServerError
+      // (E11000, com `.code` numérico mas sem `.statusCode`) subia cru até o
+      // errorHandler, que o classifica incorretamente como "deliberado" (só olha
+      // `err.code !== undefined`) e expõe a mensagem crua do driver — nome do
+      // banco/collection/índice — com HTTP 500, mesmo em produção.
+      if (isDuplicateKeyError(err)) {
+        sendErrorResponse(res, {
+          statusCode: 409,
+          code: 'auth/email-already-exists',
+          message: 'Email already exists.',
+        });
+        return;
+      }
+
+      throw err;
+    }
 
     user.scanCount = 0;
     user.scanResetDate = addMonths(user.createdAt ?? new Date(), 1);

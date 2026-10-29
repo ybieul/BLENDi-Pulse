@@ -41,6 +41,10 @@ import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils'
 // Instância única compartilhada pelos handlers
 const emailService = new EmailService();
 
+function isDuplicateKeyError(err: unknown): err is { code: number } {
+  return typeof err === 'object' && err !== null && 'code' in err && err.code === 11000;
+}
+
 // ─── Handler 1: GET /auth/google/url ─────────────────────────────────────────
 
 /**
@@ -183,26 +187,52 @@ export async function handleGoogleCallback(
         // obrigatórios no modelo desde cp-a-macros.md, mas o Google OAuth não
         // fornece nenhum deles — sem isso, esta chamada sempre falhava com
         // ValidationError (causa raiz do cadastro via Google quebrado).
-        user = await UserModel.create({
-          email: userInfo.email,
-          name: userInfo.name,
-          googleId: userInfo.googleId,
-          profilePhoto: userInfo.picture,
-          locale: 'en',
-          timezone: 'America/New_York', // sobrescrito pelo PATCH /auth/timezone no boot do app
-          blendiModel: 'Lite',
-          goal: 'Wellness',
-          dailyProteinTarget: 150,
-          dailyCalorieTarget: 2000,
-          dailyFatTarget: calculateFatTargetFromCalories(2000),
-          scanCount: 0,
-          scanResetDate: addMonths(new Date(), 1),
-          ...getAccountCreationBodyProfileDefaults(),
-        });
+        try {
+          user = await UserModel.create({
+            email: userInfo.email,
+            name: userInfo.name,
+            googleId: userInfo.googleId,
+            profilePhoto: userInfo.picture,
+            locale: 'en',
+            timezone: 'America/New_York', // sobrescrito pelo PATCH /auth/timezone no boot do app
+            blendiModel: 'Lite',
+            goal: 'Wellness',
+            dailyProteinTarget: 150,
+            dailyCalorieTarget: 2000,
+            dailyFatTarget: calculateFatTargetFromCalories(2000),
+            scanCount: 0,
+            scanResetDate: addMonths(new Date(), 1),
+            ...getAccountCreationBodyProfileDefaults(),
+          });
 
-        isNewUser = true;
-        // E-mail de boas-vindas — disparo não bloqueante, falha silenciosa
-        void emailService.sendWelcomeEmail(user.name, user.email, user.locale);
+          isNewUser = true;
+          // E-mail de boas-vindas — disparo não bloqueante, falha silenciosa
+          void emailService.sendWelcomeEmail(user.name, user.email, user.locale);
+        } catch (err) {
+          // Corrida entre os lookups acima (googleId/email) e este create: duas
+          // chamadas concorrentes do callback (ex: duplo toque em "Entrar com
+          // Google") resolvem a mesma conta Google e ambas chegam aqui sem ver
+          // a conta ainda. Sem este catch, o MongoServerError (E11000) subia cru
+          // até o errorHandler — que o trata como "deliberado" só por ter
+          // `.code` numérico definido, e devolve esse código crú (não no formato
+          // domínio/erro) com a mensagem interna do driver exposta, mesmo em
+          // produção. Aqui, a segunda requisição apenas recupera a conta que a
+          // primeira já criou e segue o login normalmente — nenhuma delas falha.
+          if (!isDuplicateKeyError(err)) {
+            throw err;
+          }
+
+          const recoveredUser = await UserModel.findOne({
+            $or: [{ googleId: userInfo.googleId }, { email: userInfo.email }],
+          });
+
+          if (!recoveredUser) {
+            throw err;
+          }
+
+          user = recoveredUser;
+          isNewUser = false;
+        }
       }
     }
 

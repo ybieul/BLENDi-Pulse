@@ -90,7 +90,7 @@ Circle size changes with the selected period:
 - `24px` for 30 days
 - `16px` for 90 days
 
-Current implementation note: the component compares `adherenceRate` against `0.5` and `1`, which indicates that the visual thresholds were designed for normalized values in the `0..1` range. The backend history endpoint in [apps/api/src/controllers/supplementLog.controller.ts](../../apps/api/src/controllers/supplementLog.controller.ts) currently computes `adherenceRate` as a percentage-like value, so the color semantics above describe the design intent more accurately than the raw runtime comparison does today.
+Implementation note (updated 2026-10-27, fixed): the component compares `adherenceRate` against `0.5` and `1`, which indicates that the visual thresholds were designed for normalized values in the `0..1` range. The backend history endpoint in [apps/api/src/controllers/supplementLog.controller.ts](../../apps/api/src/controllers/supplementLog.controller.ts) used to compute `adherenceRate` as a percentage-like value (0-100), which made the middle color bucket practically unreachable with real data. This was confirmed as a live bug during the CP-AUDIT and fixed — see [`cp-audit-achado3-adherencerate-escala-supplement-history.md`](../fixes/cp-audit-achado3-adherencerate-escala-supplement-history.md). The backend now matches the `0..1` scale the color semantics above always assumed.
 
 ## Pending Items
 

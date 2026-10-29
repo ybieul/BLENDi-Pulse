@@ -36,7 +36,7 @@ import { shoppingListRouter } from './routes/shoppingList';
 import { weeklyReportsRouter } from './routes/weeklyReports';
 import { purchasesRouter } from './routes/purchases';
 import { webhooksRouter } from './routes/webhooks';
-import { sendErrorResponse } from './utils/error.utils';
+import { sendErrorResponse, type ApiError } from './utils/error.utils';
 import { initializeNotificationJobs } from './jobs/notifications.jobs';
 
 const app = express();
@@ -52,6 +52,18 @@ function isAllowedOrigin(origin?: string): boolean {
   }
 
   return env.NODE_ENV === 'development' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+}
+
+/**
+ * Constrói o erro padronizado para origem de CORS não permitida.
+ * Carrega `statusCode`/`code` no formato que `errorHandler.ts` já sabe
+ * repassar como resposta HTTP 403 — sem precisar de mapeamento adicional.
+ */
+function buildCorsOriginNotAllowedError(origin?: string): ApiError {
+  const error = new Error(`CORS blocked for origin: ${origin ?? 'unknown'}`) as ApiError;
+  error.statusCode = 403;
+  error.code = 'cors/origin-not-allowed';
+  return error;
 }
 
 // Rotas que legitimamente recebem payloads grandes (imagens em base64) —
@@ -78,7 +90,7 @@ app.use(
         return;
       }
 
-      callback(new Error(`CORS blocked for origin: ${origin ?? 'unknown'}`));
+      callback(buildCorsOriginNotAllowedError(origin));
     },
     credentials: true,
   })

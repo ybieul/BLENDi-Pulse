@@ -218,7 +218,7 @@ The current `.env.example` files are fully documented below, including the Phase
 
 The unresolved items carried over from Phase 0 remain open as critical questions for Jon and continue blocking the same downstream phases listed below.
 
-Phase 3 is closed, the current app version is tracked as `0.4.0`, and Phase 4 — Launch is planned.
+Phase 3 is closed, the current app version is tracked as `1.0.0`, and Phase 4 — Launch is planned.
 
 These questions still block specific checkpoints across Phase 3 and Phase 4.
 

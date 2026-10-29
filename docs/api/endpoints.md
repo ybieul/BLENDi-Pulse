@@ -45,8 +45,8 @@ Creates a new user account and returns the initial session tokens.
 | `blendiModel` | string | Yes | One of `Lite`, `ProPlus`, `Steel` |
 | `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
 | `preferredLanguage` | string | No | One of `en`, `pt-BR`; defaults to `en` when omitted |
-| `dailyProteinTarget` | number | Yes | Integer between 10 and 400 |
-| `dailyCalorieTarget` | number | Yes | Integer between 500 and 10000 |
+| `dailyProteinTarget` | number | Yes | Integer between 10 and 800 |
+| `dailyCalorieTarget` | number | Yes | Integer between 300 and 15000 |
 | `timezone` | string | Yes | IANA timezone string such as `America/Sao_Paulo` |
 
 **Success response**
@@ -64,9 +64,13 @@ Creates a new user account and returns the initial session tokens.
       "blendiModel": "Lite | ProPlus | Steel",
       "goal": "Muscle | Wellness | Energy | Recovery",
       "locale": "en | pt-BR",
+      "unitSystem": "metric | imperial",
       "timezone": "string",
       "dailyProteinTarget": 150,
       "dailyCalorieTarget": 2000,
+      "dailyCarbTarget": 200,
+      "dailyFatTarget": 67,
+      "longestStreak": 0,
       "createdAt": "2026-04-29T12:34:56.000Z"
     },
     "accessToken": "string",
@@ -74,6 +78,8 @@ Creates a new user account and returns the initial session tokens.
   }
 }
 ```
+
+`dailyFatTarget` is derived automatically from `dailyCalorieTarget` (30% of calories, converted to grams) at account creation — it is never part of the request body. The body-composition profile fields collected later in the onboarding flow (`weightGoal`, `activityLevel`, `targetWeight`, `birthDate`, `biologicalSex`) are **not** part of registration: they are not accepted in this request body and are not present in this response. The account is created with internal placeholder defaults for them, which are overwritten by the first real `PATCH /users/me` that completes the onboarding body step (see `completingBodyOnboarding` under `PATCH /users/me` below).
 
 **Status codes**
 
@@ -112,9 +118,13 @@ Authenticates an existing user and returns a fresh access token and refresh toke
       "blendiModel": "Lite | ProPlus | Steel",
       "goal": "Muscle | Wellness | Energy | Recovery",
       "locale": "en | pt-BR",
+      "unitSystem": "metric | imperial",
       "timezone": "string",
       "dailyProteinTarget": 150,
       "dailyCalorieTarget": 2000,
+      "dailyCarbTarget": 200,
+      "dailyFatTarget": 67,
+      "longestStreak": 0,
       "createdAt": "2026-04-29T12:34:56.000Z"
     },
     "accessToken": "string",
@@ -122,6 +132,8 @@ Authenticates an existing user and returns a fresh access token and refresh toke
   }
 }
 ```
+
+This `user` object has the same shape as the one returned by `POST /auth/register` (see above) — both are built from the same set of fields in their respective controllers.
 
 **Status codes**
 
@@ -391,20 +403,52 @@ None.
       "name": "string",
       "email": "string",
       "profilePhoto": "https://cdn.example.com/avatar.png",
+      "hasProfilePhoto": true,
+      "profilePhotoUpdatedAt": "2026-05-20T08:15:00.000Z",
       "blendiModel": "Lite | ProPlus | Steel",
       "goal": "Muscle | Wellness | Energy | Recovery",
+      "weightGoal": "lose | maintain | gain",
+      "weight": 78,
+      "height": 180,
+      "targetWeight": 72,
+      "activityLevel": "moderatelyActive",
+      "birthDate": "1996-04-12T00:00:00.000Z",
+      "biologicalSex": "male | female",
+      "hasRealBodyProfile": true,
       "preferredLanguage": "en | pt-BR",
-      "timezone": "America/Sao_Paulo",
       "unitSystem": "metric | imperial",
+      "timezone": "America/Sao_Paulo",
+      "pushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "notificationPreferences": {
+        "dailyPulse": true,
+        "streakReminder": true,
+        "supplementReminder": true,
+        "hydrationReminder": true,
+        "levelUp": true
+      },
+      "dailyPulseTime": {
+        "hour": 7,
+        "minute": 0
+      },
       "dailyProteinTarget": 150,
       "dailyCarbTarget": 220,
       "dailyCalorieTarget": 2400,
+      "dailyFatTarget": 80,
       "dailyHydrationTarget": 2500,
       "isPro": false,
+      "subscriptionId": null,
+      "subscriptionPlan": null,
+      "subscriptionExpiresAt": null,
+      "subscriptionCancelRequestedAt": null,
+      "revenueCatCustomerId": null,
+      "createdAt": "2026-04-29T12:34:56.000Z",
       "currentStreak": 5,
       "longestStreak": 12,
       "blendCount": 28,
-      "createdAt": "2026-04-29T12:34:56.000Z",
+      "totalXP": 1240,
+      "lastLevelUp": "2026-05-18T19:02:00.000Z",
+      "currentLevel": 6,
+      "levelProgress": 0.42,
       "lastCleanedAt": "2026-05-20T08:15:00.000Z"
     }
   }
@@ -412,6 +456,8 @@ None.
 ```
 
 The current implementation also returns compatibility aliases `streakDays` and `totalBlends` with the same numeric values as `currentStreak` and `blendCount`.
+
+`hasProfilePhoto`/`profilePhotoUpdatedAt`, `weightGoal`/`weight`/`height`/`targetWeight`/`activityLevel`/`birthDate`/`biologicalSex` (onboarding body profile), `hasRealBodyProfile` (set once the onboarding body step has really been completed via `PATCH /users/me` with `completingBodyOnboarding: true`, see below), `pushToken`, `notificationPreferences`, `dailyPulseTime`, `dailyFatTarget`, the four `subscription*` fields plus `revenueCatCustomerId` (all `null` for a non-subscriber), `totalXP`, `lastLevelUp`, `currentLevel`, and `levelProgress` (a fraction between 0 and 1 toward the next level) are all real fields of this response that were missing from this document before — confirmed directly against `getMe` (`apps/api/src/controllers/user.controller.ts`).
 
 **Status codes**
 
@@ -436,14 +482,23 @@ All fields are optional. The endpoint only updates fields that are present in th
 |---|---|---|---|
 | `blendiModel` | string | No | One of `Lite`, `ProPlus`, `Steel` |
 | `goal` | string | No | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
-| `dailyProteinTarget` | number | No | Integer between 10 and 400 |
-| `dailyCarbTarget` | number | No | Integer between 50 and 800 |
-| `dailyCalorieTarget` | number | No | Integer between 500 and 10000 |
+| `weightGoal` | string | No | One of `lose`, `maintain`, `gain` — weight direction goal, independent of `goal`; triggers an automatic recalculation of `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` (see below) |
+| `dailyProteinTarget` | number | No | Integer between 10 and 800 |
+| `dailyCarbTarget` | number | No | Integer between 0 and 1500 |
+| `dailyCalorieTarget` | number | No | Integer between 300 and 15000 |
+| `dailyFatTarget` | number | No | Integer between 0 and 600 |
 | `dailyHydrationTarget` | number | No | Integer between 500 and 8000 |
-| `weight` | number | No | Number between 20 and 300 |
-| `height` | number | No | Number between 100 and 250 |
+| `weight` | number | No | Number between 20 and 300 (kg) — current body weight; also triggers the automatic macro recalculation above and, when different from the previously saved value, appends an entry to `weightHistory` (see `GET /users/me/weight-history`) |
+| `height` | number | No | Number between 100 and 250 (cm) — also triggers the automatic macro recalculation above |
+| `targetWeight` | number | No | Number between 20 and 300 (kg) — goal weight, independent of `weight`; when present together with `weight`/`weightGoal`, the response includes a `weightTargetEta` prediction (see below) |
+| `activityLevel` | string | No | One of `sedentary`, `lightlyActive`, `moderatelyActive`, `veryActive`, `extremelyActive` — also triggers the automatic macro recalculation above |
+| `birthDate` | string | No | ISO 8601 date (`YYYY-MM-DD`); must resolve to a plausible age between 13 and 120 years; also triggers the automatic macro recalculation above |
+| `biologicalSex` | string | No | One of `male`, `female` — also triggers the automatic macro recalculation above |
+| `completingBodyOnboarding` | boolean | No | Must be exactly `true` when present; transient signal (never persisted as-is) that marks this specific PATCH as the real onboarding body-step completion — this is the only way the backend sets `hasRealBodyProfile: true` |
 | `preferredLanguage` | string | No | One of `en`, `pt-BR`; stored internally as `locale` |
 | `unitSystem` | string | No | One of `metric`, `imperial` |
+
+When the body includes `weight`, `height`, `activityLevel`, `weightGoal`, `birthDate`, `biologicalSex`, or `goal`, and the user's profile has all of weight/height/birthDate/biologicalSex/activityLevel/weightGoal/goal available (merging this request's values with whatever is already saved), the backend recalculates `dailyProteinTarget`, `dailyCalorieTarget`, `dailyCarbTarget`, and `dailyFatTarget` from scratch (same Mifflin-St Jeor formula as `POST /users/calculate-macros`) and that recalculated value **overrides** any `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` sent in the same request body.
 
 **Success response**
 
@@ -460,19 +515,33 @@ All fields are optional. The endpoint only updates fields that are present in th
       "profilePhoto": "https://cdn.example.com/avatar.png",
       "blendiModel": "Lite | ProPlus | Steel",
       "goal": "Muscle | Wellness | Energy | Recovery",
+      "weightGoal": "lose | maintain | gain",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
       "timezone": "America/Sao_Paulo",
       "dailyProteinTarget": 160,
       "dailyCalorieTarget": 2500,
       "dailyCarbTarget": 240,
+      "dailyFatTarget": 83,
       "dailyHydrationTarget": 3000,
       "isPro": false,
       "longestStreak": 12,
       "weight": 78,
       "height": 180,
+      "targetWeight": 72,
+      "activityLevel": "moderatelyActive",
+      "birthDate": "1996-04-12T00:00:00.000Z",
+      "biologicalSex": "male | female",
+      "hasRealBodyProfile": true,
       "createdAt": "2026-04-29T12:34:56.000Z",
-      "updatedAt": "2026-05-26T14:20:00.000Z"
+      "updatedAt": "2026-05-26T14:20:00.000Z",
+      "imc": 24.1,
+      "imcUnit": "kg/m²",
+      "imcClassification": "normal",
+      "weightTargetEta": {
+        "etaDays": 42,
+        "etaUnavailableReason": null
+      }
     }
   }
 }
@@ -480,12 +549,69 @@ All fields are optional. The endpoint only updates fields that are present in th
 
 The request field `preferredLanguage` is normalized to the persisted `locale` field. The current PATCH response echoes `locale` rather than `preferredLanguage`.
 
+`hasRealBodyProfile` reflects whether the user has ever completed the real onboarding body step (`completingBodyOnboarding: true` in some previous request) — once set to `true` it is never reset back to `false`.
+
+`imc`, `imcUnit`, and `imcClassification` are only included in the response when the automatic macro recalculation described above actually ran in this request (i.e. not on a PATCH that only touches unrelated fields like `pushToken` or `notificationPreferences`).
+
+`weightTargetEta` is only included when the merged profile (this request plus whatever is already saved) has both `weight` and `targetWeight` available. `etaDays` is the estimated number of days to reach `targetWeight` at the calorie adjustment implied by `weightGoal`; it is `null` together with an `etaUnavailableReason` of `weightGoal_is_maintain` (no calorie adjustment to divide by) or `contradictory_direction` (e.g. `weightGoal: 'lose'` with a `targetWeight` at or above the current `weight`).
+
 **Status codes**
 
 | Status | Meaning |
 |---|---|
 | `200` | Profile updated successfully |
 | `400` | Request body failed Zod validation |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
+| `500` | Unexpected server error |
+
+### GET /users/me/weight-history
+
+Returns the authenticated user's full weight history, ordered ascending by `recordedAt`.
+
+**JWT required:** Yes
+
+**Request parameters**
+
+None.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "weightHistory": [
+      {
+        "weight": 80,
+        "recordedAt": "2026-04-01T12:00:00.000Z"
+      },
+      {
+        "weight": 78,
+        "recordedAt": "2026-05-26T14:20:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+**Response fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `weightHistory` | array | List of weight entries, sorted ascending by `recordedAt` |
+| `weightHistory[].weight` | number | Weight in kilograms (between 20 and 300) at the time it was recorded |
+| `weightHistory[].recordedAt` | string | ISO 8601 timestamp of when the entry was recorded |
+
+A new entry is appended to this history automatically by `PATCH /users/me` whenever the request body includes a `weight` different from the value currently saved — there is no dedicated endpoint to write to this history directly.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Weight history returned successfully |
 | `401` | Missing, invalid, or expired Bearer token |
 | `404` | Authenticated user record not found |
 | `500` | Unexpected server error |
@@ -536,13 +662,17 @@ Calculates IMC, TDEE, and daily macro targets for onboarding and profile setup.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `weight` | number | Yes | Positive number; interpreted according to `unitSystem` |
-| `height` | number | Yes | Positive number; interpreted according to `unitSystem` |
-| `activityLevel` | string | Yes | One of `sedentary`, `lightlyActive`, `moderatelyActive`, `veryActive` |
+| `weight` | number | Yes | Validated as 20-300 on the raw value *before* unit conversion — effectively kg, regardless of `unitSystem` |
+| `height` | number | Yes | Validated as 100-250 on the raw value *before* unit conversion — effectively cm, regardless of `unitSystem` |
+| `targetWeight` | number | No | Number between 20 and 300 (kg), same before-conversion caveat as `weight`/`height` above — goal weight, independent of `weight`; when present, the response includes a `weightTargetEta` prediction (see below) |
+| `birthDate` | string | Yes | ISO 8601 date (`YYYY-MM-DD`); must resolve to a plausible age between 13 and 120 years |
+| `biologicalSex` | string | Yes | One of `male`, `female` |
+| `activityLevel` | string | Yes | One of `sedentary`, `lightlyActive`, `moderatelyActive`, `veryActive`, `extremelyActive` |
 | `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
+| `weightGoal` | string | Yes | One of `lose`, `maintain`, `gain` |
 | `unitSystem` | string | Yes | One of `metric`, `imperial` |
 
-The current implementation converts imperial values to metric when needed, computes IMC, then derives TDEE and the daily targets using the project's current calorie and protein multipliers with a fixed assumed age of 30.
+The current implementation converts imperial values to metric when needed, computes IMC, then derives TDEE and the daily targets using the Mifflin-St Jeor formula with the user's real age (derived from `birthDate` at the moment of the request, via `calculateAge`) and real `biologicalSex` — never a fixed age or sex. The only real mobile caller (`OnboardingBodyScreen`) always converts to metric locally and hard-codes `unitSystem: 'metric'`, so the before-conversion validation-order caveat on `weight`/`height`/`targetWeight` above is never reached in practice today.
 
 **Success response**
 
@@ -558,10 +688,17 @@ The current implementation converts imperial values to metric when needed, compu
     "dailyCalorieTarget": 2450,
     "dailyProteinTarget": 156,
     "dailyCarbTarget": 284,
-    "tdee": 2150
+    "dailyFatTarget": 82,
+    "tdee": 2150,
+    "weightTargetEta": {
+      "etaDays": 42,
+      "etaUnavailableReason": null
+    }
   }
 }
 ```
+
+`weightTargetEta` is only included when the request body includes `targetWeight`. `etaDays` is the estimated number of days to reach `targetWeight` at the calorie adjustment implied by `weightGoal`; it is `null` together with an `etaUnavailableReason` of `weightGoal_is_maintain` (no calorie adjustment to divide by) or `contradictory_direction` (e.g. `weightGoal: 'lose'` with a `targetWeight` at or above `weight`).
 
 **Status codes**
 
@@ -1337,6 +1474,8 @@ Returns day-by-day supplement adherence for the requested date range.
 
 The endpoint reuses the shared history validator, so optional `page` and `limit` values are accepted for contract consistency, but the current response is day-based and not paginated.
 
+`adherenceRate` (per day) and `summary.averageAdherence` are both fractions in the `0..1` range (e.g. `0.5` for half the stack checked), matching the convention used by the weekly report endpoint. Fixed on 2026-10-27 — see [`cp-audit-achado3-adherencerate-escala-supplement-history.md`](../fixes/cp-audit-achado3-adherencerate-escala-supplement-history.md); before that, this endpoint incorrectly returned a 0-100 value while every mobile consumer already expected 0-1.
+
 **Success response**
 
 **Status:** `200 OK`
@@ -1360,11 +1499,11 @@ The endpoint reuses the shared history validator, so optional `page` and `limit`
           }
         ],
         "missedSupplements": [],
-        "adherenceRate": 100
+        "adherenceRate": 1
       }
     ],
     "summary": {
-      "averageAdherence": 82.5
+      "averageAdherence": 0.83
     }
   }
 }
@@ -1578,7 +1717,7 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 4. Normalizes the message, generates a MongoDB cache key using user context plus `AI_PROVIDER` and `AI_MODEL`, and checks the `AiCache` collection.
 5. On a cache hit, returns the cached recipe immediately with `fromCache: true` and the remaining daily quota.
 6. On a cache miss, fetches the last 5 blend recipe names for prompt context.
-7. Builds the final prompt through `promptBuilder.service`.
+7. Builds the final prompt through `promptBuilder.service`, personalizing it with the user's `blendiModel` (physical blender guardrails — power/protein limits per model), `goal` (Muscle/Wellness/Energy/Recovery), and `weightGoal` (lose/maintain/gain — adds explicit calorie/recipe bias guidance for the chosen weight direction) in addition to macro targets, unit system, and recent blend history.
 8. Calls the configured AI provider abstraction, which is selected at runtime through `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`.
 9. Parses the returned JSON and validates it against `pulseAiRecipeSchema`; if the first response is invalid JSON, the backend retries once with a strict JSON-only instruction.
 10. Persists the validated recipe in MongoDB cache and returns it with `fromCache: false` and `usageRemaining`.
@@ -2919,7 +3058,7 @@ None.
 ```json
 {
   "status": "ok",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "environment": "development",
   "timestamp": "2026-04-29T12:34:56.000Z"
 }
@@ -2939,6 +3078,47 @@ None.
 | Status | Meaning |
 |---|---|
 | `200` | API is reachable and responding |
+
+### GET /health
+
+Readiness check endpoint. In addition to everything `/ping` returns, it includes the current MongoDB connection state, so a monitoring system can distinguish "process alive but database unreachable" from "process and database both healthy" — something `/ping` (always `200`) cannot express.
+
+**JWT required:** No
+
+**Request parameters**
+
+None.
+
+**Success response**
+
+**Status:** `200 OK` when the database is connected, `503 Service Unavailable` otherwise.
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "environment": "development",
+  "timestamp": "2026-04-29T12:34:56.000Z",
+  "dbStatus": 1
+}
+```
+
+**Response fields**
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | `ok` when the database is connected, `degraded` otherwise |
+| `version` | string | API version from environment configuration |
+| `environment` | string | Runtime environment such as `development`, `staging`, or `production` |
+| `timestamp` | string | Current server time in ISO 8601 UTC format |
+| `dbStatus` | number | Raw Mongoose `readyState` value: `0` disconnected, `1` connected, `2` connecting, `3` disconnecting |
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | API is reachable and the database connection is ready (`dbStatus: 1`) |
+| `503` | API is reachable but the database connection is not ready |
 
 ---
 

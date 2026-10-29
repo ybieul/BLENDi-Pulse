@@ -96,10 +96,10 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 
 1. **Modelo** — Lite / ProPlus (120W) / Steel (180W), sem chamada de API.
 2. **Objetivo** — Muscle / Wellness / Energy / Recovery, sem chamada de API.
-3. **Corpo** — peso, altura (métrico ou imperial), nível de atividade (sedentário/levemente ativo/moderadamente ativo/muito ativo). **Não pergunta sexo nem idade.** Calcula macros em tempo real (debounce 600ms) chamando o backend; mostra IMC com classificação; tem botão "Pular por agora".
+3. **Corpo** — peso, altura (métrico ou imperial), data de nascimento, sexo biológico (masculino/feminino), meta de peso (perder/manter/ganhar) e nível de atividade (sedentário/levemente ativo/moderadamente ativo/muito ativo). Calcula macros em tempo real (debounce 600ms) chamando o backend; mostra IMC com classificação; tem botão "Pular por agora".
 4. **Macros** — mostra/permite ajustar proteína (10-400g), calorias (500-10000kcal) e carboidratos (50-800g) calculados no passo anterior; ao finalizar, salva tudo e marca o onboarding como concluído — o app navega automaticamente para a tela principal.
 
-A fórmula de cálculo (backend, `user.controller.ts`) usa Mifflin-St Jeor **com idade fixa em 30 anos e a constante "masculina" (+5) para todo mundo**, porque o app não coleta sexo nem idade em nenhum lugar. Multiplicadores de atividade e ajuste de calorias/proteína variam por objetivo escolhido.
+A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculation.utils.ts`, chamada por `user.controller.ts`) usa Mifflin-St Jeor **com idade e sexo reais do usuário**: a idade é derivada da data de nascimento coletada na etapa de Corpo (nunca armazenada diretamente, sempre recalculada a partir de `birthDate` no momento do cálculo) e a constante da fórmula (+5 ou −161) varia pelo sexo biológico informado. Multiplicadores de atividade e ajuste de calorias/proteína variam por objetivo escolhido; o ajuste calórico (déficit/superávit) varia pela meta de peso (perder/manter/ganhar).
 
 ### Início (Home)
 
@@ -330,10 +330,10 @@ Processa apenas 4 tipos de evento: compra inicial, renovação, cancelamento e e
 
 ### E-mails automáticos
 
-**Achado crítico: o serviço de e-mail está marcado no próprio código como um "stub de desenvolvimento" — hoje o sistema NÃO envia e-mails reais de produção**, apenas registra no log do servidor. Isso afeta diretamente:
-- E-mail de boas-vindas (disparado no registro e no primeiro login via Google) — hoje só loga, não chega na caixa de entrada do usuário.
-- E-mail de redefinição de senha (com o código OTP) — mesma situação: o código existe e é validado normalmente no fluxo, mas a entrega real por e-mail depende desse serviço, que está em modo "stub".
-- Existe um terceiro método (e-mail de verificação de conta) implementado, mas **nunca chamado por nenhuma tela ou rota** — código morto.
+**O serviço de e-mail envia de verdade por SMTP (Google Workspace) em produção** (`email.service.ts`), controlado pela flag `ENABLE_DEV_EMAIL_LOG`: com a flag `true` (ambiente de desenvolvimento), só registra no log do servidor; com a flag `false` (produção), entrega de fato na caixa de entrada do usuário. Isso afeta:
+- E-mail de boas-vindas (disparado no registro e no primeiro login via Google) — enviado de verdade em produção.
+- E-mail de redefinição de senha (com o código OTP) — enviado de verdade em produção; o código é validado normalmente no fluxo independente do método de entrega.
+- Existe um terceiro método (e-mail de verificação de conta) implementado, mas **nunca chamado por nenhuma tela ou rota** — continua código morto, e esse é o único dos três métodos que permanece como stub (loga ou avisa que o provedor não está configurado, nunca envia de fato).
 - **Não existem** e-mails de recibo de assinatura, de cancelamento ou de relatório semanal.
 
 ### Notificações push
@@ -391,7 +391,7 @@ Processa apenas 4 tipos de evento: compra inicial, renovação, cancelamento e e
 - Edição de nome ou e-mail dentro do app.
 - Troca de senha dentro da área logada (só via fluxo "esqueci minha senha").
 - Exclusão de conta pelo próprio usuário.
-- Envio real de e-mails em produção hoje (serviço está em modo "stub de desenvolvimento").
+- Envio real do e-mail de verificação de conta (o único dos três métodos de e-mail que continua em modo stub, nunca chamado por nenhuma tela ou rota) — boas-vindas e redefinição de senha **já são** enviados de verdade por SMTP em produção.
 - Proteção/"freeze" de streak.
 - Controle, pelo usuário, da notificação de "subiu de nível" (existe no backend, mas sem toggle na tela).
 - Opção de desativar a notificação de relatório semanal.

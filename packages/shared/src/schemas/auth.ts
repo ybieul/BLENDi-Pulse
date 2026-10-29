@@ -20,6 +20,12 @@ import { z } from 'zod';
 
 import { isValidIanaTimezone } from '../utils/timezone.utils';
 import { rangeErrorMessage } from '../utils/validationRange.utils';
+import {
+  DAILY_CALORIE_TARGET_MAX,
+  DAILY_CALORIE_TARGET_MIN,
+  DAILY_PROTEIN_TARGET_VALIDATION_MAX,
+  DAILY_PROTEIN_TARGET_VALIDATION_MIN,
+} from './user';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -62,23 +68,27 @@ export const registerSchema = z.object({
 
   preferredLanguage: z.enum(['en', 'pt-BR']).default('en'),
 
+  // Mesmas constantes de updateUserSchema (./user.ts) — antes duplicadas aqui
+  // com números menores (10-400 / 500-10.000), o que deixava o registro mais
+  // restritivo que o PATCH de perfil para os mesmos campos, sem nenhum motivo
+  // documentado para a diferença.
   dailyProteinTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(10, 400),
+      invalid_type_error: rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX),
     })
     .int('errors.validation.integer')
-    .min(10, rangeErrorMessage(10, 400))
-    .max(400, rangeErrorMessage(10, 400)),
+    .min(DAILY_PROTEIN_TARGET_VALIDATION_MIN, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX))
+    .max(DAILY_PROTEIN_TARGET_VALIDATION_MAX, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX)),
 
   dailyCalorieTarget: z
     .number({
       required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(500, 10_000),
+      invalid_type_error: rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX),
     })
     .int('errors.validation.integer')
-    .min(500, rangeErrorMessage(500, 10_000))
-    .max(10_000, rangeErrorMessage(500, 10_000)),
+    .min(DAILY_CALORIE_TARGET_MIN, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX))
+    .max(DAILY_CALORIE_TARGET_MAX, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX)),
 
   // Timezone IANA do dispositivo (ex: 'America/Sao_Paulo', 'Europe/London').
   // Capturado automaticamente pelo app durante o onboarding via expo-localization —

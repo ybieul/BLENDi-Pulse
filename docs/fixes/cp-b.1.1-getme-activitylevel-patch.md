@@ -40,6 +40,8 @@ A causa é 100% client-side: `OnboardingMacrosScreen.tsx` (mobile) nunca inclui 
 
 Não aplicável — ver Tarefa 0.2. Nenhuma alteração de código feita aqui.
 
+**Atualização (2026-10-27):** o gap do lado mobile foi corrigido num CP próprio — ver [`cp-audit-achado1-activitylevel-onboarding-patch.md`](cp-audit-achado1-activitylevel-onboarding-patch.md). `OnboardingMacrosScreen.tsx` agora lê `activityLevel` do onboarding store e o inclui no PATCH final.
+
 ## TAREFA 3 — Testes reais
 
 Executado contra o Atlas real (ambiente `development`, servidor local `tsx watch` apontando para a mesma `MONGODB_URI` do `.env`), conta descartável `cp-b11-test-<timestamp>@example.com`.
@@ -58,5 +60,7 @@ Executado contra o Atlas real (ambiente `development`, servidor local `tsx watch
 Implementado: `getMe` agora retorna `weightGoal`, `weight`, `height`, `targetWeight`, `activityLevel`, `birthDate` e `biologicalSex`, reaproveitando o mesmo formato de resposta já usado. Testado de ponta a ponta contra o Atlas real, com prova empírica de que os valores persistidos pelo PATCH são corretamente relidos.
 
 **Achado 2 (`activityLevel` no PATCH) não teve fix de código** — investigação encontrou que o backend já persiste o campo corretamente desde o commit `cf652dc6` (2026-10-21). O gap real está em `OnboardingMacrosScreen.tsx` (mobile), fora do escopo deste CP (back-end only) e documentado como pendência futura.
+
+**Atualização (2026-10-27): a pendência foi resolvida** — ver [`cp-audit-achado1-activitylevel-onboarding-patch.md`](cp-audit-achado1-activitylevel-onboarding-patch.md).
 
 **Dependência do CP-B.1 resolvida:** `getMe` agora expõe os campos reais de perfil (incluindo os 3 coletados pelo CP-B). Importante notar, como o próprio CP-B já havia analisado: isso **não** resolve sozinho a detecção de "perfil completo", porque um usuário real com os mesmos valores dos placeholders (ex.: 30 anos, `male`, `maintain`) continua indistinguível deles. O CP-B ainda precisa decidir e implementar esse flag dedicado e *sticky* — ele sugere, textualmente, um **exemplo** de nome ("a forma robusta é um flag booleano dedicado (**ex.** `hasRealBodyProfile`)"), não um nome fechado; o CP-B.1 é livre para adotar esse nome ou outro. Este CP apenas garante que `getMe` tem os dados crus disponíveis caso esse flag (ou qualquer outra estratégia) precise deles.

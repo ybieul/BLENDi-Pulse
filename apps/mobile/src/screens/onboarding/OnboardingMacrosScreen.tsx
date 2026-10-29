@@ -106,6 +106,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const birthDate        = useOnboardingStore((state) => state.birthDate);
   const biologicalSex    = useOnboardingStore((state) => state.biologicalSex);
   const weightGoal       = useOnboardingStore((state) => state.weightGoal);
+  const activityLevel    = useOnboardingStore((state) => state.activityLevel);
   const calculatedProtein  = useOnboardingStore((state) => state.calculatedProtein);
   const calculatedCalories = useOnboardingStore((state) => state.calculatedCalories);
   const calculatedCarbs    = useOnboardingStore((state) => state.calculatedCarbs);
@@ -183,6 +184,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
       if (birthDate !== null) payload['birthDate'] = birthDate;
       if (biologicalSex !== null) payload['biologicalSex'] = biologicalSex;
       if (weightGoal !== null) payload['weightGoal'] = weightGoal;
+      if (activityLevel !== null) payload['activityLevel'] = activityLevel;
 
       // CP-B.1 — sinal explícito de "perfil completo" (hasRealBodyProfile).
       // Enviado só quando os 5 campos acima vieram de verdade do onboarding

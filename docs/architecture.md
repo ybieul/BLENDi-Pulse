@@ -12,11 +12,19 @@ BLENDi Pulse is organized as a layered system with explicit responsibilities per
 
 The mobile app lives in `apps/mobile` and is built with React Native and Expo for iOS and Android. It is the user-facing client installed on devices and is responsible for rendering UI, driving navigation, capturing device context, and calling the backend over HTTPS.
 
-At the current Phase 0 foundation, Zustand manages in-memory authentication state, `expo-secure-store` persists the refresh token across app restarts, and MMKV is already used for lightweight persisted preferences such as the saved locale. TanStack React Query is part of the mobile stack and is intended to become the server-state layer as screens and feature flows are added.
+Zustand manages in-memory state for auth, theme, and the active blend timer. `expo-secure-store` persists the refresh token across app restarts. MMKV backs a broad set of persisted state beyond just preferences: the saved locale, the auth/theme/blend Zustand stores, and — most significantly — the persisted cache of TanStack React Query, which is the app's server-state layer in active use across most feature domains (profile, daily missions, blend history, favorites, hydration, shopping lists, supplement stack/history, Pulse AI history), each with its own TTL defined in `apps/mobile/src/config/cache.config.ts`.
 
 ### 2. Backend API
 
-The backend lives in `apps/api` and is built with Node.js and Express 5, deployed on Railway. It owns all business logic, validates external input, manages JWT authentication, persists data to MongoDB, and acts as the single integration point for external providers. In the current codebase, the implemented third-party integration is Google OAuth; future providers are expected to follow the same backend-only boundary.
+The backend lives in `apps/api` and is built with Node.js and Express 5, deployed on Railway. It owns all business logic, validates external input, manages JWT authentication, persists data to MongoDB, and acts as the single integration point for external providers. No mobile client talks directly to any of these providers. The third-party integrations implemented in the current codebase are:
+
+- **Google OAuth** — login/account linking (see Authentication Architecture below).
+- **AI provider (configurable: OpenAI, Anthropic, or Google)** — powers Pulse AI recipe generation (`AI_PROVIDER`/`AI_MODEL`/`AI_API_KEY`) and, as a separate independently configurable provider, Pantry Scanner image analysis (`VISION_PROVIDER`/`VISION_MODEL`/`VISION_API_KEY`), both behind a single abstraction (`services/aiProvider.service.ts`).
+- **RevenueCat** — subscription purchase verification and an authenticated webhook (`POST /webhooks/revenuecat/{REVENUECAT_WEBHOOK_PATH_SECRET}`) that processes purchase/renewal/cancellation/expiration events.
+- **Expo Push Notification service** — delivers push notifications (Daily Pulse, streak/supplement/hydration reminders, weekly report ready, level up) via `EXPO_ACCESS_TOKEN`.
+- **SMTP (Google Workspace)** — sends the welcome email and password-reset OTP email for real in production; see Error Handling/Environment Variables below for the development-only logging fallback.
+
+Future providers are expected to follow the same backend-only boundary.
 
 No mobile client talks directly to MongoDB or third-party APIs. Every privileged operation flows through the backend so that validation, authorization, auditing, and rate-limiting decisions remain centralized.
 
@@ -24,7 +32,7 @@ No mobile client talks directly to MongoDB or third-party APIs. Every privileged
 
 MongoDB Atlas stores the system's persistent application data, including users, authentication state, OTP records, and future domain entities.
 
-Object storage for binary assets is a planned architectural direction for later phases, but no object storage provider is integrated in the current Phase 0 codebase.
+Object storage for binary assets is a planned architectural direction for later phases. No object storage provider is integrated today: the one binary asset the app currently stores (user-uploaded profile photos) is persisted as a base64 string directly in MongoDB (`user_photos` collection), not in an object storage provider.
 
 ### Request Flow
 
@@ -39,6 +47,15 @@ iOS / Android App (React Native + Expo)
 Railway - Node.js / Express 5 API
   |                |
   |                +--------------------> Google OAuth API
+  |                |
+  |                +--------------------> AI Provider (OpenAI | Anthropic | Google)
+  |                |                      (Pulse AI + Pantry Scanner vision)
+  |                |
+  |                +--------------------> RevenueCat API (+ incoming webhook)
+  |                |
+  |                +--------------------> Expo Push Notification service
+  |                |
+  |                +--------------------> SMTP (Google Workspace)
   |
   v
 MongoDB Atlas
@@ -150,17 +167,7 @@ The shared Axios instance is intentionally kept stateless. Authentication interc
 
 BLENDi Pulse enforces a zero-hardcoded-strings rule for all screens, components, and user-visible error messages. If text appears in the UI, it belongs in the translation files.
 
-Translation content is organized by functional namespaces. In the current mobile bootstrap, these groups are loaded under a single i18next translation namespace for synchronous initialization, but the domain split remains the documentation contract for where strings belong:
-
-- `common`
-- `onboarding`
-- `home`
-- `blend`
-- `recipes`
-- `track`
-- `profile`
-- `errors`
-- `notifications`
+Translation content is organized by functional namespaces (e.g. `common`, `onboarding`, `home`, `blend`, `pulseAi`, `pantryScanner`, `gamification`, `errors`, and others — one per feature domain, defined directly in `apps/mobile/src/locales/en.json`/`pt-BR.json`). The exact namespace list grows as features are added, so it is not enumerated here; the two locale files are the source of truth. All namespaces are loaded under a single i18next translation bundle for synchronous initialization.
 
 At runtime, the mobile app initializes i18next synchronously and wraps translation access through `useAppTranslation`. That hook encapsulates i18next usage behind a project-specific API with complete TypeScript key autocomplete, compile-time protection against invalid keys, and centralized language persistence.
 
@@ -189,7 +196,7 @@ Error handling is centralized and consistent across layers.
 
 ### Backend
 
-The Express `errorHandler` middleware is the final middleware in the chain and catches all uncaught application errors. It returns a standardized JSON payload with the fields `success` and `message`, and includes a stack trace only in development mode.
+The Express `errorHandler` middleware is the final middleware in the chain and catches all uncaught application errors. It returns a standardized JSON payload with the fields `success`, `code`, and `message`, and includes a stack trace only in development mode. `code` is a domain-scoped error code in the format `domain/error` (e.g. `auth/invalid-credentials`, `cors/origin-not-allowed`) — the mobile app's Axios interceptor uses this field, not `message`, to resolve the translated error text (`errors.<code with / and - replaced by _>`, see `apps/mobile/src/utils/error.utils.ts`).
 
 Validation errors are handled before business logic executes. Shared Zod schemas are used to validate request bodies, and invalid payloads are returned as `400 Bad Request` responses with normalized error messages that the mobile app can translate or surface consistently.
 
@@ -203,14 +210,14 @@ This separation keeps components focused on rendering states instead of re-imple
 
 ## Offline Strategy
 
-The app is designed so that temporary network loss degrades gracefully instead of making the UI unusable, but the current Phase 0 implementation only lays the storage foundations for that strategy.
+The app is designed so that temporary network loss degrades gracefully instead of making the UI unusable.
 
-- `expo-secure-store` already persists the refresh token for authenticated session recovery.
-- MMKV already persists lightweight preferences such as the selected locale.
-- TanStack React Query is part of the stack and is intended to manage server-state caching, request deduplication, and stale-data synchronization as feature screens are added.
-- Feature-specific offline caches such as recipes, favorites, hydration logs, and supplement tracking are planned consumers of that storage model rather than behavior already implemented in Phase 0.
+- `expo-secure-store` persists the refresh token for authenticated session recovery.
+- MMKV persists lightweight preferences such as the selected locale, the auth/theme/blend Zustand stores, and the TanStack React Query cache itself.
+- TanStack React Query manages server-state caching, request deduplication, and stale-data synchronization, with a per-domain TTL defined in `apps/mobile/src/config/cache.config.ts` (`CACHE_CONFIG`).
+- Most feature domains persist their React Query cache to MMKV through `PERSISTABLE_QUERY_KEYS` (profile, daily missions, blend history/today, favorites, hydration history/today, shopping lists, supplement stack/history, Pulse AI history) so their last known data survives app restarts and brief offline periods. A few domains are deliberately excluded from this persistence by design — Pantry Scanner usage (quota is sensitive and must reflect the server), conversation history, and weekly reports (the server is the single source of truth; the in-memory React Query cache is enough) — and always refetch from the server instead of rehydrating a potentially stale on-disk snapshot.
 
-The goal is predictable behavior: sensitive credentials stay in secure native storage, lightweight preferences survive restarts, and future local-first features will be able to keep working while network-only workflows fail clearly and recover cleanly.
+The goal is predictable behavior: sensitive credentials stay in secure native storage, lightweight preferences and most feature data survive restarts, and workflows that genuinely require a fresh server round-trip fail clearly and recover cleanly instead of serving stale data silently.
 
 ---
 
@@ -225,8 +232,12 @@ The goal is predictable behavior: sensitive credentials stay in secure native st
 | Reset tokens are temporary, last 10 minutes, and include a `purpose` claim | Prevents reusing access or refresh tokens for password reset and narrows the window for misuse |
 | Reset token replay is checked against `passwordChangedAt` | Rejects reuse of a previously valid reset token after the password has already been changed |
 | `googleId` uses a sparse unique index on `User` | Preserves uniqueness for Google-linked accounts while allowing regular email/password users to exist without a `googleId` value |
+| Per-route rate limiting (login, registration, forgot-password by IP and separately by target email, OTP verification — each with its own window/limit — plus a global 120 requests/minute per authenticated user) | Narrows brute-force/enumeration/abuse windows per attack vector instead of relying on one generic limit; keying forgot-password by the target email (not just IP) specifically protects a single victim's inbox from being flooded by an attacker rotating IPs |
+| MongoDB operator injection sanitization on `req.body`/`req.params`/`req.headers`/`req.query` (`express-mongo-sanitize`, called directly rather than via its default middleware) | Strips keys containing `$` or `.` so an attacker cannot inject MongoDB query operators (`$ne`, `$gt`, `$where`, etc.) through user input; called directly instead of `app.use(mongoSanitize())` because the library's default `req[key]` reassignment crashes every request with a `500` under Express 5, where `req.query` is a read-only getter |
+| Global HTTP security headers via `helmet()` | Applies HSTS, `X-Content-Type-Options`, `X-Frame-Options`, removal of `X-Powered-By`, and other standard hardening headers to every response with no route-specific tuning needed, since the API serves only JSON to the mobile app |
+| CORS origin allowlist (`ALLOWED_ORIGINS`, plus `localhost`/`127.0.0.1` only in development) with a controlled rejection | A request from a non-allowed origin is rejected with a deliberate `403` and `code: 'cors/origin-not-allowed'` through the standard error envelope, instead of letting the `cors` library's raw error fall through as a generic `500` |
 
-These decisions are intentionally layered: credential storage, token lifecycle, account recovery, and schema-level database constraints each contribute to the overall security posture.
+These decisions are intentionally layered: credential storage, token lifecycle, account recovery, schema-level database constraints, rate limiting, input sanitization, HTTP headers, and CORS validation each contribute to the overall security posture.
 
 ---
 
@@ -258,6 +269,40 @@ The following environment variables define the current runtime contract for back
 | `GOOGLE_CLIENT_SECRET` | Backend | Google OAuth client secret used during code exchange | `apps/api/src/config/env.ts`, Google OAuth service |
 | `GOOGLE_REDIRECT_URI` | Backend | Redirect URI registered in Google Cloud and used during OAuth callback validation | `apps/api/src/config/env.ts`, Google OAuth controller/service |
 
+### Email (SMTP)
+
+| Variable | Layer | Purpose | Used in |
+|---|---|---|---|
+| `ENABLE_DEV_EMAIL_LOG` | Backend | When `true`, the email service only logs welcome/password-reset emails to the console instead of sending them; defaults to `false`. Must never be `true` in production | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+| `SMTP_HOST` | Backend | SMTP server hostname (Google Workspace) used for real email delivery | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+| `SMTP_PORT` | Backend | SMTP server port; defaults to `465` when omitted | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+| `SMTP_USER` | Backend | SMTP authentication username | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+| `SMTP_PASS` | Backend | SMTP authentication password | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+| `EMAIL_FROM` | Backend | Display "From" address used on outgoing emails (e.g. `BLENDi Pulse <info@blendiblender.com>`) | `apps/api/src/config/env.ts`, `services/email.service.ts` |
+
+All five SMTP-related variables above are optional at the environment-validation level: when any is missing and `ENABLE_DEV_EMAIL_LOG` is `false`, the email service logs a warning and skips sending instead of preventing server boot.
+
+### AI Providers (Pulse AI + Pantry Scanner Vision)
+
+| Variable | Layer | Purpose | Used in |
+|---|---|---|---|
+| `AI_PROVIDER` | Backend | Selects the text-generation AI provider: `openai`, `anthropic`, or `google` | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+| `AI_MODEL` | Backend | Model identifier for the selected `AI_PROVIDER` (e.g. `gemini-2.5-flash-lite`) — powers Pulse AI recipe generation and the Pantry Scanner recipe step | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+| `AI_API_KEY` | Backend | API key for the selected `AI_PROVIDER` | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+| `VISION_PROVIDER` | Backend | Selects the image-analysis AI provider: `openai`, `anthropic`, or `google` — configured independently from `AI_PROVIDER` | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+| `VISION_MODEL` | Backend | Model identifier for the selected `VISION_PROVIDER` — powers Pantry Scanner image analysis | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+| `VISION_API_KEY` | Backend | API key for the selected `VISION_PROVIDER` | `apps/api/src/config/env.ts`, `services/aiProvider.service.ts` |
+
+### RevenueCat
+
+| Variable | Layer | Purpose | Used in |
+|---|---|---|---|
+| `REVENUECAT_API_KEY` | Backend | RevenueCat API key used to verify purchases server-side | `apps/api/src/config/env.ts`, `config/revenuecat.config.ts` |
+| `REVENUECAT_WEBHOOK_SECRET` | Backend | Shared secret used to authenticate the incoming RevenueCat webhook request (`Authorization` header); optional, but must be at least 32 characters when set | `apps/api/src/config/env.ts`, `utils/revenueCatWebhookAuth.ts` |
+| `REVENUECAT_WEBHOOK_PATH_SECRET` | Backend | Required random path segment of the webhook URL itself (`/webhooks/revenuecat/{this value}`), so the endpoint is not a predictable URL; the server refuses to boot without it | `apps/api/src/config/env.ts`, `routes/webhooks.ts` |
+| `REVENUECAT_APP_IDS` | Backend | Comma-separated list of RevenueCat `app_id` values accepted by the webhook (one per platform — iOS and Android are distinct RevenueCat apps) | `apps/api/src/config/env.ts`, `config/revenuecat.config.ts` |
+| `REVENUECAT_APP_ID` | Backend | Legacy single-`app_id` variant; still accepted and merged into `REVENUECAT_APP_IDS` | `apps/api/src/config/env.ts`, `config/revenuecat.config.ts` |
+
 ### General Configuration
 
 | Variable | Layer | Purpose | Used in |
@@ -266,6 +311,7 @@ The following environment variables define the current runtime contract for back
 | `NODE_ENV` | Backend | Runtime mode controlling behavior such as stack trace exposure | `apps/api/src/config/env.ts`, error handling |
 | `API_VERSION` | Backend | Version label for the API surface and operational metadata | `apps/api/src/config/env.ts`, server config |
 | `ALLOWED_ORIGINS` | Backend | CORS allowlist configuration for approved client origins | `apps/api/src/config/env.ts`, HTTP server setup |
+| `EXPO_ACCESS_TOKEN` | Backend | Expo access token used to authenticate push notification requests sent through the Expo Push Notification service | `apps/api/src/config/env.ts`, `services/pushNotification.service.ts` |
 | `EXPO_PUBLIC_API_URL` | Mobile | Public base URL for the backend API consumed by the mobile client | `apps/mobile/.env.example`, `apps/mobile/src/config/api.ts` |
 
 The mobile app does not define private secrets in environment files. Any variable with the `EXPO_PUBLIC_` prefix is bundled into the client and must therefore be treated as public configuration only.

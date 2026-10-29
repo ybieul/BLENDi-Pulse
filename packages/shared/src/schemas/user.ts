@@ -314,14 +314,16 @@ export const calculateMacrosSchema = z.object({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.number_range',
     })
-    .positive('errors.validation.number_range'),
+    .min(20, rangeErrorMessage(20, 300))
+    .max(300, rangeErrorMessage(20, 300)),
 
   height: z
     .number({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.number_range',
     })
-    .positive('errors.validation.number_range'),
+    .min(100, rangeErrorMessage(100, 250))
+    .max(250, rangeErrorMessage(100, 250)),
 
   // Opcional — calculateMacros é stateless (não lê o perfil do usuário), então
   // a previsão de prazo só aparece na resposta se o próprio payload trouxer
@@ -373,48 +375,6 @@ export const calculateMacrosSchema = z.object({
   }),
 });
 
-// ─── Schema: metas de macronutrientes ────────────────────────────────────────
-
-export const macroTargetSchema = z.object({
-  dailyCalorieTarget: z
-    .number({
-      required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX),
-    })
-    .int('errors.validation.integer')
-    .min(DAILY_CALORIE_TARGET_MIN, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX))
-    .max(DAILY_CALORIE_TARGET_MAX, rangeErrorMessage(DAILY_CALORIE_TARGET_MIN, DAILY_CALORIE_TARGET_MAX)),
-
-  dailyProteinTarget: z
-    .number({
-      required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX),
-    })
-    .int('errors.validation.integer')
-    .min(DAILY_PROTEIN_TARGET_VALIDATION_MIN, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX))
-    .max(DAILY_PROTEIN_TARGET_VALIDATION_MAX, rangeErrorMessage(DAILY_PROTEIN_TARGET_VALIDATION_MIN, DAILY_PROTEIN_TARGET_VALIDATION_MAX)),
-
-  dailyCarbTarget: z
-    .number({
-      required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX),
-    })
-    .int('errors.validation.integer')
-    .min(DAILY_CARB_TARGET_MIN, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX))
-    .max(DAILY_CARB_TARGET_MAX, rangeErrorMessage(DAILY_CARB_TARGET_MIN, DAILY_CARB_TARGET_MAX))
-    .optional(),
-
-  dailyFatTarget: z
-    .number({
-      required_error: 'errors.validation.required',
-      invalid_type_error: rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX),
-    })
-    .int('errors.validation.integer')
-    .min(DAILY_FAT_TARGET_MIN, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX))
-    .max(DAILY_FAT_TARGET_MAX, rangeErrorMessage(DAILY_FAT_TARGET_MIN, DAILY_FAT_TARGET_MAX))
-    .optional(),
-});
-
 // ─── Schema: timezone do usuário ─────────────────────────────────────────────
 // Fonte de verdade para validação do campo timezone em qualquer contexto de
 // domínio do usuário (perfil, preferências, sincronização de dispositivo).
@@ -460,7 +420,6 @@ export const calculateMacrosResponseSchema = z.object({
 
 // ─── Tipos inferidos ──────────────────────────────────────────────────────────
 
-export type MacroTargetInput = z.infer<typeof macroTargetSchema>;
 export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
 export type DailyPulseTimeInput = z.infer<typeof dailyPulseTimeSchema>;
 export type TimezoneInput = z.infer<typeof timezoneSchema>;

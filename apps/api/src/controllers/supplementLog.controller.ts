@@ -258,7 +258,7 @@ export async function getSupplementHistory(
           .map(serializeSupplementItem);
         const adherenceRate = historyStack.length === 0
           ? 0
-          : roundToTwoDecimals((checkedSupplements.length / historyStack.length) * 100);
+          : roundToTwoDecimals(checkedSupplements.length / historyStack.length);
 
         return {
           date,

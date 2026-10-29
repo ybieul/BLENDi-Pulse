@@ -96,6 +96,79 @@ export const authRegisterLimiter = rateLimit({
 });
 
 /**
+ * Limitador de forgot-password por IP.
+ * 10 requisições por 60 minutos, apenas por IP — evita que uma única fonte
+ * sobrecarregue o endpoint de redefinição de senha em geral (ex.: varrendo
+ * e-mails diferentes). Reaproveita o mesmo código de erro de
+ * `authLoginLimiter` ('auth/too-many-requests'), já que para o cliente é a
+ * mesma categoria de "muitas tentativas vindas de você".
+ */
+export const forgotPasswordIpLimiter = rateLimit({
+  windowMs: 60 * MINUTE_MS,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => ipKeyGenerator(req.ip ?? ''),
+  handler: rateLimitHandler(
+    'auth/too-many-requests',
+    'Too many password reset requests. Please try again later.'
+  ),
+});
+
+/**
+ * Limitador de forgot-password por e-mail de destino.
+ * 3 requisições por 60 minutos, chave = SÓ o e-mail do body (sem IP) — ao
+ * contrário do limitador de login, aqui a chave não pode ser composta com o
+ * IP: um atacante trocando de IP a cada chamada continuaria conseguindo
+ * mandar e-mails ilimitados para a MESMA vítima se a chave dependesse do IP
+ * (cada IP novo abriria uma cota nova para aquele par). Isolar a chave só no
+ * e-mail é o que protege a caixa de entrada da vítima de verdade. E-mail é
+ * normalizado (trim + minúsculas) para não permitir bypass por
+ * "Nome@Email.com" vs "nome@email.com". Quando o body não trouxer um e-mail
+ * válido, cai no IP normalizado como fallback, igual ao `authLoginLimiter`.
+ */
+export const forgotPasswordEmailLimiter = rateLimit({
+  windowMs: 60 * MINUTE_MS,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => {
+    const email =
+      typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : undefined;
+    return email ?? ipKeyGenerator(req.ip ?? '');
+  },
+  handler: rateLimitHandler(
+    'auth/too-many-password-reset-requests',
+    'Too many password reset requests for this email. Please try again later.'
+  ),
+});
+
+/**
+ * Limitador de verify-otp por IP.
+ * 10 requisições por 15 minutos, apenas por IP — o limite de 5 tentativas
+ * por registro de OTP (otp.service.ts, MAX_ATTEMPTS) já protege contra
+ * adivinhação do código de UM e-mail específico. Mas sem nenhum limite por
+ * IP, um atacante pode varrer MUITOS e-mails diferentes em alta velocidade,
+ * esgotando as 5 tentativas de cada um rapidamente e passando pro próximo.
+ * Esse limitador cobre esse vetor volumétrico — mesma janela/limite do
+ * `authLoginLimiter`, já que ambos protegem fluxos de verificação de
+ * credencial. Não compõe com e-mail (ao contrário do login): aqui o
+ * objetivo é limitar o volume total vindo de uma fonte, não um par
+ * IP+e-mail específico.
+ */
+export const verifyOtpLimiter = rateLimit({
+  windowMs: 15 * MINUTE_MS,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => ipKeyGenerator(req.ip ?? ''),
+  handler: rateLimitHandler(
+    'auth/too-many-requests',
+    'Too many OTP verification attempts. Please try again later.'
+  ),
+});
+
+/**
  * Limitador global para requisições autenticadas.
  * 120 requisições por minuto (2 req/s) por usuário — chave é o `sub` do
  * access token (ver `extractUserId` acima), com fallback para IP
