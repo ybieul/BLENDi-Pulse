@@ -13,6 +13,7 @@ import Purchases, {
 import { api } from '../config/api';
 import { PRICING_CONFIG } from '../config/pricing.config';
 import { getRevenueCatApiKey, isRevenueCatNativePlatform } from '../config/revenuecat.config';
+import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 
 export type PurchasePlanId = 'monthly' | 'annual';
@@ -389,6 +390,13 @@ export async function purchasePlan(planId: PurchasePlanId): Promise<PurchaseSync
     const targetPackage = await getRequiredPackage(planId);
     const purchaseResult = await Purchases.purchasePackage(targetPackage);
     const user = await verifySubscriptionOnBackend(purchaseResult.productIdentifier);
+
+    trackEvent('purchase_completed', {
+      planId,
+      productIdentifier: purchaseResult.productIdentifier,
+      priceString: targetPackage.product.priceString,
+      currencyCode: targetPackage.product.currencyCode,
+    });
 
     return {
       user,

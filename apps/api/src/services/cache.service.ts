@@ -3,6 +3,7 @@
 // Controllers e outros services devem depender deste módulo, nunca do modelo diretamente.
 
 import { createHash } from 'node:crypto';
+import type mongoose from 'mongoose';
 import { CACHE_CONFIG } from '../config/cache.config';
 import { AiCacheModel, type IAiCache } from '../models/AiCache';
 
@@ -160,10 +161,17 @@ export async function setInCache({
 }
 
 /**
- * Entrada: userId do dono das entradas de cache.
+ * Entrada: userId do dono das entradas de cache. `session` opcional permite
+ * chamar esta função dentro de uma transação do Mongoose (ex: exclusão de conta).
  * Saída: quantidade de documentos removidos para invalidar todo o contexto de cache do usuário.
  */
-export async function invalidateUserCache(userId: string): Promise<number> {
-  const result = await AiCacheModel.deleteMany({ userId: userId.trim() }).exec();
+export async function invalidateUserCache(
+  userId: string,
+  session?: mongoose.ClientSession
+): Promise<number> {
+  const result = await AiCacheModel.deleteMany(
+    { userId: userId.trim() },
+    session ? { session } : undefined
+  ).exec();
   return result.deletedCount ?? 0;
 }

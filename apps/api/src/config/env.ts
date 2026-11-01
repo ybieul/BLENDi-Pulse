@@ -188,6 +188,9 @@ const envSchema = z.object({
   REVENUECAT_APP_IDS: optionalString(),
   // Legado (um unico app_id). Continua aceito e e somado a REVENUECAT_APP_IDS.
   REVENUECAT_APP_ID: optionalString(),
+
+  // PostHog (analytics). Opcional: ausente, os eventos de servidor simplesmente nao sao enviados.
+  POSTHOG_API_KEY: optionalString(),
 });
 
 // Valida sincronamente — se falhar, lança erro e mata o processo

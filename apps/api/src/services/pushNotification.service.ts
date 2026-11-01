@@ -9,13 +9,12 @@ const EXPO_MAX_BATCH_SIZE = 100;
 // sob carga normal.
 const EXPO_PUSH_TIMEOUT_MS = 30_000;
 const EXPO_SUCCESS_STATUS = 'ok';
-const EXPO_ERROR_STATUS = 'error';
 const DEVICE_NOT_REGISTERED_ERROR = 'DeviceNotRegistered';
 
 type PushNotificationPriority = 'default' | 'normal' | 'high';
 
 type ExpoPushTicket = {
-  status?: typeof EXPO_SUCCESS_STATUS | typeof EXPO_ERROR_STATUS;
+  status?: typeof EXPO_SUCCESS_STATUS | 'error';
   details?: {
     error?: string;
   };

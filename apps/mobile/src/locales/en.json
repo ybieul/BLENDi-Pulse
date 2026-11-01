@@ -748,6 +748,19 @@
       "message": "You'll need to sign in again to access your account",
       "confirm": "Sign Out"
     },
+    "deleteAccount": {
+      "button": "Delete Account",
+      "sheetTitle": "Delete your account?",
+      "warning": "This permanently deletes your account and all your data — blends, favorites, history, and progress. This cannot be undone.",
+      "subscriptionWarning": "This does NOT cancel an active Pulse Pro subscription. You must cancel it separately in your Apple or Google Play subscription settings, or you'll keep being charged with no access to the app.",
+      "confirmInstruction": "Type {{phrase}} to confirm",
+      "confirmPhrase": "DELETE",
+      "inputPlaceholder": "Type DELETE",
+      "confirmButton": "Delete My Account",
+      "cancelButton": "Cancel",
+      "successMessage": "Your account has been deleted.",
+      "errorMessage": "We couldn't delete your account. Please try again."
+    },
     "notifications": {
       "title": "Notifications",
       "dailyPulse": "Daily Pulse",

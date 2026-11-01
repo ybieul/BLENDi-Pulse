@@ -88,6 +88,7 @@ import {
 } from "../hooks/useNotificationPreferences";
 import { usePulseProPurchase } from "../hooks/usePulseProPurchase";
 import { DailyPulseTimeSheet } from "../components/me/DailyPulseTimeSheet";
+import { DeleteAccountSheet } from "../components/me/DeleteAccountSheet";
 import { formatUsdCurrency } from "../utils/pricing.utils";
 import {
   cacheProfilePhoto,
@@ -442,6 +443,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const { formatMonthYear } = useDateFormat();
   const authUser = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const queryClient = useQueryClient();
   const { displayVolume } = useUnits();
@@ -466,6 +468,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const setThemeMode = useThemeStore((state) => state.setMode);
 
   const [editingType, setEditingType] = useState<EditSettingType | null>(null);
+  const [isDeleteAccountSheetVisible, setIsDeleteAccountSheetVisible] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<UserBadge | null>(null);
   const [editingTime, setEditingTime] = useState(false);
   const [profilePhotoPreviewUri, setProfilePhotoPreviewUri] = useState<string | null>(null);
@@ -1027,6 +1030,18 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     );
   }, [t, logout, queryClient]);
 
+  const handleDeleteAccount = useCallback(async () => {
+    // Erro aqui propaga pra DeleteAccountSheet (não é capturado) — o sheet
+    // permanece aberto com a mensagem de erro, sem tocar em onboarding/
+    // queryClient/sessão, exatamente como no backend: exclusão parcial
+    // nunca pode acontecer nem no estado local.
+    await deleteAccount();
+
+    appStorage.delete(ONBOARDING_KEY);
+    queryClient.clear();
+    showToast(t("me.deleteAccount.successMessage"));
+  }, [deleteAccount, queryClient, t]);
+
   const handleShareWeekly = useCallback(async () => {
     if (!canShareWeekly || isWeeklyShareLoading) {
       return;
@@ -1505,6 +1520,20 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       color: colors.brand.pulse,
       fontFamily: fonts.body,
       fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+    deleteAccountButton: {
+      marginTop: 20,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.overlay.plum[10],
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    deleteAccountText: {
+      color: colors.feedback.error,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
       fontWeight: fontWeights.medium,
     },
     versionText: {
@@ -2012,6 +2041,16 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             </Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={() => { setIsDeleteAccountSheetVisible(true); }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.deleteAccountText}>
+              {t("me.deleteAccount.button")}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.versionText}>
             {"v" + (Constants.expoConfig?.version ?? "1.0.0")}
           </Text>
@@ -2064,6 +2103,13 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           onClose={() => {
             setEditingType(null);
           }}
+        />
+      ) : null}
+
+      {isDeleteAccountSheetVisible ? (
+        <DeleteAccountSheet
+          onConfirm={handleDeleteAccount}
+          onClose={() => { setIsDeleteAccountSheetVisible(false); }}
         />
       ) : null}
 

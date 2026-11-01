@@ -155,6 +155,19 @@ export async function logout(): Promise<void> {
 }
 
 /**
+ * Exclui permanentemente a conta autenticada e todos os dados relacionados.
+ * DELETE /users/me → 200 { message }
+ *
+ * Diferente de logout(): não é melhor esforço. Se a chamada falhar, o caller
+ * (auth.store.ts) NÃO pode limpar a sessão local — uma exclusão que falhou
+ * nunca pode deixar o app fingindo que a conta sumiu enquanto ela ainda
+ * existe no servidor.
+ */
+export async function deleteAccount(): Promise<void> {
+  await api.delete('/users/me');
+}
+
+/**
  * Inicia o fluxo de recuperação de senha.
  * POST /auth/forgot-password → 200 { message }
  *

@@ -8,7 +8,6 @@ import {
   RevenueCatInvalidPurchaseError,
   RevenueCatRequestError,
   getSubscriberCustomerInfo,
-  postReceiptAndGetActiveSubscription,
 } from '../services/revenueCat.service';
 import {
   sendErrorResponse,
@@ -19,44 +18,18 @@ import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils'
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 
-const verifyPurchaseSchema = z
-  .object({
-    platform: z
-      .enum(['ios', 'android'], {
-        errorMap: () => ({ message: 'errors.validation.invalid_option' }),
-      })
-      .optional(),
-    receipt: z
-      .string({
-        required_error: 'errors.validation.required',
-        invalid_type_error: 'errors.validation.required',
-      })
-      .trim()
-      .min(1, 'errors.validation.required')
-      .optional(),
-    productId: z
-      .string({ invalid_type_error: 'errors.validation.invalid_option' })
-      .trim()
-      .min(1, 'errors.validation.required')
-      .optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.receipt && !value.platform) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['platform'],
-        message: 'errors.validation.required',
-      });
-    }
-
-    if (value.receipt && value.platform === 'android' && !value.productId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['productId'],
-        message: 'errors.validation.required',
-      });
-    }
-  });
+const verifyPurchaseSchema = z.object({
+  platform: z
+    .enum(['ios', 'android'], {
+      errorMap: () => ({ message: 'errors.validation.invalid_option' }),
+    })
+    .optional(),
+  productId: z
+    .string({ invalid_type_error: 'errors.validation.invalid_option' })
+    .trim()
+    .min(1, 'errors.validation.required')
+    .optional(),
+});
 
 function formatZodErrors(err: ZodError) {
   return err.issues.map(issue => ({
@@ -144,14 +117,7 @@ export async function verifyPurchase(
       return;
     }
 
-    const subscription = parsed.data.receipt
-      ? await postReceiptAndGetActiveSubscription({
-          appUserId: userId,
-          platform: parsed.data.platform!,
-          receipt: parsed.data.receipt,
-          productId: parsed.data.productId,
-        })
-      : extractActiveSubscriptionSnapshot(await getSubscriberCustomerInfo(userId));
+    const subscription = extractActiveSubscriptionSnapshot(await getSubscriberCustomerInfo(userId));
 
     const updatedUser = await UserModel.findByIdAndUpdate(
       userId,

@@ -5,10 +5,8 @@ import type { UserSubscriptionPlan } from '../models/User';
 const REVENUECAT_API_BASE_URL = 'https://api.revenuecat.com/v1';
 // Sem isso, um RevenueCat lento (não fora do ar) deixava POST /purchases/verify
 // pendurado indefinidamente — achado de Alta do diagnóstico de resiliência
-// (Tarefa 4): nenhuma camada tinha timeout algum para essas duas chamadas.
+// (Tarefa 4): nenhuma camada tinha timeout algum para essa chamada.
 const REVENUECAT_REQUEST_TIMEOUT_MS = 15_000;
-
-export type RevenueCatPlatform = 'ios' | 'android';
 
 interface RevenueCatCustomerInfoResponse {
   request_date: string;
@@ -63,7 +61,7 @@ export class RevenueCatRequestError extends Error {
   }
 }
 
-function getRevenueCatHeaders(platform?: RevenueCatPlatform): Record<string, string> {
+function getRevenueCatHeaders(): Record<string, string> {
   if (!env.REVENUECAT_API_KEY) {
     throw new RevenueCatConfigurationError(
       'Payment system is temporarily unavailable while RevenueCat keys are being configured.'
@@ -73,7 +71,6 @@ function getRevenueCatHeaders(platform?: RevenueCatPlatform): Record<string, str
   return {
     Authorization: `Bearer ${env.REVENUECAT_API_KEY}`,
     'Content-Type': 'application/json',
-    ...(platform ? { 'X-Platform': platform } : {}),
   };
 }
 
@@ -188,37 +185,6 @@ async function parseRevenueCatError(response: Response): Promise<string> {
   }
 
   return `RevenueCat request failed with status ${response.status}.`;
-}
-
-export async function postReceiptAndGetActiveSubscription(input: {
-  appUserId: string;
-  platform: RevenueCatPlatform;
-  receipt: string;
-  productId?: string;
-}): Promise<RevenueCatSubscriptionSnapshot> {
-  if (!paymentsConfig.isConfigured) {
-    throw new RevenueCatConfigurationError(
-      'Payment system is temporarily unavailable while RevenueCat keys are being configured.'
-    );
-  }
-
-  const response = await fetch(`${REVENUECAT_API_BASE_URL}/receipts`, {
-    method: 'POST',
-    headers: getRevenueCatHeaders(input.platform),
-    body: JSON.stringify({
-      app_user_id: input.appUserId,
-      fetch_token: input.receipt,
-      ...(input.productId ? { product_id: input.productId } : {}),
-    }),
-    signal: AbortSignal.timeout(REVENUECAT_REQUEST_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new RevenueCatRequestError(await parseRevenueCatError(response), response.status);
-  }
-
-  const payload = parseRevenueCatResponse(await response.json());
-  return extractActiveSubscriptionSnapshot(payload);
 }
 
 export async function getSubscriberCustomerInfo(appUserId: string): Promise<RevenueCatCustomerInfoResponse> {

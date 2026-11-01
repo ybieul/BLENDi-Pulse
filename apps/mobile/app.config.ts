@@ -34,6 +34,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       expoProjectId,
       revenueCatAppleApiKey: fromEnv('EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY'),
       revenueCatGoogleApiKey: fromEnv('EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY'),
+      posthogApiKey: fromEnv('EXPO_PUBLIC_POSTHOG_API_KEY'),
       eas: {
         ...staticEas,
         projectId: expoProjectId,

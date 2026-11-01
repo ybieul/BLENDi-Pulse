@@ -221,6 +221,17 @@ The goal is predictable behavior: sensitive credentials stay in secure native st
 
 ---
 
+## Analytics Architecture
+
+Product analytics is sent to PostHog from both the mobile app and the backend, following the same "never fails the caller" robustness pattern already used by the RevenueCat integration: every analytics call is wrapped so it never throws, and the client (mobile or server) is simply not initialized when its respective API key is absent.
+
+- **Mobile** (`apps/mobile/src/services/analytics.service.ts`): `initializeAnalytics()` runs once at boot, alongside `initializePurchases()`. `identifyAnalyticsUser`/`resetAnalyticsUser` are called at every point `identifyPurchasesUser`/`logoutPurchasesUser` already are (register, Google sign-in, session restore, logout, account deletion), so the PostHog `distinctId` tracks the same identity lifecycle as RevenueCat. The client runs with in-memory storage only (no `@react-native-async-storage/async-storage`), so the anonymous `distinctId` does not persist across app restarts — identify calls on every session-restoring path exist specifically to compensate for that.
+- **Screen views**: a single `onStateChange` listener on the root `NavigationContainer` (not per-screen instrumentation) emits `screen_viewed` for a fixed allow-list of routes (`TRACKED_SCREEN_NAMES` in `App.tsx`) — onboarding steps, the paywall, and the two screens that pair with an existing completion event (`Blend`, `PantryScanner`) to make abandonment visible, not just completion.
+- **Backend** (`apps/api/src/services/analytics.service.ts`): `captureServerEvent(distinctId, event, properties?)` lazily constructs a `posthog-node` client only when `POSTHOG_API_KEY` is set, and catches any send error internally (`console.warn`, never rethrown) so a PostHog outage can never affect the RevenueCat webhook's response time or status code.
+- **No double-counting**: the purchase-completed event is emitted exclusively by the mobile app (`purchase_completed`, right after the purchase is verified with the backend) — the RevenueCat webhook's `INITIAL_PURCHASE` branch intentionally never calls `captureServerEvent`, since both would otherwise fire for the same real-world purchase.
+
+---
+
 ## Security Decisions
 
 | Decision | Rationale |
@@ -302,6 +313,13 @@ All five SMTP-related variables above are optional at the environment-validation
 | `REVENUECAT_WEBHOOK_PATH_SECRET` | Backend | Required random path segment of the webhook URL itself (`/webhooks/revenuecat/{this value}`), so the endpoint is not a predictable URL; the server refuses to boot without it | `apps/api/src/config/env.ts`, `routes/webhooks.ts` |
 | `REVENUECAT_APP_IDS` | Backend | Comma-separated list of RevenueCat `app_id` values accepted by the webhook (one per platform — iOS and Android are distinct RevenueCat apps) | `apps/api/src/config/env.ts`, `config/revenuecat.config.ts` |
 | `REVENUECAT_APP_ID` | Backend | Legacy single-`app_id` variant; still accepted and merged into `REVENUECAT_APP_IDS` | `apps/api/src/config/env.ts`, `config/revenuecat.config.ts` |
+
+### PostHog (Analytics)
+
+| Variable | Layer | Purpose | Used in |
+|---|---|---|---|
+| `POSTHOG_API_KEY` | Backend | PostHog project API key used to send subscription lifecycle events server-side; optional — when absent, `captureServerEvent` is a no-op | `apps/api/src/config/env.ts`, `services/analytics.service.ts` |
+| `EXPO_PUBLIC_POSTHOG_API_KEY` | Mobile | PostHog project API key bundled into the client; optional — when absent, all analytics calls are no-ops and the app functions normally | `apps/mobile/app.config.ts`, `config/analytics.config.ts` |
 
 ### General Configuration
 

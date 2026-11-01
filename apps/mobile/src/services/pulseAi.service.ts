@@ -2,6 +2,7 @@ import axios from 'axios';
 import { calculateLevel, type PulseAiChatInput, type PulseAiRecipe } from '@blendi/shared';
 
 import { api } from '../config/api';
+import { trackEvent } from './analytics.service';
 import i18n from '../locales/i18n';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
@@ -113,6 +114,7 @@ export async function sendMessage(
     const result = response.data.data;
     handleXPResponse(result);
     handleMissionResponse(result);
+    trackEvent('ai_message_sent', { fromCache: result.fromCache });
     return result;
   } catch (error) {
     throw toPulseAiServiceError(error);

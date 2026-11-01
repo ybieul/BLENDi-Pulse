@@ -748,6 +748,19 @@
       "message": "Você precisará entrar novamente para acessar sua conta",
       "confirm": "Sair"
     },
+    "deleteAccount": {
+      "button": "Excluir Conta",
+      "sheetTitle": "Excluir sua conta?",
+      "warning": "Isso exclui permanentemente sua conta e todos os seus dados — blends, favoritos, histórico e progresso. Essa ação não pode ser desfeita.",
+      "subscriptionWarning": "Isso NÃO cancela uma assinatura Pulse Pro ativa. Você precisa cancelá-la separadamente nas configurações de assinatura da Apple ou do Google Play, ou continuará sendo cobrado sem ter mais acesso ao app.",
+      "confirmInstruction": "Digite {{phrase}} para confirmar",
+      "confirmPhrase": "EXCLUIR",
+      "inputPlaceholder": "Digite EXCLUIR",
+      "confirmButton": "Excluir Minha Conta",
+      "cancelButton": "Cancelar",
+      "successMessage": "Sua conta foi excluída.",
+      "errorMessage": "Não foi possível excluir sua conta. Tente novamente."
+    },
     "notifications": {
       "title": "Notificações",
       "dailyPulse": "Daily Pulse",

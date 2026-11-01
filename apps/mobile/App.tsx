@@ -50,6 +50,7 @@ import {
   updatePushToken,
   type NotificationData,
 } from './src/services/notifications.service';
+import { initializeAnalytics, trackEvent } from './src/services/analytics.service';
 import { initializePurchases } from './src/services/purchase.service';
 import { syncTimezoneIfNeeded } from './src/services/timezone.service';
 
@@ -80,6 +81,21 @@ void SplashScreen.preventAutoHideAsync();
 // precisam de navigate direto no root em vez de aninhado via
 // navigate('AppFlow', { screen, params }).
 const ROOT_LEVEL_DEEP_LINK_SCREENS = new Set(['WeeklyReport']);
+
+// Rotas instrumentadas pelo listener central de navegação (onboarding + paywall +
+// funil de ação) — qualquer outra rota é ignorada, para não gerar ruído de analytics
+// além do pedido. Blend e PantryScanner foram adicionadas depois, pareando com os
+// eventos de ação blend_completed/pantry_scan_completed já existentes: sem o
+// screen_viewed da tela, o PostHog só via a conclusão, nunca o abandono.
+const TRACKED_SCREEN_NAMES = new Set([
+  'OnboardingModel',
+  'OnboardingGoal',
+  'OnboardingBody',
+  'OnboardingMacros',
+  'Upgrade',
+  'Blend',
+  'PantryScanner',
+]);
 
 function buildHandledNotificationResponseKey(response: Notifications.NotificationResponse): string {
   return `${response.notification.request.identifier}:${response.actionIdentifier}`;
@@ -137,6 +153,7 @@ function AppShell() {
   const appStatePrevious = useRef<AppStateStatus>(AppState.currentState);
   const lastKnownPushToken = useRef<string | null>(null);
   const lastHandledNotificationResponseKey = useRef<string | null>(null);
+  const lastTrackedScreenName = useRef<string | null>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     Syne_400Regular,
@@ -161,6 +178,7 @@ function AppShell() {
     });
 
     void initializePurchases().catch(() => undefined);
+    void initializeAnalytics().catch(() => undefined);
 
     // Dispara imediatamente após a montagem, sem delay intermediário.
     void restoreSession();
@@ -400,12 +418,33 @@ function AppShell() {
     };
   }, []);
 
+  // ── Analytics: screen_viewed para as rotas em TRACKED_SCREEN_NAMES ──────────
+  // getCurrentRoute() já resolve a rota mais profunda, mesmo dentro de navegação
+  // aninhada (ex: dentro de um stack de onboarding dentro do root stack).
+  const handleNavigationStateChange = () => {
+    const currentRouteName = navigationRef.getCurrentRoute()?.name;
+
+    if (!currentRouteName || currentRouteName === lastTrackedScreenName.current) {
+      return;
+    }
+
+    lastTrackedScreenName.current = currentRouteName;
+
+    if (TRACKED_SCREEN_NAMES.has(currentRouteName)) {
+      trackEvent('screen_viewed', { screen_name: currentRouteName });
+    }
+  };
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navigationTheme}
+      onStateChange={handleNavigationStateChange}
+    >
       <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background.primary} />
       <RootNavigator />
       <ToastViewport />

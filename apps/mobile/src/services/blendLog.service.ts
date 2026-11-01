@@ -2,6 +2,7 @@ import axios, { type AxiosError } from 'axios';
 import { calculateLevel, type CreateBlendLogInput } from '@blendi/shared';
 
 import { api } from '../config/api';
+import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 
@@ -147,6 +148,10 @@ export async function createBlendLog(input: CreateBlendLogInput): Promise<Create
     const result = response.data.data;
     handleXPResponse(result);
     handleMissionResponse(result);
+    trackEvent('blend_completed', {
+      blendiModel: result.log.blendiModel,
+      durationSeconds: result.log.durationSeconds,
+    });
     return result;
   } catch (error) {
     throw toBlendLogServiceError(error);

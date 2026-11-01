@@ -38,6 +38,7 @@ import { createAppStorage } from '../config/storage';
 import { useGamificationStore } from './gamification.store';
 import * as AuthService from '../services/auth.service';
 import type { AuthResponse, AuthUser } from '../services/auth.service';
+import { identifyAnalyticsUser, resetAnalyticsUser, trackEvent } from '../services/analytics.service';
 import { identifyPurchasesUser, logoutPurchasesUser } from '../services/purchase.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
 
@@ -168,6 +169,7 @@ async function hydrateAuthenticatedUserAndPayments(fallbackUser: AuthUser): Prom
   }
 
   await identifyPurchasesUser(nextUser.id);
+  identifyAnalyticsUser(nextUser.id);
   return nextUser;
 }
 
@@ -257,6 +259,13 @@ interface AuthActions {
   /** Limpa a sessão local e remove o refresh token do Secure Store. */
   logout: () => Promise<void>;
   /**
+   * Exclui permanentemente a conta no backend e, só em caso de sucesso,
+   * limpa a sessão local (mesmo estado final de um logout). Se a chamada ao
+   * backend falhar, a promise rejeita e a sessão local permanece intacta —
+   * ao contrário de logout(), não é melhor esforço.
+   */
+  deleteAccount: () => Promise<void>;
+  /**
    * Tenta restaurar a sessão a partir do refresh token persistido.
    * Deve ser chamada no boot do app (App.tsx) antes de exibir qualquer tela.
    * Não lança exceção — se falhar, o usuário permanece deslogado.
@@ -319,6 +328,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       const hydratedUser = await hydrateAuthenticatedUserAndPayments(data.user);
       get().setUser(hydratedUser);
+      trackEvent('sign_up', { method: 'email' });
 
       persistOnboardingCompletion(false);
     } finally {
@@ -384,6 +394,33 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     });
 
     await logoutPurchasesUser();
+    resetAnalyticsUser();
+  },
+
+  // ── deleteAccount ────────────────────────────────────────────────────────
+
+  deleteAccount: async () => {
+    // Ao contrário de logout(), chamar a API NÃO é melhor esforço: se o
+    // backend falhar em excluir a conta, a promise precisa rejeitar aqui
+    // mesmo, antes de qualquer limpeza local — o caller (UI) mostra o erro
+    // e a sessão continua válida, porque a conta ainda existe no servidor.
+    await AuthService.deleteAccount();
+
+    // A partir daqui a exclusão já foi confirmada pelo backend — limpeza
+    // local idêntica à de logout(), para a conta excluída terminar no mesmo
+    // estado de "deslogado" que um logout normal.
+    await deleteRefreshToken();
+
+    get().setUser(null);
+
+    set({
+      accessToken: null,
+      isAuthenticated: false,
+      isNewUser: false,
+    });
+
+    await logoutPurchasesUser();
+    resetAnalyticsUser();
   },
 
   // ── restoreSession ────────────────────────────────────────────────────────
@@ -417,6 +454,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         const normalizedUser = normalizeAuthUser(user);
         get().setUser(normalizedUser);
         await identifyPurchasesUser(normalizedUser.id);
+        identifyAnalyticsUser(normalizedUser.id);
       } catch {
         // Preserva a sessão restaurada mesmo se o perfil não puder ser hidratado agora.
       }
@@ -446,6 +484,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
     if (data.isNewUser === true) {
       persistOnboardingCompletion(false);
+      trackEvent('sign_up', { method: 'google' });
     }
 
     set({

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from 'express';
 import {
   calculateMacros,
+  deleteAccount,
   deleteProfilePhoto,
   getMe,
   getMyProfilePhoto,
@@ -41,6 +42,15 @@ usersRouter.get('/me/weight-history', authenticate, getWeightHistory);
  * Atualiza parcialmente o perfil e as metas do usuário autenticado.
  */
 usersRouter.patch('/me', authenticate, updateMe);
+
+/**
+ * DELETE /users/me  🔒 autenticado
+ * Exclusão permanente e atômica da conta do usuário autenticado e de
+ * todos os documentos relacionados (BlendLog, Conversation, Favorite,
+ * HydrationLog, NotificationLog, ShoppingList, SupplementLog, UserPhoto,
+ * WeeklyReport, XPLog, DailyMission, cache de IA e o próprio User).
+ */
+usersRouter.delete('/me', authenticate, deleteAccount);
 
 /**
  * POST /users/profile-photo  🔒 autenticado

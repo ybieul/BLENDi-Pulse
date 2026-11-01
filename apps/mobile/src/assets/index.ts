@@ -1,9 +1,12 @@
 import type { ViewStyle } from 'react-native';
 import { borderRadius, colors } from '@blendi/shared';
 
+import blendiLogo from '../../assets/images/blendi-logo.png';
+import swirl from '../../assets/images/swirl.png';
+
 export const images = {
-  swirl: require('../../assets/images/swirl.png'),
-  blendiLogo: require('../../assets/images/blendi-logo.png'),
+  swirl,
+  blendiLogo,
 } as const;
 
 export const imagePlaceholderStyles = {

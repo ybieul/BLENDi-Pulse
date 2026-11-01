@@ -9,6 +9,17 @@ import {
 } from '@blendi/shared';
 import { UserModel } from '../models/User';
 import { UserPhotoModel } from '../models/UserPhoto';
+import { BlendLogModel } from '../models/BlendLog';
+import { ConversationModel } from '../models/Conversation';
+import { FavoriteModel } from '../models/Favorite';
+import { HydrationLogModel } from '../models/HydrationLog';
+import { NotificationLogModel } from '../models/NotificationLog';
+import { ShoppingListModel } from '../models/ShoppingList';
+import { SupplementLogModel } from '../models/SupplementLog';
+import { WeeklyReportModel } from '../models/WeeklyReport';
+import { XPLogModel } from '../models/XPLog';
+import { DailyMissionModel } from '../models/DailyMission';
+import { invalidateUserCache } from '../services/cache.service';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -495,6 +506,78 @@ export async function deleteProfilePhoto(
       success: true,
       data: {
         user: buildUserPhotoProfileResponse(user),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /users/me — exclusão permanente e atômica da conta do usuário
+ * autenticado e de todos os documentos relacionados. Requisito de loja
+ * (Apple Guideline 5.1.1(v) / Google Play): usuário precisa poder iniciar
+ * a exclusão de dentro do app. Não é soft-delete — os dados são removidos
+ * de verdade, sem depender de TTL futuro.
+ */
+export async function deleteAccount(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const session = await UserModel.db.startSession();
+
+    try {
+      let deletedUser: { _id: unknown } | null = null;
+
+      await session.withTransaction(async () => {
+        await Promise.all([
+          BlendLogModel.deleteMany({ userId }, { session }),
+          ConversationModel.deleteMany({ userId }, { session }),
+          FavoriteModel.deleteMany({ userId }, { session }),
+          HydrationLogModel.deleteMany({ userId }, { session }),
+          NotificationLogModel.deleteMany({ userId }, { session }),
+          ShoppingListModel.deleteMany({ userId }, { session }),
+          SupplementLogModel.deleteMany({ userId }, { session }),
+          UserPhotoModel.deleteMany({ userId }, { session }),
+          WeeklyReportModel.deleteMany({ userId }, { session }),
+          XPLogModel.deleteMany({ userId }, { session }),
+          DailyMissionModel.deleteMany({ userId }, { session }),
+          invalidateUserCache(userId, session),
+        ]);
+
+        deletedUser = await UserModel.findByIdAndDelete(userId, { session }).lean();
+
+        if (!deletedUser) {
+          throw new Error('USER_NOT_FOUND');
+        }
+      });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'USER_NOT_FOUND') {
+        sendErrorResponse(res, {
+          statusCode: 404,
+          code: 'resource/not-found',
+          message: 'User not found.',
+        });
+        return;
+      }
+
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        message: 'Account deleted.',
       },
     });
   } catch (err) {

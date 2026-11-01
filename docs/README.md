@@ -102,6 +102,15 @@ A lettered track (CP-A, CP-A.1, CP-A.2, ...) parallel to the numbered phase road
 
 CP-A and CP-A.1 (idade/sexo reais, `weightGoal`, recálculo automático em `updateMe`, `goal` como gatilho, clamp de proteína) predate this folder and have their own root-level reports: [cp-a-macros.md](../cp-a-macros.md) and [cp-a1-macros.md](../cp-a1-macros.md).
 
+### Fixes — Launch Readiness Track
+
+Unlettered checkpoints scoped to specific items from Jon's "Fix Before Launch" feature brief (October 2026), documented in `docs/fixes/` like the macro track above instead of a `phase-N` folder.
+
+| Document | Description |
+|---|---|
+| [fixes/posthog-analytics.md](fixes/posthog-analytics.md) | PostHog instrumentation across mobile (SDK init, identify/reset tied to session, `sign_up`, a single navigation listener for 7 screens, 4 business-action events) and backend (3 subscription lifecycle events on the RevenueCat webhook); includes the subsequent fix of 2 out-of-scope findings (2 more tracked screens, ESLint config created from scratch in `apps/api`/`packages/shared` and 8 real violations fixed across all 3 workspaces) and a live pentest batch against the webhook that surfaced an unrelated critical finding (see External Services Status above) |
+| [fixes/posthog-analytics-achados-fora-do-escopo.md](fixes/posthog-analytics-achados-fora-do-escopo.md) | Findings documented without fixing, per the checkpoint's own open task — later 2 of them were fixed anyway at Gabriel's request (cross-referenced from the document above) |
+
 ---
 
 ## Key Decisions
@@ -133,6 +142,8 @@ CP-A and CP-A.1 (idade/sexo reais, `weightGoal`, recálculo automático em `upda
 - `XPLog` and `DailyMission` TTL increased to 90 days: the original 48h TTL was designed only for old-log cleanup, since idempotency is guaranteed by the unique index rather than the TTL itself; the increase was required so the weekly report cron can aggregate the full previous week of data.
 - Weekly report streak data derived from `BlendLog` instead of stored snapshots: `streakAtStart` and `streakAtEnd` were replaced by `blendDaysInWeek` and `streakBrokenOnDate`, removing the need for historical streak snapshots without losing informational value.
 - Weight history left unpaginated for now (CP-A.4): growth is structurally capped at one entry per account under the current UI (no screen allows editing weight after onboarding), confirmed against real data (3 total accounts, 0 entries each) — revisit only if a future feature allows editing weight repeatedly after onboarding, since that changes the growth model entirely.
+- `purchase_completed` is emitted only by the mobile app, never by the RevenueCat webhook's `INITIAL_PURCHASE` handler, even though both observe the same real-world purchase: firing it from both sides would double-count every purchase in PostHog.
+- PostHog's mobile client runs without `@react-native-async-storage/async-storage`: the brief asked for installation plus initialization only, with no additional native dependency. The tradeoff is that the anonymous `distinctId` does not persist across app restarts, which is why `identifyAnalyticsUser` is called on every session-restoring path (not just login/register) instead of only once per install.
 
 ---
 
@@ -190,6 +201,7 @@ The current `.env.example` files are fully documented below, including the Phase
 | `REVENUECAT_API_KEY` | RevenueCat secret key with the `sk_` prefix, used to validate purchases via the REST API; optional at boot, the server starts with a warning if absent |
 | `REVENUECAT_WEBHOOK_SECRET` | Custom string sent by RevenueCat in each webhook request header to authenticate the payload; optional at boot |
 | `REVENUECAT_APP_ID` | Project identifier from the RevenueCat dashboard, in the format `proj_xxxxxxxx`; optional at boot |
+| `POSTHOG_API_KEY` | PostHog project API key used to send subscription lifecycle events server-side; optional, analytics calls are a no-op when absent |
 
 ### Mobile Environment Variables
 
@@ -198,6 +210,7 @@ The current `.env.example` files are fully documented below, including the Phase
 | `EXPO_PUBLIC_API_URL` | Base URL used by the Expo client to reach the backend API |
 | `EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY` | Public SDK key for iOS, generated in the RevenueCat dashboard when registering the Apple app |
 | `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY` | Public SDK key for Android, generated in the RevenueCat dashboard when registering the Google app |
+| `EXPO_PUBLIC_POSTHOG_API_KEY` | PostHog project API key bundled into the client; optional, the app functions normally and simply disables event sending when absent |
 
 ---
 
@@ -205,7 +218,8 @@ The current `.env.example` files are fully documented below, including the Phase
 
 | Service | Status |
 |---|---|
-| RevenueCat | Account created and backend API key available; waiting on the Apple Developer Account to complete the iOS app setup and on the Google Play Console to complete the Android app setup |
+| RevenueCat | Account created and backend API key available; waiting on the Apple Developer Account to complete the iOS app setup and on the Google Play Console to complete the Android app setup. **Resolved (2026-11-01):** the backend `REVENUECAT_API_KEY` was previously rejected by RevenueCat's own V1 REST API (`403`, code `7723`); Gabriel generated a new V1-compatible key and it was verified live against both the real RevenueCat API and this backend's webhook end-to-end (`getSubscriberCustomerInfo`, `200`). A second, separate RevenueCat endpoint (`POST /v1/receipts`, reachable only via an optional `receipt` field that no client ever sent) was found to always reject secret REST keys regardless — it was dead code and was deleted rather than fixed. See the "Achado crítico" section in [`fixes/posthog-analytics.md`](fixes/posthog-analytics.md) |
+| PostHog | Not created yet — `POSTHOG_API_KEY` and `EXPO_PUBLIC_POSTHOG_API_KEY` are intentionally left empty in both `.env` files until the Gabriel creates the account/project separately; all instrumentation already in place and tolerant of the missing key |
 | Expo EAS | Pending `eas init` to obtain the real Project ID; `app.json` currently holds the placeholder `PENDING_EAS_PROJECT_ID` |
 | Firebase FCM | Project created, but credentials have not been uploaded to the Expo dashboard yet |
 | Apple Developer Account | Blocked, pending the $99/year payment by Jon; unblocks RevenueCat iOS, production APNs, the App Store, and the P8 key |

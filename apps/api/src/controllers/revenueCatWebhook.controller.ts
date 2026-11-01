@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { env, paymentsConfig, revenueCatAppIds } from '../config/env';
 import { isRevenueCatAppIdAccepted } from '../config/revenuecat.config';
 import { UserModel } from '../models/User';
+import { captureServerEvent } from '../services/analytics.service';
 import {
   RevenueCatConfigurationError,
   RevenueCatInvalidPurchaseError,
@@ -80,7 +81,23 @@ async function syncActiveSubscriptionFromRevenueCat(userId: string) {
   ).lean();
 }
 
-async function markCancellationRequested(
+// Exportada para teste direto do ponto de ciclo de vida 'subscription_renewed' sem
+// precisar simular toda a requisicao HTTP do webhook (ver *.test.ts).
+export async function handleInitialPurchaseOrRenewal(
+  user: { _id: unknown },
+  event: RevenueCatWebhookPayload['event']
+): Promise<void> {
+  await syncActiveSubscriptionFromRevenueCat(String(user._id));
+
+  if (event.type === 'RENEWAL') {
+    captureServerEvent(String(user._id), 'subscription_renewed', {
+      product_id: event.product_id,
+      store: event.store,
+    });
+  }
+}
+
+export async function markCancellationRequested(
   userId: string,
   event: RevenueCatWebhookPayload['event']
 ): Promise<void> {
@@ -109,9 +126,14 @@ async function markCancellationRequested(
       runValidators: true,
     }
   ).lean();
+
+  captureServerEvent(userId, 'subscription_cancel_requested', {
+    product_id: event.product_id,
+    store: event.store,
+  });
 }
 
-async function revokeExpiredSubscription(
+export async function revokeExpiredSubscription(
   userId: string,
   event: RevenueCatWebhookPayload['event']
 ): Promise<void> {
@@ -132,6 +154,11 @@ async function revokeExpiredSubscription(
       runValidators: true,
     }
   ).lean();
+
+  captureServerEvent(userId, 'subscription_expired', {
+    product_id: event.product_id,
+    store: event.store,
+  });
 }
 
 function sendWebhookIgnored(res: Response, reason: string): void {
@@ -216,7 +243,7 @@ export async function handleRevenueCatWebhook(
     }
 
     if (event.type === 'INITIAL_PURCHASE' || event.type === 'RENEWAL') {
-      await syncActiveSubscriptionFromRevenueCat(String(user._id));
+      await handleInitialPurchaseOrRenewal(user, event);
 
       res.status(200).json({
         success: true,

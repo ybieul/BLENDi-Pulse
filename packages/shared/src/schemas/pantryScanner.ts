@@ -35,7 +35,7 @@ export const pantryIngredientSchema = z.object({
   confidence: pantryConfidenceSchema,
 });
 
-export interface PantryIngredient extends z.infer<typeof pantryIngredientSchema> {}
+export type PantryIngredient = z.infer<typeof pantryIngredientSchema>;
 
 export const pantryAnalysisResultSchema = z.object({
   ingredients: z.array(pantryIngredientSchema, {
