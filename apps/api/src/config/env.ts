@@ -160,6 +160,29 @@ const envSchema = z.object({
       'GOOGLE_REDIRECT_URI deve ser uma URL válida'
     ),
 
+  // Sign in with Apple
+  // Obtenha em: developer.apple.com → Certificates, Identifiers & Profiles
+  APPLE_TEAM_ID: requiredString('APPLE_TEAM_ID'),
+  APPLE_KEY_ID: requiredString('APPLE_KEY_ID'),
+  // Bundle id do app — também usado como client_id e audience nas chamadas
+  // para a Apple (apple.service.ts).
+  APPLE_CLIENT_ID: requiredString('APPLE_CLIENT_ID'),
+  // Conteúdo do arquivo .p8 (Key privada) baixado do portal. Usado só para
+  // assinar o client_secret ES256 (apple.service.ts) — nunca sai do backend.
+  // Valida a FORMA do PEM (marcadores BEGIN/END PRIVATE KEY — real multilinha
+  // entre aspas duplas, ou com "\n" escapado, ambos aceitos por
+  // apple.service.ts), não só presença: sem isso, um placeholder tipo
+  // "CHANGE_ME" sobe o servidor normalmente e só falha, silenciosamente, na
+  // primeira tentativa de login (ver apple.service.ts, getApplePrivateKey).
+  APPLE_PRIVATE_KEY: requiredString('APPLE_PRIVATE_KEY').pipe(
+    z
+      .string()
+      .regex(
+        /-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----/,
+        'APPLE_PRIVATE_KEY deve ser o conteúdo PEM completo do arquivo .p8 (com os marcadores BEGIN/END PRIVATE KEY)'
+      )
+  ),
+
   // AI Provider
   AI_PROVIDER: providerEnum('AI_PROVIDER'),
   AI_MODEL: requiredString('AI_MODEL'),

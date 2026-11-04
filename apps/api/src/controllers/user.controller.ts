@@ -20,6 +20,7 @@ import { WeeklyReportModel } from '../models/WeeklyReport';
 import { XPLogModel } from '../models/XPLog';
 import { DailyMissionModel } from '../models/DailyMission';
 import { invalidateUserCache } from '../services/cache.service';
+import { revokeAppleRefreshToken } from '../services/apple.service';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -530,6 +531,35 @@ export async function deleteAccount(
     if (!userId) {
       sendUnauthorized(res);
       return;
+    }
+
+    // Revogação do acesso na Apple — melhor esforço, nunca bloqueia nem
+    // atrasa a exclusão da conta (ver apple.service.ts, revokeAppleRefreshToken).
+    // appleRefreshToken é select: false — precisa ser buscado explicitamente,
+    // e precisa ser lido ANTES da transação abaixo apagar o usuário, ou o
+    // valor se perde. Esta LEITURA também está isolada em try/catch: sem
+    // isso, uma falha transitória só nesta query (ex: timeout do Mongo)
+    // abortaria a exclusão inteira antes mesmo de chegar na transação —
+    // para TODO usuário, não só os vinculados à Apple. A chamada de
+    // revogação em si não é esperada (void): o `.catch` trata a falha só
+    // com log, sem nunca repassar pro fluxo principal de exclusão.
+    let appleRefreshToken: string | undefined;
+    try {
+      const userWithAppleToken = await UserModel.findById(userId)
+        .select('+appleRefreshToken')
+        .lean();
+      appleRefreshToken = userWithAppleToken?.appleRefreshToken;
+    } catch (err) {
+      console.error('[user.controller] failed to read appleRefreshToken before deletion', {
+        userId,
+        err,
+      });
+    }
+
+    if (appleRefreshToken) {
+      void revokeAppleRefreshToken(appleRefreshToken).catch(err => {
+        console.error('[user.controller] Apple token revocation failed', { userId, err });
+      });
     }
 
     const session = await UserModel.db.startSession();

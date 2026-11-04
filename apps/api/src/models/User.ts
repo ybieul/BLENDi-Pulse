@@ -86,6 +86,14 @@ export interface IUserWeightHistoryEntry {
 export interface IUser {
   email: string;
   /**
+   * Reflete o claim `email_verified` do provedor OAuth no momento da
+   * CRIAÇÃO da conta (ex: identityToken da Apple — ver apple.controller.ts,
+   * Caso 3). Default `false`: contas via email/senha (register) e via
+   * Google (google.controller.ts) ainda não populam este campo — ele só é
+   * setado hoje pelo fluxo de criação de conta via Apple.
+   */
+  emailVerified: boolean;
+  /**
    * Hash Argon2id da senha. Ausente em contas criadas exclusivamente via OAuth.
    * Nunca retornado por padrão (select: false no schema).
    */
@@ -96,6 +104,20 @@ export interface IUser {
    * Nunca retornado por padrão — usado apenas internamente para lookup.
    */
   googleId?: string;
+  /**
+   * ID único e estável do usuário na Apple (campo `sub` do identityToken).
+   * Ausente em contas criadas via email/senha ou via Google.
+   * Nunca retornado por padrão — usado apenas internamente para lookup.
+   */
+  appleUserId?: string;
+  /**
+   * Refresh token emitido pela Apple na troca do authorizationCode (ver
+   * apple.service.ts). Guardado apenas para permitir a revogação do acesso
+   * da Apple quando a conta for excluída — nunca usado para gerar sessão
+   * no BLENDi. Nunca retornado por padrão (select: false), mesmo motivo de
+   * segurança do password e do googleId.
+   */
+  appleRefreshToken?: string;
   /**
    * URL da foto de perfil vinda do Google.
    * Ausente em contas criadas via email/senha (sem foto padrão).
@@ -421,6 +443,13 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       lowercase: true,
       trim: true,
     },
+    // Ver JSDoc de IUser.emailVerified — hoje só setado por
+    // apple.controller.ts (Caso 3). Default false por segurança: ausência de
+    // verificação positiva nunca deve ser tratada como "verificado".
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
     // select: false — a senha NUNCA é retornada por padrão nas queries.
     // Opcional: usuários que se cadastram via Google OAuth não têm senha local.
     password: {
@@ -437,6 +466,26 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: false,
       unique: true,
       sparse: true,
+      select: false,
+    },
+    // ID do usuário na Apple (campo `sub` do identityToken).
+    // sparse: true → permite múltiplos documentos com appleUserId ausente
+    //                  (undefined/null) enquanto mantém uniqueness para valores presentes.
+    // select: false → não exposto em queries padrão (lookup interno apenas).
+    appleUserId: {
+      type: String,
+      required: false,
+      unique: true,
+      sparse: true,
+      select: false,
+    },
+    // Refresh token emitido pela Apple — guardado apenas para permitir a
+    // revogação do acesso na exclusão de conta (ver apple.service.ts,
+    // revokeAppleRefreshToken). Não é identificador, então sem unique/sparse.
+    // select: false → mesmo motivo de segurança do password e do googleId.
+    appleRefreshToken: {
+      type: String,
+      required: false,
       select: false,
     },
     // URL da foto de perfil vinda do Google.

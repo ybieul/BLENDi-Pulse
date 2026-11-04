@@ -146,6 +146,30 @@ export const googleCallbackSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+// ─── Schema: Sign in with Apple ───────────────────────────────────────────────
+// Valida o body recebido no endpoint POST /auth/apple. Diferente do Google
+// (sem browser/redirect no fluxo nativo), o app mobile recebe o
+// identityToken e o authorizationCode diretamente do SDK nativo da Apple
+// (expo-apple-authentication) e manda os dois num único POST.
+// `fullName` só vem preenchido no primeiro login que o usuário já fez com a
+// Apple — a Apple nunca o reenvia depois disso.
+
+export const appleSignInSchema = z.object({
+  identityToken: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
+
+  authorizationCode: z
+    .string({ required_error: 'errors.validation.required' })
+    .min(1, 'errors.validation.required'),
+
+  fullName: z
+    .string()
+    .trim()
+    .max(60, 'errors.validation.too_long')
+    .optional(),
+});
+
 // ─── Schema: solicitação de OTP (forgot password) ────────────────────────────
 // Recebe apenas o email. O backend gera o OTP, persiste o hash no banco
 // e envia por email. Usa as mesmas regras de validação do loginSchema.
@@ -199,6 +223,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type UpdateTimezoneInput = z.infer<typeof updateTimezoneSchema>;
 export type GoogleCallbackInput = z.infer<typeof googleCallbackSchema>;
+export type AppleSignInInput = z.infer<typeof appleSignInSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

@@ -12,6 +12,7 @@ import {
   getGoogleUrl,
   handleGoogleCallback,
 } from '../controllers/google.controller';
+import { handleAppleSignIn } from '../controllers/apple.controller';
 import {
   forgotPassword,
   verifyOtp,
@@ -75,6 +76,18 @@ authRouter.get('/google/url', getGoogleUrl);
  * Query params: code (obrigatório), state (CSRF), error (se o usuário cancelou)
  */
 authRouter.get('/google/callback', handleGoogleCallback);
+
+/**
+ * POST /auth/apple  🔒 rate limited (10/15min, mesmo limiter do /auth/login)
+ * Login/registro via Sign in with Apple — fluxo nativo (sem browser/redirect).
+ * Body: { identityToken, authorizationCode, fullName? }
+ * Resposta: { success: true, data: { user, accessToken, refreshToken, isNewUser } }
+ *
+ * authLoginLimiter normalmente combina IP+email, mas o body aqui não tem
+ * `email` — o keyGenerator (rateLimiter.ts) cai no fallback e a chave vira
+ * só o IP, igual ao authRegisterLimiter.
+ */
+authRouter.post('/apple', authLoginLimiter, handleAppleSignIn);
 
 // ─── Redefinição de senha via OTP ─────────────────────────────────────────────
 

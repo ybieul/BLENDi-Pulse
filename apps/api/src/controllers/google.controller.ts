@@ -23,7 +23,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { addMonths } from 'date-fns';
 import jwt from 'jsonwebtoken';
 import { googleCallbackSchema } from '@blendi/shared';
-import { UserModel } from '../models/User';
+import { UserModel, type UserDocument } from '../models/User';
 import {
   getAuthorizationUrl,
   exchangeCodeForTokens,
@@ -164,15 +164,34 @@ export async function handleGoogleCallback(
 
     // ── Passo 5: lógica de login / vinculação / registro ──────────────────────
 
-    let user = await UserModel.findOne({ googleId: userInfo.googleId });
+    let user: UserDocument | null = await UserModel.findOne({ googleId: userInfo.googleId });
     let isNewUser = false;
 
     if (!user) {
       // Nenhuma conta com esse googleId — buscar por email
-      user = await UserModel.findOne({ email: userInfo.email });
+      // select('+googleId') — precisa do valor atual pra checar conflito
+      // abaixo (select: false por padrão).
+      // Cast: a sobrecarga de .select(string) do Mongoose não propaga
+      // IUserMethods no tipo de retorno (limitação conhecida da tipagem) —
+      // o método comparePassword existe em runtime independente da
+      // projeção, só a inferência de tipo não reflete isso aqui.
+      user = (await UserModel.findOne({ email: userInfo.email }).select('+googleId')) as
+        | UserDocument
+        | null;
 
       if (user) {
         // Caso 2: conta existente com email/senha → vincula o Google
+        if (user.googleId && user.googleId !== userInfo.googleId) {
+          // Esta conta já está vinculada a uma conta Google DIFERENTE —
+          // nunca sobrescrever silenciosamente (perderia o vínculo antigo
+          // sem que o usuário saiba). Cenário improvável (o mesmo email
+          // verificado pertencendo a duas contas Google distintas), mas sem
+          // esta checagem o segundo login resolveria a mesma conta sem
+          // nenhum aviso.
+          res.redirect('blendipulse://auth/callback?error=errors.auth.google_account_conflict');
+          return;
+        }
+
         // Salva googleId e foto de perfil sem alterar nenhum outro dado
         user.googleId = userInfo.googleId;
         user.profilePhoto = userInfo.picture;
