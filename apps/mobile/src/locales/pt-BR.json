@@ -505,7 +505,8 @@
     "termsOfService": "Termos de Serviço",
     "termsConnector": "e",
     "privacyPolicy": "Política de Privacidade",
-    "google_sign_in": "Continuar com Google"
+    "google_sign_in": "Continuar com Google",
+    "apple_sign_in": "Continuar com Apple"
   },
 
   "errors": {
@@ -526,6 +527,7 @@
       "session_expired": "Sua sessão expirou. Faça login novamente.",
       "unauthorized": "Você não tem acesso a este recurso.",
       "google_auth_failed": "Falha ao entrar com Google. Tente novamente.",
+      "apple_auth_failed": "Falha ao entrar com Apple. Tente novamente.",
       "google_cancelled": "Login com Google cancelado.",
       "invalid_state": "Solicitação de autenticação expirada. Tente novamente.",
       "email_not_verified": "O e-mail da sua conta Google não está verificado.",

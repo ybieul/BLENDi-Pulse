@@ -22,6 +22,9 @@ export type { AuthProgressDotsProps } from './AuthProgressDots';
 export { AuthScreenLayout } from './AuthScreenLayout';
 export type { AuthScreenLayoutProps } from './AuthScreenLayout';
 
+export { AppleSignInButton } from './AppleSignInButton';
+export type { AppleSignInButtonProps } from './AppleSignInButton';
+
 export { GoogleSignInButton } from './GoogleSignInButton';
 export type { GoogleSignInButtonProps } from './GoogleSignInButton';
 

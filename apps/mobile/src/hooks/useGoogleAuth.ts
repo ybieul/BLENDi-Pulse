@@ -112,7 +112,15 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       const userBase64 = params.get('user');
 
       if (!accessToken || !refreshToken || !userBase64) {
-        console.error('[useGoogleAuth] Params obrigatórios ausentes no deep link:', result.url);
+        // Nunca logar `result.url` diretamente: se só um dos três campos
+        // estiver ausente, os outros podem ser um accessToken/refreshToken
+        // reais e válidos — mais sensíveis que o identityToken da Apple, já
+        // que dão acesso direto à sessão da conta.
+        console.error('[useGoogleAuth] Params obrigatórios ausentes no deep link', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          hasUserBase64: !!userBase64,
+        });
         setError('errors.auth.google_auth_failed');
         return;
       }

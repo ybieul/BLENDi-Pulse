@@ -23,6 +23,7 @@
       "bundleIdentifier": "com.blendi.pulse",
       "buildNumber": "1",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
         "NSPhotoLibraryUsageDescription": "BLENDi Pulse needs photo access to analyze your pantry ingredients",

@@ -17,14 +17,18 @@ import {
   spacing,
 } from '@blendi/shared';
 import {
+  AppleSignInButton,
   AuthButton,
   AuthInput,
   AuthProgressDots,
   AuthScreenLayout,
+  GoogleSignInButton,
 } from '../../components/ui';
 import { TERMS_URL, PRIVACY_URL } from '../../config/legal';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useAppleAuth } from '../../hooks/useAppleAuth';
 import { useColors } from '../../hooks/useColors';
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
@@ -165,9 +169,24 @@ function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) {
 
 export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const colors = useColors();
+  const DIVIDER_LINE_COLOR = colors.overlay.plum[8];
+  const DIVIDER_TEXT_COLOR = colors.overlay.plum[40];
+
   const { t, locale } = useAppTranslation();
   const register = useAuthStore((state) => state.register);
   const isLoading = useAuthStore((state) => state.isLoading);
+  const {
+    signInWithGoogle,
+    isLoading: isGoogleLoading,
+    error: googleError,
+    clearError: clearGoogleError,
+  } = useGoogleAuth();
+  const {
+    signInWithApple,
+    isLoading: isAppleLoading,
+    error: appleError,
+    clearError: clearAppleError,
+  } = useAppleAuth();
 
   const emailInputRef = useRef<RNTextInput | null>(null);
   const passwordInputRef = useRef<RNTextInput | null>(null);
@@ -307,6 +326,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const handleNameChange = (nextValue: string) => {
     setName(nextValue);
     setFormError(null);
+    clearGoogleError();
+    clearAppleError();
 
     if (touchedFields.name) {
       updateFieldError('name', { name: nextValue });
@@ -316,6 +337,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const handleEmailChange = (nextValue: string) => {
     setEmail(nextValue);
     setFormError(null);
+    clearGoogleError();
+    clearAppleError();
 
     if (touchedFields.email) {
       updateFieldError('email', { email: nextValue });
@@ -325,6 +348,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const handlePasswordChange = (nextValue: string) => {
     setPassword(nextValue);
     setFormError(null);
+    clearGoogleError();
+    clearAppleError();
 
     if (touchedFields.password) {
       updateFieldError('password', { password: nextValue });
@@ -341,6 +366,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
   const handleConfirmPasswordChange = (nextValue: string) => {
     setConfirmPassword(nextValue);
     setFormError(null);
+    clearGoogleError();
+    clearAppleError();
 
     if (touchedFields.confirmPassword) {
       updateFieldError('confirmPassword', { confirmPassword: nextValue });
@@ -411,6 +438,26 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     }
   };
 
+  const clearManualFormErrors = () => {
+    setFormError(null);
+    setFieldErrors({ name: null, email: null, password: null, confirmPassword: null });
+  };
+
+  const handleGoogleSignIn = async () => {
+    clearManualFormErrors();
+    clearAppleError();
+    await signInWithGoogle();
+    // Quando o Google login conclui, o RootNavigator troca para o AppFlow
+    // (ou para o Onboarding, se isNewUser — ver _setSession em auth.store.ts).
+  };
+
+  const handleAppleSignIn = async () => {
+    clearManualFormErrors();
+    clearGoogleError();
+    await signInWithApple();
+    // Mesmo destino pós-login do Google — ver comentário acima.
+  };
+
   const styles = StyleSheet.create({
     progressBlock: {
       marginBottom: spacing['4xl'],
@@ -441,6 +488,23 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     },
     passwordFieldGroup: {
       gap: spacing.md,
+    },
+    dividerRow: {
+      marginTop: spacing.xl,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: DIVIDER_LINE_COLOR,
+    },
+    dividerText: {
+      color: DIVIDER_TEXT_COLOR,
+      fontFamily: 'DMSans_400Regular',
+      fontSize: 12,
+      backgroundColor: colors.background.primary,
+      paddingHorizontal: 12,
     },
     bottomText: {
       marginTop: spacing.xl,
@@ -570,13 +634,28 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
           returnKeyType="done"
           onSubmitEditing={() => { void handleSubmit(); }}
         />
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>{t('common.or')}</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <AppleSignInButton onPress={() => void handleAppleSignIn()} isLoading={isAppleLoading} />
+        <GoogleSignInButton onPress={() => void handleGoogleSignIn()} isLoading={isGoogleLoading} />
       </View>
     </View>
   );
 
   const bottomContent = (
     <View>
-      {formError ? <Text style={styles.formError}>{formError}</Text> : null}
+      {formError || googleError || appleError ? (
+        <Text style={styles.formError}>
+          {formError ??
+            (googleError ? translateKey(googleError) : null) ??
+            (appleError ? translateKey(appleError) : null)}
+        </Text>
+      ) : null}
 
       <AuthButton loading={isLoading} onPress={() => { void handleSubmit(); }}>
         {t('auth.registerCta')}

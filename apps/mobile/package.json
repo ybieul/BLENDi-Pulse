@@ -34,6 +34,7 @@
     "@tanstack/react-query-persist-client": "5.99.2",
     "axios": "^1.20.0",
     "expo": "~54.0.37",
+    "expo-apple-authentication": "~8.0.8",
     "expo-auth-session": "^7.0.11",
     "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
@@ -87,6 +88,7 @@
     "eslint-plugin-react-native": "^4.1.0",
     "hermes-compiler": "file:vendor/hermes-compiler",
     "prettier": "^3.4.2",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   }
 }

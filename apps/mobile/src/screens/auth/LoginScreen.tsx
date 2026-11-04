@@ -14,8 +14,15 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
-import { AuthButton, AuthInput, AuthScreenLayout, GoogleSignInButton } from '../../components/ui';
+import {
+  AppleSignInButton,
+  AuthButton,
+  AuthInput,
+  AuthScreenLayout,
+  GoogleSignInButton,
+} from '../../components/ui';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useAppleAuth } from '../../hooks/useAppleAuth';
 import { useColors } from '../../hooks/useColors';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
@@ -43,6 +50,12 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     error: googleError,
     clearError: clearGoogleError,
   } = useGoogleAuth();
+  const {
+    signInWithApple,
+    isLoading: isAppleLoading,
+    error: appleError,
+    clearError: clearAppleError,
+  } = useAppleAuth();
 
   const passwordInputRef = useRef<RNTextInput | null>(null);
 
@@ -88,29 +101,34 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
     setEmail(nextEmail);
     clearFormErrors();
     clearGoogleError();
+    clearAppleError();
   };
 
   const handleChangePassword = (nextPassword: string) => {
     setPassword(nextPassword);
     clearFormErrors();
     clearGoogleError();
+    clearAppleError();
   };
 
   const handleForgotPassword = () => {
     clearFormErrors();
     clearGoogleError();
+    clearAppleError();
     navigation.navigate('ForgotPassword');
   };
 
   const handleNavigateToRegister = () => {
     clearFormErrors();
     clearGoogleError();
+    clearAppleError();
     navigation.navigate('Register');
   };
 
   const handleLogin = async () => {
     clearFormErrors();
     clearGoogleError();
+    clearAppleError();
 
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -152,9 +170,17 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
 
   const handleGoogleSignIn = async () => {
     clearFormErrors();
+    clearAppleError();
     await signInWithGoogle();
     // Quando o Google login conclui, o RootNavigator troca para o AppFlow.
     // O AppNavigator já entra em Home como rota inicial por enquanto.
+  };
+
+  const handleAppleSignIn = async () => {
+    clearFormErrors();
+    clearGoogleError();
+    await signInWithApple();
+    // Mesmo destino pós-login do Google — ver comentário acima.
   };
 
   const styles = StyleSheet.create({
@@ -329,11 +355,14 @@ export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {
           <View style={styles.dividerLine} />
         </View>
 
+        <AppleSignInButton onPress={() => void handleAppleSignIn()} isLoading={isAppleLoading} />
         <GoogleSignInButton onPress={() => void handleGoogleSignIn()} isLoading={isGoogleLoading} />
 
-        {formError || googleError ? (
+        {formError || googleError || appleError ? (
           <Text style={styles.formErrorText}>
-            {formError ?? (googleError ? translateKey(googleError) : null)}
+            {formError ??
+              (googleError ? translateKey(googleError) : null) ??
+              (appleError ? translateKey(appleError) : null)}
           </Text>
         ) : null}
       </View>

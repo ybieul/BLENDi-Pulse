@@ -505,7 +505,8 @@
     "termsOfService": "Terms of Service",
     "termsConnector": "and",
     "privacyPolicy": "Privacy Policy",
-    "google_sign_in": "Continue with Google"
+    "google_sign_in": "Continue with Google",
+    "apple_sign_in": "Continue with Apple"
   },
 
   "errors": {
@@ -526,6 +527,7 @@
       "session_expired": "Your session expired. Please sign in again.",
       "unauthorized": "You don't have access to this feature.",
       "google_auth_failed": "Google sign-in failed. Please try again.",
+      "apple_auth_failed": "Apple sign-in failed. Please try again.",
       "google_cancelled": "Google sign-in was cancelled.",
       "invalid_state": "Authentication request expired. Please try again.",
       "email_not_verified": "Your Google account email is not verified.",

@@ -8,6 +8,7 @@
 // Tipagem de saída: interfaces locais alinhadas ao contrato da API.
 
 import type {
+  AppleSignInInput,
   ForgotPasswordInput,
   RegisterInput,
   LoginInput,
@@ -73,6 +74,16 @@ export interface AuthResponse {
     user: AuthUser;
     accessToken: string;
     refreshToken: string;
+  };
+}
+
+export interface AppleSignInResponse {
+  success: true;
+  data: {
+    user: AuthUser;
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
   };
 }
 
@@ -206,4 +217,20 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
 export async function getGoogleAuthUrl(): Promise<string> {
   const response = await api.get<{ success: true; data: { url: string } }>('/auth/google/url');
   return response.data.data.url;
+}
+
+// ─── Apple Sign In ────────────────────────────────────────────────────────────
+
+/**
+ * Autentica (ou cria conta) via Sign in with Apple.
+ * POST /auth/apple → 200/201 { user, accessToken, refreshToken, isNewUser }
+ *
+ * Fluxo nativo (expo-apple-authentication): o identityToken e o
+ * authorizationCode já vêm prontos do SDK, sem browser/redirect.
+ */
+export async function signInWithApple(
+  input: AppleSignInInput
+): Promise<AppleSignInResponse['data']> {
+  const response = await api.post<AppleSignInResponse>('/auth/apple', input);
+  return response.data.data;
 }
