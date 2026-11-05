@@ -9,6 +9,11 @@ export interface IFavoriteIngredient {
   amount: string;
 }
 
+export interface IFavoriteStep {
+  text: string;
+  pulseCount?: number;
+}
+
 export interface IFavorite {
   userId: mongoose.Types.ObjectId;
   recipeName: string;
@@ -23,6 +28,7 @@ export interface IFavorite {
   hasSubstitutes: boolean;
   blendiModel: BlendiModel;
   goal: UserGoal;
+  steps?: IFavoriteStep[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +46,24 @@ const favoriteIngredientSchema = new mongoose.Schema<IFavoriteIngredient>(
       type: String,
       required: [true, 'errors.validation.required'],
       trim: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+const favoriteStepSchema = new mongoose.Schema<IFavoriteStep>(
+  {
+    text: {
+      type: String,
+      required: [true, 'errors.validation.required'],
+      trim: true,
+    },
+    pulseCount: {
+      type: Number,
+      required: false,
+      min: [1, 'errors.validation.number_range'],
     },
   },
   {
@@ -127,6 +151,10 @@ const favoriteSchema = new mongoose.Schema<IFavorite>(
       enum: userGoalValues,
       required: [true, 'errors.validation.required'],
       trim: true,
+    },
+    steps: {
+      type: [favoriteStepSchema],
+      required: false,
     },
   },
   {

@@ -23,6 +23,7 @@ import { forgotPassword, verifyOtp } from '../../services/auth.service';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import { showToast } from '../../utils/toast.utils';
 import type { AuthScreenProps } from '../../navigation/types';
+import type { TranslationKey } from '../../locales/i18n';
 
 const OTP_LENGTH = 6;
 const RESEND_COUNTDOWN_SECONDS = 60;
@@ -31,7 +32,6 @@ const SHAKE_DISTANCE = 4;
 const SHAKE_TOTAL_DURATION_MS = 300;
 const ERROR_BORDER_DURATION_MS = 600;
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ApiErrorResponse = { code?: string };
 type VerifyOtpRequest = (input: { email: string; otp: string }) => Promise<string>;

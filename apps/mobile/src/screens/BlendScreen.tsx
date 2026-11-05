@@ -20,17 +20,25 @@
 // garantindo que TimerCircle receba o `remainingSeconds` correto na transição.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CreateBlendLogInput, PulseAiRecipe } from '@blendi/shared';
 
+import {
+  fonts,
+  fontSizes,
+  fontWeights,
+  spacing,
+} from '@blendi/shared';
 import type { AppTabScreenProps } from '../navigation/types';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ActiveRecipeHeader } from '../components/blend/ActiveRecipeHeader';
 import { TimerCircle, type TimerCircleStatus } from '../components/blend/TimerCircle';
 import { TimerControls } from '../components/blend/TimerControls';
+import { StepModeView } from '../components/blend/StepModeView';
 import { RatingBottomSheet } from '../components/blend/RatingBottomSheet';
 import { CleaningReminder } from '../components/blend/CleaningReminder';
 import { useBlendStore, useHasBlendStoreHydrated } from '../store/blend.store';
@@ -39,8 +47,11 @@ import { useNetworkStore } from '../store/network.store';
 import { BlendLogServiceError, createBlendLog } from '../services/blendLog.service';
 import { QUERY_KEYS } from '../config/cache.config';
 import { useAppTranslation } from '../hooks/useAppTranslation';
+import { useColors } from '../hooks/useColors';
 import { addPendingBlend } from '../utils/pendingBlends.utils';
 import { showToast } from '../utils/toast.utils';
+
+type BlendViewMode = 'timer' | 'steps';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -142,8 +153,11 @@ function shouldShowCleaningReminder(lastCleanedAt?: string | null): boolean {
 
 export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   const { t } = useAppTranslation();
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+
+  useKeepAwake();
 
   // ── Blend store ──────────────────────────────────────────────────────────
 
@@ -172,6 +186,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   const [showRating, setShowRating] = useState(false);
   const [showCleaningReminder, setShowCleaningReminder] = useState(false);
   const [isLogging, setIsLogging] = useState(false);
+  const [viewMode, setViewMode] = useState<BlendViewMode>('timer');
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -386,6 +401,13 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
   // o timer está rodando.
 
   const remainingSeconds = Math.max(0, timerDuration - elapsedSeconds);
+  const recipeSteps = activeRecipe?.steps;
+  const hasSteps = Array.isArray(recipeSteps) && recipeSteps.length > 0;
+  const showStepMode = hasSteps && viewMode === 'steps';
+
+  const handleStepsComplete = useCallback(() => {
+    setViewMode('timer');
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -394,25 +416,73 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
       <AuroraBackground intensity="reduced" />
 
       <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+        {hasSteps && (
+          <View style={[styles.viewModeToggle, { backgroundColor: colors.overlay.plum[8], borderColor: colors.overlay.plum[12] }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={() => setViewMode('timer')}
+              style={[
+                styles.viewModeSegment,
+                viewMode === 'timer' && { backgroundColor: colors.brand.pulse },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.viewModeLabel,
+                  { color: viewMode === 'timer' ? colors.text.inverse : colors.text.primary },
+                ]}
+              >
+                {t('blend.viewModeTimer')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.82}
+              onPress={() => setViewMode('steps')}
+              style={[
+                styles.viewModeSegment,
+                viewMode === 'steps' && { backgroundColor: colors.brand.pulse },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.viewModeLabel,
+                  { color: viewMode === 'steps' ? colors.text.inverse : colors.text.primary },
+                ]}
+              >
+                {t('blend.viewModeSteps')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {activeRecipe !== null && <ActiveRecipeHeader recipe={activeRecipe} />}
 
         <View style={styles.timerArea}>
-          <TimerCircle
-            duration={remainingSeconds}
-            status={timerStatus}
-            onComplete={handleComplete}
-          />
+          {showStepMode ? (
+            <StepModeView steps={recipeSteps} onComplete={handleStepsComplete} />
+          ) : (
+            <TimerCircle
+              duration={remainingSeconds}
+              status={timerStatus}
+              onComplete={handleComplete}
+            />
+          )}
         </View>
 
-        <View style={styles.controlsArea}>
-          <TimerControls
-            status={timerStatus}
-            duration={timerDuration}
-            onAdjust={handleAdjust}
-            onStart={handleStart}
-            onStop={handleStop}
-          />
-        </View>
+        {!showStepMode && (
+          <View style={styles.controlsArea}>
+            <TimerControls
+              status={timerStatus}
+              duration={timerDuration}
+              onAdjust={handleAdjust}
+              onStart={handleStart}
+              onStop={handleStop}
+            />
+          </View>
+        )}
       </View>
 
       <RatingBottomSheet
@@ -443,6 +513,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  viewModeToggle: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    padding: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  viewModeSegment: {
+    borderRadius: 999,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  viewModeLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.medium,
   },
   controlsArea: {
     flex: 0,

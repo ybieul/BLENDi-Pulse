@@ -17,9 +17,9 @@ import {
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import type { DailyMissionItem } from '../../services/dailyMission.service';
+import type { TranslationKey } from '../../locales/i18n';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 
 interface MissionCardProps {
   mission: DailyMissionItem;

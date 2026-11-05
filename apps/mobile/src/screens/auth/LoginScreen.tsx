@@ -28,12 +28,12 @@ import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
+import type { TranslationKey } from '../../locales/i18n';
 
 interface ApiErrorResponse {
   code?: string;
 }
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
 export function LoginScreen({ navigation }: AuthScreenProps<'Login'>) {

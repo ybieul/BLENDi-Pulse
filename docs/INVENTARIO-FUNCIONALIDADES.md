@@ -62,7 +62,7 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 | Favorites | `screens/FavoritesListScreen.tsx` | Lista de receitas favoritadas. |
 | PantryScanner | `screens/PantryScannerScreen.tsx` | Scanner por câmera que reconhece ingredientes e sugere receitas. |
 | ConversationHistory | `screens/ConversationHistoryScreen.tsx` | Histórico de conversas do Pulse AI por dia. |
-| Blend | `screens/BlendScreen.tsx` | Timer de preparo do shake, com avaliação ao final. |
+| Blend | `screens/BlendScreen.tsx` | Timer de preparo do shake (com modo "Passos" alternativo quando a receita ativa tem passos estruturados), com avaliação ao final. |
 | TrackMain | `screens/TrackScreen.tsx` | Registro de água, stack de suplementos do dia, atalhos. |
 | ManageStack | `screens/ManageStackScreen.tsx` | Adicionar/remover/ativar suplementos do stack pessoal. |
 | History | `screens/HistoryScreen.tsx` | Histórico de 7/30/90 dias de nutrição, hidratação e suplementos. |
@@ -110,7 +110,7 @@ A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculatio
 - Badge de streak (3 estágios visuais: fraco, normal, "lendário" com giro contínuo a partir de 30 dias).
 - Até 3 missões diárias com progresso e recompensa de XP.
 - Carrossel de "protocolos rápidos" (4 prompts prontos: treino, mães ativas, coquetel de praia, viagem) que abrem o Pulse AI já com o texto preenchido.
-- Card de receita sugerida do dia, por objetivo do usuário (receitas fixas no código, não geradas por IA).
+- Card de receita sugerida do dia, por objetivo do usuário (pool fixo de 20 receitas por objetivo, 80 no total, escritas no código, não geradas por IA). A receita do dia é escolhida por rotação determinística 100% local (sem rede, sem estado salvo), via `getLocalDayIndex(date, timezone?)` em `DailyRecipeCard.tsx` — extrai ano/mês/dia pelo fuso real do aparelho (`Intl.DateTimeFormat(...).formatToParts(...)`), não pela divisão do epoch UTC. Bug original (fórmula calculava o dia em UTC) e correção documentados no achado 1 de [docs/fixes/cp1.1.8-achados-fora-do-escopo.md](fixes/cp1.1.8-achados-fora-do-escopo.md), **corrigido**.
 - Pull-to-refresh recarrega perfil, blends de hoje e hidratação de hoje em paralelo.
 
 ### Pulse AI (chat)
@@ -121,11 +121,13 @@ A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculatio
 - Indicador visual de uso restante (quantas mensagens grátis sobraram hoje).
 - Indicador "veio do cache" (ícone de raio) quando a resposta não precisou chamar a IA de novo.
 - Banner "Visualizando uma conversa anterior" quando o usuário abre uma conversa do histórico, com botão para iniciar uma nova.
+- Receita gerada traz 3 a 5 passos estruturados (`steps`, campo opcional) além do parágrafo único (`blendInstruction`) — usados pelo modo "Passos" do Blend quando o usuário inicia essa receita.
 
 ### Favoritos
 
 - Lista de receitas favoritadas (coração animado para favoritar/desfavoritar direto no card da receita, com atualização otimista).
 - Swipe para remover na lista de favoritos.
+- Os passos estruturados da receita (quando existirem) são preservados ao favoritar.
 
 ### Pantry Scanner (scanner de despensa)
 
@@ -133,6 +135,7 @@ A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculatio
 - Reconhece até 2 receitas por scan, usando só os ingredientes confirmados pelo usuário.
 - Indicador de "scans restantes no mês" (plano grátis).
 - Usuário pode marcar/desmarcar ingredientes identificados e adicionar ingredientes manualmente antes de gerar as receitas.
+- Cada receita gerada também traz passos estruturados (`steps`), mesmo campo opcional da Pulse AI.
 
 ### Histórico de conversas (Pulse AI)
 
@@ -147,6 +150,8 @@ A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculatio
 - Lembrete de limpeza do liquidificador se não foi marcado como limpo nos últimos 7 dias.
 - Recupera o timer em andamento se o app for fechado e reaberto no meio do preparo.
 - Pode receber uma receita vinda do Pulse AI, da Home ou dos Favoritos; mostra cabeçalho com macros e ingredientes da receita ativa, com botão para fechar e voltar ao "blend livre".
+- Quando a receita ativa tem passos estruturados (`steps`), mostra um controle de alternância Timer/Passos no topo da tela; o modo "Passos" (`StepModeView`) exibe um passo por vez com navegação e contador de toque para passos que envolvem gelo/fruta congelada, e leva ao timer de bater normal ao terminar o último passo. Sem passos (receitas de IA/favoritos anteriores a essa mudança), nenhuma alternância aparece.
+- Tela permanece acesa (`expo-keep-awake`) durante toda a montagem, em qualquer modo.
 
 ### Acompanhar (Track)
 

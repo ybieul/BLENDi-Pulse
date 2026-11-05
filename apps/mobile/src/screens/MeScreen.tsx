@@ -66,7 +66,7 @@ import { buildHistoryRange } from "../utils/historyRange.utils";
 import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
 import { useGamificationStore } from "../store/gamification.store";
-import type { SupportedLocale } from "../locales/i18n";
+import type { SupportedLocale, TranslationKey } from "../locales/i18n";
 import type { AppTabScreenProps, RootNavigationProp } from "../navigation/types";
 
 import { AuroraBackground } from "../components/ui/AuroraBackground";
@@ -295,8 +295,6 @@ interface WeeklySharePayload {
 }
 
 // ─── Translation key type ─────────────────────────────────────────────────────
-
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>["t"]>[0];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

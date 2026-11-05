@@ -11,6 +11,18 @@ const favoriteIngredientSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+const favoriteStepSchema = z.object({
+  text: z
+    .string({ required_error: 'errors.validation.required' })
+    .trim()
+    .min(1, 'errors.validation.required'),
+  pulseCount: z
+    .number({ invalid_type_error: 'errors.validation.number_range' })
+    .int('errors.validation.integer')
+    .min(1, 'errors.validation.number_range')
+    .optional(),
+});
+
 export const createFavoriteSchema = z.object({
   recipeName: z
     .string({ required_error: 'errors.validation.required' })
@@ -71,6 +83,8 @@ export const createFavoriteSchema = z.object({
     required_error: 'errors.validation.required',
     invalid_type_error: 'errors.validation.invalid_option',
   }).default(false),
+
+  steps: z.array(favoriteStepSchema).optional(),
 });
 
 export interface FavoriteItem {
@@ -91,6 +105,10 @@ export interface FavoriteItem {
   blendiModel: string;
   goal: string;
   createdAt: string;
+  steps?: Array<{
+    text: string;
+    pulseCount?: number;
+  }>;
 }
 
 export type CreateFavoriteInput = z.infer<typeof createFavoriteSchema>;

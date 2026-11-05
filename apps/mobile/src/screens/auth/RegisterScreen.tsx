@@ -32,6 +32,7 @@ import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAuthStore } from '../../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
+import type { TranslationKey } from '../../locales/i18n';
 
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_IDEAL_LENGTH = 12;
@@ -44,7 +45,6 @@ const SEGMENT_ACTIVE_COLORS = [
   colors.feedback.success,
 ] as const;
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type FieldName = 'name' | 'email' | 'password' | 'confirmPassword';
 

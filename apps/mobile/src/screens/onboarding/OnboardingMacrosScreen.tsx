@@ -25,13 +25,13 @@ import type { OnboardingScreenProps } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth.store';
 import { useOnboardingStore } from '../../store/onboarding.store';
 import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import type { TranslationKey } from '../../locales/i18n';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 
 interface ApiErrorResponse {

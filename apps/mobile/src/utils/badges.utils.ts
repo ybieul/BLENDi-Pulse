@@ -1,4 +1,5 @@
 import { colors } from '@blendi/shared';
+import type { TranslationKey } from '../locales/i18n';
 
 export type BadgeStageName = 'bronze' | 'silver' | 'gold';
 export type UserBadgeStage = BadgeStageName | 'locked';
@@ -6,7 +7,7 @@ export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 
 export interface BadgeStage {
   stage: BadgeStageName;
-  requirementKey: string;
+  requirementKey: TranslationKey;
   requirement: number;
   unlocked: boolean;
 }
@@ -14,8 +15,8 @@ export interface BadgeStage {
 export interface Badge {
   id: string;
   category: string;
-  titleKey: string;
-  descriptionKey: string;
+  titleKey: TranslationKey;
+  descriptionKey: TranslationKey;
   icon: string;
   iconColor: string;
   stages: BadgeStage[];

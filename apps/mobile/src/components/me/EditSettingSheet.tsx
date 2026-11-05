@@ -28,6 +28,7 @@ import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
 import { AuthInput } from '../ui/AuthInput';
 import { SelectionCard } from '../ui/SelectionCard';
+import type { TranslationKey } from '../../locales/i18n';
 
 const SHEET_RADIUS = 24;
 const SUBTITLE_OPACITY = 0.7;
@@ -59,7 +60,6 @@ interface EditSettingSheetProps {
   onClose: () => void;
 }
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {

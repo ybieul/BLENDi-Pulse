@@ -23,6 +23,7 @@ import { useColors } from '../../hooks/useColors';
 import { resetPassword } from '../../services/auth.service';
 import { getAxiosErrorTranslationKey } from '../../utils/error.utils';
 import type { AuthScreenProps } from '../../navigation/types';
+import type { TranslationKey } from '../../locales/i18n';
 
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_IDEAL_LENGTH = 12;
@@ -38,7 +39,6 @@ const SUCCESS_TEXT_DURATION_MS = 200;
 const SUCCESS_RESET_DELAY_MS = 2500;
 const WAVE_SIZE = 80;
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ResetPasswordRequest = (input: { resetToken: string; newPassword: string }) => Promise<void>;
 

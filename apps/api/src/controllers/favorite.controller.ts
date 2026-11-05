@@ -72,6 +72,10 @@ function serializeFavorite(favorite: FavoriteRecord): FavoriteItem {
     hasSubstitutes: favorite.hasSubstitutes,
     blendiModel: favorite.blendiModel,
     goal: favorite.goal,
+    steps: favorite.steps?.map(step => ({
+      text: step.text,
+      ...(step.pulseCount !== undefined && { pulseCount: step.pulseCount }),
+    })),
     createdAt: favorite.createdAt.toISOString(),
   };
 }

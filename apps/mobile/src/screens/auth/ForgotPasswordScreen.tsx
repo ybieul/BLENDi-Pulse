@@ -8,10 +8,10 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { forgotPassword } from '../../services/auth.service';
 import type { AuthScreenProps } from '../../navigation/types';
+import type { TranslationKey } from '../../locales/i18n';
 
 const MINIMUM_LOADING_MS = 800;
 
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
 type ForgotPasswordRequest = (input: { email: string }) => Promise<void>;
 

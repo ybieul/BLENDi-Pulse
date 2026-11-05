@@ -5,8 +5,7 @@
 // por CompleteProfileScreen.tsx, sem duplicar a lógica de máscara/validação.
 
 import type { useAppTranslation } from '../hooks/useAppTranslation';
-
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
+import type { TranslationKey } from '../locales/i18n';
 
 export const BIRTH_DATE_DIGITS_LENGTH = 8;
 export const BIRTH_DATE_MASKED_LENGTH = 10;

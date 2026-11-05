@@ -1565,6 +1565,11 @@ Invalid `limit` values are ignored and do not trigger a validation error.
         "hasSubstitutes": false,
         "blendiModel": "ProPlus",
         "goal": "Muscle",
+        "steps": [
+          { "text": "Add the blueberries and yogurt to the cup." },
+          { "text": "Add the frozen banana and pulse to break it up.", "pulseCount": 6 },
+          { "text": "Blend on high for 45 seconds until smooth." }
+        ],
         "createdAt": "2026-05-26T14:20:00.000Z"
       }
     ],
@@ -1601,6 +1606,7 @@ Creates a new favorite recipe for the authenticated user.
 | `blendInstruction` | string | Yes | Non-empty string |
 | `tip` | string | No | Optional non-empty string |
 | `hasSubstitutes` | boolean | No | Defaults to `false` |
+| `steps` | array | No | Each item requires `text`; `pulseCount` is an optional integer, minimum 1 |
 
 The backend checks duplicates by `recipeName` within the authenticated user's favorites. If a matching favorite already exists, the endpoint returns the existing record and `alreadyExists: true` instead of creating a duplicate.
 
@@ -1631,6 +1637,11 @@ The backend checks duplicates by `recipeName` within the authenticated user's fa
       "hasSubstitutes": false,
       "blendiModel": "ProPlus",
       "goal": "Muscle",
+      "steps": [
+        { "text": "Add the blueberries and yogurt to the cup." },
+        { "text": "Add the frozen banana and pulse to break it up.", "pulseCount": 6 },
+        { "text": "Blend on high for 45 seconds until smooth." }
+      ],
       "createdAt": "2026-05-26T14:20:00.000Z"
     },
     "alreadyExists": false,
@@ -1747,7 +1758,12 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
       "prepTimeSeconds": 60,
       "blendInstruction": "Blend for 45 seconds.",
       "tip": "Use frozen fruit for a thicker texture.",
-      "hasSubstitutes": false
+      "hasSubstitutes": false,
+      "steps": [
+        { "text": "Add the blueberries and yogurt to the cup." },
+        { "text": "Add the frozen banana and pulse to break it up.", "pulseCount": 6 },
+        { "text": "Blend on high for 45 seconds until smooth." }
+      ]
     },
     "fromCache": false,
     "usageRemaining": 2,
@@ -1763,6 +1779,8 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 `xpAwarded` is the multi-occurrence Pulse AI usage XP. It is returned for both cache hits and fresh generations after a successful request.
 
 `conversationId` is the `_id` of the `Conversation` document the message was saved to. `macrosValidated` indicates whether the recipe's declared macros passed mathematical validation against its ingredients — it is `false` when the discrepancy exceeds 15% even after the automatic retry. A `macrosValidated: false` response does not block the recipe from being returned; it is only an indicator of reduced accuracy.
+
+`steps` is an optional array of structured preparation steps (`text`, and `pulseCount` when the step involves adding ice or frozen fruit) requested from the AI alongside `blendInstruction`; it may be absent on recipes generated before this field existed.
 
 **Status codes**
 
@@ -1914,7 +1932,12 @@ Analyzes a pantry image, filters low-confidence ingredients, and generates up to
         "prepTimeSeconds": 60,
         "blendInstruction": "Blend for 45 seconds until smooth.",
         "tip": "Add ice for a thicker texture.",
-        "hasSubstitutes": false
+        "hasSubstitutes": false,
+        "steps": [
+          { "text": "Add the banana and yogurt to the cup." },
+          { "text": "Add a handful of ice and pulse to break it up.", "pulseCount": 5 },
+          { "text": "Blend on high for 45 seconds until smooth." }
+        ]
       }
     ],
     "scansUsed": 2,
@@ -2849,7 +2872,11 @@ The backend verifies that the conversation's `userId` matches the authenticated 
             "prepTimeSeconds": 60,
             "blendInstruction": "Blend for 45 seconds.",
             "tip": "Use frozen fruit for a thicker texture.",
-            "hasSubstitutes": false
+            "hasSubstitutes": false,
+            "steps": [
+              { "text": "Add the blueberries and yogurt to the cup." },
+              { "text": "Blend on high for 45 seconds until smooth." }
+            ]
           },
           "timestamp": "2026-06-26T14:20:05.000Z"
         }

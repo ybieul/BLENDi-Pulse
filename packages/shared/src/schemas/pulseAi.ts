@@ -30,6 +30,10 @@ export interface PulseAiRecipe {
   tip?: string;
   hasSubstitutes: boolean;
   macrosValidated?: boolean;
+  steps?: Array<{
+    text: string;
+    pulseCount?: number;
+  }>;
 }
 
 const pulseAiIngredientSchema = z.object({
@@ -41,6 +45,18 @@ const pulseAiIngredientSchema = z.object({
     .string({ required_error: 'errors.validation.required' })
     .trim()
     .min(1, 'errors.validation.required'),
+});
+
+const pulseAiStepSchema = z.object({
+  text: z
+    .string({ required_error: 'errors.validation.required' })
+    .trim()
+    .min(1, 'errors.validation.required'),
+  pulseCount: z
+    .number({ invalid_type_error: 'errors.validation.number_range' })
+    .int('errors.validation.integer')
+    .min(1, 'errors.validation.number_range')
+    .optional(),
 });
 
 const pulseAiMacrosSchema = z.object({
@@ -94,4 +110,5 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
   macrosValidated: z
     .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
     .default(true),
+  steps: z.array(pulseAiStepSchema).optional(),
 });

@@ -47,14 +47,13 @@ import {
   translateBirthDateError,
 } from '../utils/birthDate.utils';
 import type { RootStackParamList } from '../navigation/types';
+import type { TranslationKey } from '../locales/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ActivityLevel = 'sedentary' | 'lightlyActive' | 'moderatelyActive' | 'veryActive';
 type BiologicalSex = 'male' | 'female';
 type WeightGoalOption = 'lose' | 'maintain' | 'gain';
-
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 
 interface ApiErrorResponse {
   code?: string;

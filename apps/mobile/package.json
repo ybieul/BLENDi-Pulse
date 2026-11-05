@@ -45,6 +45,7 @@
     "expo-haptics": "~15.0.8",
     "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.11",
+    "expo-keep-awake": "~15.0.8",
     "expo-linear-gradient": "^15.0.8",
     "expo-linking": "~8.0.12",
     "expo-localization": "^17.0.9",
@@ -74,9 +75,11 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@testing-library/react-native": "13.3.3",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.17.10",
     "@types/react": "~19.1.0",
+    "@types/react-test-renderer": "19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
     "babel-preset-expo": "54.0.10",

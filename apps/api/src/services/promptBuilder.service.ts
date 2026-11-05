@@ -85,10 +85,10 @@ export interface BuildPulseAiPromptResult {
 }
 
 const PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE =
-  '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}';
+  '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}';
 
 const PANTRY_RECIPES_JSON_ARRAY_STRUCTURE =
-  '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean}]';
+  '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}]';
 
 const MODEL_CONTEXT: Record<BlendiModel, PulseAiModelContext> = {
   Lite: {
@@ -315,6 +315,8 @@ function buildSystemPrompt({
     ...buildResponseFormatRequirements(responseMode, recipeCount),
     '- All macro fields must be numeric values, not strings.',
     '- Personalize the blendInstruction for the user hardware and ingredient difficulty.',
+    '- Generate between 3 and 5 preparation steps in the steps field, written in the same language as the rest of the response.',
+    '- Include pulseCount (an integer number of pulses) only in steps that involve adding ice or frozen fruit; omit the pulseCount field from every other step.',
     '- Calibrate the recipe macros so the suggestion fits the user daily targets and goal context. Keep the serving practical instead of arbitrarily oversized.',
     '- Prioritize common, accessible, supermarket-friendly ingredients.',
     `- ${unitSystemContext.instruction}`,

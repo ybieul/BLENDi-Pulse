@@ -23,6 +23,7 @@ import {
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import type { BadgeStage, UserBadge } from '../../utils/badges.utils';
+import type { TranslationKey } from '../../locales/i18n';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -34,7 +35,6 @@ const SILVER_COLOR = colors.badgeTier.silverIcon;
 const GOLD_COLOR = colors.badgeTier.goldIcon;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 
 export interface BadgeDetailSheetProps {
   badge: UserBadge | null;

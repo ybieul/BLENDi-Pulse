@@ -7,13 +7,13 @@ import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import type { UserBadge } from '../../utils/badges.utils';
+import type { TranslationKey } from '../../locales/i18n';
 
 const BRONZE_BORDER_GLOW = colors.badgeTier.bronzeGlow;
 const SILVER_BORDER_GLOW = colors.badgeTier.silverGlow;
 const GOLD_BORDER_GLOW = colors.badgeTier.goldGlow;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type TranslationKey = Parameters<ReturnType<typeof useAppTranslation>['t']>[0];
 
 export interface BadgeCardProps {
   badge: UserBadge;
@@ -123,7 +123,7 @@ export function BadgeCard({ badge, onPress }: BadgeCardProps) {
       <Ionicons name={badge.icon as IoniconName} size={24} color={iconColor} style={styles.icon} />
 
       <Text numberOfLines={2} style={styles.title}>
-        {t(badge.titleKey as TranslationKey)}
+        {t(badge.titleKey)}
       </Text>
 
       <Text numberOfLines={1} style={styles.stageLabel}>

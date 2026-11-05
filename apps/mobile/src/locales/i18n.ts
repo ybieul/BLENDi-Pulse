@@ -37,6 +37,35 @@ const LANGUAGE_KEY = 'user_language';
 export type SupportedLocale = 'en' | 'pt-BR';
 export const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'pt-BR'];
 
+// Caminho pontuado (dot-path) de toda chave-folha de en.json, derivado
+// estruturalmente do JSON — não de Parameters<typeof t>, que resolve pra
+// `string` (perde toda a restrição de chave) porque `Parameters<T>` sobre
+// um tipo de função sobrecarregada (o `t` do react-i18next) sempre pega a
+// ÚLTIMA assinatura da sobrecarga, que é o fallback mais permissivo. Esse
+// alias quebrado foi copiado em 14 arquivos antes desta correção (ver
+// achado 2 em docs/fixes/cp1.1.8-achados-fora-do-escopo.md) — agora todos
+// importam este tipo em vez de redefini-lo localmente.
+type DotPath<T, Prefix extends string = ''> = {
+  [K in Extract<keyof T, string>]: T[K] extends string
+    ? `${Prefix}${K}`
+    : DotPath<T[K], `${Prefix}${K}.`>;
+}[Extract<keyof T, string>];
+
+type AllLeafPaths = DotPath<typeof en>;
+
+// Chaves de pluralização do i18next (compatibilityJSON: 'v4', config de
+// i18next.init abaixo) nunca existem no JSON sem sufixo — só como
+// `<chave>_one`/`<chave>_other` (ex: me.badges.requirements.
+// blendJourneyBronze_one/_other, chamado no código como só
+// "...blendJourneyBronze" + { count }, com o sufixo resolvido em runtime
+// pelo próprio i18next). Sem isso, toda chamada a uma chave pluralizada
+// real seria rejeitada pelo tipo — descoberto ao aplicar esta correção
+// nos 14 arquivos (BadgeDetailSheet.tsx, achado 2).
+type PluralSuffix = '_zero' | '_one' | '_two' | '_few' | '_many' | '_other';
+type StripPluralSuffix<K extends string> = K extends `${infer Base}${PluralSuffix}` ? Base : never;
+
+export type TranslationKey = AllLeafPaths | StripPluralSuffix<AllLeafPaths>;
+
 /**
  * Resolve o idioma inicial na seguinte ordem de prioridade:
  * 1. Preferência salva pelo usuário no MMKV
