@@ -51,7 +51,7 @@ function ManageStackRoute() {
         error instanceof SupplementStackServiceError
           ? error.translationKey
           : 'errors.network_internal_server_error';
-      showToast(t(translationKey as Parameters<typeof t>[0]));
+      showToast(t(translationKey));
     },
   });
 

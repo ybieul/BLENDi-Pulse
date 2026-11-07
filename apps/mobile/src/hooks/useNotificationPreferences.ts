@@ -12,6 +12,7 @@ import { useAuthStore } from '../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../utils/error.utils';
 import { showToast } from '../utils/toast.events';
 import { useAppTranslation } from './useAppTranslation';
+import type { TranslationKey } from '../locales/i18n';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ interface UpdateDailyPulseTimeContext {
   previousDailyPulseTime: DailyPulseTime;
 }
 
-function getErrorTranslationKey(error: unknown): string {
+function getErrorTranslationKey(error: unknown): TranslationKey {
   return axios.isAxiosError(error)
     ? getAxiosErrorTranslationKey(error)
     : 'errors.network_internal_server_error';
@@ -111,7 +112,7 @@ export function useNotificationPreferences() {
         updateUserProfile({ notificationPreferences: context.previousPreferences });
       }
 
-      showToast(t(getErrorTranslationKey(error) as Parameters<typeof t>[0]));
+      showToast(t(getErrorTranslationKey(error)));
     },
   });
 
@@ -135,7 +136,7 @@ export function useNotificationPreferences() {
         updateUserProfile({ dailyPulseTime: context.previousDailyPulseTime });
       }
 
-      showToast(t(getErrorTranslationKey(error) as Parameters<typeof t>[0]));
+      showToast(t(getErrorTranslationKey(error)));
     },
   });
 

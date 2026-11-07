@@ -6,6 +6,7 @@ import { trackEvent } from './analytics.service';
 import i18n from '../locales/i18n';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
+import type { TranslationKey } from '../locales/i18n';
 
  void calculateLevel;
 
@@ -60,7 +61,7 @@ export interface PulseAiUsage {
 export class PulseAiServiceError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string,
+    public readonly translationKey: TranslationKey,
     public readonly apiCode?: string
   ) {
     super(message);
@@ -68,7 +69,7 @@ export class PulseAiServiceError extends Error {
   }
 }
 
-function mapPulseAiErrorTranslationKey(code?: string | null): string {
+function mapPulseAiErrorTranslationKey(code?: string | null): TranslationKey {
   const normalizedCode = code?.trim().toLowerCase();
 
   if (!normalizedCode) {

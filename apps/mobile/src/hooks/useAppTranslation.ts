@@ -9,17 +9,18 @@
 //   ✅ Re-render automático em todos os componentes ao trocar idioma
 
 import { useCallback } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { storage, type SupportedLocale, SUPPORTED_LOCALES } from '../locales/i18n';
 
 const LANGUAGE_KEY = 'user_language';
 
 // ─── Tipos inferidos do arquivo de referência (en.json) ──────────────────────
-// O i18n.d.ts garante que TFunction conheça todas as chaves válidas.
+// O i18n-augment.d.ts garante que TFunction conheça todas as chaves válidas.
 
 export interface UseAppTranslationReturn {
   /** Função de tradução com autocomplete TypeScript completo */
-  t: ReturnType<typeof useTranslation>['t'];
+  t: TFunction<'translation'>;
   /** Idioma atualmente ativo */
   locale: SupportedLocale;
   /** Lista de idiomas suportados */

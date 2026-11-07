@@ -4,6 +4,7 @@ import { calculateLevel, type CreateFavoriteInput, type FavoriteItem, type Pulse
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
+import type { TranslationKey } from '../locales/i18n';
 
 void calculateLevel;
 
@@ -61,7 +62,7 @@ export interface ToggleFavoriteResult {
 export class FavoritesServiceError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string,
+    public readonly translationKey: TranslationKey,
     public readonly apiCode?: string
   ) {
     super(message);
@@ -134,7 +135,7 @@ function removeFavoriteIdMapping(favoriteId: string): void {
   }
 }
 
-function getFavoritesErrorTranslationKey(apiCode?: string): string {
+function getFavoritesErrorTranslationKey(apiCode?: string): TranslationKey {
   const normalizedCode = apiCode?.trim().toLowerCase();
 
   if (normalizedCode && normalizedCode in FAVORITES_ERROR_TRANSLATION_KEYS) {
@@ -146,7 +147,7 @@ function getFavoritesErrorTranslationKey(apiCode?: string): string {
   return getApiErrorTranslationKey(apiCode);
 }
 
-function mapFavoritesErrorTranslationKey(error: AxiosError<ApiErrorResponse>): string {
+function mapFavoritesErrorTranslationKey(error: AxiosError<ApiErrorResponse>): TranslationKey {
   if (error.code === 'ECONNABORTED') {
     return 'errors.network.timeout';
   }

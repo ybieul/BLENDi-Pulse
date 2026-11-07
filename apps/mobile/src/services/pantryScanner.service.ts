@@ -15,6 +15,7 @@ import { api } from '../config/api';
 import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
+import type { TranslationKey } from '../locales/i18n';
 
  void calculateLevel;
 
@@ -51,7 +52,7 @@ interface LocalImageSize {
 export class PantryScannerServiceError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string,
+    public readonly translationKey: TranslationKey,
     public readonly apiCode?: string
   ) {
     super(message);
@@ -62,7 +63,7 @@ export class PantryScannerServiceError extends Error {
 export class PantryScannerImageCompressionError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string
+    public readonly translationKey: TranslationKey
   ) {
     super(message);
     this.name = 'PantryScannerImageCompressionError';
@@ -109,7 +110,7 @@ function getResizeDimensions({ width, height }: LocalImageSize): LocalImageSize 
   };
 }
 
-function mapPantryScannerErrorTranslationKey(apiCode?: string | null): string {
+function mapPantryScannerErrorTranslationKey(apiCode?: string | null): TranslationKey {
   const normalizedCode = apiCode?.trim().toLowerCase();
 
   if (normalizedCode && normalizedCode in PANTRY_SCANNER_ERROR_TRANSLATION_KEYS) {

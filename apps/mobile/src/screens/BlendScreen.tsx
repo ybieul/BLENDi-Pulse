@@ -297,7 +297,7 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
           error instanceof BlendLogServiceError
             ? error.translationKey
             : 'errors.network.server';
-        showToast(t(translationKey as Parameters<typeof t>[0]));
+        showToast(t(translationKey));
         // timerStatus permanece 'completed' para o usuário poder tentar novamente
       }
     },

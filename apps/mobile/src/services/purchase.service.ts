@@ -15,6 +15,7 @@ import { PRICING_CONFIG } from '../config/pricing.config';
 import { getRevenueCatApiKey, isRevenueCatNativePlatform } from '../config/revenuecat.config';
 import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import type { TranslationKey } from '../locales/i18n';
 
 export type PurchasePlanId = 'monthly' | 'annual';
 
@@ -85,7 +86,7 @@ export interface PurchaseSyncResult {
 export class PurchaseServiceError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string,
+    public readonly translationKey: TranslationKey,
     public readonly code?: string,
     public readonly isUserCancelled = false
   ) {
@@ -202,7 +203,7 @@ function getCachedPackage(planId: PurchasePlanId): PurchasesPackage | null {
   return cachedPackages.get(planId) ?? null;
 }
 
-function getPurchaseErrorTranslationKey(error: PurchasesError): string {
+function getPurchaseErrorTranslationKey(error: PurchasesError): TranslationKey {
   switch (error.code) {
     case PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR:
       return 'errors.purchases_cancelled';

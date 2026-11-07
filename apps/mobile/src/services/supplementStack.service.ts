@@ -4,6 +4,7 @@ import { calculateLevel } from '@blendi/shared';
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
+import type { TranslationKey } from '../locales/i18n';
 
  void calculateLevel;
 
@@ -69,7 +70,7 @@ export interface SupplementCheckLog {
 export class SupplementStackServiceError extends Error {
   constructor(
     message: string,
-    public readonly translationKey: string,
+    public readonly translationKey: TranslationKey,
     public readonly apiCode?: string
   ) {
     super(message);
@@ -77,7 +78,7 @@ export class SupplementStackServiceError extends Error {
   }
 }
 
-function mapSupplementStackErrorTranslationKey(error: AxiosError<ApiErrorResponse>): string {
+function mapSupplementStackErrorTranslationKey(error: AxiosError<ApiErrorResponse>): TranslationKey {
   if (error.code === 'ECONNABORTED') {
     return 'errors.network.timeout';
   }

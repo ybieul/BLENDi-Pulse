@@ -21,6 +21,7 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useGamificationStore } from '../../store/gamification.store';
+import type { TranslationKey } from '../../locales/i18n';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -227,8 +228,8 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
   });
 
   const levelDetailLabel = t('gamification.levelDetail', { level: levelInfo.level });
-  const currentLevelName = t(levelInfo.levelNameKey, { level: levelInfo.level });
-  const nextLevelName = t(nextLevelInfo.levelNameKey, { level: nextLevelInfo.level });
+  const currentLevelName = t(levelInfo.levelNameKey as TranslationKey, { level: levelInfo.level });
+  const nextLevelName = t(nextLevelInfo.levelNameKey as TranslationKey, { level: nextLevelInfo.level });
   const formattedTotalXP = formatCount(totalXP);
   const formattedCurrentLevelXP = formatCount(levelInfo.xpForCurrentLevel);
   const formattedNextLevelXP = formatCount(levelInfo.xpForNextLevel);

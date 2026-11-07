@@ -121,7 +121,7 @@ export function usePulseProPurchase() {
           ? error.translationKey
           : 'errors.purchases_failed';
 
-      showToast(t(translationKey as Parameters<typeof t>[0]));
+      showToast(t(translationKey));
     },
     [t],
   );

@@ -1,4 +1,4 @@
-// apps/mobile/src/locales/i18n.d.ts
+// apps/mobile/src/locales/i18n-augment.d.ts
 // Estende o módulo i18next com a estrutura completa dos arquivos JSON.
 // Qualquer chave inválida é um ERRO DE COMPILAÇÃO — nunca um bug silencioso.
 

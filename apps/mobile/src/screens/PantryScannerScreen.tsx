@@ -248,7 +248,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         if (cancelled) return;
         const message =
           err instanceof PantryScannerServiceError
-            ? t(err.translationKey as Parameters<typeof t>[0])
+            ? t(err.translationKey)
             : t('errors.network_internal_server_error');
 
         if (
@@ -330,7 +330,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     async (uri: string) => {
       const result = await compressAndEncodeImage(uri);
       if (!result.ok) {
-        showToast(t(result.error.translationKey as Parameters<typeof t>[0]));
+        showToast(t(result.error.translationKey));
         return;
       }
       setCapturedUri(uri);

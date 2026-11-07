@@ -127,7 +127,7 @@ export function FavoritesListScreen({ navigation }: Props) {
             next.delete(item.id);
             return next;
           });
-          showToast(t(error.translationKey as Parameters<typeof t>[0]));
+          showToast(t(error.translationKey));
         },
         onSuccess: () => {
           setPendingRemovals((prev) => {

@@ -474,7 +474,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           const limitReachedMessage: ChatMessageItem = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: t(err.translationKey as Parameters<typeof t>[0]),
+            content: t(err.translationKey),
             timestamp: new Date(),
             isError: true,
           };
@@ -492,7 +492,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
 
           const errorText =
             err instanceof PulseAiServiceError
-              ? t(err.translationKey as Parameters<typeof t>[0])
+              ? t(err.translationKey)
               : t('errors.network_internal_server_error');
 
           const errorMessage: ChatMessageItem = {

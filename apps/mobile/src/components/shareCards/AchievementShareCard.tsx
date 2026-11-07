@@ -7,6 +7,7 @@ import { colors, fonts, fontWeights } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { ProfilePhoto } from '../profile/ProfilePhoto';
 import { AuroraBackground, DARK_AURORA_BASE_COLORS } from '../ui/AuroraBackground';
+import type { TranslationKey } from '../../locales/i18n';
 
 const SHARE_CARD_BACKGROUND = colors.brand.plum;
 const HERO_GLOW_TOP = [colors.overlay.warning[18], 'transparent'] as const;
@@ -54,7 +55,7 @@ export const AchievementShareCard = forwardRef<AchievementShareCardHandle, Achie
           <View style={styles.content}>
             <View style={styles.centerContent}>
               <Text style={styles.levelNumber}>{level}</Text>
-              <Text style={styles.levelName}>{t(levelNameKey, { level })}</Text>
+              <Text style={styles.levelName}>{t(levelNameKey as TranslationKey, { level })}</Text>
               <Text style={styles.levelUnlockLabel}>{t('share.levelUnlocked')}</Text>
             </View>
 

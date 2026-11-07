@@ -25,6 +25,7 @@ import {
   AchievementShareCard,
   type AchievementShareCardHandle,
 } from '../shareCards/AchievementShareCard';
+import type { TranslationKey } from '../../locales/i18n';
 
 const PARTICLE_COUNT = 15;
 const PARTICLE_DISTANCE_Y = -120;
@@ -473,7 +474,7 @@ export function LevelUpCelebration() {
 
                 <Text style={styles.levelNumber}>{levelUpData.newLevel}</Text>
                 <Text style={styles.levelName}>
-                  {t(levelUpData.newLevelNameKey, { level: levelUpData.newLevel })}
+                  {t(levelUpData.newLevelNameKey as TranslationKey, { level: levelUpData.newLevel })}
                 </Text>
                 <Text style={styles.levelUpTitle}>{t('gamification.levelUpTitle')}</Text>
                 <Pressable

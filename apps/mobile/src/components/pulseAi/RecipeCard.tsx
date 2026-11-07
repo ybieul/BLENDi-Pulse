@@ -241,7 +241,7 @@ export function RecipeCard({
         onError: (error) => {
           setOptimisticIsFavorited(false);
           setOptimisticFavoriteId(undefined);
-          showToast(t(error.translationKey as Parameters<typeof t>[0]));
+          showToast(t(error.translationKey));
         },
       });
 
@@ -264,7 +264,7 @@ export function RecipeCard({
       onError: (error) => {
         setOptimisticIsFavorited(true);
         setOptimisticFavoriteId(nextFavoriteId);
-        showToast(t(error.translationKey as Parameters<typeof t>[0]));
+        showToast(t(error.translationKey));
       },
     });
   };

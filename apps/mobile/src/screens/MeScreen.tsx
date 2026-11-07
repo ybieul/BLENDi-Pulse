@@ -781,7 +781,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         const translationKey = axios.isAxiosError(error)
           ? getAxiosErrorTranslationKey(error)
           : "errors.network_internal_server_error";
-        showToast(t(translationKey as Parameters<typeof t>[0]));
+        showToast(t(translationKey));
       } finally {
         setEditingType(null);
       }
