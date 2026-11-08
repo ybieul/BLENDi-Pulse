@@ -106,7 +106,7 @@
     "proteinPlaceholder": "Daily protein (g)",
     "caloriesPlaceholder": "Daily calories (kcal)",
     "carbTarget": "Daily carbs (g)",
-    "macroRecommendation": "For {{goal}}, we recommend {{proteinMin}}\u2013{{proteinMax}}g protein and {{caloriesMin}}\u2013{{caloriesMax}} kcal",
+    "macroRecommendation": "For {{goal}}, we recommend {{proteinMin}}\u2013{{proteinMax}}g protein, {{caloriesMin}}\u2013{{caloriesMax}} kcal, and {{carbsMin}}\u2013{{carbsMax}}g carbs",
     "finishSetup": "Finish setup"
   },
 

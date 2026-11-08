@@ -106,7 +106,7 @@
     "proteinPlaceholder": "Proteína diária (g)",
     "caloriesPlaceholder": "Calorias diárias (kcal)",
     "carbTarget": "Carboidratos diários (g)",
-    "macroRecommendation": "Para {{goal}}, recomendamos {{proteinMin}}\u2013{{proteinMax}}g de proteína e {{caloriesMin}}\u2013{{caloriesMax}} kcal",
+    "macroRecommendation": "Para {{goal}}, recomendamos {{proteinMin}}\u2013{{proteinMax}}g de proteína, {{caloriesMin}}\u2013{{caloriesMax}} kcal e {{carbsMin}}\u2013{{carbsMax}}g de carboidratos",
     "finishSetup": "Finalizar configuração"
   },
 

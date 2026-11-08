@@ -159,6 +159,20 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const carbsValid = !isNaN(carbsNum) && carbsNum >= CARBS_MIN && carbsNum <= CARBS_MAX;
   const canSubmit = proteinValid && caloriesValid && carbsValid;
 
+  // Erro inline só depois que o usuário já digitou algo — sem isso o botão
+  // "Finish setup" fica desabilitado sem nenhuma explicação visível quando o
+  // valor preenchido cai fora da faixa aceita (ex.: carboidratos, cuja faixa
+  // nem aparece no texto de recomendação acima).
+  const proteinError = proteinText.length > 0 && !proteinValid
+    ? t('errors.validation.number_range', { min: PROTEIN_MIN, max: PROTEIN_MAX })
+    : undefined;
+  const caloriesError = caloriesText.length > 0 && !caloriesValid
+    ? t('errors.validation.number_range', { min: CALORIES_MIN, max: CALORIES_MAX })
+    : undefined;
+  const carbsError = carbsText.length > 0 && !carbsValid
+    ? t('errors.validation.number_range', { min: CARBS_MIN, max: CARBS_MAX })
+    : undefined;
+
   const goalLabel = translateKey(`onboarding.goal${goal}`);
 
   // ── Actions ───────────────────────────────────────────────────────────────────
@@ -283,6 +297,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                   setFormError(null);
                 }}
                 placeholder={t('onboarding.proteinPlaceholder')}
+                error={proteinError}
                 keyboardType="number-pad"
                 returnKeyType="next"
               />
@@ -293,6 +308,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                   setFormError(null);
                 }}
                 placeholder={t('onboarding.caloriesPlaceholder')}
+                error={caloriesError}
                 keyboardType="number-pad"
                 returnKeyType="next"
               />
@@ -303,12 +319,16 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                   setFormError(null);
                 }}
                 placeholder={t('onboarding.carbTarget')}
+                error={carbsError}
                 keyboardType="number-pad"
                 returnKeyType="done"
               />
             </View>
 
-            {/* Linha informativa com ranges recomendados para o goal */}
+            {/* Linha informativa com ranges recomendados — proteína/calorias
+                variam por goal (goalConfig); carboidratos usa a faixa fixa
+                de validação (CARBS_MIN/MAX), já que não há um range por goal
+                para esse macro. */}
             <Text style={styles.recommendation}>
               {t('onboarding.macroRecommendation', {
                 goal: goalLabel,
@@ -316,6 +336,8 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                 proteinMax: goalConfig.proteinMax,
                 caloriesMin: goalConfig.caloriesMin,
                 caloriesMax: goalConfig.caloriesMax,
+                carbsMin: CARBS_MIN,
+                carbsMax: CARBS_MAX,
               })}
             </Text>
           </View>
