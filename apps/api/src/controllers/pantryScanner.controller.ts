@@ -16,6 +16,7 @@ import { BlendLogModel } from '../models/BlendLog';
 import {
   UserModel,
   type BlendiModel,
+  type DietaryPreference,
   type UserGoal,
   type UserLocale,
   type UserUnitSystem,
@@ -56,6 +57,7 @@ interface PantryScannerUserProfile {
   blendiModel: BlendiModel;
   goal: UserGoal;
   weightGoal?: WeightGoal;
+  dietaryPreferences: DietaryPreference[];
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   timezone: string;
@@ -382,6 +384,7 @@ async function findPantryScannerUserProfile(
       blendiModel: 1,
       goal: 1,
       weightGoal: 1,
+      dietaryPreferences: 1,
       locale: 1,
       unitSystem: 1,
       timezone: 1,
@@ -404,6 +407,8 @@ async function findPantryScannerUserProfile(
     blendiModel: user.blendiModel as BlendiModel,
     goal: user.goal as UserGoal,
     weightGoal: user.weightGoal as WeightGoal | undefined,
+    // .lean() não aplica o default do schema — conta antiga sem o campo = sem dieta.
+    dietaryPreferences: (user.dietaryPreferences ?? []) as DietaryPreference[],
     locale: user.locale as UserLocale,
     unitSystem: user.unitSystem as UserUnitSystem,
     timezone: user.timezone,
@@ -537,6 +542,7 @@ async function generatePantryRecipes(
     blendiModel: user.blendiModel,
     goal: user.goal,
     weightGoal: user.weightGoal,
+    dietaryPreferences: user.dietaryPreferences,
     locale: user.locale,
     language: user.locale,
     unitSystem: user.unitSystem,

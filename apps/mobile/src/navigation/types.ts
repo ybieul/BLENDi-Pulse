@@ -60,6 +60,7 @@ export type AppTabParamList = {
 export type OnboardingStackParamList = {
   OnboardingModel: undefined;
   OnboardingGoal: undefined;
+  OnboardingDiet: undefined;
   OnboardingBody: undefined;
   OnboardingMacros: undefined;
 };

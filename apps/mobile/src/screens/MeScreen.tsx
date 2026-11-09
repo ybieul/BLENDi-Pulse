@@ -53,6 +53,7 @@ import {
   fonts,
   fontWeights,
 } from "@blendi/shared";
+import type { BlendiOwnership, DietaryPreference } from "@blendi/shared";
 
 import { useColors } from "../hooks/useColors";
 import { api } from "../config/api";
@@ -77,9 +78,16 @@ import { BadgeDetailSheet } from "../components/me/BadgeDetailSheet";
 import { SettingRow } from "../components/me/SettingRow";
 import {
   EditSettingSheet,
+  type EditSettingDetails,
   type EditSettingType,
   type EditSettingValue,
 } from "../components/me/EditSettingSheet";
+import {
+  getBlenderOptionKey,
+  getModelDisplay,
+  isBlenderOptionKey,
+  resolveBlenderOption,
+} from "../utils/blenderOwnership.utils";
 import { calculateUserBadges, type UserBadge } from "../utils/badges.utils";
 import { useThemeStore, type ThemeMode } from "../store/theme.store";
 import {
@@ -222,6 +230,9 @@ interface UserProfileData {
   name: string;
   email: string;
   blendiModel: BlendiModel;
+  blendiOwnership?: BlendiOwnership;
+  otherBlenderModel?: string | null;
+  dietaryPreferences?: DietaryPreference[];
   goal: UserGoal;
   preferredLanguage: string;
   timezone: string;
@@ -301,15 +312,6 @@ interface WeeklySharePayload {
 async function fetchUserProfile(): Promise<UserProfileResponse> {
   const response = await api.get<UserProfileResponse>("/users/me");
   return response.data;
-}
-
-function getModelKey(model: BlendiModel): TranslationKey {
-  const keys: Record<BlendiModel, TranslationKey> = {
-    Lite: "onboarding.model.lite.name",
-    ProPlus: "onboarding.model.pro_plus.name",
-    Steel: "onboarding.model.steel.name",
-  };
-  return keys[model];
 }
 
 function getGoalKey(goal: UserGoal): TranslationKey {
@@ -545,6 +547,10 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const displayEmail = profile?.email ?? authUser?.email ?? "";
   const displayModel: BlendiModel =
     (profile?.blendiModel ?? authUser?.blendiModel) ?? "Lite";
+  const displayOwnership: BlendiOwnership =
+    profile?.blendiOwnership ?? authUser?.blendiOwnership ?? "blendi";
+  const displayOtherBlenderModel =
+    profile?.otherBlenderModel ?? authUser?.otherBlenderModel ?? null;
   const displayGoal: UserGoal =
     (profile?.goal ?? authUser?.goal) ?? "Muscle";
   const displayUnitSystem =
@@ -649,13 +655,15 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   }, [pendingWeeklyShare]);
 
   const languageDisplayName = t(getLanguageKey(displayLanguage));
+  const modelDisplay = getModelDisplay(displayModel, displayOwnership, displayOtherBlenderModel);
+  const modelDisplayName = t(modelDisplay.key, modelDisplay.options);
 
   // ── Settings current values ───────────────────────────────────────────────
 
   function getCurrentEditValue(type: EditSettingType): EditSettingValue {
     switch (type) {
       case "model":
-        return displayModel;
+        return getBlenderOptionKey(displayModel, displayOwnership);
       case "goal":
         return displayGoal;
       case "protein":
@@ -682,7 +690,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleConfirmEdit = useCallback(
-    async (nextValue: EditSettingValue) => {
+    async (nextValue: EditSettingValue, details?: EditSettingDetails) => {
       if (!editingType) return;
 
       // Tema é preferência 100% local — sem campo no backend (ver
@@ -694,10 +702,26 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         return;
       }
 
+      // Opção de liquidificador escolhida — modelo e posse vão sempre juntos;
+      // o texto de "outro modelo" só quando a posse é 'other' (vazio limpa).
+      const nextValueKey = String(nextValue);
+      const modelOption =
+        editingType === "model" && isBlenderOptionKey(nextValueKey)
+          ? resolveBlenderOption(nextValueKey)
+          : null;
+      const otherBlenderModelText = details?.otherBlenderModel.trim() ?? "";
+
       let body: Record<string, unknown>;
       switch (editingType) {
         case "model":
-          body = { blendiModel: nextValue };
+          if (!modelOption) return;
+          body = {
+            blendiModel: modelOption.blendiModel,
+            blendiOwnership: modelOption.blendiOwnership,
+            ...(modelOption.blendiOwnership === "other" && {
+              otherBlenderModel: otherBlenderModelText,
+            }),
+          };
           break;
         case "goal":
           body = { goal: nextValue };
@@ -733,7 +757,16 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
         switch (editingType) {
           case "model":
-            updateUserProfile({ blendiModel: nextValue as BlendiModel });
+            if (modelOption) {
+              updateUserProfile({
+                blendiModel: modelOption.blendiModel,
+                blendiOwnership: modelOption.blendiOwnership,
+                otherBlenderModel:
+                  modelOption.blendiOwnership === "other" && otherBlenderModelText.length > 0
+                    ? otherBlenderModelText
+                    : null,
+              });
+            }
             break;
           case "goal":
             updateUserProfile({ goal: nextValue as UserGoal });
@@ -1812,7 +1845,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
             <SettingRow
               label={t("profile.fields.model")}
-              value={t(getModelKey(displayModel))}
+              value={modelDisplayName}
               onPress={() => { setEditingType("model"); }}
             />
             <View style={styles.divider} />
@@ -2095,8 +2128,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         <EditSettingSheet
           type={editingType}
           currentValue={getCurrentEditValue(editingType)}
-          onConfirm={(val) => {
-            void handleConfirmEdit(val);
+          currentOtherBlenderModel={editingType === "model" ? displayOtherBlenderModel : null}
+          onConfirm={(val, details) => {
+            void handleConfirmEdit(val, details);
           }}
           onClose={() => {
             setEditingType(null);

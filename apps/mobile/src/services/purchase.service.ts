@@ -10,6 +10,7 @@ import Purchases, {
   type PurchasesPackage,
 } from 'react-native-purchases';
 
+import type { BlendiOwnership, DietaryPreference } from '@blendi/shared';
 import { api } from '../config/api';
 import { PRICING_CONFIG } from '../config/pricing.config';
 import { getRevenueCatApiKey, isRevenueCatNativePlatform } from '../config/revenuecat.config';
@@ -35,6 +36,9 @@ interface PurchaseVerifiedUser {
   lastCleanedAt?: string | null;
   pushToken?: string | null;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
+  blendiOwnership: BlendiOwnership;
+  otherBlenderModel: string | null;
+  dietaryPreferences: DietaryPreference[];
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
   unitSystem: 'metric' | 'imperial';

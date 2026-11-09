@@ -18,6 +18,7 @@ import {
 import {
   UserModel,
   type BlendiModel,
+  type DietaryPreference,
   type UserGoal,
   type UserLocale,
   type UserUnitSystem,
@@ -73,6 +74,7 @@ interface PulseAiUserProfile {
   blendiModel: BlendiModel;
   goal: UserGoal;
   weightGoal?: WeightGoal;
+  dietaryPreferences: DietaryPreference[];
   locale: UserLocale;
   unitSystem: UserUnitSystem;
   timezone: string;
@@ -233,6 +235,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
       blendiModel: 1,
       goal: 1,
       weightGoal: 1,
+      dietaryPreferences: 1,
       locale: 1,
       unitSystem: 1,
       timezone: 1,
@@ -255,6 +258,8 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     blendiModel: user.blendiModel as BlendiModel,
     goal: user.goal as UserGoal,
     weightGoal: user.weightGoal as WeightGoal | undefined,
+    // .lean() não aplica o default do schema — conta antiga sem o campo = sem dieta.
+    dietaryPreferences: (user.dietaryPreferences ?? []) as DietaryPreference[],
     locale: user.locale as UserLocale,
     unitSystem: user.unitSystem as UserUnitSystem,
     timezone: user.timezone,
@@ -533,6 +538,7 @@ async function runPulseAiChat(params: {
     aiProvider: env.AI_PROVIDER,
     aiModel: env.AI_MODEL,
     rawMessage: normalizedMessage,
+    dietaryFlags: currentUser.dietaryPreferences,
   });
 
   const cacheKeyParts = cacheKey.split(':');
@@ -593,6 +599,7 @@ async function runPulseAiChat(params: {
     blendiModel: currentUser.blendiModel,
     goal: currentUser.goal,
     weightGoal: currentUser.weightGoal,
+    dietaryPreferences: currentUser.dietaryPreferences,
     language: requestedLanguage,
     locale: currentUser.locale,
     unitSystem: currentUser.unitSystem,
@@ -694,6 +701,7 @@ async function runPulseAiChat(params: {
       aiProvider: aiResponse.provider,
       aiModel: aiResponse.model,
       rawMessage: normalizedMessage,
+      dietaryFlags: currentUser.dietaryPreferences,
       response: {
         recipe,
         aiProvider: aiResponse.provider,

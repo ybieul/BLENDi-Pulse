@@ -3,7 +3,7 @@
 //
 // O usuário escolhe entre Muscle, Wellness, Energy ou Recovery. O CTA só fica
 // habilitado após a seleção; ao confirmar, o valor é gravado no onboarding
-// store e o fluxo avança para a coleta de dados corporais.
+// store e o fluxo avança para as restrições alimentares.
 
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
@@ -24,7 +24,7 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 type OnboardingGoalScreenProps = {
   navigation: {
-    navigate: (screen: 'OnboardingBody') => void;
+    navigate: (screen: 'OnboardingDiet') => void;
   };
 };
 
@@ -136,7 +136,7 @@ export function OnboardingGoalScreen({ navigation }: OnboardingGoalScreenProps) 
         bottomContent={(
           <AuthButton
             disabled={selectedGoal === null}
-            onPress={() => { navigation.navigate('OnboardingBody'); }}
+            onPress={() => { navigation.navigate('OnboardingDiet'); }}
           >
             {t('onboarding.continue')}
           </AuthButton>

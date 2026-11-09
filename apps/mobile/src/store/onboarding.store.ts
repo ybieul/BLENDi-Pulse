@@ -6,10 +6,16 @@
 // fechado no meio do fluxo, o onboarding recomeça do zero intencionalmente.
 
 import { create } from 'zustand';
+import type { BlendiOwnership, DietaryPreference } from '@blendi/shared';
 
 interface OnboardingState {
   selectedModel: string | null;
+  /** 'other' e 'none' sempre vêm com selectedModel 'Lite'. */
+  blendiOwnership: BlendiOwnership;
+  /** Texto livre opcional — só enviado quando blendiOwnership é 'other'. */
+  otherBlenderModel: string;
   selectedGoal: string | null;
+  dietaryPreferences: DietaryPreference[];
   unitSystem: 'metric' | 'imperial' | null;
   weight: number | null;
   height: number | null;
@@ -40,8 +46,10 @@ interface SetCalculatedMacrosInput {
 }
 
 interface OnboardingActions {
-  setModel: (selectedModel: string) => void;
+  setModel: (selectedModel: string, blendiOwnership?: BlendiOwnership) => void;
+  setOtherBlenderModel: (otherBlenderModel: string) => void;
   setGoal: (selectedGoal: string) => void;
+  toggleDietaryPreference: (preference: DietaryPreference) => void;
   setUnitSystem: (unitSystem: 'metric' | 'imperial') => void;
   setBodyData: (input: SetBodyDataInput) => void;
   setCalculatedMacros: (input: SetCalculatedMacrosInput) => void;
@@ -50,7 +58,10 @@ interface OnboardingActions {
 
 const initialState: OnboardingState = {
   selectedModel: null,
+  blendiOwnership: 'blendi',
+  otherBlenderModel: '',
   selectedGoal: null,
+  dietaryPreferences: [],
   unitSystem: null,
   weight: null,
   height: null,
@@ -67,12 +78,24 @@ const initialState: OnboardingState = {
 export const useOnboardingStore = create<OnboardingState & OnboardingActions>((set) => ({
   ...initialState,
 
-  setModel: (selectedModel) => {
-    set({ selectedModel });
+  setModel: (selectedModel, blendiOwnership = 'blendi') => {
+    set({ selectedModel, blendiOwnership });
+  },
+
+  setOtherBlenderModel: (otherBlenderModel) => {
+    set({ otherBlenderModel });
   },
 
   setGoal: (selectedGoal) => {
     set({ selectedGoal });
+  },
+
+  toggleDietaryPreference: (preference) => {
+    set((state) => ({
+      dietaryPreferences: state.dietaryPreferences.includes(preference)
+        ? state.dietaryPreferences.filter((current) => current !== preference)
+        : [...state.dietaryPreferences, preference],
+    }));
   },
 
   setUnitSystem: (unitSystem) => {

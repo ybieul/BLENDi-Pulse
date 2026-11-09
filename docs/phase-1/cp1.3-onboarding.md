@@ -1,5 +1,7 @@
 # CP1.3 — Onboarding Flow
 
+> **Update (CP-1.1.1a):** the flow described below has since grown from four to **five** screens — a diet screen (`OnboardingDiet`, restrictions as multi-select) was added between Goal and Body, the model screen gained two options ("other or older model" and "no BLENDi yet") with an optional free-text field, and the model power labels were corrected to 70W / 120W / 180W. See [../fixes/cp-1.1.1a-onboarding-additions.md](../fixes/cp-1.1.1a-onboarding-additions.md). The text below documents the original four-screen checkpoint and is kept as the historical record.
+
 This checkpoint implements the four-screen onboarding flow that collects the user's BLENDi model, primary goal, body data for automatic macro calculation with BMI and the revised Harris-Benedict / Mifflin-St Jeor-style formula used by the backend, and the final editable macro targets before the app shell unlocks. Every new user, whether created through email/password registration or Google login, is routed through onboarding before reaching Home.
 
 ## Files Created

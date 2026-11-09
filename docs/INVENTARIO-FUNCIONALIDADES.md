@@ -22,6 +22,7 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 ├── autenticado + isNewUser=true → OnboardingNavigator (stack)
 │   ├── OnboardingModel
 │   ├── OnboardingGoal
+│   ├── OnboardingDiet
 │   ├── OnboardingBody
 │   └── OnboardingMacros
 └── autenticado + isNewUser=false → AppFlow + telas modais do RootStack
@@ -53,10 +54,11 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 | ForgotPassword | `screens/auth/ForgotPasswordScreen.tsx` | Pede e-mail para iniciar recuperação de senha. |
 | VerifyOtp | `screens/auth/VerifyOtpScreen.tsx` | Confirma o código de 6 dígitos enviado por e-mail. |
 | ResetPassword | `screens/auth/ResetPasswordScreen.tsx` | Define a nova senha após validar o OTP. |
-| OnboardingModel | `screens/onboarding/OnboardingModelScreen.tsx` | Passo 1/4: escolhe o modelo físico de liquidificador (Lite/ProPlus/Steel). |
-| OnboardingGoal | `screens/onboarding/OnboardingGoalScreen.tsx` | Passo 2/4: escolhe o objetivo (Muscle/Wellness/Energy/Recovery). |
-| OnboardingBody | `screens/onboarding/OnboardingBodyScreen.tsx` | Passo 3/4: peso, altura, nível de atividade; calcula macros em tempo real. |
-| OnboardingMacros | `screens/onboarding/OnboardingMacrosScreen.tsx` | Passo 4/4: confirma/ajusta as metas de proteína, carbo e caloria; finaliza o onboarding. |
+| OnboardingModel | `screens/onboarding/OnboardingModelScreen.tsx` | Passo 1/5: escolhe o liquidificador — Lite (70W), Pro+ (120W), Steel (180W), "Outro modelo ou modelo antigo" (com campo opcional de marca/modelo) ou "Ainda não tenho um BLENDi". |
+| OnboardingGoal | `screens/onboarding/OnboardingGoalScreen.tsx` | Passo 2/5: escolhe o objetivo (Muscle/Wellness/Energy/Recovery). |
+| OnboardingDiet | `screens/onboarding/OnboardingDietScreen.tsx` | Passo 3/5: restrições alimentares (múltipla escolha, pode seguir sem marcar nada). |
+| OnboardingBody | `screens/onboarding/OnboardingBodyScreen.tsx` | Passo 4/5: peso, altura, nível de atividade; calcula macros em tempo real. |
+| OnboardingMacros | `screens/onboarding/OnboardingMacrosScreen.tsx` | Passo 5/5: confirma/ajusta as metas de proteína, carbo e caloria; finaliza o onboarding. |
 | Home | `screens/HomeScreen.tsx` | Dashboard: saudação, nível, metas do dia, missões, atalhos, receita sugerida. |
 | PulseAIChat | `screens/PulseAIScreen.tsx` | Chat com IA que gera receitas de shake/smoothie. |
 | Favorites | `screens/FavoritesListScreen.tsx` | Lista de receitas favoritadas. |
@@ -82,7 +84,7 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 
 **LoginScreen** — campos e-mail/senha (toggle de visibilidade da senha); botão "Esqueci minha senha"; botão "Criar conta"; botão de login com Google. Erro 401 específico marca o campo de senha; outros erros aparecem como erro geral de formulário.
 
-**RegisterScreen** — campos nome, e-mail, senha, confirmar senha; medidor de força de senha (Weak/Fair/Good/Strong, 4 critérios: 8+ caracteres, maiúscula, dígito, 12+ caracteres); senha exige minúscula+maiúscula+dígito, 8-72 caracteres. O registro já envia valores padrão fixos de modelo/objetivo/metas (`Lite`, `Wellness`, 120g proteína, 2000kcal) — o onboarding completo (4 telas) depois sobrescreve isso. Links para Termos de Uso e Política de Privacidade. Não tem botão de login social.
+**RegisterScreen** — campos nome, e-mail, senha, confirmar senha; medidor de força de senha (Weak/Fair/Good/Strong, 4 critérios: 8+ caracteres, maiúscula, dígito, 12+ caracteres); senha exige minúscula+maiúscula+dígito, 8-72 caracteres. O registro já envia valores padrão fixos de modelo/objetivo/metas (`Lite`, `Wellness`, 120g proteína, 2000kcal) — o onboarding completo (5 telas) depois sobrescreve isso. Links para Termos de Uso e Política de Privacidade. Não tem botão de login social.
 
 **ForgotPasswordScreen** — campo e-mail; sempre avança para a próxima tela mesmo se a chamada falhar (engolindo erro de rede de propósito, para não dar pista sobre e-mails inexistentes); loading mínimo artificial de 800ms antes de navegar (anti-enumeração por tempo de resposta).
 
@@ -92,12 +94,13 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 
 **Login social (Google)** — usa `expo-web-browser` (não usa SDK nativo do Google) para abrir um navegador in-app, autoriza no Google, e o backend redireciona de volta via deep link `blendipulse://auth/callback` com os tokens. Três casos no backend: conta já vinculada → login direto; e-mail já existente sem Google → vincula a conta; e-mail novo → cria conta com valores de onboarding padrão.
 
-### Onboarding (4 telas, sem navegação manual entre elas — tudo guiado)
+### Onboarding (5 telas, sem navegação manual entre elas — tudo guiado)
 
-1. **Modelo** — Lite / ProPlus (120W) / Steel (180W), sem chamada de API.
+1. **Modelo** — 5 opções, sem chamada de API: Lite (70W), ProPlus (120W), Steel (180W), "Outro modelo ou modelo antigo" e "Ainda não tenho um BLENDi". As duas últimas não têm badge de potência, gravam o modelo como `Lite` (limites de segurança mais conservadores da Pulse AI) e guardam a **posse** (`blendiOwnership`: `blendi`/`other`/`none`) num campo separado, para uso futuro (Shop Tab). Em "Outro modelo" aparece um campo de texto opcional para marca e modelo (até 60 caracteres, ex.: "BLENDi antigo, Ninja, NutriBullet"); o botão de continuar não depende dele. O enum `blendiModel` continua com 3 valores.
 2. **Objetivo** — Muscle / Wellness / Energy / Recovery, sem chamada de API.
-3. **Corpo** — peso, altura (métrico ou imperial), data de nascimento, sexo biológico (masculino/feminino), meta de peso (perder/manter/ganhar) e nível de atividade (sedentário/levemente ativo/moderadamente ativo/muito ativo). Calcula macros em tempo real (debounce 600ms) chamando o backend; mostra IMC com classificação; tem botão "Pular por agora".
-4. **Macros** — mostra/permite ajustar proteína (10-400g), calorias (500-10000kcal) e carboidratos (50-800g) calculados no passo anterior; ao finalizar, salva tudo e marca o onboarding como concluído — o app navega automaticamente para a tela principal.
+3. **Dieta** — 4 restrições em múltipla escolha (toque marca e desmarca): sem laticínios, vegano, sem oleaginosas, sem açúcar adicionado. Dá para continuar sem marcar nada (o botão passa a dizer "Sem restrições"). Mostra um alerta discreto: são preferências, não uma garantia para alergias. A Pulse AI e o Pantry Scanner tratam cada restrição como obrigatória em toda receita (aplicada pelo prompt, sem validação de ingredientes no backend). Ainda **não** é editável no Me (CP-1.1.1b).
+4. **Corpo** — peso, altura (métrico ou imperial), data de nascimento, sexo biológico (masculino/feminino), meta de peso (perder/manter/ganhar) e nível de atividade (sedentário/levemente ativo/moderadamente ativo/muito ativo). Calcula macros em tempo real (debounce 600ms) chamando o backend; mostra IMC com classificação; tem botão "Pular por agora".
+5. **Macros** — mostra/permite ajustar proteína (10-400g), calorias (500-10000kcal) e carboidratos (50-800g) calculados no passo anterior; ao finalizar, salva tudo e marca o onboarding como concluído — o app navega automaticamente para a tela principal.
 
 A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculation.utils.ts`, chamada por `user.controller.ts`) usa Mifflin-St Jeor **com idade e sexo reais do usuário**: a idade é derivada da data de nascimento coletada na etapa de Corpo (nunca armazenada diretamente, sempre recalculada a partir de `birthDate` no momento do cálculo) e a constante da fórmula (+5 ou −161) varia pelo sexo biológico informado. Multiplicadores de atividade e ajuste de calorias/proteína variam por objetivo escolhido; o ajuste calórico (déficit/superávit) varia pela meta de peso (perder/manter/ganhar).
 
@@ -212,8 +215,10 @@ Editadas num bottom sheet único e genérico (`EditSettingSheet`) a partir da te
 | Meta de carboidrato (g/dia) | 50–800 |
 | Meta de calorias (kcal/dia) | 500–10.000 |
 | Meta de hidratação (ml) | 500–8.000 |
-| Modelo BLENDi (Lite/ProPlus/Steel) | enum fixo |
+| Modelo BLENDi — as mesmas 5 opções do onboarding (Lite/ProPlus/Steel/Outro modelo/Ainda não tenho); em "Outro modelo" há o campo opcional de marca/modelo, já preenchido com o valor salvo | enum fixo de modelo + posse (`blendi`/`other`/`none`) + texto de até 60 caracteres |
 | Objetivo (Muscle/Wellness/Energy/Recovery) | enum fixo |
+
+A linha "Meu BLENDi" do card de configurações reflete a posse: o nome do modelo para quem tem um BLENDi, "Outro modelo" (seguido do texto digitado, quando houver) ou "Ainda não tenho um BLENDi". A dieta **não** aparece nessas configurações neste momento.
 
 O app **não valida esses limites antes de enviar** — só mostra erro depois que o backend rejeita. Não existe campo de meta de gordura na UI (existe só internamente, no cálculo do onboarding).
 
@@ -277,6 +282,8 @@ Lista completa dos 6 badges existentes no código, cada um com 3 estágios (bron
 | BLENDi Pro+ | modelo atual = ProPlus | desbloqueado se o modelo escolhido hoje for ProPlus | — | — |
 | BLENDi Steel | modelo atual = Steel | desbloqueado se o modelo escolhido hoje for Steel | — | — |
 
+Nota: quem escolhe "Outro modelo" ou "Ainda não tenho um BLENDi" grava `Lite` e portanto também desbloqueia o badge "BLENDi Lite" (o badge olha o modelo gravado, não a posse).
+
 Nota: os 3 badges de modelo são mutuamente exclusivos e **somem visualmente se o usuário troca de modelo** (não existe histórico de "já tive esse modelo").
 
 ### Missões diárias
@@ -303,11 +310,12 @@ Todo dia, o sistema sorteia **3 dessas 9** de forma ponderada pelo objetivo do u
 ## TAREFA 5 — Pulse AI em detalhe
 
 - **Tipo de pedido aceito:** texto livre (até 500 caracteres), mas a resposta é **sempre uma receita estruturada** de shake/smoothie — não é um assistente de texto livre genérico.
-- **Contexto do usuário usado para personalizar:** modelo do liquidificador, objetivo, idioma, sistema de unidades, metas diárias de proteína/carboidrato/caloria, as últimas 5 receitas feitas no blender (para não repetir) e o histórico de conversa do próprio dia (até 6 trocas). **Suplementos cadastrados, streak, missões e hidratação NÃO são usados para personalizar a resposta** — o streak/XP só são atualizados *depois* como efeito colateral, nunca lidos pela IA.
+- **Contexto do usuário usado para personalizar:** modelo do liquidificador, objetivo, **restrições alimentares (dieta)**, idioma, sistema de unidades, metas diárias de proteína/carboidrato/caloria, as últimas 5 receitas feitas no blender (para não repetir) e o histórico de conversa do próprio dia (até 6 trocas). **Suplementos cadastrados, streak, missões e hidratação NÃO são usados para personalizar a resposta** — o streak/XP só são atualizados *depois* como efeito colateral, nunca lidos pela IA.
 - **Receitas completas, não só sugestões:** toda resposta vem em formato estruturado fixo com título, ingredientes com quantidade, macros calculadas (proteína/carbo/gordura/calorias), tempo de preparo e instrução de preparo. Há 3 camadas de validação automática no backend (formato, limite físico de proteína do liquidificador, e consistência das macros), que tentam corrigir a receita antes de entregá-la ao usuário.
 - **Limite por plano:** usuário grátis tem **3 mensagens por dia** no chat (reseta à meia-noite local); usuário Pro é ilimitado.
 - **Pantry Scanner:** reconhece ingredientes de despensa/geladeira por foto (usando um modelo de visão de IA) e gera exatamente 2 receitas com os ingredientes confirmados. Usuário grátis tem **3 scans por mês**; Pro é ilimitado. Um scan só é "gasto" se a foto realmente tiver ingredientes utilizáveis reconhecidos com confiança.
-- **Cache de respostas:** existe um cache de 7 dias no banco de dados, por usuário + contexto completo (modelo, objetivo, idioma, texto exato da pergunta) — mesma pergunta de outro usuário, ou com outro objetivo/modelo, não aproveita o cache. Importante: **um "cache hit" ainda consome 1 das 3 mensagens grátis do dia**, só evita chamar a IA de novo.
+- **Dieta no prompt (Pulse AI e Pantry Scanner):** com pelo menos uma restrição, o prompt ganha um bloco "obrigatório" que a mensagem do usuário não pode revogar (nem "ignore as restrições", nem "estou liberado pelo médico"), e o texto fixo do prompt deixa de sugerir ingredientes proibidos (tabela nutricional, exemplos). No Pantry Scanner, itens da foto que a dieta proíbe são tratados como indisponíveis. Quem não tem restrição recebe o mesmo prompt de antes. **A garantia é do prompt, não de uma validação:** o modelo de IA pode errar, por isso a tela de dieta avisa que não é garantia para alergias. Detalhes e medições em `docs/fixes/cp-1.1.1a-testes-pentest.md`.
+- **Cache de respostas:** existe um cache de 7 dias no banco de dados, por usuário + contexto completo (modelo, objetivo, idioma, dieta, texto exato da pergunta) — mesma pergunta de outro usuário, ou com outro objetivo/modelo, não aproveita o cache. Importante: **um "cache hit" ainda consome 1 das 3 mensagens grátis do dia**, só evita chamar a IA de novo.
 - **Favoritos:** qualquer receita gerada (chat ou scanner) pode ser favoritada; favoritos ficam salvos indefinidamente.
 - **Histórico de conversas:** agrupado por dia (uma "conversa" por dia corrido), mostra as últimas 20, sem busca por texto.
 

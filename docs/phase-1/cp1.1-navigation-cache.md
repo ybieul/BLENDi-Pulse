@@ -120,7 +120,7 @@ The persistent AI cache is defined in [apps/api/src/models/AiCache.ts](../../app
 | `goal` | string | Active user goal at request time. |
 | `language` | string | Response language used to build the AI answer. |
 | `messageHash` | string | SHA-256 of the normalized user message. |
-| `dietaryFlags` | string[] | Normalized dietary modifiers reserved for broader prompt context. |
+| `dietaryFlags` | string[] | Normalized dietary modifiers reserved for broader prompt context. Left empty by every caller until CP-1.1.1a, which fills it with the user's `dietaryPreferences` on both key generation and cache writes, so changing the diet can never return a recipe generated under the previous one (see [../fixes/cp-1.1.1a-onboarding-additions.md](../fixes/cp-1.1.1a-onboarding-additions.md)). |
 | `response` | object | Structured cached payload returned by the configured AI provider. |
 | `expiresAt` | Date | Absolute expiration timestamp used by the TTL index. |
 | `createdAt` | Date | Automatic creation timestamp. |

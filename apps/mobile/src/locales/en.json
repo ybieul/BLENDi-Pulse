@@ -60,9 +60,28 @@
     },
     "modelTitle": "Which BLENDi\ndo you have?",
     "modelSubtitle": "We'll optimize recipes for your motor power.",
-    "modelLiteDesc": "500W — perfect for smoothies and light blends",
-    "modelProDesc": "900W — handles frozen fruit and seeds with ease",
-    "modelSteelDesc": "1400W — full-power blending for any ingredient",
+    "modelLiteDesc": "70W — perfect for smoothies and light blends",
+    "modelProDesc": "120W — handles frozen fruit and seeds with ease",
+    "modelSteelDesc": "180W — full-power blending for any ingredient",
+    "modelOtherTitle": "Other or older model",
+    "modelOtherDesc": "An older BLENDi or another brand. Recipes will use safe settings that work in any portable blender.",
+    "modelNoneTitle": "No BLENDi yet",
+    "modelNoneDesc": "No problem. Recipes will use safe settings that work in any portable blender.",
+    "otherModelPlaceholder": "Brand and model (optional), e.g. older BLENDi, Ninja, NutriBullet",
+    "diet": {
+      "title": "Any dietary\nrestrictions?",
+      "subtitle": "Pulse AI will follow these in every recipe. Pick as many as you need.",
+      "dairyFree": "Dairy-free",
+      "dairyFreeDesc": "No milk, yogurt, cheese or whey",
+      "vegan": "Vegan",
+      "veganDesc": "No animal products, including honey and collagen",
+      "nutFree": "Nut-free",
+      "nutFreeDesc": "No peanuts, tree nuts or nut milks",
+      "noAddedSugar": "No added sugar",
+      "noAddedSugarDesc": "No sugar, honey or syrups. Fruit is fine",
+      "disclaimer": "These are preferences, not a guarantee for allergies. Always check the ingredients.",
+      "continueNoRestrictions": "No restrictions"
+    },
     "continue": "Continue",
     "goalMuscle": "Muscle",
     "goalMuscleDesc": "High-protein blends to fuel strength and hypertrophy",
@@ -1482,6 +1501,11 @@
   },
 
   "me": {
+    "blenderOwnership": {
+      "other": "Other model",
+      "otherWithName": "Other model · {{name}}",
+      "none": "No BLENDi yet"
+    },
     "currentStreak": "Current Streak",
     "totalBlends": "Total Blends",
     "profilePhotoTitle": "Profile photo",

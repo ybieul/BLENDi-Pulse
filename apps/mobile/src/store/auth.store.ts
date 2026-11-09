@@ -73,6 +73,9 @@ interface CurrentUserProfileResponse {
       lastCleanedAt?: string | null;
       pushToken?: string | null;
       blendiModel: AuthUser['blendiModel'];
+      blendiOwnership: NonNullable<AuthUser['blendiOwnership']>;
+      otherBlenderModel: string | null;
+      dietaryPreferences: NonNullable<AuthUser['dietaryPreferences']>;
       goal: AuthUser['goal'];
       preferredLanguage: AuthUser['locale'];
       unitSystem: AuthUser['unitSystem'];
@@ -121,6 +124,9 @@ async function fetchCurrentUserProfile(): Promise<AuthUser> {
     lastCleanedAt: user.lastCleanedAt ?? null,
     pushToken: user.pushToken ?? null,
     blendiModel: user.blendiModel,
+    blendiOwnership: user.blendiOwnership,
+    otherBlenderModel: user.otherBlenderModel,
+    dietaryPreferences: user.dietaryPreferences,
     goal: user.goal,
     locale: user.preferredLanguage,
     unitSystem: user.unitSystem,

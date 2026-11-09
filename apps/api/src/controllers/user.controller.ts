@@ -33,6 +33,7 @@ import {
   evaluateManualMacroEditWarnings,
   type MacroEditWarning,
 } from '../utils/macroCalculation.utils';
+import { resolveBlenderOwnershipUpdates } from '../utils/blenderOwnership.utils';
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 const MAX_PROFILE_PHOTO_BASE64_LENGTH = 530_000;
@@ -232,6 +233,11 @@ export async function getMe(
           hasProfilePhoto: user.hasProfilePhoto ?? false,
           profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
           blendiModel: user.blendiModel,
+          // .lean() não aplica defaults do schema — contas anteriores a estes
+          // campos não os têm gravados, por isso o fallback explícito.
+          blendiOwnership: user.blendiOwnership ?? 'blendi',
+          otherBlenderModel: user.otherBlenderModel ?? null,
+          dietaryPreferences: user.dietaryPreferences ?? [],
           goal: user.goal,
           weightGoal: user.weightGoal,
           weight: user.weight,
@@ -905,6 +911,9 @@ export async function updateMe(
 
     const {
       blendiModel,
+      blendiOwnership,
+      otherBlenderModel,
+      dietaryPreferences,
       goal,
       weightGoal,
       dailyProteinTarget,
@@ -924,7 +933,7 @@ export async function updateMe(
     } = parsed.data;
 
     const updates: Record<string, unknown> = {
-      ...(blendiModel !== undefined && { blendiModel }),
+      ...(dietaryPreferences !== undefined && { dietaryPreferences }),
       ...(goal !== undefined && { goal }),
       ...(weightGoal !== undefined && { weightGoal }),
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
@@ -964,6 +973,7 @@ export async function updateMe(
         weightGoal: 1,
         goal: 1,
         targetWeight: 1,
+        blendiOwnership: 1,
       })
       .lean();
 
@@ -975,6 +985,15 @@ export async function updateMe(
       });
       return;
     }
+
+    // blendiModel/blendiOwnership/otherBlenderModel — regras de coerência
+    // centralizadas em resolveBlenderOwnershipUpdates. blendiModel não é
+    // gatilho de recálculo de macro (ver shouldRecalculateMacroTargets).
+    const ownershipUpdates = resolveBlenderOwnershipUpdates(
+      { blendiModel, blendiOwnership, otherBlenderModel },
+      currentUser.blendiOwnership ?? 'blendi'
+    );
+    Object.assign(updates, ownershipUpdates.set);
 
     const mergedWeight = weight ?? currentUser.weight;
     const mergedHeight = height ?? currentUser.height;
@@ -1107,10 +1126,23 @@ export async function updateMe(
         ? { weight, recordedAt: new Date() }
         : null;
 
+    // Texto de "outro modelo" enviado sozinho: escrita atômica condicionada à
+    // posse ainda ser 'other' (ver blenderOwnership.utils.ts, RACE01). Se outra
+    // requisição trocou a posse no meio, o filtro não casa e o texto é
+    // descartado — o mesmo resultado de enviá-lo a uma conta que não é 'other'.
+    if (ownershipUpdates.onlyIfOwnershipIsOther) {
+      await UserModel.updateOne(
+        { _id: userId, blendiOwnership: 'other' },
+        { $set: ownershipUpdates.onlyIfOwnershipIsOther },
+        { runValidators: true }
+      );
+    }
+
     const user = await UserModel.findByIdAndUpdate(
       userId,
       {
         $set: updates,
+        ...(ownershipUpdates.unsetOtherBlenderModel && { $unset: { otherBlenderModel: 1 } }),
         ...(weightHistoryEntry && { $push: { weightHistory: weightHistoryEntry } }),
       },
       {
@@ -1137,6 +1169,9 @@ export async function updateMe(
           name: user.name,
           profilePhoto: user.profilePhoto,
           blendiModel: user.blendiModel,
+          blendiOwnership: user.blendiOwnership ?? 'blendi',
+          otherBlenderModel: user.otherBlenderModel ?? null,
+          dietaryPreferences: user.dietaryPreferences ?? [],
           goal: user.goal,
           weightGoal: user.weightGoal,
           locale: user.locale,

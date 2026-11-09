@@ -23,7 +23,7 @@ The original CP1.5 checkpoint defined the cache identity around six business fie
 3. `goal`
 4. `language`
 5. `messageHash`
-6. `dietaryFlags`
+6. `dietaryFlags` (empty until CP-1.1.1a; since then it carries the user's `dietaryPreferences`, normalized and order-independent — see [../fixes/cp-1.1.1a-onboarding-additions.md](../fixes/cp-1.1.1a-onboarding-additions.md))
 
 The `messageHash` is the SHA-256 of the normalized message after converting to lowercase, removing punctuation, collapsing whitespace, and trimming the result.
 

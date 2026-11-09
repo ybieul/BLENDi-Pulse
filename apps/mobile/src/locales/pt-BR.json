@@ -60,9 +60,28 @@
     },
     "modelTitle": "Qual BLENDi\nvocê tem?",
     "modelSubtitle": "Vamos otimizar as receitas para a potência do seu motor.",
-    "modelLiteDesc": "500W — ideal para smoothies e blends leves",
-    "modelProDesc": "900W — frutas congeladas e sementes sem esforço",
-    "modelSteelDesc": "1400W — potência total para qualquer ingrediente",
+    "modelLiteDesc": "70W — ideal para smoothies e blends leves",
+    "modelProDesc": "120W — frutas congeladas e sementes sem esforço",
+    "modelSteelDesc": "180W — potência total para qualquer ingrediente",
+    "modelOtherTitle": "Outro modelo ou modelo antigo",
+    "modelOtherDesc": "Um BLENDi antigo ou de outra marca. As receitas vão usar configurações seguras para qualquer liquidificador portátil.",
+    "modelNoneTitle": "Ainda não tenho um BLENDi",
+    "modelNoneDesc": "Sem problema. As receitas vão usar configurações seguras para qualquer liquidificador portátil.",
+    "otherModelPlaceholder": "Marca e modelo (opcional). Ex.: BLENDi antigo, Ninja, NutriBullet",
+    "diet": {
+      "title": "Alguma restrição\nalimentar?",
+      "subtitle": "A Pulse AI vai seguir isso em todas as receitas. Marque quantas precisar.",
+      "dairyFree": "Sem lactose e laticínios",
+      "dairyFreeDesc": "Sem leite, iogurte, queijo ou whey",
+      "vegan": "Vegano",
+      "veganDesc": "Sem nada de origem animal, incluindo mel e colágeno",
+      "nutFree": "Sem oleaginosas",
+      "nutFreeDesc": "Sem amendoim, castanhas ou leites vegetais de castanha",
+      "noAddedSugar": "Sem açúcar adicionado",
+      "noAddedSugarDesc": "Sem açúcar, mel ou xaropes. Fruta pode",
+      "disclaimer": "São preferências, não uma garantia para alergias. Sempre confira os ingredientes.",
+      "continueNoRestrictions": "Sem restrições"
+    },
     "continue": "Continuar",
     "goalMuscle": "Músculo",
     "goalMuscleDesc": "Blends ricos em proteína para força e hipertrofia",
@@ -1482,6 +1501,11 @@
   },
 
   "me": {
+    "blenderOwnership": {
+      "other": "Outro modelo",
+      "otherWithName": "Outro modelo · {{name}}",
+      "none": "Ainda não tenho um BLENDi"
+    },
     "currentStreak": "Streak Atual",
     "totalBlends": "Total de Blends",
     "profilePhotoTitle": "Foto de perfil",

@@ -90,6 +90,7 @@ const ROOT_LEVEL_DEEP_LINK_SCREENS = new Set(['WeeklyReport']);
 const TRACKED_SCREEN_NAMES = new Set([
   'OnboardingModel',
   'OnboardingGoal',
+  'OnboardingDiet',
   'OnboardingBody',
   'OnboardingMacros',
   'Upgrade',

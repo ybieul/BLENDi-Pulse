@@ -67,12 +67,18 @@ jest.mock('../../store/auth.store', () => ({
 }));
 
 const mockResetOnboarding = jest.fn();
+// Sobrescritas por teste (modelo/posse/dieta). Lida só quando o selector roda
+// (render), nunca na factory — por isso o prefixo "mock" basta para o hoisting.
+let mockOnboardingOverrides: Record<string, unknown> = {};
 jest.mock('../../store/onboarding.store', () => ({
   useOnboardingStore: (selector: (state: Record<string, unknown>) => unknown) =>
     // Estado inline = exatamente o resultado do fluxo "Pular por agora":
     // nenhum dado corporal, nenhuma macro pré-calculada.
     selector({
       selectedModel: 'Lite',
+      blendiOwnership: 'blendi',
+      otherBlenderModel: '',
+      dietaryPreferences: [],
       selectedGoal: 'Wellness',
       unitSystem: 'metric',
       weight: null,
@@ -84,6 +90,7 @@ jest.mock('../../store/onboarding.store', () => ({
       calculatedProtein: null,
       calculatedCalories: null,
       calculatedCarbs: null,
+      ...mockOnboardingOverrides,
       resetOnboarding: mockResetOnboarding,
     }),
 }));
@@ -97,7 +104,26 @@ function renderScreen() {
   );
 }
 
+function fillValidMacrosAndFinish(
+  utils: ReturnType<typeof renderScreen>,
+) {
+  const inputs = utils.UNSAFE_getAllByType(TextInput);
+  fireEvent.changeText(inputs[0], '150'); // protein
+  fireEvent.changeText(inputs[1], '2000'); // calories
+  fireEvent.changeText(inputs[2], '200'); // carbs
+  fireEvent.press(utils.getByRole('button', { name: 'onboarding.finishSetup' }));
+}
+
+const BASE_MACROS_PAYLOAD = {
+  goal: 'Wellness',
+  dailyProteinTarget: 150,
+  dailyCalorieTarget: 2000,
+  dailyCarbTarget: 200,
+  unitSystem: 'metric',
+};
+
 beforeEach(() => {
+  mockOnboardingOverrides = {};
   mockPatch.mockReset();
   mockUpdateUserProfile.mockReset();
   mockCompleteOnboarding.mockReset().mockResolvedValue(undefined);
@@ -146,6 +172,8 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
 
     expect(mockPatch).toHaveBeenCalledWith('/users/me', {
       blendiModel: 'Lite',
+      blendiOwnership: 'blendi',
+      dietaryPreferences: [],
       goal: 'Wellness',
       dailyProteinTarget: 150,
       dailyCalorieTarget: 2000,
@@ -180,5 +208,90 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
     expect(mockCompleteOnboarding).not.toHaveBeenCalled();
 
     jest.spyOn(axios, 'isAxiosError').mockRestore();
+  });
+});
+
+describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', () => {
+  it('"Other or older model" com texto: Lite, posse "other", texto com trim e dietas', async () => {
+    mockOnboardingOverrides = {
+      selectedModel: 'Lite',
+      blendiOwnership: 'other',
+      otherBlenderModel: '  Ninja BN401  ',
+      dietaryPreferences: ['vegan', 'nut_free'],
+    };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', {
+      ...BASE_MACROS_PAYLOAD,
+      blendiModel: 'Lite',
+      blendiOwnership: 'other',
+      otherBlenderModel: 'Ninja BN401',
+      dietaryPreferences: ['vegan', 'nut_free'],
+    });
+    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+  });
+
+  it('"Other or older model" sem texto: não envia otherBlenderModel', async () => {
+    mockOnboardingOverrides = {
+      selectedModel: 'Lite',
+      blendiOwnership: 'other',
+      otherBlenderModel: '   ',
+    };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', {
+      ...BASE_MACROS_PAYLOAD,
+      blendiModel: 'Lite',
+      blendiOwnership: 'other',
+      dietaryPreferences: [],
+    });
+    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+  });
+
+  it('"No BLENDi yet": modelo Lite, posse "none" e sem texto (mesmo com texto antigo no store)', async () => {
+    mockOnboardingOverrides = {
+      selectedModel: 'Lite',
+      blendiOwnership: 'none',
+      // Digitado antes de trocar de "Other" para "No BLENDi yet".
+      otherBlenderModel: 'NutriBullet',
+      dietaryPreferences: ['dairy_free'],
+    };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    const [, payload] = mockPatch.mock.calls[0] as [string, Record<string, unknown>];
+    expect(payload).toEqual({
+      ...BASE_MACROS_PAYLOAD,
+      blendiModel: 'Lite',
+      blendiOwnership: 'none',
+      dietaryPreferences: ['dairy_free'],
+    });
+    expect(payload).not.toHaveProperty('otherBlenderModel');
+    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+  });
+
+  it('BLENDi atual (Steel): posse "blendi" e nenhum texto de outro modelo', async () => {
+    mockOnboardingOverrides = {
+      selectedModel: 'Steel',
+      blendiOwnership: 'blendi',
+      otherBlenderModel: 'Ninja',
+      dietaryPreferences: ['no_added_sugar'],
+    };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', {
+      ...BASE_MACROS_PAYLOAD,
+      blendiModel: 'Steel',
+      blendiOwnership: 'blendi',
+      dietaryPreferences: ['no_added_sugar'],
+    });
+    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
   });
 });

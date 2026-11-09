@@ -9,6 +9,8 @@
 
 import type {
   AppleSignInInput,
+  BlendiOwnership,
+  DietaryPreference,
   ForgotPasswordInput,
   RegisterInput,
   LoginInput,
@@ -30,6 +32,13 @@ export interface AuthUser {
   lastCleanedAt?: string | null;
   pushToken?: string | null;
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
+  /**
+   * Opcionais: um usuário salvo localmente antes destes campos existirem não
+   * os tem até a próxima hidratação via GET /users/me. Ausente = 'blendi' / [].
+   */
+  blendiOwnership?: BlendiOwnership;
+  otherBlenderModel?: string | null;
+  dietaryPreferences?: DietaryPreference[];
   goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
   locale: 'en' | 'pt-BR';
   unitSystem: 'metric' | 'imperial';

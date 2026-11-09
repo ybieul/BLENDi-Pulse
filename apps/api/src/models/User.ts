@@ -24,6 +24,7 @@ import {
   DAILY_PROTEIN_TARGET_VALIDATION_MIN,
   MAX_PLAUSIBLE_AGE_YEARS,
   MIN_PLAUSIBLE_AGE_YEARS,
+  OTHER_BLENDER_MODEL_MAX_LENGTH,
 } from '@blendi/shared';
 
 // Reaproveitada pelo validador de idade plausível de `birthDate` (abaixo) —
@@ -36,6 +37,8 @@ import { calculateAge } from '../utils/macroCalculation.utils';
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
+export type BlendiOwnership = 'blendi' | 'other' | 'none';
+export type DietaryPreference = 'dairy_free' | 'vegan' | 'nut_free' | 'no_added_sugar';
 export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 export type BiologicalSex = 'male' | 'female';
 export type WeightGoal = 'lose' | 'maintain' | 'gain';
@@ -127,6 +130,19 @@ export interface IUser {
   profilePhotoUpdatedAt?: Date;
   name: string;
   blendiModel: BlendiModel;
+  /**
+   * Posse de liquidificador. 'other'/'none' sempre gravam blendiModel 'Lite'
+   * (limites mais conservadores), garantido em updateMe. Default 'blendi':
+   * contas anteriores a este campo leem 'blendi' sem migração.
+   */
+  blendiOwnership: BlendiOwnership;
+  /**
+   * Marca/modelo digitado pelo usuário quando blendiOwnership é 'other'.
+   * Texto livre: nunca entra no prompt da IA, em analytics nem em log.
+   */
+  otherBlenderModel?: string;
+  /** Restrições alimentares aplicadas pelo prompt da Pulse AI/Pantry Scanner. */
+  dietaryPreferences: DietaryPreference[];
   goal: UserGoal;
   /**
    * Objetivo de peso corporal (perder/manter/ganhar) — independente de
@@ -282,6 +298,15 @@ const supplementTimingValues = [
 ] as const satisfies readonly SupplementTiming[];
 
 const userSubscriptionPlanValues = ['monthly', 'annual'] as const satisfies readonly UserSubscriptionPlan[];
+
+const blendiOwnershipValues = ['blendi', 'other', 'none'] as const satisfies readonly BlendiOwnership[];
+
+const dietaryPreferenceValues = [
+  'dairy_free',
+  'vegan',
+  'nut_free',
+  'no_added_sugar',
+] as const satisfies readonly DietaryPreference[];
 
 const userSupplementSchema = new mongoose.Schema<IUserSupplement>(
   {
@@ -511,6 +536,27 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: String,
       enum: ['Lite', 'ProPlus', 'Steel'] satisfies BlendiModel[],
       required: [true, 'errors.validation.required'],
+    },
+    blendiOwnership: {
+      type: String,
+      enum: blendiOwnershipValues,
+      default: 'blendi',
+    },
+    otherBlenderModel: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: [OTHER_BLENDER_MODEL_MAX_LENGTH, 'errors.validation.too_long'],
+    },
+    dietaryPreferences: {
+      type: [{ type: String, enum: dietaryPreferenceValues }],
+      default: [],
+      // O Zod (updateUserSchema) já remove duplicados; aqui só garante que um
+      // caminho que não passe por ele nunca grave lista com repetição.
+      validate: {
+        validator: (values: string[]) => new Set(values).size === values.length,
+        message: 'errors.validation.invalid_option',
+      },
     },
     goal: {
       type: String,

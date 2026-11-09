@@ -19,6 +19,7 @@ import {
   fontSizes,
   fonts,
   fontWeights,
+  OTHER_BLENDER_MODEL_MAX_LENGTH,
   spacing,
   type Colors,
 } from '@blendi/shared';
@@ -29,6 +30,7 @@ import { AuthButton } from '../ui/AuthButton';
 import { AuthInput } from '../ui/AuthInput';
 import { SelectionCard } from '../ui/SelectionCard';
 import type { TranslationKey } from '../../locales/i18n';
+import { BLENDER_OPTIONS } from '../../utils/blenderOwnership.utils';
 
 const SHEET_RADIUS = 24;
 const SUBTITLE_OPACITY = 0.7;
@@ -48,6 +50,11 @@ export type EditSettingType =
 
 export type EditSettingValue = string | number;
 
+/** Dados extras do tipo 'model' — o texto livre de "outro modelo". */
+export interface EditSettingDetails {
+  otherBlenderModel: string;
+}
+
 interface ToggleOption {
   value: string;
   label: string;
@@ -55,8 +62,11 @@ interface ToggleOption {
 
 interface EditSettingSheetProps {
   type: EditSettingType;
+  /** Em 'model', é a chave da opção: 'Lite' | 'ProPlus' | 'Steel' | 'other' | 'none'. */
   currentValue: EditSettingValue;
-  onConfirm: (nextValue: EditSettingValue) => void;
+  /** Só para 'model': marca/modelo já salvo, para pré-preencher o campo de "outro modelo". */
+  currentOtherBlenderModel?: string | null;
+  onConfirm: (nextValue: EditSettingValue, details?: EditSettingDetails) => void;
   onClose: () => void;
 }
 
@@ -74,24 +84,6 @@ const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
   language: 'me.edit.languageTitle',
   theme: 'me.edit.themeTitle',
 };
-
-const MODEL_OPTIONS = [
-  {
-    value: 'Lite',
-    titleKey: 'onboarding.model.lite.name' as TranslationKey,
-    descriptionKey: 'onboarding.modelLiteDesc' as TranslationKey,
-  },
-  {
-    value: 'ProPlus',
-    titleKey: 'onboarding.model.pro_plus.name' as TranslationKey,
-    descriptionKey: 'onboarding.modelProDesc' as TranslationKey,
-  },
-  {
-    value: 'Steel',
-    titleKey: 'onboarding.model.steel.name' as TranslationKey,
-    descriptionKey: 'onboarding.modelSteelDesc' as TranslationKey,
-  },
-] as const;
 
 // Nomes de ícone apenas — o elemento <Ionicons> é construído em
 // renderSelectionContent(), onde `colors` (reativo ao tema) está em escopo.
@@ -195,6 +187,7 @@ function ToggleButton({
 export function EditSettingSheet({
   type,
   currentValue,
+  currentOtherBlenderModel,
   onConfirm,
   onClose,
 }: EditSettingSheetProps) {
@@ -208,9 +201,15 @@ export function EditSettingSheet({
 
   const [selectedValue, setSelectedValue] = useState(String(currentValue));
 
+  const [otherBlenderModelText, setOtherBlenderModelText] = useState(currentOtherBlenderModel ?? '');
+
   useEffect(() => {
     setSelectedValue(String(currentValue));
   }, [currentValue, type]);
+
+  useEffect(() => {
+    setOtherBlenderModelText(currentOtherBlenderModel ?? '');
+  }, [currentOtherBlenderModel, type]);
 
   useEffect(() => {
     translateY.setValue(height);
@@ -301,7 +300,11 @@ export function EditSettingSheet({
       return;
     }
 
-    onConfirm(confirmValue);
+    if (type === 'model') {
+      onConfirm(confirmValue, { otherBlenderModel: otherBlenderModelText.trim() });
+    } else {
+      onConfirm(confirmValue);
+    }
     closeSheet();
   };
 
@@ -309,15 +312,27 @@ export function EditSettingSheet({
     if (type === 'model') {
       return (
         <View style={styles.cardList}>
-          {MODEL_OPTIONS.map(option => (
+          {BLENDER_OPTIONS.map(option => (
             <SelectionCard
-              key={option.value}
-              onPress={() => { setSelectedValue(option.value); }}
-              selected={selectedValue === option.value}
-              subtitle={t(option.descriptionKey)}
+              key={option.key}
+              badge={option.badge}
+              onPress={() => { setSelectedValue(option.key); }}
+              selected={selectedValue === option.key}
+              subtitle={t(option.descKey)}
               title={t(option.titleKey)}
             />
           ))}
+          {selectedValue === 'other' ? (
+            <AuthInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={OTHER_BLENDER_MODEL_MAX_LENGTH}
+              onChangeText={setOtherBlenderModelText}
+              placeholder={t('onboarding.otherModelPlaceholder')}
+              returnKeyType="done"
+              value={otherBlenderModelText}
+            />
+          ) : null}
         </View>
       );
     }

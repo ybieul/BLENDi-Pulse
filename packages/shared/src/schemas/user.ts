@@ -32,6 +32,37 @@ const activityLevelValues = [
 ] as const;
 const weightTargetEtaUnavailableReasonValues = ['weightGoal_is_maintain', 'contradictory_direction'] as const;
 
+// Posse de liquidificador (Onboarding Additions). 'blendi' = tem um BLENDi
+// atual (Lite/Pro+/Steel); 'other' = modelo antigo ou outra marca; 'none' =
+// ainda não tem. Nos dois últimos o blendiModel gravado é sempre 'Lite' (os
+// limites mais conservadores de BLENDER_LIMITS) — a regra é aplicada no
+// backend (resolveBlenderOwnershipUpdates, apps/api), não só no app.
+export const BLENDI_OWNERSHIP_VALUES = ['blendi', 'other', 'none'] as const;
+export type BlendiOwnership = (typeof BLENDI_OWNERSHIP_VALUES)[number];
+
+// Texto livre digitado pelo usuário (marca/modelo do liquidificador). Nunca
+// entra no prompt da IA, em evento de analytics nem em log.
+export const OTHER_BLENDER_MODEL_MAX_LENGTH = 60;
+
+// Caracteres de controle (\p{Cc}: NUL, quebra de linha, tab...) e de controle
+// bidirecional (U+202A-202E, U+2066-2069 — o "RTL override" inverte a ordem
+// visual do texto) viram espaço. O campo é de uma linha só e vai ser lido por
+// listas/exports futuros (Shop Tab); em vez de rejeitar com 400 (o usuário não
+// teria como entender o motivo ao colar um texto com tab), saneia. Achado X01
+// do pentest do CP-1.1.1a. ZWJ/ZWNJ ficam de fora de propósito: fazem parte de
+// emojis compostos.
+const UNSAFE_TEXT_CHARS_PATTERN = /[\p{Cc}\u202A-\u202E\u2066-\u2069]+/gu;
+
+// Teto de itens enviados em dietaryPreferences. Há só 4 valores válidos; o
+// teto deixa margem para duplicados (que são aceitos e removidos) mas corta
+// payloads gigantes ANTES da validação item a item — sem ele, 4000 itens
+// inválidos geravam 4000 issues (resposta ~20x maior que o pedido, achado D03).
+export const DIETARY_PREFERENCES_MAX_ITEMS = 16;
+
+// Restrições alimentares aplicadas pelo prompt da Pulse AI e do Pantry Scanner.
+export const DIETARY_PREFERENCE_VALUES = ['dairy_free', 'vegan', 'nut_free', 'no_added_sugar'] as const;
+export type DietaryPreference = (typeof DIETARY_PREFERENCE_VALUES)[number];
+
 // Limites do CLAMP automático de dailyProteinTarget (calculateMacroTargets,
 // apps/api/src/utils/macroCalculation.utils.ts) — 10-400, decisão do CP-A.1,
 // INTOCADA pelo CP-A.2.2. Deliberadamente DESACOPLADO (desde o CP-A.2.2) do
@@ -163,6 +194,36 @@ export const updateUserSchema = z
       required_error: 'errors.validation.required',
       message: 'errors.validation.invalid_option',
     }),
+
+    blendiOwnership: z.enum(BLENDI_OWNERSHIP_VALUES, {
+      required_error: 'errors.validation.required',
+      message: 'errors.validation.invalid_option',
+    }),
+
+    // String vazia é aceita e significa "limpar" (ver resolveBlenderOwnershipUpdates).
+    otherBlenderModel: z
+      .string({
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.invalid_option',
+      })
+      .transform(value => value.replace(UNSAFE_TEXT_CHARS_PATTERN, ' '))
+      .pipe(z.string().trim().max(OTHER_BLENDER_MODEL_MAX_LENGTH, 'errors.validation.too_long')),
+
+    // Lista vazia é válida (sem restrições). Duplicados são removidos aqui,
+    // mantendo a ordem da primeira ocorrência.
+    dietaryPreferences: z
+      .array(z.unknown(), {
+        required_error: 'errors.validation.required',
+        invalid_type_error: 'errors.validation.invalid_option',
+      })
+      .max(DIETARY_PREFERENCES_MAX_ITEMS, 'errors.validation.invalid_option')
+      // .pipe só roda o schema seguinte se o anterior passou — é o que impede
+      // a explosão de issues quando o array estoura o teto acima.
+      .pipe(
+        z
+          .array(z.enum(DIETARY_PREFERENCE_VALUES, { message: 'errors.validation.invalid_option' }))
+          .transform(values => [...new Set(values)])
+      ),
 
     goal: z.enum(userGoalValues, {
       required_error: 'errors.validation.required',

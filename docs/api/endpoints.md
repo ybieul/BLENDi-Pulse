@@ -62,6 +62,9 @@ Creates a new user account and returns the initial session tokens.
       "email": "string",
       "name": "string",
       "blendiModel": "Lite | ProPlus | Steel",
+      "blendiOwnership": "blendi | other | none",
+      "otherBlenderModel": null,
+      "dietaryPreferences": [],
       "goal": "Muscle | Wellness | Energy | Recovery",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
@@ -78,6 +81,8 @@ Creates a new user account and returns the initial session tokens.
   }
 }
 ```
+
+`blendiOwnership`, `otherBlenderModel` and `dietaryPreferences` are **not** accepted at registration (the Zod schema strips them) — a new account always starts as `blendiOwnership: "blendi"`, `otherBlenderModel: null`, `dietaryPreferences: []`, and the real values are collected by the onboarding and saved through `PATCH /users/me`. They are returned here (and in every other endpoint that returns the full user, see `GET /users/me`) so the client never has to guess their defaults.
 
 `dailyFatTarget` is derived automatically from `dailyCalorieTarget` (30% of calories, converted to grams) at account creation — it is never part of the request body. The body-composition profile fields collected later in the onboarding flow (`weightGoal`, `activityLevel`, `targetWeight`, `birthDate`, `biologicalSex`) are **not** part of registration: they are not accepted in this request body and are not present in this response. The account is created with internal placeholder defaults for them, which are overwritten by the first real `PATCH /users/me` that completes the onboarding body step (see `completingBodyOnboarding` under `PATCH /users/me` below).
 
@@ -116,6 +121,9 @@ Authenticates an existing user and returns a fresh access token and refresh toke
       "email": "string",
       "name": "string",
       "blendiModel": "Lite | ProPlus | Steel",
+      "blendiOwnership": "blendi | other | none",
+      "otherBlenderModel": null,
+      "dietaryPreferences": [],
       "goal": "Muscle | Wellness | Energy | Recovery",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
@@ -244,6 +252,9 @@ The `user` parameter is a Base64-encoded JSON payload containing:
 | `name` | string |
 | `profilePhoto` | string or undefined |
 | `blendiModel` | string |
+| `blendiOwnership` | `blendi`, `other` or `none` |
+| `otherBlenderModel` | string or null |
+| `dietaryPreferences` | array of strings (possibly empty) |
 | `goal` | string |
 | `locale` | string |
 | `timezone` | string |
@@ -406,6 +417,9 @@ None.
       "hasProfilePhoto": true,
       "profilePhotoUpdatedAt": "2026-05-20T08:15:00.000Z",
       "blendiModel": "Lite | ProPlus | Steel",
+      "blendiOwnership": "blendi | other | none",
+      "otherBlenderModel": "Ninja BN401",
+      "dietaryPreferences": ["vegan", "nut_free"],
       "goal": "Muscle | Wellness | Energy | Recovery",
       "weightGoal": "lose | maintain | gain",
       "weight": 78,
@@ -455,6 +469,8 @@ None.
 }
 ```
 
+`blendiOwnership` (`blendi`, `other` or `none`), `otherBlenderModel` (free text the user typed for an older/other blender, `null` unless `blendiOwnership` is `other`) and `dietaryPreferences` (zero or more of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`) were added by CP-1.1.1a (Onboarding Additions). Accounts created before that CP have none of the three stored; the API reads them as `"blendi"`, `null` and `[]` — no migration. The same three fields are returned by `POST /auth/register`, `POST /auth/login`, `GET /auth/google/callback`, `POST /auth/apple`, `PATCH /users/me` and `POST /purchases/verify`; the mobile client replaces its whole cached user with the purchase response, so a missing field there would silently reset it.
+
 The current implementation also returns compatibility aliases `streakDays` and `totalBlends` with the same numeric values as `currentStreak` and `blendCount`.
 
 `hasProfilePhoto`/`profilePhotoUpdatedAt`, `weightGoal`/`weight`/`height`/`targetWeight`/`activityLevel`/`birthDate`/`biologicalSex` (onboarding body profile), `hasRealBodyProfile` (set once the onboarding body step has really been completed via `PATCH /users/me` with `completingBodyOnboarding: true`, see below), `pushToken`, `notificationPreferences`, `dailyPulseTime`, `dailyFatTarget`, the four `subscription*` fields plus `revenueCatCustomerId` (all `null` for a non-subscriber), `totalXP`, `lastLevelUp`, `currentLevel`, and `levelProgress` (a fraction between 0 and 1 toward the next level) are all real fields of this response that were missing from this document before — confirmed directly against `getMe` (`apps/api/src/controllers/user.controller.ts`).
@@ -480,7 +496,10 @@ All fields are optional. The endpoint only updates fields that are present in th
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `blendiModel` | string | No | One of `Lite`, `ProPlus`, `Steel` |
+| `blendiModel` | string | No | One of `Lite`, `ProPlus`, `Steel`. Sent **without** `blendiOwnership` it means "I have a real BLENDi" — see *Blender ownership rules* below |
+| `blendiOwnership` | string | No | One of `blendi`, `other` (older model or another brand), `none` (no BLENDi yet) — see *Blender ownership rules* below |
+| `otherBlenderModel` | string | No | Free text with brand/model for `blendiOwnership: "other"`. Control characters (including line breaks and bidi overrides) are replaced by a space, then the text is trimmed; at most 60 characters after trimming (`errors.validation.too_long`); an empty/blank string clears the field. Never sent to the AI, to analytics or to logs |
+| `dietaryPreferences` | string[] | No | At most 16 items, each one of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`; duplicates are removed (order of first occurrence is kept); `[]` means "no restrictions". Unknown value, wrong type or more than 16 items → `400` with a single `errors.validation.invalid_option` issue. Applied by the Pulse AI and Pantry Scanner prompts (see those endpoints) |
 | `goal` | string | No | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
 | `weightGoal` | string | No | One of `lose`, `maintain`, `gain` — weight direction goal, independent of `goal`; triggers an automatic recalculation of `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` (see below) |
 | `dailyProteinTarget` | number | No | Integer between 10 and 800 |
@@ -500,6 +519,22 @@ All fields are optional. The endpoint only updates fields that are present in th
 
 When the body includes `weight`, `height`, `activityLevel`, `weightGoal`, `birthDate`, `biologicalSex`, or `goal`, and the user's profile has all of weight/height/birthDate/biologicalSex/activityLevel/weightGoal/goal available (merging this request's values with whatever is already saved), the backend recalculates `dailyProteinTarget`, `dailyCalorieTarget`, `dailyCarbTarget`, and `dailyFatTarget` from scratch (same Mifflin-St Jeor formula as `POST /users/calculate-macros`) and that recalculated value **overrides** any `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` sent in the same request body.
 
+#### Blender ownership rules
+
+Enforced by the backend (`apps/api/src/utils/blenderOwnership.utils.ts`), never trusting the app to send a consistent payload. The two new ownership options store `blendiModel: "Lite"` — the enum is **not** extended and `BLENDER_LIMITS` (volume/protein caps used by the AI guardrail) is unchanged, so an `other`/`none` user always gets the most conservative limits.
+
+| Request | Stored result |
+|---|---|
+| `blendiOwnership: "other"` or `"none"`, any `blendiModel` | `blendiModel` is always `"Lite"` (a `Steel` sent in the same PATCH is overridden) |
+| `blendiOwnership: "blendi"` or `"none"` | `otherBlenderModel` is cleared, even if text was sent |
+| `blendiOwnership: "other"` + `otherBlenderModel: "Ninja"` | text trimmed and saved; `"other"` without text keeps the saved text; blank text clears it |
+| `blendiModel` without `blendiOwnership` | the user picked a real BLENDi: `blendiOwnership` becomes `"blendi"` and `otherBlenderModel` is cleared |
+| `otherBlenderModel` alone | saved only if the account is currently `"other"`, silently ignored otherwise |
+
+The "text alone" write is a conditional update (`{ blendiOwnership: "other" }` in the filter) so a concurrent PATCH that switches the ownership can never leave orphan text behind — found by the CP-1.1.1a pentest and covered by an exhaustive interleaving test. `blendiModel` is **not** a macro-recalculation trigger.
+
+Changing the diet or the model does not touch `AiCache` entries by itself: the diet is part of the cache key, so a different diet simply misses the old entries (the Me screen additionally calls `DELETE /pulse-ai/cache` after a model change).
+
 **Success response**
 
 **Status:** `200 OK`
@@ -514,6 +549,9 @@ When the body includes `weight`, `height`, `activityLevel`, `weightGoal`, `birth
       "name": "string",
       "profilePhoto": "https://cdn.example.com/avatar.png",
       "blendiModel": "Lite | ProPlus | Steel",
+      "blendiOwnership": "blendi | other | none",
+      "otherBlenderModel": null,
+      "dietaryPreferences": [],
       "goal": "Muscle | Wellness | Energy | Recovery",
       "weightGoal": "lose | maintain | gain",
       "locale": "en | pt-BR",
@@ -1725,10 +1763,10 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 1. Validates the request body against `pulseAiChatSchema`.
 2. Loads the authenticated user's Pulse AI profile and resets daily usage if the user's local day has changed.
 3. Reserves usage atomically for non-Pro users with `findOneAndUpdate` and `dailyAiUsage: { $lt: 3 }`.
-4. Normalizes the message, generates a MongoDB cache key using user context plus `AI_PROVIDER` and `AI_MODEL`, and checks the `AiCache` collection.
+4. Normalizes the message, generates a MongoDB cache key using user context (including the user's `dietaryPreferences`, normalized and order-independent) plus `AI_PROVIDER` and `AI_MODEL`, and checks the `AiCache` collection. Because the diet is part of the key, changing it never returns a recipe generated under the previous diet, and returning to the same diet reuses the original entry.
 5. On a cache hit, returns the cached recipe immediately with `fromCache: true` and the remaining daily quota.
 6. On a cache miss, fetches the last 5 blend recipe names for prompt context.
-7. Builds the final prompt through `promptBuilder.service`, personalizing it with the user's `blendiModel` (physical blender guardrails — power/protein limits per model), `goal` (Muscle/Wellness/Energy/Recovery), and `weightGoal` (lose/maintain/gain — adds explicit calorie/recipe bias guidance for the chosen weight direction) in addition to macro targets, unit system, and recent blend history.
+7. Builds the final prompt through `promptBuilder.service`, personalizing it with the user's `blendiModel` (physical blender guardrails — power/protein limits per model), `goal` (Muscle/Wellness/Energy/Recovery), `weightGoal` (lose/maintain/gain — adds explicit calorie/recipe bias guidance for the chosen weight direction) and `dietaryPreferences` (see *Dietary restrictions in the prompt* below) in addition to macro targets, unit system, and recent blend history. The free-text `otherBlenderModel` is never read by this endpoint.
 8. Calls the configured AI provider abstraction, which is selected at runtime through `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`.
 9. Parses the returned JSON and validates it against `pulseAiRecipeSchema`; if the first response is invalid JSON, the backend retries once with a strict JSON-only instruction.
 10. Persists the validated recipe in MongoDB cache and returns it with `fromCache: false` and `usageRemaining`.
@@ -1779,6 +1817,18 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 `xpAwarded` is the multi-occurrence Pulse AI usage XP. It is returned for both cache hits and fresh generations after a successful request.
 
 `conversationId` is the `_id` of the `Conversation` document the message was saved to. `macrosValidated` indicates whether the recipe's declared macros passed mathematical validation against its ingredients — it is `false` when the discrepancy exceeds 15% even after the automatic retry. A `macrosValidated: false` response does not block the recipe from being returned; it is only an indicator of reduced accuracy.
+
+#### Dietary restrictions in the prompt
+
+When the user has at least one of `dairy_free`, `vegan`, `nut_free` or `no_added_sugar`, the system prompt gets a **"Dietary restrictions (mandatory)"** block (English, like the rest of the prompt) placed after the weight-goal guidance and before the physical blender guardrails, which stay last. An account with no preference (or an old account without the field) gets a byte-identical prompt to before. The block:
+
+- treats every restriction as a hard requirement and states that it takes priority over any ingredient mentioned elsewhere in the prompt;
+- states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`);
+- lists per-diet rules: `nut_free` (no peanuts or tree nuts nor derivatives; listed first because it is usually an allergy), `vegan` (no animal-origin ingredient; protein powder must be plant-based), `dairy_free`, `no_added_sugar` (natural fruit sugar is allowed).
+
+With a diet active, the fixed parts of the prompt also stop *suggesting* ingredients that violate it: the nutrition reference table omits them (a new table entry must be classified in `NUTRITION_ENTRY_RESTRICTIONS`, enforced by a test), the unit example uses `water` instead of `almond milk`, the `gain` guidance and the Lite/Steel hardware hints drop the conflicting examples. This was needed because the pentest showed the explicit priority clause alone still let `Unsweetened almond milk` through for `nut_free` users (2 of 12 generations) — the prompt itself was offering it.
+
+The diet is enforced **by the prompt only**: there is no ingredient validation on the backend, so compliance is probabilistic (see `docs/fixes/cp-1.1.1a-testes-pentest.md` for measured numbers and residual risk). The diet is not editable in the Me screen yet (CP-1.1.1b).
 
 `steps` is an optional array of structured preparation steps (`text`, and `pulseCount` when the step involves adding ice or frozen fruit) requested from the AI alongside `blendInstruction`; it may be absent on recipes generated before this field existed.
 
@@ -1886,7 +1936,9 @@ Analyzes a pantry image, filters low-confidence ingredients, and generates up to
 5. Calls `callVisionAi` with the pantry-analysis prompt built by `pantryPromptBuilder.service.ts`.
 6. Parses and validates the returned JSON; if `noFoodDetected: true`, returns `200 OK` with empty arrays and does not increment the scanner.
 7. Filters the detected ingredients to confidence levels `high` and `medium`; if the filtered array becomes empty, returns `200 OK` with `noUsableIngredients: true` and does not increment the scanner.
-8. Only after valid ingredients are confirmed, increments `scanCount` atomically with `$inc`, then generates recipes through `promptBuilder.service.ts` and returns the Pantry Scanner XP payload.
+8. Only after valid ingredients are confirmed, increments `scanCount` atomically with `$inc`, then generates recipes through `promptBuilder.service.ts` (the same internal prompt function as Pulse AI, so the user's `dietaryPreferences` produce the same "Dietary restrictions (mandatory)" block — see `POST /pulse-ai/chat`) and returns the Pantry Scanner XP payload.
+
+With a diet active, ingredients detected in the photo that violate it are treated by the prompt as unavailable (the recipes are built from the compliant remaining ones, and the list is empty only when fewer than 2 distinct compliant recipes are possible), and ingredient names are declared to be data, never instructions. The backend does not filter ingredients by name.
 
 **Success response**
 
@@ -2536,6 +2588,9 @@ Resynchronizes the authenticated user's subscription state from RevenueCat and s
       "name": "string",
       "profilePhoto": "https://cdn.example.com/avatar.png",
       "blendiModel": "Lite | ProPlus | Steel",
+      "blendiOwnership": "blendi | other | none",
+      "otherBlenderModel": null,
+      "dietaryPreferences": [],
       "goal": "Muscle | Wellness | Energy | Recovery",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",

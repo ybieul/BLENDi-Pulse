@@ -1,5 +1,5 @@
 // apps/mobile/src/screens/onboarding/OnboardingMacrosScreen.tsx
-// Passo 4 (final) do fluxo de onboarding: confirmação das metas de macros.
+// Passo 5 (final) do fluxo de onboarding: confirmação das metas de macros.
 //
 // Campos pré-preenchidos com os valores calculados na etapa anterior (se o
 // usuário não pulou o cálculo). O usuário pode ajustar antes de confirmar.
@@ -99,7 +99,10 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   };
 
   const selectedModel    = useOnboardingStore((state) => state.selectedModel);
+  const blendiOwnership  = useOnboardingStore((state) => state.blendiOwnership);
+  const otherBlenderModel = useOnboardingStore((state) => state.otherBlenderModel);
   const selectedGoal     = useOnboardingStore((state) => state.selectedGoal);
+  const dietaryPreferences = useOnboardingStore((state) => state.dietaryPreferences);
   const unitSystem       = useOnboardingStore((state) => state.unitSystem);
   const weight           = useOnboardingStore((state) => state.weight);
   const height           = useOnboardingStore((state) => state.height);
@@ -184,8 +187,17 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
     setIsSubmitting(true);
 
     try {
+      // Texto de marca/modelo só vai quando a posse é 'other' e há algo
+      // digitado — nunca vai para analytics nem log, só para o perfil.
+      const trimmedOtherBlenderModel = otherBlenderModel.trim();
+
       const payload: Record<string, unknown> = {
         blendiModel,
+        blendiOwnership,
+        ...(blendiOwnership === 'other' && trimmedOtherBlenderModel.length > 0 && {
+          otherBlenderModel: trimmedOtherBlenderModel,
+        }),
+        dietaryPreferences,
         goal,
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,
@@ -213,6 +225,12 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
       useAuthStore.getState().updateUserProfile({
         blendiModel,
+        blendiOwnership,
+        otherBlenderModel:
+          blendiOwnership === 'other' && trimmedOtherBlenderModel.length > 0
+            ? trimmedOtherBlenderModel
+            : null,
+        dietaryPreferences,
         goal,
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,
@@ -283,7 +301,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
       <OnboardingLayout
-        step={4}
+        step={5}
         topContent={(
           <View style={styles.topContent}>
             <Text style={styles.title}>{t('onboarding.macrosTitle')}</Text>

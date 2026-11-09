@@ -1,5 +1,5 @@
 // apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx
-// Passo 3 do fluxo de onboarding: coleta de dados corporais e cálculo de macros.
+// Passo 4 do fluxo de onboarding: coleta de dados corporais e cálculo de macros.
 //
 // Dois inputs numéricos (peso kg / altura cm) disparam POST /users/calculate-macros
 // com debounce de 600ms. O IMC e a classificação são exibidos em tempo real.
@@ -442,7 +442,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   return (
     <Animated.View style={[styles.container, { opacity, transform: [{ translateY }] }]}>
       <OnboardingLayout
-        step={3}
+        step={4}
         topContent={(
           <View style={styles.topContent}>
             <Text style={styles.title}>{t('onboarding.bodyTitle')}</Text>

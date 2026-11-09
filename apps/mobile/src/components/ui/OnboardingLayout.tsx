@@ -17,7 +17,7 @@ import { useColors } from '../../hooks/useColors';
 import { AuroraBackground } from './AuroraBackground';
 import { AuthProgressDots } from './AuthProgressDots';
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 const FOOTER_HORIZONTAL_PADDING = spacing['3xl'];
 const FOOTER_VERTICAL_PADDING = spacing['5xl'];
 const TOP_HORIZONTAL_PADDING = spacing['3xl'];
@@ -45,7 +45,7 @@ type OnboardingLayoutNavigation = {
 };
 
 export interface OnboardingLayoutProps {
-  step: 1 | 2 | 3 | 4;
+  step: 1 | 2 | 3 | 4 | 5;
   topContent: ReactNode;
   bottomContent: ReactNode;
   onBack?: () => void;
