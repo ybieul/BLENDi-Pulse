@@ -71,7 +71,7 @@
     "diet": {
       "title": "Alguma restrição\nalimentar?",
       "subtitle": "A Pulse AI vai seguir isso em todas as receitas. Marque quantas precisar.",
-      "dairyFree": "Sem lactose e laticínios",
+      "dairyFree": "Sem laticínios",
       "dairyFreeDesc": "Sem leite, iogurte, queijo ou whey",
       "vegan": "Vegano",
       "veganDesc": "Sem nada de origem animal, incluindo mel e colágeno",
@@ -1244,8 +1244,6 @@
     "fields": {
       "model": "Meu BLENDi",
       "goal": "Objetivo",
-      "protein_target": "Meta de proteína",
-      "calories_target": "Meta de calorias",
       "fat_target": "Meta de gordura"
     },
     "language": {
@@ -1536,7 +1534,6 @@
       "light": "Claro",
       "dark": "Escuro"
     },
-    "settingCarbs": "Meta de carboidratos",
     "badges": {
       "title": "Conquistas",
       "subtitle": "Toque em um badge para ver detalhes",
@@ -1579,11 +1576,7 @@
     "edit": {
       "modelTitle": "Seu Modelo BLENDi",
       "goalTitle": "Seu Objetivo",
-      "proteinTitle": "Meta de Proteína Diária",
-      "carbsTitle": "Meta de Carboidratos Diária",
-      "caloriesTitle": "Meta de Calorias Diária",
       "fatTitle": "Meta de Gordura Diária",
-      "hydrationTitle": "Meta de Hidratação Diária",
       "unitSystemTitle": "Unidades",
       "languageTitle": "Idioma",
       "themeTitle": "Tema",
@@ -1670,6 +1663,31 @@
     "subtitle": "Confirme seus dados corporais reais para calcularmos metas de macro precisas.",
     "activityLevelLabel": "Nível de atividade",
     "success": "Perfil atualizado"
+  },
+  "nutritionGoals": {
+    "rowLabel": "Minhas metas",
+    "title": "Minhas metas",
+    "subtitle": "Ajuste suas metas diárias e suas preferências alimentares.",
+    "hydrationLabel": "Hidratação diária (ml)",
+    "recalcNotice": "Mudar seu objetivo ou seus dados de corpo recalcula proteína, carboidratos e calorias automaticamente.",
+    "dietTitle": "Preferências alimentares",
+    "saved": "Metas salvas",
+    "next": "Próximo",
+    "done": "Concluir",
+    "discard": {
+      "title": "Descartar alterações?",
+      "message": "Você tem alterações não salvas. Se sair agora, elas serão perdidas.",
+      "keepEditing": "Continuar editando",
+      "confirm": "Descartar"
+    },
+    "warnings": {
+      "proteinBelowRange": "Essa meta de proteína está abaixo do que costuma ser recomendado para o seu peso. Ela foi salva, mas vale conferir.",
+      "proteinAboveRange": "Essa meta de proteína está acima do que costuma ser recomendado para o seu peso. Ela foi salva, mas vale conferir.",
+      "caloriesBelowBmr": "Essa meta de calorias está abaixo do seu metabolismo basal estimado, a energia que o corpo gasta em repouso. Ela foi salva, mas vale conferir.",
+      "caloriesAboveTdee": "Essa meta de calorias está bem acima do seu gasto diário estimado. Ela foi salva, mas vale conferir.",
+      "carbBelowRange": "Essa meta de carboidratos está abaixo do que costuma ser recomendado para o seu peso. Ela foi salva, mas vale conferir.",
+      "carbAboveRange": "Essa meta de carboidratos está acima do que costuma ser recomendado para o seu peso. Ela foi salva, mas vale conferir."
+    }
   },
   "weeklyReport": {
     "title": "Relatório Semanal",

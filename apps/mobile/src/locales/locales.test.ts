@@ -93,3 +93,65 @@ describe('locales — potência dos modelos', () => {
     }
   });
 });
+
+// CP-1.1.1b, Tarefa 7 — a regra do prompt da Pulse AI proíbe QUALQUER laticínio
+// (inclusive leite sem lactose), então o rótulo não pode sugerir que "sem
+// lactose" basta. Só o pt-BR mudou; "Dairy-free" do en já estava certo.
+describe('locales — dieta sem laticínios', () => {
+  it('pt-BR: "Sem laticínios" (não mais "Sem lactose e laticínios")', () => {
+    expect(get(ptBR as Json, 'onboarding.diet.dairyFree')).toBe('Sem laticínios');
+    expect(JSON.stringify(ptBR)).not.toContain('Sem lactose');
+  });
+
+  it('en: continua "Dairy-free"', () => {
+    expect(get(en as Json, 'onboarding.diet.dairyFree')).toBe('Dairy-free');
+  });
+
+  it('a descrição segue coerente com o rótulo: leite, iogurte, queijo e whey (sem ressalva de lactose)', () => {
+    expect(get(ptBR as Json, 'onboarding.diet.dairyFreeDesc')).toBe('Sem leite, iogurte, queijo ou whey');
+    expect(get(ptBR as Json, 'onboarding.diet.dairyFreeDesc')).not.toMatch(/lactose/i);
+    expect(get(en as Json, 'onboarding.diet.dairyFreeDesc')).toBe('No milk, yogurt, cheese or whey');
+  });
+});
+
+// CP-1.1.1b — as chaves das 4 linhas que saíram do Me não ficam órfãs, e as da
+// tela "Minhas metas" existem nos dois idiomas com o mesmo conjunto de chaves.
+describe('locales — Minhas metas', () => {
+  it('en e pt-BR têm exatamente as mesmas chaves em nutritionGoals', () => {
+    expect(leafPaths((ptBR as Json).nutritionGoals as Json).sort()).toEqual(
+      leafPaths((en as Json).nutritionGoals as Json).sort()
+    );
+  });
+
+  it('as chaves das linhas removidas do Me saíram dos dois idiomas', () => {
+    for (const locale of [en as Json, ptBR as Json]) {
+      const paths = leafPaths(locale);
+      for (const orphan of [
+        'me.settingCarbs',
+        'me.edit.proteinTitle',
+        'me.edit.carbsTitle',
+        'me.edit.caloriesTitle',
+        'me.edit.hydrationTitle',
+        'profile.fields.protein_target',
+        'profile.fields.calories_target',
+      ]) {
+        expect(paths).not.toContain(orphan);
+      }
+      // A gordura continua (linha comentada no Me, mas existente).
+      expect(paths).toContain('me.edit.fatTitle');
+      expect(paths).toContain('profile.fields.fat_target');
+    }
+  });
+
+  it('nenhum texto novo é string vazia e os avisos não têm tom de alarme (sem "!")', () => {
+    for (const locale of [en as Json, ptBR as Json]) {
+      for (const path of leafPaths(locale.nutritionGoals as Json, 'nutritionGoals.')) {
+        const text = get(locale, path);
+        expect(text.trim().length).toBeGreaterThan(0);
+        if (path.startsWith('nutritionGoals.warnings.')) {
+          expect(text).not.toContain('!');
+        }
+      }
+    }
+  });
+});

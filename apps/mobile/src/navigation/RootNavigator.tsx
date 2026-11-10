@@ -8,6 +8,7 @@ import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import { CompleteProfileScreen } from '../screens/CompleteProfileScreen';
+import { NutritionGoalsScreen } from '../screens/NutritionGoalsScreen';
 import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { WeeklyReportScreen } from '../screens/WeeklyReportScreen';
 import type { RootStackParamList } from './types';
@@ -73,6 +74,7 @@ export function RootNavigator() {
           <RootStack.Screen name="Upgrade" component={UpgradeScreen} />
           <RootStack.Screen name="WeeklyReport" component={WeeklyReportScreen} />
           <RootStack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
+          <RootStack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
         </>
       ) : (
         <RootStack.Screen name="AuthFlow" component={AuthNavigator} />

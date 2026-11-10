@@ -137,20 +137,16 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
     expect(getByRole('button', { name: 'onboarding.finishSetup' })).toBeDisabled();
   });
 
-  it('carboidratos fora do range (50-800g) mantém o botão desabilitado, mas agora mostra o motivo', () => {
+  it('carboidratos fora do range (0-1.500g) mantém o botão desabilitado e mostra o motivo no campo', () => {
     const { getByRole, getByText, UNSAFE_getAllByType } = renderScreen();
     const inputs = UNSAFE_getAllByType(TextInput);
 
-    // Valor plausível para quem não sabe dos limites internos (ex.: dieta
-    // low-carb com 30g) — mesmo agora que macroRecommendation menciona a
-    // faixa de carboidratos, o erro inline por campo continua garantindo
-    // que o motivo apareça no exato campo que está fora do range.
     fireEvent.changeText(inputs[0], '150'); // protein válido
     fireEvent.changeText(inputs[1], '2000'); // calories válido
-    fireEvent.changeText(inputs[2], '30'); // carbs INVÁLIDO (min 50g)
+    fireEvent.changeText(inputs[2], '1501'); // carbs INVÁLIDO (max 1.500g)
 
     expect(getByRole('button', { name: 'onboarding.finishSetup' })).toBeDisabled();
-    expect(getByText('errors.validation.number_range:{"min":50,"max":800}')).toBeTruthy();
+    expect(getByText('errors.validation.number_range:{"min":0,"max":1500}')).toBeTruthy();
   });
 
   it('habilita o botão e dispara o PATCH ao preencher valores válidos', async () => {
@@ -208,6 +204,71 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
     expect(mockCompleteOnboarding).not.toHaveBeenCalled();
 
     jest.spyOn(axios, 'isAxiosError').mockRestore();
+  });
+});
+
+describe('OnboardingMacrosScreen — limites iguais aos do resto do app (packages/shared)', () => {
+  function fillMacros(utils: ReturnType<typeof renderScreen>, protein: string, calories: string, carbs: string) {
+    const inputs = utils.UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], protein);
+    fireEvent.changeText(inputs[1], calories);
+    fireEvent.changeText(inputs[2], carbs);
+  }
+
+  it('450g de proteína e 400 kcal agora são aceitos (antes: máx. 400g e mín. 500 kcal)', () => {
+    const utils = renderScreen();
+    fillMacros(utils, '450', '400', '200');
+
+    expect(utils.getByRole('button', { name: 'onboarding.finishSetup' })).not.toBeDisabled();
+    expect(utils.queryByText(/errors\.validation\.number_range/)).toBeNull();
+  });
+
+  it.each([
+    ['mínimos (10g / 300 kcal / 0g)', '10', '300', '0'],
+    ['máximos (800g / 15.000 kcal / 1.500g)', '800', '15000', '1500'],
+  ])('extremos %s são aceitos', (_label, protein, calories, carbs) => {
+    const utils = renderScreen();
+    fillMacros(utils, protein, calories, carbs);
+
+    expect(utils.getByRole('button', { name: 'onboarding.finishSetup' })).not.toBeDisabled();
+  });
+
+  it.each([
+    ['proteína abaixo do mínimo', ['9', '2000', '200'], '{"min":10,"max":800}'],
+    ['proteína acima do máximo', ['801', '2000', '200'], '{"min":10,"max":800}'],
+    ['calorias abaixo do mínimo', ['150', '299', '200'], '{"min":300,"max":15000}'],
+    ['calorias acima do máximo', ['150', '15001', '200'], '{"min":300,"max":15000}'],
+    ['carboidratos acima do máximo', ['150', '2000', '1501'], '{"min":0,"max":1500}'],
+  ] as const)('valores logo além dos extremos continuam bloqueados, com o erro no campo certo: %s', (_label, [protein, calories, carbs], range) => {
+    const utils = renderScreen();
+    fillMacros(utils, protein, calories, carbs);
+
+    expect(utils.getByRole('button', { name: 'onboarding.finishSetup' })).toBeDisabled();
+    expect(utils.getByText(`errors.validation.number_range:${range}`)).toBeTruthy();
+  });
+
+  it('o PATCH leva os valores novos (ex.: 450g de proteína, 400 kcal) sem alteração', async () => {
+    const utils = renderScreen();
+    fillMacros(utils, '450', '400', '0');
+    fireEvent.press(utils.getByRole('button', { name: 'onboarding.finishSetup' }));
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', expect.objectContaining({
+      dailyProteinTarget: 450,
+      dailyCalorieTarget: 400,
+      dailyCarbTarget: 0,
+    }));
+  });
+
+  it('o texto de recomendação de carboidratos continua mostrando 50 a 800g (não a faixa de validação)', () => {
+    const { getByText } = renderScreen();
+
+    // Mesmo com a validação em 0-1.500g, a recomendação não muda — nem a de
+    // proteína/calorias, que vêm por goal (Wellness: 100-160g, 1600-2400 kcal).
+    expect(getByText(
+      'onboarding.macroRecommendation:' +
+      '{"goal":"onboarding.goalWellness","proteinMin":100,"proteinMax":160,"caloriesMin":1600,"caloriesMax":2400,"carbsMin":50,"carbsMax":800}'
+    )).toBeTruthy();
   });
 });
 

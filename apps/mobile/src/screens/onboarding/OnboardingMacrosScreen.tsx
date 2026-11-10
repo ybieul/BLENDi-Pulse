@@ -14,7 +14,18 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import axios from 'axios';
 
-import { fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
+import {
+  DAILY_CALORIE_TARGET_MAX,
+  DAILY_CALORIE_TARGET_MIN,
+  DAILY_CARB_TARGET_MAX,
+  DAILY_CARB_TARGET_MIN,
+  DAILY_PROTEIN_TARGET_VALIDATION_MAX,
+  DAILY_PROTEIN_TARGET_VALIDATION_MIN,
+  fontSizes,
+  fonts,
+  fontWeights,
+  spacing,
+} from '@blendi/shared';
 import { api } from '../../config/api';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
@@ -40,13 +51,21 @@ interface ApiErrorResponse {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-// Protein: int 10–400g  |  Calories: int 500–10000 kcal  |  Carbs: int 50–800g
-const PROTEIN_MIN = 10;
-const PROTEIN_MAX = 400;
-const CALORIES_MIN = 500;
-const CALORIES_MAX = 10_000;
-const CARBS_MIN = 50;
-const CARBS_MAX = 800;
+// Faixas de VALIDAÇÃO: as mesmas que o backend aplica (packages/shared) —
+// proteína 10–800g, calorias 300–15.000 kcal, carboidratos 0–1.500g. Antes
+// eram faixas locais mais estreitas, que barravam aqui valores que o Me aceita.
+const PROTEIN_MIN = DAILY_PROTEIN_TARGET_VALIDATION_MIN;
+const PROTEIN_MAX = DAILY_PROTEIN_TARGET_VALIDATION_MAX;
+const CALORIES_MIN = DAILY_CALORIE_TARGET_MIN;
+const CALORIES_MAX = DAILY_CALORIE_TARGET_MAX;
+const CARBS_MIN = DAILY_CARB_TARGET_MIN;
+const CARBS_MAX = DAILY_CARB_TARGET_MAX;
+
+// Faixa de RECOMENDAÇÃO de carboidratos, só para o texto informativo abaixo
+// dos campos. Não é faixa de validação (0–1.500g aceitos, ver acima) e não
+// varia por goal, ao contrário de proteína/calorias (GOAL_CONFIG).
+const CARBS_RECOMMENDATION_MIN = 50;
+const CARBS_RECOMMENDATION_MAX = 800;
 
 // Goal-specific recommendation ranges and suggested defaults shown as placeholders
 // when the user skipped body data collection.
@@ -164,8 +183,8 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
   // Erro inline só depois que o usuário já digitou algo — sem isso o botão
   // "Finish setup" fica desabilitado sem nenhuma explicação visível quando o
-  // valor preenchido cai fora da faixa aceita (ex.: carboidratos, cuja faixa
-  // nem aparece no texto de recomendação acima).
+  // valor preenchido cai fora da faixa aceita (a faixa de validação não é a
+  // mesma do texto de recomendação acima).
   const proteinError = proteinText.length > 0 && !proteinValid
     ? t('errors.validation.number_range', { min: PROTEIN_MIN, max: PROTEIN_MAX })
     : undefined;
@@ -344,9 +363,10 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
             </View>
 
             {/* Linha informativa com ranges recomendados — proteína/calorias
-                variam por goal (goalConfig); carboidratos usa a faixa fixa
-                de validação (CARBS_MIN/MAX), já que não há um range por goal
-                para esse macro. */}
+                variam por goal (goalConfig); carboidratos usa uma faixa fixa
+                de recomendação própria (CARBS_RECOMMENDATION_MIN/MAX), já que
+                não há um range por goal para esse macro. NÃO usar aqui a faixa
+                de validação (CARBS_MIN/MAX): aceitar um valor não é recomendá-lo. */}
             <Text style={styles.recommendation}>
               {t('onboarding.macroRecommendation', {
                 goal: goalLabel,
@@ -354,8 +374,8 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                 proteinMax: goalConfig.proteinMax,
                 caloriesMin: goalConfig.caloriesMin,
                 caloriesMax: goalConfig.caloriesMax,
-                carbsMin: CARBS_MIN,
-                carbsMax: CARBS_MAX,
+                carbsMin: CARBS_RECOMMENDATION_MIN,
+                carbsMax: CARBS_RECOMMENDATION_MAX,
               })}
             </Text>
           </View>

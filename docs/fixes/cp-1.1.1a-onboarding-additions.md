@@ -1,5 +1,12 @@
 # CP-1.1.1a — Onboarding Additions (potência, posse do liquidificador, dieta)
 
+> **Seguimento (CP-1.1.1b):** a dieta ganhou edição fora do onboarding (tela "Minhas
+> metas"), o badge "BLENDi Lite" passou a olhar `blendiOwnership` (item 1 de "Achados
+> fora do escopo" abaixo) e o rótulo pt-BR da dieta virou "Sem laticínios". Ver
+> [cp-1.1.1b-minhas-metas.md](cp-1.1.1b-minhas-metas.md) e
+> [cp-1.1.1b-testes-pentest.md](cp-1.1.1b-testes-pentest.md). O texto abaixo
+> descreve o estado do CP-1.1.1a e foi mantido como estava.
+
 **Contexto:** item "Onboarding Additions" do feature brief do Jon, com escopo
 fechado com o Gabriel. Três partes independentes mais uma correção de texto:
 

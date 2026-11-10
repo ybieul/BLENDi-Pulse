@@ -10,7 +10,7 @@
 //   safeArea.top + 20  →  header (paddingHorizontal 24): foto/iniciais + badge de plano
 //   24                 →  stats (paddingHorizontal 16): 3 × StatCard
 //   24                 →  badges (paddingHorizontal 16): header + FlatList 4 colunas
-//   24                 →  settings (paddingHorizontal 16): card glassmorphism + 8 SettingRow
+//   24                 →  settings (paddingHorizontal 16): card glassmorphism + 6 SettingRow
 //   24                 →  upgrade/pro (paddingHorizontal 16): upgrade card ou pro card
 //   32                 →  footer (paddingHorizontal 24): sign out + versão + links
 
@@ -64,7 +64,6 @@ import { useAppTranslation } from "../hooks/useAppTranslation";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { useFormatNumbers } from "../hooks/useFormatNumbers";
 import { buildHistoryRange } from "../utils/historyRange.utils";
-import { useUnits } from "../hooks/useUnits";
 import { useAuthStore } from "../store/auth.store";
 import { useGamificationStore } from "../store/gamification.store";
 import type { SupportedLocale, TranslationKey } from "../locales/i18n";
@@ -446,7 +445,6 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
   const queryClient = useQueryClient();
-  const { displayVolume } = useUnits();
   const {
     availablePlans,
     isBusy: isPurchaseBusy,
@@ -618,8 +616,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       blendCount: profile?.blendCount ?? 0,
       longestStreak: profile?.longestStreak ?? 0,
       blendiModel: displayModel,
+      blendiOwnership: displayOwnership,
     });
-  }, [profile?.blendCount, profile?.longestStreak, displayModel]);
+  }, [profile?.blendCount, profile?.longestStreak, displayModel, displayOwnership]);
 
   useEffect(() => {
     const animation = Animated.timing(levelProgressAnim, {
@@ -654,6 +653,16 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     };
   }, [pendingWeeklyShare]);
 
+  // Resumo da linha "Minhas metas": proteína e calorias atuais. As metas em si
+  // (inclusive carboidratos e hidratação) são editadas na NutritionGoalsScreen.
+  const nutritionGoalsSummary =
+    formatCount(profile?.dailyProteinTarget ?? authUser?.dailyProteinTarget ?? 0) +
+    t("common.units.grams") +
+    " · " +
+    formatCount(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) +
+    " " +
+    t("common.units.kilocalories");
+
   const languageDisplayName = t(getLanguageKey(displayLanguage));
   const modelDisplay = getModelDisplay(displayModel, displayOwnership, displayOtherBlenderModel);
   const modelDisplayName = t(modelDisplay.key, modelDisplay.options);
@@ -666,18 +675,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         return getBlenderOptionKey(displayModel, displayOwnership);
       case "goal":
         return displayGoal;
-      case "protein":
-        return profile?.dailyProteinTarget ?? authUser?.dailyProteinTarget ?? 120;
-      case "carbs":
-        return profile?.dailyCarbTarget ?? authUser?.dailyCarbTarget ?? 150;
-      case "calories":
-        return (
-          profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 2000
-        );
       case "fat":
         return profile?.dailyFatTarget ?? authUser?.dailyFatTarget ?? 67;
-      case "hydration":
-        return profile?.dailyHydrationTarget ?? 2500;
       case "unitSystem":
         return displayUnitSystem;
       case "language":
@@ -726,20 +725,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         case "goal":
           body = { goal: nextValue };
           break;
-        case "protein":
-          body = { dailyProteinTarget: Number(nextValue) };
-          break;
-        case "carbs":
-          body = { dailyCarbTarget: Number(nextValue) };
-          break;
-        case "calories":
-          body = { dailyCalorieTarget: Number(nextValue) };
-          break;
         case "fat":
           body = { dailyFatTarget: Number(nextValue) };
-          break;
-        case "hydration":
-          body = { dailyHydrationTarget: Number(nextValue) };
           break;
         case "unitSystem":
           body = { unitSystem: nextValue };
@@ -771,26 +758,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           case "goal":
             updateUserProfile({ goal: nextValue as UserGoal });
             break;
-          case "protein":
-            updateUserProfile({ dailyProteinTarget: Number(nextValue) });
-            break;
-          case "carbs":
-            updateUserProfile({ dailyCarbTarget: Number(nextValue) });
-            break;
-          case "calories":
-            updateUserProfile({ dailyCalorieTarget: Number(nextValue) });
-            break;
           case "fat":
             updateUserProfile({ dailyFatTarget: Number(nextValue) });
-            break;
-          case "hydration":
-            updateUserProfile({ dailyHydrationTarget: Number(nextValue) });
-            // hydrationToday (GET /hydration-logs/today) é a fonte de goalMl
-            // usada tanto pela HomeScreen quanto pela TrackScreen — sem essa
-            // invalidação, as duas telas continuam mostrando a meta antiga
-            // (cache compartilhado, staleTime de 1h) até outra ação
-            // (registrar água, etc.) invalidar essa query por outro motivo.
-            await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
             break;
           case "unitSystem":
             updateUserProfile({ unitSystem: nextValue as "metric" | "imperial" });
@@ -1858,23 +1827,11 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             <View style={styles.divider} />
 
             <SettingRow
-              label={t("profile.fields.protein_target")}
-              value={formatCount(profile?.dailyProteinTarget ?? authUser?.dailyProteinTarget ?? 0) + t("common.units.grams")}
-              onPress={() => { setEditingType("protein"); }}
-            />
-            <View style={styles.divider} />
-
-            <SettingRow
-              label={t("me.settingCarbs")}
-              value={formatCount(profile?.dailyCarbTarget ?? authUser?.dailyCarbTarget ?? 0) + t("common.units.grams")}
-              onPress={() => { setEditingType("carbs"); }}
-            />
-            <View style={styles.divider} />
-
-            <SettingRow
-              label={t("profile.fields.calories_target")}
-              value={formatCount(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) + " " + t("common.units.kilocalories")}
-              onPress={() => { setEditingType("calories"); }}
+              label={t("nutritionGoals.rowLabel")}
+              value={nutritionGoalsSummary}
+              onPress={() => {
+                navigation.getParent<RootNavigationProp<"NutritionGoals">>()?.navigate("NutritionGoals");
+              }}
             />
             <View style={styles.divider} />
 
@@ -1895,13 +1852,6 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               />
               <View style={styles.divider} />
             */}
-
-            <SettingRow
-              label={t("track.hydration")}
-              value={displayVolume(profile?.dailyHydrationTarget ?? 2500)}
-              onPress={() => { setEditingType("hydration"); }}
-            />
-            <View style={styles.divider} />
 
             <SettingRow
               label={t("profile.unitSystem")}

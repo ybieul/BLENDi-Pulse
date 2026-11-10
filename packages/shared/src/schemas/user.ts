@@ -102,6 +102,13 @@ export const DAILY_CARB_TARGET_MAX = 1_500;
 export const DAILY_FAT_TARGET_MIN = 0;
 export const DAILY_FAT_TARGET_MAX = 600;
 
+// Limites de dailyHydrationTarget (ml) — os mesmos 500-8000 que o schema Zod
+// abaixo e o schema Mongoose (apps/api/src/models/User.ts) já aplicavam como
+// números soltos. Exportados aqui só para o app mobile validar o campo sem
+// repetir o número na tela; o valor NÃO mudou.
+export const DAILY_HYDRATION_TARGET_MIN = 500;
+export const DAILY_HYDRATION_TARGET_MAX = 8_000;
+
 // Piso de sanidade só da SUGESTÃO automática de dailyCalorieTarget
 // (calculateMacroTargets) — CP-A.2.3. Não é um limite de validação de
 // schema (esse continua DAILY_CALORIE_TARGET_MIN/MAX, 300-15.000, sem
@@ -284,11 +291,11 @@ export const updateUserSchema = z
     dailyHydrationTarget: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(500, 8000),
+        invalid_type_error: rangeErrorMessage(DAILY_HYDRATION_TARGET_MIN, DAILY_HYDRATION_TARGET_MAX),
       })
       .int('errors.validation.integer')
-      .min(500, rangeErrorMessage(500, 8000))
-      .max(8000, rangeErrorMessage(500, 8000)),
+      .min(DAILY_HYDRATION_TARGET_MIN, rangeErrorMessage(DAILY_HYDRATION_TARGET_MIN, DAILY_HYDRATION_TARGET_MAX))
+      .max(DAILY_HYDRATION_TARGET_MAX, rangeErrorMessage(DAILY_HYDRATION_TARGET_MIN, DAILY_HYDRATION_TARGET_MAX)),
 
     weight: z
       .number({

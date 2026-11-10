@@ -1,4 +1,5 @@
 import { colors } from '@blendi/shared';
+import type { BlendiOwnership } from '@blendi/shared';
 import type { TranslationKey } from '../locales/i18n';
 
 export type BadgeStageName = 'bronze' | 'silver' | 'gold';
@@ -31,6 +32,13 @@ export interface BadgeProfile {
   blendCount: number;
   longestStreak: number;
   blendiModel: BlendiModel;
+  /**
+   * Posse do liquidificador. Os badges de modelo só contam com 'blendi':
+   * "Other or older model" e "No BLENDi yet" gravam blendiModel 'Lite' mesmo
+   * sem a pessoa ter um BLENDi. Ausente (conta anterior ao CP-1.1.1a) conta
+   * como 'blendi', igual a getBlenderOptionKey e ao fallback do Me.
+   */
+  blendiOwnership?: BlendiOwnership;
 }
 
 const STREAK_MASTER_ICON_COLOR = colors.feedback.warning;
@@ -195,8 +203,10 @@ function getBadgeMetric(profile: BadgeProfile, badge: Badge): number {
       return normalizeMetric(profile.longestStreak);
     case 'early_adopter':
       return 1;
-    case 'blendi_model':
-      return MODEL_BADGE_IDS[badge.id] === profile.blendiModel ? 1 : 0;
+    case 'blendi_model': {
+      const ownsBlendi = (profile.blendiOwnership ?? 'blendi') === 'blendi';
+      return ownsBlendi && MODEL_BADGE_IDS[badge.id] === profile.blendiModel ? 1 : 0;
+    }
     default:
       return 0;
   }

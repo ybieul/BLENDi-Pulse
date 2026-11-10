@@ -39,11 +39,7 @@ const GOAL_ICON_SIZE = 22;
 export type EditSettingType =
   | 'model'
   | 'goal'
-  | 'protein'
-  | 'carbs'
-  | 'calories'
   | 'fat'
-  | 'hydration'
   | 'unitSystem'
   | 'language'
   | 'theme';
@@ -75,11 +71,7 @@ type IoniconName = ComponentProps<typeof Ionicons>['name'];
 const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
   model: 'me.edit.modelTitle',
   goal: 'me.edit.goalTitle',
-  protein: 'me.edit.proteinTitle',
-  carbs: 'me.edit.carbsTitle',
-  calories: 'me.edit.caloriesTitle',
   fat: 'me.edit.fatTitle',
-  hydration: 'me.edit.hydrationTitle',
   unitSystem: 'me.edit.unitSystemTitle',
   language: 'me.edit.languageTitle',
   theme: 'me.edit.themeTitle',
@@ -114,14 +106,11 @@ const GOAL_OPTIONS = [
   },
 ] as const;
 
+// Proteína, carboidratos, calorias e hidratação saíram daqui: são editadas na
+// tela "Minhas metas" (NutritionGoalsScreen). Resta só a gordura, cuja linha
+// está comentada no Me até o consumo de gordura ser rastreado.
 function isNumericType(type: EditSettingType): boolean {
-  return (
-    type === 'protein' ||
-    type === 'carbs' ||
-    type === 'calories' ||
-    type === 'fat' ||
-    type === 'hydration'
-  );
+  return type === 'fat';
 }
 
 function ToggleButton({

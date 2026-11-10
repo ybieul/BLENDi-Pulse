@@ -506,7 +506,7 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `dailyCarbTarget` | number | No | Integer between 0 and 1500 |
 | `dailyCalorieTarget` | number | No | Integer between 300 and 15000 |
 | `dailyFatTarget` | number | No | Integer between 0 and 600 |
-| `dailyHydrationTarget` | number | No | Integer between 500 and 8000 |
+| `dailyHydrationTarget` | number | No | Integer between 500 and 8000 (millilitres; `DAILY_HYDRATION_TARGET_MIN`/`MAX` in `packages/shared`) |
 | `weight` | number | No | Number between 20 and 300 (kg) — current body weight; also triggers the automatic macro recalculation above and, when different from the previously saved value, appends an entry to `weightHistory` (see `GET /users/me/weight-history`) |
 | `height` | number | No | Number between 100 and 250 (cm) — also triggers the automatic macro recalculation above |
 | `targetWeight` | number | No | Number between 20 and 300 (kg) — goal weight, independent of `weight`; when present together with `weight`/`weightGoal`, the response includes a `weightTargetEta` prediction (see below) |
@@ -518,6 +518,37 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `unitSystem` | string | No | One of `metric`, `imperial` |
 
 When the body includes `weight`, `height`, `activityLevel`, `weightGoal`, `birthDate`, `biologicalSex`, or `goal`, and the user's profile has all of weight/height/birthDate/biologicalSex/activityLevel/weightGoal/goal available (merging this request's values with whatever is already saved), the backend recalculates `dailyProteinTarget`, `dailyCalorieTarget`, `dailyCarbTarget`, and `dailyFatTarget` from scratch (same Mifflin-St Jeor formula as `POST /users/calculate-macros`) and that recalculated value **overrides** any `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` sent in the same request body.
+
+#### Manual macro-edit warnings (`warnings`)
+
+When a request is a **pure manual edit** of the macro targets — it includes at least one of `dailyProteinTarget`, `dailyCalorieTarget`, `dailyCarbTarget` or `dailyFatTarget` and **no** automatic recalculation ran for it (none of the triggers above was in the body) — the backend compares each edited value with sensible ranges and, when one falls outside, adds a `warnings` array to `data.user`. The values are **saved anyway**: a warning never blocks the update and never changes the status code.
+
+```json
+"warnings": [
+  {
+    "field": "dailyProteinTarget",
+    "code": "macros/protein-above-range",
+    "message": "warnings.manualMacroEdit.proteinAboveRange"
+  }
+]
+```
+
+| `code` | `field` | Raised when (strict comparisons — the boundary value itself does **not** warn) |
+|---|---|---|
+| `macros/protein-below-range` | `dailyProteinTarget` | `dailyProteinTarget / weight < 0.8` g/kg |
+| `macros/protein-above-range` | `dailyProteinTarget` | `dailyProteinTarget / weight > 3.5` g/kg |
+| `macros/calories-below-bmr` | `dailyCalorieTarget` | `dailyCalorieTarget <` the user's BMR |
+| `macros/calories-above-tdee` | `dailyCalorieTarget` | `dailyCalorieTarget > 1.6 ×` the user's TDEE |
+| `macros/carb-below-range` | `dailyCarbTarget` | `dailyCarbTarget / weight < 0.5` g/kg |
+| `macros/carb-above-range` | `dailyCarbTarget` | `dailyCarbTarget / weight > 8` g/kg |
+| `macros/fat-below-range` | `dailyFatTarget` | `dailyFatTarget / weight < 0.5` g/kg |
+| `macros/fat-above-range` | `dailyFatTarget` | `dailyFatTarget / weight > 2` g/kg |
+
+- Only the fields **present in the request** are evaluated, and at most one warning per field is returned (the `below` and `above` codes are mutually exclusive). Three out-of-range targets in the same request yield three warnings.
+- `weight` is the weight **already saved** for the user; the calorie rules also need the saved height, birth date, sex and activity level (BMR/TDEE). An account that skipped the onboarding body step has none of that, so it never receives a warning — verified live by the CP-1.1.1b pentest.
+- If the body contains an automatic-recalculation trigger (`weight`, `height`, `activityLevel`, `weightGoal`, `birthDate`, `biologicalSex` or `goal`), the targets sent in the same request are overwritten by the recalculated values and **no `warnings` are returned** — each of the seven triggers was checked on its own. Sending only `dailyHydrationTarget` and/or `dietaryPreferences` never recalculates and never warns.
+- `warnings` and `imc`/`imcUnit`/`imcClassification` are mutually exclusive; `warnings` and `weightTargetEta` can appear together (CP-A.2.1).
+- `message` is an internal translation key, **not** user-facing text. Clients must translate by `code`: the mobile app maps each known `code` to a typed translation key (`apps/mobile/src/utils/nutritionGoals.utils.ts`), shows the text next to the field named in `field`, and ignores any `code` it does not know (including the two `fat` codes while the fat target is hidden in the UI).
 
 #### Blender ownership rules
 
@@ -597,11 +628,14 @@ The request field `preferredLanguage` is normalized to the persisted `locale` fi
 
 | Status | Meaning |
 |---|---|
-| `200` | Profile updated successfully |
-| `400` | Request body failed Zod validation |
+| `200` | Profile updated successfully (the response may carry `warnings`, see above) |
+| `400` | Request body failed Zod validation; **nothing** is saved — a single invalid field rejects the whole request |
 | `401` | Missing, invalid, or expired Bearer token |
 | `404` | Authenticated user record not found |
+| `413` | Request body larger than 50 kB |
 | `500` | Unexpected server error |
+
+**Behavior confirmed by the CP-1.1.1b pentest** (live, against the real API): every limit above is inclusive and exact at the boundary (e.g. `dailyProteinTarget` 10 and 800 are accepted, 9 and 801 are rejected); numbers sent as strings, fractions, `null`, booleans, arrays, objects, `Infinity`, `-Infinity`, negative values and MongoDB operators (`{"$gt":0}`, `{"$ne":null}`, `{"$inc":5}`) are rejected with `400`, while JSON integers written as `150.0` or `1.5e2` are accepted as `150`; keys that are not part of the schema (`isPro`, `totalXP`, `email`, `password`, `role`, `_id`, `$set`, `__proto__`…) are silently dropped and answered with `200`, never applied; the account is always the one in the token (an `_id`/`id`/`userId` in the body has no effect); concurrent requests that touch different fields never lose an update. Known limitation, not specific to this endpoint: a JSON body nested ~5,000 levels deep or more (≈ 10 kB) makes `express-mongo-sanitize` overflow the stack and the API answers `500` (the process stays up).
 
 ### GET /users/me/weight-history
 

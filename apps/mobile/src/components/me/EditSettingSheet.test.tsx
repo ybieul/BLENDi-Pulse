@@ -119,4 +119,22 @@ describe('EditSettingSheet — outros tipos não mudam', () => {
     fireEvent.press(getByRole('button', { name: 'me.edit.confirm' }));
     expect(onConfirm).toHaveBeenCalledWith('Muscle');
   });
+
+  // Proteína, carboidratos, calorias e hidratação saíram daqui (agora na tela
+  // "Minhas metas"); a gordura continua existindo, com a linha comentada no Me.
+  it('fat continua com campo numérico e confirma o valor digitado como número', () => {
+    const { UNSAFE_getAllByType, getByRole } = render(
+      <EditSettingSheet type="fat" currentValue={67} onConfirm={onConfirm} onClose={onClose} />
+    );
+
+    const inputs = UNSAFE_getAllByType(TextInput);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]?.props.value).toBe('67');
+    expect(inputs[0]?.props.keyboardType).toBe('numeric');
+
+    fireEvent.changeText(inputs[0], '80');
+    fireEvent.press(getByRole('button', { name: 'me.edit.confirm' }));
+
+    expect(onConfirm).toHaveBeenCalledWith(80);
+  });
 });

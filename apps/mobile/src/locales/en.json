@@ -1244,8 +1244,6 @@
     "fields": {
       "model": "My BLENDi",
       "goal": "Goal",
-      "protein_target": "Protein target",
-      "calories_target": "Calorie target",
       "fat_target": "Fat target"
     },
     "language": {
@@ -1536,7 +1534,6 @@
       "light": "Light",
       "dark": "Dark"
     },
-    "settingCarbs": "Carbs target",
     "badges": {
       "title": "Achievements",
       "subtitle": "Tap a badge to see details",
@@ -1579,11 +1576,7 @@
     "edit": {
       "modelTitle": "Your BLENDi Model",
       "goalTitle": "Your Goal",
-      "proteinTitle": "Daily Protein Target",
-      "carbsTitle": "Daily Carbs Target",
-      "caloriesTitle": "Daily Calorie Target",
       "fatTitle": "Daily Fat Target",
-      "hydrationTitle": "Daily Hydration Target",
       "unitSystemTitle": "Units",
       "languageTitle": "Language",
       "themeTitle": "Theme",
@@ -1670,6 +1663,31 @@
     "subtitle": "Confirm your real body details so we can calculate accurate macro targets.",
     "activityLevelLabel": "Activity level",
     "success": "Profile updated"
+  },
+  "nutritionGoals": {
+    "rowLabel": "My goals",
+    "title": "My goals",
+    "subtitle": "Set your daily targets and dietary preferences.",
+    "hydrationLabel": "Daily hydration (ml)",
+    "recalcNotice": "Changing your goal or body data recalculates protein, carbs and calories automatically.",
+    "dietTitle": "Dietary preferences",
+    "saved": "Goals saved",
+    "next": "Next",
+    "done": "Done",
+    "discard": {
+      "title": "Discard changes?",
+      "message": "You have unsaved changes. If you leave now, they will be lost.",
+      "keepEditing": "Keep editing",
+      "confirm": "Discard"
+    },
+    "warnings": {
+      "proteinBelowRange": "This protein target is below what's usually recommended for your weight. It was saved, but it's worth a look.",
+      "proteinAboveRange": "This protein target is above what's usually recommended for your weight. It was saved, but it's worth a look.",
+      "caloriesBelowBmr": "This calorie target is below your estimated basal metabolism, the energy your body uses at rest. It was saved, but it's worth a look.",
+      "caloriesAboveTdee": "This calorie target is well above your estimated daily energy expenditure. It was saved, but it's worth a look.",
+      "carbBelowRange": "This carb target is below what's usually recommended for your weight. It was saved, but it's worth a look.",
+      "carbAboveRange": "This carb target is above what's usually recommended for your weight. It was saved, but it's worth a look."
+    }
   },
   "weeklyReport": {
     "title": "Weekly Report",

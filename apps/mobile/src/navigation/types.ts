@@ -26,6 +26,7 @@ export type RootStackParamList = {
   Upgrade: undefined;
   WeeklyReport: undefined;
   CompleteProfile: undefined;
+  NutritionGoals: undefined;
 };
 
 export type PulseAIStackParamList = {

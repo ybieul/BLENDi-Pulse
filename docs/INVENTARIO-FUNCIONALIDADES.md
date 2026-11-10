@@ -1,6 +1,6 @@
 # Inventário Completo de Funcionalidades — BLENDi Pulse
 
-**Data do levantamento:** 2026-10-08
+**Data do levantamento:** 2026-10-08 (atualizado em 2026-11-09 pelo CP-1.1.1b: tela "Minhas metas", dieta editável, avisos de meta, limites de validação e badge de modelo — as seções afetadas estão marcadas com "CP-1.1.1b")
 **Método:** leitura direta do código-fonte do monorepo (`apps/mobile/src`, `apps/api/src`, `packages/shared/src`), sem uso de memória de conversas anteriores. Todas as afirmações abaixo têm evidência em arquivo/linha; onde o código não deixa algo claro ou algo esperado não existe, isso é dito explicitamente em vez de presumido.
 **Propósito:** base técnica completa para depois traduzir em material de apresentação de negócio para o Jon. Este documento é técnico de propósito — nomes de arquivos, funções, variáveis e endpoints estão citados para permitir verificação.
 
@@ -42,7 +42,9 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
     │   │   └── ShoppingListDetail (ShoppingListDetailScreen)
     │   └── Me (MeScreen)
     ├── Upgrade (UpgradeScreen) — acessível de várias telas, não é tab
-    └── WeeklyReport (WeeklyReportScreen) — idem
+    ├── WeeklyReport (WeeklyReportScreen) — idem
+    ├── CompleteProfile (CompleteProfileScreen) — dados de corpo reais; aberta pelo aviso do Me
+    └── NutritionGoals (NutritionGoalsScreen) — "Minhas metas"; aberta pela linha do card de configurações do Me (CP-1.1.1b)
 ```
 
 ### Lista de todas as telas e o que fazem (uma frase cada)
@@ -73,6 +75,8 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 | Me | `screens/MeScreen.tsx` | Perfil: avatar, estatísticas, nível, badges, configurações, notificações, conta. |
 | Upgrade | `screens/UpgradeScreen.tsx` | Tela de venda do plano Pulse Pro (paywall). |
 | WeeklyReport | `screens/WeeklyReportScreen.tsx` | Relatório semanal (feature Pro) com paywall para quem não é Pro. |
+| CompleteProfile | `screens/CompleteProfileScreen.tsx` | Edita os dados de corpo (peso, altura, nascimento, sexo, meta de peso, atividade) fora do onboarding; recalcula as metas. |
+| NutritionGoals ("Minhas metas") | `screens/NutritionGoalsScreen.tsx` | CP-1.1.1b: edita proteína, carboidratos, calorias, hidratação e dieta, com validação inline, avisos de meta do backend e confirmação ao sair com alteração não salva. |
 
 **Telas que não aparecem na navegação principal:** nenhuma tela de erro/loading dedicada foi encontrada como rota separada — loading e erro são tratados *dentro* das telas acima (skeletons, banners de erro com retry), não como rotas próprias. Não há deep link documentado além do uso interno de `blendipulse://` para o callback do Google OAuth e para notificações push (`blendipulse://pulse-ai/chat`, `blendipulse://blend`, `blendipulse://track`, `blendipulse://me`, `blendipulse://me/weekly-report`).
 
@@ -98,9 +102,9 @@ RootNavigator (apps/mobile/src/navigation/RootNavigator.tsx)
 
 1. **Modelo** — 5 opções, sem chamada de API: Lite (70W), ProPlus (120W), Steel (180W), "Outro modelo ou modelo antigo" e "Ainda não tenho um BLENDi". As duas últimas não têm badge de potência, gravam o modelo como `Lite` (limites de segurança mais conservadores da Pulse AI) e guardam a **posse** (`blendiOwnership`: `blendi`/`other`/`none`) num campo separado, para uso futuro (Shop Tab). Em "Outro modelo" aparece um campo de texto opcional para marca e modelo (até 60 caracteres, ex.: "BLENDi antigo, Ninja, NutriBullet"); o botão de continuar não depende dele. O enum `blendiModel` continua com 3 valores.
 2. **Objetivo** — Muscle / Wellness / Energy / Recovery, sem chamada de API.
-3. **Dieta** — 4 restrições em múltipla escolha (toque marca e desmarca): sem laticínios, vegano, sem oleaginosas, sem açúcar adicionado. Dá para continuar sem marcar nada (o botão passa a dizer "Sem restrições"). Mostra um alerta discreto: são preferências, não uma garantia para alergias. A Pulse AI e o Pantry Scanner tratam cada restrição como obrigatória em toda receita (aplicada pelo prompt, sem validação de ingredientes no backend). Ainda **não** é editável no Me (CP-1.1.1b).
+3. **Dieta** — 4 restrições em múltipla escolha (toque marca e desmarca): sem laticínios, vegano, sem oleaginosas, sem açúcar adicionado. Dá para continuar sem marcar nada (o botão passa a dizer "Sem restrições"). Mostra um alerta discreto: são preferências, não uma garantia para alergias. A Pulse AI e o Pantry Scanner tratam cada restrição como obrigatória em toda receita (aplicada pelo prompt, sem validação de ingredientes no backend). Desde o CP-1.1.1b a dieta também é editável depois do onboarding, na tela "Minhas metas" (os mesmos 4 cards e o mesmo alerta de alergia, via o componente compartilhado `DietaryPreferencesPicker`); contas antigas, que nunca definiram dieta, abrem com a lista vazia e já podem escolher. O rótulo pt-BR é "Sem laticínios" (a regra do prompt proíbe qualquer laticínio, inclusive leite sem lactose).
 4. **Corpo** — peso, altura (métrico ou imperial), data de nascimento, sexo biológico (masculino/feminino), meta de peso (perder/manter/ganhar) e nível de atividade (sedentário/levemente ativo/moderadamente ativo/muito ativo). Calcula macros em tempo real (debounce 600ms) chamando o backend; mostra IMC com classificação; tem botão "Pular por agora".
-5. **Macros** — mostra/permite ajustar proteína (10-400g), calorias (500-10000kcal) e carboidratos (50-800g) calculados no passo anterior; ao finalizar, salva tudo e marca o onboarding como concluído — o app navega automaticamente para a tela principal.
+5. **Macros** — mostra/permite ajustar proteína, calorias e carboidratos calculados no passo anterior; ao finalizar, salva tudo e marca o onboarding como concluído — o app navega automaticamente para a tela principal. Desde o CP-1.1.1b a validação usa os **mesmos limites do backend** (`packages/shared`): proteína 10–800 g, calorias 300–15.000 kcal e carboidratos 0–1.500 g (antes eram faixas locais mais estreitas — 10–400, 500–10.000 e 50–800 — que barravam aqui valores que o Me aceitava). O texto de recomendação continua mostrando faixas **recomendadas**, separadas das de validação: proteína e calorias por objetivo, e carboidratos 50–800 g.
 
 A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculation.utils.ts`, chamada por `user.controller.ts`) usa Mifflin-St Jeor **com idade e sexo reais do usuário**: a idade é derivada da data de nascimento coletada na etapa de Corpo (nunca armazenada diretamente, sempre recalculada a partir de `birthDate` no momento do cálculo) e a constante da fórmula (+5 ou −161) varia pelo sexo biológico informado. Multiplicadores de atividade e ajuste de calorias/proteína variam por objetivo escolhido; o ajuste calórico (déficit/superávit) varia pela meta de peso (perder/manter/ganhar).
 
@@ -195,7 +199,8 @@ A fórmula de cálculo (`calculateMacroTargets`, backend, `utils/macroCalculatio
 - Grade de 6 badges/conquistas com detalhe ao tocar (ver Tarefa 4).
 - Acesso ao Relatório Semanal e à tela de Upgrade (se não for Pro) ou "Restaurar compra".
 - Compartilhar card da semana (se a conta já existe desde antes da semana atual).
-- Bloco de configurações (ver Tarefa 3), bloco de notificações (ver Tarefa 3), sair da conta, links de Termos e Privacidade.
+- Bloco de configurações (ver Tarefa 3) com 6 linhas: Meu BLENDi (modelo), Objetivo, **Minhas metas** (resumo "150g · 2.100 kcal"; abre a tela própria — CP-1.1.1b), Unidade, Idioma e Tema. Proteína, carboidratos, calorias e hidratação **não** são mais editadas aqui.
+- Bloco de notificações (ver Tarefa 3), sair da conta, links de Termos e Privacidade.
 
 ### Upgrade (paywall) e Relatório Semanal
 
@@ -205,22 +210,30 @@ Detalhados nas Tarefas 6 e 7.
 
 ## TAREFA 3 — Configurações e personalização
 
-### Metas nutricionais e hidratação
+### Metas nutricionais e hidratação (CP-1.1.1b)
 
-Editadas num bottom sheet único e genérico (`EditSettingSheet`) a partir da tela de Perfil:
+Editadas na tela **"Minhas metas"** (`NutritionGoalsScreen`), aberta pela linha de mesmo nome no card de configurações do Perfil. Tudo na mesma tela, com um botão "Salvar" fixo no rodapé:
 
-| Configuração | Limite validado no backend |
+| Configuração | Limite (validado no app **e** no backend, vindo de `packages/shared`) |
 |---|---|
-| Meta de proteína (g/dia) | 10–400 |
-| Meta de carboidrato (g/dia) | 50–800 |
-| Meta de calorias (kcal/dia) | 500–10.000 |
-| Meta de hidratação (ml) | 500–8.000 |
-| Modelo BLENDi — as mesmas 5 opções do onboarding (Lite/ProPlus/Steel/Outro modelo/Ainda não tenho); em "Outro modelo" há o campo opcional de marca/modelo, já preenchido com o valor salvo | enum fixo de modelo + posse (`blendi`/`other`/`none`) + texto de até 60 caracteres |
-| Objetivo (Muscle/Wellness/Energy/Recovery) | enum fixo |
+| Meta de proteína (g/dia) | 10–800 |
+| Meta de carboidrato (g/dia) | 0–1.500 |
+| Meta de calorias (kcal/dia) | 300–15.000 |
+| Meta de hidratação (**ml**, sem conversão para fl oz) | 500–8.000 |
+| Dieta (4 restrições, múltipla escolha) | `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`; lista vazia = sem restrições |
 
-A linha "Meu BLENDi" do card de configurações reflete a posse: o nome do modelo para quem tem um BLENDi, "Outro modelo" (seguido do texto digitado, quando houver) ou "Ainda não tenho um BLENDi". A dieta **não** aparece nessas configurações neste momento.
+Comportamento:
 
-O app **não valida esses limites antes de enviar** — só mostra erro depois que o backend rejeita. Não existe campo de meta de gordura na UI (existe só internamente, no cálculo do onboarding).
+- **Validação inline por campo**, só depois que a pessoa digita algo (só aceita inteiros); "Salvar" fica desabilitado sem mudança ou com campo inválido.
+- **PATCH só com o que mudou** (`PATCH /users/me`); a hidratação alterada também invalida a query `hydrationToday` (a Home e o Track leem a meta de lá) e o perfil local é sincronizado (Relatório Semanal e Histórico leem as metas dele).
+- **Avisos de meta do backend:** em edição manual de proteína, carboidratos ou calorias fora de faixas de bom senso, o backend devolve `warnings` e a tela fica aberta mostrando, num quadro âmbar abaixo do campo, que a meta **foi salva** mas vale conferir (6 textos, em inglês e português; a regra é do backend — o app só exibe e ignora `code` desconhecido). Editar o campo apaga o aviso dele. Quem não tem dados de corpo salvos não recebe avisos.
+- **Aviso fixo na tela:** mudar o objetivo ou os dados de corpo recalcula proteína, carboidratos e calorias automaticamente (e sobrescreve o que foi digitado à mão).
+- **Sair com alteração não salva** pede confirmação ("Descartar alterações?"), inclusive pelo gesto do iOS e pelo botão físico do Android.
+- **Teclado:** teclado numérico, "Próximo"/"Concluir" (barra acima do teclado no iOS, tecla de ação no Android), rolagem automática até o campo em foco (nos 4), tocar fora fecha o teclado, "Salvar" sempre visível.
+
+As demais configurações continuam num bottom sheet genérico (`EditSettingSheet`): modelo BLENDi (as mesmas 5 opções do onboarding; em "Outro modelo" há o campo opcional de marca/modelo, já preenchido com o valor salvo), objetivo (Muscle/Wellness/Energy/Recovery), unidade, idioma e tema. A linha "Meu BLENDi" do card reflete a posse: o nome do modelo para quem tem um BLENDi, "Outro modelo" (seguido do texto digitado, quando houver) ou "Ainda não tenho um BLENDi".
+
+Não existe campo de meta de gordura na UI (o backend a calcula e a aceita, mas a linha está desativada até o consumo de gordura ser rastreado).
 
 ### Sistema de unidades
 
@@ -282,7 +295,7 @@ Lista completa dos 6 badges existentes no código, cada um com 3 estágios (bron
 | BLENDi Pro+ | modelo atual = ProPlus | desbloqueado se o modelo escolhido hoje for ProPlus | — | — |
 | BLENDi Steel | modelo atual = Steel | desbloqueado se o modelo escolhido hoje for Steel | — | — |
 
-Nota: quem escolhe "Outro modelo" ou "Ainda não tenho um BLENDi" grava `Lite` e portanto também desbloqueia o badge "BLENDi Lite" (o badge olha o modelo gravado, não a posse).
+Nota (corrigida no CP-1.1.1b): quem escolhe "Outro modelo" ou "Ainda não tenho um BLENDi" grava `Lite`, mas **não** ganha mais o badge "BLENDi Lite" — os 3 badges de modelo agora só contam quando o modelo bate **e** a posse (`blendiOwnership`) é `blendi`. Contas antigas, sem o campo de posse, contam como `blendi`.
 
 Nota: os 3 badges de modelo são mutuamente exclusivos e **somem visualmente se o usuário troca de modelo** (não existe histórico de "já tive esse modelo").
 
