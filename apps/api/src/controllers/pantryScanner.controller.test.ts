@@ -54,9 +54,15 @@ interface CallAiInput {
 // resposta é escolhida pelo conteúdo e não pela ordem.
 let initialRecipes: unknown[] = [];
 let retryByTitle: Record<string, unknown> = {};
+// CP-1.1.1d: quando definido, a geração inicial lança (falha da IA).
+let generationError: Error | null = null;
 
 const callAiMock = mock.fn(async ({ messages }: CallAiInput) => {
   const last = messages[messages.length - 1].content;
+
+  if (generationError) {
+    throw generationError;
+  }
 
   if (last.includes('mandatory restrictions')) {
     const previous = JSON.parse(messages[messages.length - 2].content) as { title: string };
@@ -98,8 +104,10 @@ mock.module('../services/xp.service', {
   namedExports: { awardXP: awardXPMock },
 });
 
+const updateMissionProgressMock = mock.fn(async (..._args: unknown[]) => undefined);
+
 mock.module('../services/missionProgress.service', {
-  namedExports: { updateMissionProgress: async () => undefined },
+  namedExports: { updateMissionProgress: updateMissionProgressMock },
 });
 
 type ControllerModule = typeof import('./pantryScanner.controller.js');
@@ -175,7 +183,15 @@ beforeEach(() => {
   };
   initialRecipes = [];
   retryByTitle = {};
-  for (const fn of [userFindByIdMock, userFindOneAndUpdateMock, userUpdateOneMock, callAiMock, awardXPMock]) {
+  generationError = null;
+  for (const fn of [
+    userFindByIdMock,
+    userFindOneAndUpdateMock,
+    userUpdateOneMock,
+    callAiMock,
+    awardXPMock,
+    updateMissionProgressMock,
+  ]) {
     fn.mock.resetCalls();
   }
 });
@@ -241,5 +257,75 @@ describe('Pantry Scanner — validação de restrições', () => {
     assert.equal(proRes.statusCode, 200);
     assert.equal((proRes.body?.data as { recipes: unknown[] }).recipes.length, 2);
     assert.equal(callAiMock.mock.callCount(), 1);
+  });
+});
+
+describe('Pantry Scanner — IA sem receita (CP-1.1.1d)', () => {
+  // Formato que o app já recebia nesses casos: 200, recipes [], ingredientes
+  // e contadores — só os valores de scansUsed/xpAwarded mudam.
+  function assertNoRecipeResponse(res: Awaited<ReturnType<typeof analyze>>) {
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body?.success, true);
+    const data = res.body?.data as Record<string, unknown>;
+    assert.deepEqual(data.recipes, []);
+    assert.equal((data.ingredients as unknown[]).length, 3);
+    assert.equal(data.noFoodDetected, false);
+    assert.equal(data.scansLimit, 3);
+    // o increment devolveu 1; com o scan devolvido, volta a 0
+    assert.equal(data.scansUsed, 0);
+    assert.equal(data.xpAwarded, 0);
+    assert.equal(data.leveledUp, false);
+    assert.equal(data.newLevel, null);
+    assert.deepEqual(
+      Object.keys(data).sort(),
+      [
+        'ingredients',
+        'leveledUp',
+        'newLevel',
+        'noFoodDetected',
+        'recipes',
+        'resetDate',
+        'scansLimit',
+        'scansUsed',
+        'xpAwarded',
+      ]
+    );
+  }
+
+  it('geração vazia: devolve o scan, sem XP e sem progresso de missão', async () => {
+    initialRecipes = [];
+
+    const res = await analyze();
+
+    assertNoRecipeResponse(res);
+    assert.equal(scanRollbackCalls().length, 1);
+    assert.equal(awardXPMock.mock.callCount(), 0);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(updateMissionProgressMock.mock.callCount(), 0);
+  });
+
+  it('falha da IA na geração: devolve o scan, sem XP e sem progresso de missão', async () => {
+    generationError = new Error('provider down');
+
+    const res = await analyze();
+
+    assertNoRecipeResponse(res);
+    assert.equal(scanRollbackCalls().length, 1);
+    assert.equal(awardXPMock.mock.callCount(), 0);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(updateMissionProgressMock.mock.callCount(), 0);
+  });
+
+  it('com receita entregue: scan consumido e XP dado (sem regressão)', async () => {
+    initialRecipes = [recipe('Oat Banana', 'Oats'), recipe('Seed Banana', 'Sunflower seeds')];
+
+    const res = await analyze();
+
+    assert.equal(res.statusCode, 200);
+    const data = res.body?.data as { scansUsed: number; xpAwarded: number };
+    assert.equal(data.scansUsed, 1);
+    assert.equal(data.xpAwarded, 15);
+    assert.equal(scanRollbackCalls().length, 0);
+    assert.equal(awardXPMock.mock.callCount(), 1);
   });
 });

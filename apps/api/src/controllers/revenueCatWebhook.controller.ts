@@ -81,20 +81,65 @@ async function syncActiveSubscriptionFromRevenueCat(userId: string) {
   ).lean();
 }
 
+/**
+ * Resultado da sincronização na compra/renovação (CP-1.1.1d):
+ * - 'synced': assinatura ativa gravada.
+ * - 'invalid-purchase': erro PERMANENTE — a RevenueCat respondeu, mas não há
+ *   assinatura ativa de produto conhecido (RevenueCatInvalidPurchaseError).
+ *   Reenviar não muda a resposta, então o webhook responde 2xx.
+ * - 'retry': erro TEMPORÁRIO — falha de rede/timeout, erro HTTP da API da
+ *   RevenueCat (RevenueCatRequestError), configuração ausente ou falha do
+ *   banco. O webhook responde fora de 2xx para a RevenueCat reenviar; a
+ *   renovação é aplicada (e o evento disparado) na tentativa que der certo.
+ */
+export type PurchaseOrRenewalOutcome = 'synced' | 'invalid-purchase' | 'retry';
+
 // Exportada para teste direto do ponto de ciclo de vida 'subscription_renewed' sem
 // precisar simular toda a requisicao HTTP do webhook (ver *.test.ts).
 export async function handleInitialPurchaseOrRenewal(
   user: { _id: unknown },
   event: RevenueCatWebhookPayload['event']
-): Promise<void> {
-  await syncActiveSubscriptionFromRevenueCat(String(user._id));
+): Promise<PurchaseOrRenewalOutcome> {
+  const userId = String(user._id);
+
+  try {
+    await syncActiveSubscriptionFromRevenueCat(userId);
+  } catch (err) {
+    // Só nome e status do erro: a mensagem pode trazer texto da API externa.
+    const errorInfo = {
+      userId,
+      eventId: event.id,
+      eventType: event.type,
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      ...(err instanceof RevenueCatRequestError ? { statusCode: err.statusCode } : {}),
+    };
+
+    if (err instanceof RevenueCatInvalidPurchaseError) {
+      // Sem subscription_renewed: nada foi renovado no nosso banco.
+      console.warn(
+        '[revenueCatWebhook.controller] purchase/renewal without an active subscription on RevenueCat — not retrying.',
+        errorInfo
+      );
+      return 'invalid-purchase';
+    }
+
+    // Sem subscription_renewed aqui: o evento só sai quando a sincronização
+    // de fato acontecer (na tentativa reenviada), para não duplicar.
+    console.error(
+      '[revenueCatWebhook.controller] purchase/renewal sync failed — asking RevenueCat to retry.',
+      errorInfo
+    );
+    return 'retry';
+  }
 
   if (event.type === 'RENEWAL') {
-    captureServerEvent(String(user._id), 'subscription_renewed', {
+    captureServerEvent(userId, 'subscription_renewed', {
       product_id: event.product_id,
       store: event.store,
     });
   }
+
+  return 'synced';
 }
 
 export async function markCancellationRequested(
@@ -243,7 +288,22 @@ export async function handleRevenueCatWebhook(
     }
 
     if (event.type === 'INITIAL_PURCHASE' || event.type === 'RENEWAL') {
-      await handleInitialPurchaseOrRenewal(user, event);
+      const outcome = await handleInitialPurchaseOrRenewal(user, event);
+
+      if (outcome === 'retry') {
+        // Fora de 2xx: a RevenueCat reenvia o webhook com backoff.
+        sendErrorResponse(res, {
+          statusCode: 503,
+          code: 'webhooks/subscription-sync-unavailable',
+          message: 'Subscription sync is temporarily unavailable. Please retry.',
+        });
+        return;
+      }
+
+      if (outcome === 'invalid-purchase') {
+        sendWebhookIgnored(res, 'No active subscription found on RevenueCat for this event.');
+        return;
+      }
 
       res.status(200).json({
         success: true,

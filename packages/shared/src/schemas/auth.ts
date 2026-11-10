@@ -146,6 +146,44 @@ export const googleCallbackSchema = z.object({
     .min(1, 'errors.validation.required'),
 });
 
+// ─── Schemas: código de uso único do login Google (CP-1.1.1d) ────────────────
+// No espírito do PKCE (RFC 7636): o app gera um verificador aleatório, manda
+// só o desafio (SHA-256 do verificador, base64url) ao pedir a URL de login, e
+// depois troca o código recebido no deep link + o verificador pelos tokens.
+// Um código interceptado no deep link não serve sem o verificador, que nunca
+// sai da memória do app até a troca.
+
+/** SHA-256 em base64url sem padding: sempre 43 caracteres. */
+export const GOOGLE_CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/** Verificador: 32 a 96 bytes aleatórios em base64url (43 a 128 caracteres, como no PKCE). */
+export const GOOGLE_CODE_VERIFIER_PATTERN = /^[A-Za-z0-9_-]{43,128}$/;
+/** Código de uso único gerado pelo backend: 32 bytes em base64url (43 caracteres). */
+export const GOOGLE_EXCHANGE_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+export const googleAuthUrlQuerySchema = z.object({
+  codeChallenge: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.invalid_option',
+    })
+    .regex(GOOGLE_CODE_CHALLENGE_PATTERN, 'errors.validation.invalid_option'),
+});
+
+export const googleExchangeSchema = z.object({
+  code: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.invalid_option',
+    })
+    .regex(GOOGLE_EXCHANGE_CODE_PATTERN, 'errors.validation.invalid_option'),
+  codeVerifier: z
+    .string({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.invalid_option',
+    })
+    .regex(GOOGLE_CODE_VERIFIER_PATTERN, 'errors.validation.invalid_option'),
+});
+
 // ─── Schema: Sign in with Apple ───────────────────────────────────────────────
 // Valida o body recebido no endpoint POST /auth/apple. Diferente do Google
 // (sem browser/redirect no fluxo nativo), o app mobile recebe o
@@ -223,6 +261,8 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type UpdateTimezoneInput = z.infer<typeof updateTimezoneSchema>;
 export type GoogleCallbackInput = z.infer<typeof googleCallbackSchema>;
+export type GoogleAuthUrlQuery = z.infer<typeof googleAuthUrlQuerySchema>;
+export type GoogleExchangeInput = z.infer<typeof googleExchangeSchema>;
 export type AppleSignInInput = z.infer<typeof appleSignInSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;

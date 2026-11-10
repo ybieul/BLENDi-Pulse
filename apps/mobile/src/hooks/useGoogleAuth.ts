@@ -1,19 +1,29 @@
 // apps/mobile/src/hooks/useGoogleAuth.ts
-// Encapsula todo o fluxo de Google Login:
-//   1. Obtém a URL de autorização do Google via backend
-//   2. Abre o browser com expo-web-browser
-//   3. Aguarda o usuário autorizar; o backend processa o OAuth e redireciona
-//      para o deep link blendipulse://auth/callback com os tokens na query string
-//   4. Extrai accessToken, refreshToken, isNewUser e user do deep link
-//   5. Decodifica o payload do usuário (base64 → JSON)
+// Encapsula todo o fluxo de Google Login (CP-1.1.1d — código de uso único):
+//   1. Gera o verificador (só em memória) e o desafio (SHA-256 do verificador)
+//   2. Obtém a URL de autorização do Google via backend, mandando o desafio
+//   3. Abre o browser com expo-web-browser
+//   4. O backend processa o OAuth e redireciona para o deep link
+//      blendipulse://auth/callback?code=... — só um código de uso único,
+//      sem tokens nem dados do usuário na URL
+//   5. Troca o código + o verificador pelos tokens e pelo usuário
+//      (POST /auth/google/exchange)
 //   6. Salva a sessão no store Zustand
+//
+// Por quê: no Android, outro app instalado pode registrar o esquema
+// blendipulse:// e receber o deep link. Sem o verificador, que nunca sai
+// deste hook até a troca, o código interceptado não serve para nada.
+//
+// Nunca registrar a URL do deep link, o código nem o verificador: os logs
+// levam no máximo o nome do erro e flags booleanas.
 //
 // O componente de UI só precisa de: { signInWithGoogle, isLoading, error }
 
 import { useState, useCallback } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { getGoogleAuthUrl, type AuthUser } from '../services/auth.service';
+import { exchangeGoogleCode, getGoogleAuthUrl } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
+import { createPkcePair } from '../utils/pkce.utils';
 
 // Necessário para fechar o browser corretamente no Android após o redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -48,29 +58,43 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
     setError(null);
 
     try {
-      // ── Passo 1: obter a URL de autorização do backend ─────────────────────
-      // A URL inclui o state JWT (CSRF) gerado pelo backend.
+      // ── Passo 1: verificador (só em memória) e desafio ─────────────────────
+      // `codeVerifier` é uma variável local: some quando o fluxo termina.
+      let codeVerifier: string;
+      let codeChallenge: string;
+      try {
+        ({ codeVerifier, codeChallenge } = await createPkcePair());
+      } catch (err) {
+        console.error('[useGoogleAuth] Falha ao gerar o verificador do login', {
+          errorName: err instanceof Error ? err.name : 'UnknownError',
+        });
+        setError('errors.auth.google_auth_failed');
+        return;
+      }
+
+      // ── Passo 2: obter a URL de autorização do backend ─────────────────────
+      // A URL inclui o state JWT (CSRF + desafio) gerado pelo backend.
       let authUrl: string;
       try {
-        authUrl = await getGoogleAuthUrl();
+        authUrl = await getGoogleAuthUrl(codeChallenge);
       } catch (err) {
-        console.error('[useGoogleAuth] Falha ao obter URL de autorização:', err);
+        console.error('[useGoogleAuth] Falha ao obter URL de autorização', {
+          errorName: err instanceof Error ? err.name : 'UnknownError',
+        });
         setError('errors.network.server');
         return;
       }
 
-      // ── Passo 2: abrir o browser de autorização ────────────────────────────
-      // O redirect URI do backend (http://localhost:3000/auth/google/callback)
-      // processa o callback e redireciona de volta para o deep link do app.
-      // O expo-web-browser detecta o deep link e fecha o browser automaticamente.
+      // ── Passo 3: abrir o browser de autorização ────────────────────────────
+      // O redirect URI do backend processa o callback e redireciona de volta
+      // para o deep link do app. O expo-web-browser detecta o deep link e
+      // fecha o browser automaticamente.
       //
       // redirectUrl: esquema do app que sinaliza ao browser quando fechar.
-      // Em desenvolvimento (Expo Go): exp://127.0.0.1:8081
-      // Em produção (build EAS): blendipulse://
       const redirectUrl = 'blendipulse://';
       const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
 
-      // ── Passo 3: verificar resultado do browser ────────────────────────────
+      // ── Passo 4: verificar resultado do browser ────────────────────────────
       if (
         result.type === WebBrowser.WebBrowserResultType.CANCEL ||
         result.type === WebBrowser.WebBrowserResultType.DISMISS
@@ -85,16 +109,17 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
         return;
       }
 
-      // ── Passo 4: parsear URL e extrair params do deep link ────────────────
-      // O backend processa o OAuth e redireciona para:
-      //   blendipulse://auth/callback?accessToken=...&refreshToken=...&isNewUser=...&user=<base64>
-      // Em caso de erro:
+      // ── Passo 5: ler o código (ou o erro) do deep link ─────────────────────
+      //   blendipulse://auth/callback?code=<código de uso único>
       //   blendipulse://auth/callback?error=errors.auth.<chave>
+      // Nunca logar `result.url`: ela traz o código de uso único.
       let params: URLSearchParams;
       try {
         params = new URL(result.url).searchParams;
       } catch (err) {
-        console.error('[useGoogleAuth] Falha ao parsear URL de deep link:', result.url, err);
+        console.error('[useGoogleAuth] Falha ao parsear URL de deep link', {
+          errorName: err instanceof Error ? err.name : 'UnknownError',
+        });
         setError('errors.auth.google_auth_failed');
         return;
       }
@@ -106,43 +131,41 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
         return;
       }
 
-      const accessToken = params.get('accessToken');
-      const refreshToken = params.get('refreshToken');
-      const isNewUser = params.get('isNewUser') === 'true';
-      const userBase64 = params.get('user');
+      const code = params.get('code');
+      if (!code) {
+        console.error('[useGoogleAuth] Código ausente no deep link', { hasCode: false });
+        setError('errors.auth.google_auth_failed');
+        return;
+      }
 
-      if (!accessToken || !refreshToken || !userBase64) {
-        // Nunca logar `result.url` diretamente: se só um dos três campos
-        // estiver ausente, os outros podem ser um accessToken/refreshToken
-        // reais e válidos — mais sensíveis que o identityToken da Apple, já
-        // que dão acesso direto à sessão da conta.
-        console.error('[useGoogleAuth] Params obrigatórios ausentes no deep link', {
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          hasUserBase64: !!userBase64,
+      // ── Passo 6: trocar código + verificador pela sessão ──────────────────
+      let session: Awaited<ReturnType<typeof exchangeGoogleCode>>;
+      try {
+        session = await exchangeGoogleCode({ code, codeVerifier });
+      } catch (err) {
+        // Só o nome do erro: o objeto do Axios carrega a config da requisição,
+        // com o código e o verificador no corpo.
+        console.error('[useGoogleAuth] Falha ao trocar o código do login Google', {
+          errorName: err instanceof Error ? err.name : 'UnknownError',
         });
         setError('errors.auth.google_auth_failed');
         return;
       }
 
-      // ── Passo 5: decodificar payload do usuário ───────────────────────────
-      // atob() está disponível no Hermes desde RN 0.64.
-      // O backend serializa o user como JSON → base64 via Buffer.from().toString('base64').
-      let user: AuthUser;
-      try {
-        user = JSON.parse(atob(userBase64)) as AuthUser;
-      } catch (err) {
-        console.error('[useGoogleAuth] Falha ao decodificar payload do usuário:', err);
-        setError('errors.auth.google_auth_failed');
-        return;
-      }
-
-      // ── Passo 6: salvar sessão no store (SecureStore + Zustand) ───────────
-      await _setSession({ user, accessToken, refreshToken, isNewUser });
-      setIsNewUser(isNewUser);
+      // ── Passo 7: salvar sessão no store (SecureStore + Zustand) ───────────
+      await _setSession({
+        user: session.user,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        isNewUser: session.isNewUser,
+      });
+      setIsNewUser(session.isNewUser);
     } catch (err) {
-      // Captura erros não tratados nos passos anteriores
-      console.error('[useGoogleAuth] Erro inesperado no fluxo Google Login:', err);
+      // Captura erros não tratados nos passos anteriores. Só o nome do erro:
+      // o objeto pode carregar a sessão ou o código.
+      console.error('[useGoogleAuth] Erro inesperado no fluxo Google Login', {
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+      });
       setError('errors.auth.google_auth_failed');
     } finally {
       setIsLoading(false);

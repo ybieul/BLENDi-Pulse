@@ -37,7 +37,12 @@ import { api } from '../config/api';
 import { createAppStorage } from '../config/storage';
 import { useGamificationStore } from './gamification.store';
 import * as AuthService from '../services/auth.service';
-import type { AuthResponse, AuthUser } from '../services/auth.service';
+import {
+  mapCurrentUserProfile,
+  type AuthResponse,
+  type AuthUser,
+  type CurrentUserProfileResponse,
+} from '../services/auth.service';
 import { identifyAnalyticsUser, resetAnalyticsUser, trackEvent } from '../services/analytics.service';
 import { identifyPurchasesUser, logoutPurchasesUser } from '../services/purchase.service';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
@@ -60,95 +65,10 @@ type AuthSessionData = AuthResponse['data'] & {
   isNewUser?: boolean;
 };
 
-interface CurrentUserProfileResponse {
-  success: true;
-  data: {
-    user: {
-      id: string;
-      email: string;
-      name: string;
-      profilePhoto?: string;
-      hasProfilePhoto?: boolean;
-      profilePhotoUpdatedAt?: string | null;
-      lastCleanedAt?: string | null;
-      pushToken?: string | null;
-      blendiModel: AuthUser['blendiModel'];
-      blendiOwnership: NonNullable<AuthUser['blendiOwnership']>;
-      otherBlenderModel: string | null;
-      dietaryPreferences: NonNullable<AuthUser['dietaryPreferences']>;
-      goal: AuthUser['goal'];
-      preferredLanguage: AuthUser['locale'];
-      unitSystem: AuthUser['unitSystem'];
-      timezone: string;
-      dailyProteinTarget: number;
-      dailyCalorieTarget: number;
-      dailyCarbTarget: number;
-      dailyFatTarget?: number;
-      dailyHydrationTarget?: number;
-      isPro: boolean;
-      subscriptionId?: string | null;
-      subscriptionPlan?: 'monthly' | 'annual' | null;
-      subscriptionExpiresAt?: string | null;
-      subscriptionCancelRequestedAt?: string | null;
-      revenueCatCustomerId?: string | null;
-      longestStreak: number;
-      totalXP: number;
-      createdAt: string;
-      updatedAt?: string;
-      notificationPreferences?: {
-        dailyPulse: boolean;
-        streakReminder: boolean;
-        supplementReminder: boolean;
-        hydrationReminder: boolean;
-        levelUp: boolean;
-      };
-      dailyPulseTime?: {
-        hour: number;
-        minute: number;
-      };
-    };
-  };
-}
 
 async function fetchCurrentUserProfile(): Promise<AuthUser> {
   const response = await api.get<CurrentUserProfileResponse>('/users/me');
-  const { user } = response.data.data;
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    profilePhoto: user.profilePhoto,
-    hasProfilePhoto: user.hasProfilePhoto ?? false,
-    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
-    lastCleanedAt: user.lastCleanedAt ?? null,
-    pushToken: user.pushToken ?? null,
-    blendiModel: user.blendiModel,
-    blendiOwnership: user.blendiOwnership,
-    otherBlenderModel: user.otherBlenderModel,
-    dietaryPreferences: user.dietaryPreferences,
-    goal: user.goal,
-    locale: user.preferredLanguage,
-    unitSystem: user.unitSystem,
-    timezone: user.timezone,
-    dailyProteinTarget: user.dailyProteinTarget,
-    dailyCalorieTarget: user.dailyCalorieTarget,
-    dailyCarbTarget: user.dailyCarbTarget,
-    dailyFatTarget: user.dailyFatTarget,
-    dailyHydrationTarget: user.dailyHydrationTarget,
-    isPro: user.isPro,
-    subscriptionId: user.subscriptionId ?? null,
-    subscriptionPlan: user.subscriptionPlan ?? null,
-    subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
-    subscriptionCancelRequestedAt: user.subscriptionCancelRequestedAt ?? null,
-    revenueCatCustomerId: user.revenueCatCustomerId ?? null,
-    longestStreak: user.longestStreak,
-    totalXP: user.totalXP ?? 0,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    notificationPreferences: user.notificationPreferences,
-    dailyPulseTime: user.dailyPulseTime,
-  };
+  return mapCurrentUserProfile(response.data.data.user);
 }
 
 function normalizeAuthUser(user: AuthUser): AuthUser {

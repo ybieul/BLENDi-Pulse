@@ -17,12 +17,18 @@ const mockPost = jest.fn<
   [string, Record<string, unknown>]
 >();
 
+const mockGet = jest.fn<
+  Promise<{ data: { success: true; data: unknown } }>,
+  [string, Record<string, unknown>?]
+>();
+
 jest.mock('../config/api', () => ({
-  api: { post: mockPost },
+  api: { post: mockPost, get: mockGet },
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- ver comentário acima sobre hoisting de import
-const { signInWithApple } = require('./auth.service') as typeof import('./auth.service');
+const authService = require('./auth.service') as typeof import('./auth.service');
+const { signInWithApple, getGoogleAuthUrl, exchangeGoogleCode } = authService;
 
 describe('auth.service — signInWithApple', () => {
   beforeEach(() => {
@@ -82,5 +88,67 @@ describe('auth.service — signInWithApple', () => {
     await expect(
       signInWithApple({ identityToken: 'tok', authorizationCode: 'code' })
     ).rejects.toBe(axiosError);
+  });
+});
+
+// CP-1.1.1d: login Google com código de uso único + verificador.
+describe('auth.service — login Google', () => {
+  beforeEach(() => {
+    mockPost.mockReset();
+    mockGet.mockReset();
+  });
+
+  it('getGoogleAuthUrl manda o desafio como query param', async () => {
+    mockGet.mockResolvedValue({ data: { success: true, data: { url: 'https://accounts.google.com/x' } } });
+
+    const url = await getGoogleAuthUrl('C'.repeat(43));
+
+    expect(url).toBe('https://accounts.google.com/x');
+    expect(mockGet).toHaveBeenCalledWith('/auth/google/url', { params: { codeChallenge: 'C'.repeat(43) } });
+  });
+
+  it('exchangeGoogleCode: POST com código + verificador e usuário convertido do formato do getMe', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          user: {
+            id: 'u1',
+            email: 'g@example.com',
+            name: 'G',
+            blendiModel: 'Steel',
+            blendiOwnership: 'blendi',
+            otherBlenderModel: null,
+            dietaryPreferences: ['vegan'],
+            goal: 'Muscle',
+            preferredLanguage: 'pt-BR',
+            unitSystem: 'metric',
+            timezone: 'America/Sao_Paulo',
+            dailyProteinTarget: 160,
+            dailyCalorieTarget: 2200,
+            dailyCarbTarget: 220,
+            isPro: true,
+            longestStreak: 4,
+            totalXP: 50,
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+          accessToken: 'at',
+          refreshToken: 'rt',
+          isNewUser: true,
+        },
+      },
+    });
+
+    const input = { code: 'K'.repeat(43), codeVerifier: 'V'.repeat(43) };
+    const result = await exchangeGoogleCode(input);
+
+    expect(mockPost).toHaveBeenCalledWith('/auth/google/exchange', input);
+    expect(Object.keys(mockPost.mock.calls[0][1])).toEqual(['code', 'codeVerifier']);
+    expect(result.accessToken).toBe('at');
+    expect(result.refreshToken).toBe('rt');
+    expect(result.isNewUser).toBe(true);
+    expect(result.user.locale).toBe('pt-BR');
+    expect(result.user.dietaryPreferences).toEqual(['vegan']);
+    expect(result.user.isPro).toBe(true);
   });
 });

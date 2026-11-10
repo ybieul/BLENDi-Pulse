@@ -43,10 +43,19 @@ export const shoppingListItemSchema = z.object({
   source: shoppingListItemSourceSchema.default('manual'),
 });
 
-export const updateItemsSchema = z.array(shoppingListItemSchema, {
-  required_error: 'errors.validation.required',
-  invalid_type_error: 'errors.validation.invalid_option',
-}).max(100, 'errors.validation.too_long');
+// Teto checado antes dos itens (CP-1.1.1d): com .max depois do array de
+// objetos, o Zod validava os milhares de itens antes de recusar o tamanho e
+// devolvia um issue por item. .pipe só roda a validação dos itens se o teto
+// passou (mesmo padrão de dietaryPreferences em user.ts).
+export const SHOPPING_LIST_MAX_ITEMS = 100;
+
+export const updateItemsSchema = z
+  .array(z.unknown(), {
+    required_error: 'errors.validation.required',
+    invalid_type_error: 'errors.validation.invalid_option',
+  })
+  .max(SHOPPING_LIST_MAX_ITEMS, 'errors.validation.too_long')
+  .pipe(z.array(shoppingListItemSchema));
 
 export type ShoppingListItemSource = z.infer<typeof shoppingListItemSourceSchema>;
 export type CreateShoppingListInput = z.infer<typeof createShoppingListSchema>;

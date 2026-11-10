@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError, z } from 'zod';
 import {
-  calculateLevel,
   calculateMacrosSchema,
   dailyPulseTimeSchema,
   notificationPreferencesSchema,
@@ -19,6 +18,7 @@ import { SupplementLogModel } from '../models/SupplementLog';
 import { WeeklyReportModel } from '../models/WeeklyReport';
 import { XPLogModel } from '../models/XPLog';
 import { DailyMissionModel } from '../models/DailyMission';
+import { GoogleAuthCodeModel } from '../models/GoogleAuthCode';
 import { invalidateUserCache } from '../services/cache.service';
 import { revokeAppleRefreshToken } from '../services/apple.service';
 import {
@@ -34,34 +34,17 @@ import {
   type MacroEditWarning,
 } from '../utils/macroCalculation.utils';
 import { resolveBlenderOwnershipUpdates } from '../utils/blenderOwnership.utils';
+import {
+  DEFAULT_DAILY_HYDRATION_TARGET,
+  normalizeDailyPulseTime,
+  normalizeNotificationPreferences,
+  serializeUserProfile,
+} from '../utils/userProfile.utils';
 
-const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 const MAX_PROFILE_PHOTO_BASE64_LENGTH = 530_000;
 
 const POUNDS_PER_KILOGRAM = 2.205;
 const CENTIMETERS_PER_INCH = 2.54;
-type NotificationPreferencesState = {
-  dailyPulse: boolean;
-  streakReminder: boolean;
-  supplementReminder: boolean;
-  hydrationReminder: boolean;
-  levelUp: boolean;
-};
-type DailyPulseTimeState = {
-  hour: number;
-  minute: number;
-};
-const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesState = {
-  dailyPulse: true,
-  streakReminder: true,
-  supplementReminder: true,
-  hydrationReminder: true,
-  levelUp: true,
-};
-const DEFAULT_DAILY_PULSE_TIME: DailyPulseTimeState = {
-  hour: 7,
-  minute: 0,
-};
 const NOTIFICATION_PREFERENCE_KEYS = [
   'dailyPulse',
   'streakReminder',
@@ -138,22 +121,6 @@ type UserPhotoProfileResponse = {
   updatedAt?: Date | null;
 };
 
-function normalizeNotificationPreferences(
-  preferences: Partial<NotificationPreferencesState> | null | undefined
-) {
-  return {
-    ...DEFAULT_NOTIFICATION_PREFERENCES,
-    ...preferences,
-  };
-}
-
-function normalizeDailyPulseTime(dailyPulseTime: Partial<DailyPulseTimeState> | null | undefined) {
-  return {
-    ...DEFAULT_DAILY_PULSE_TIME,
-    ...dailyPulseTime,
-  };
-}
-
 function formatZodErrors(err: ZodError) {
   return err.issues.map(issue => ({
     field: issue.path.join('.') || 'root',
@@ -219,64 +186,10 @@ export async function getMe(
       return;
     }
 
-    const totalXP = user.totalXP ?? 0;
-    const levelInfo = calculateLevel(totalXP);
-
     res.status(200).json({
       success: true,
       data: {
-        user: {
-          id: String(user._id),
-          name: user.name,
-          email: user.email,
-          profilePhoto: user.profilePhoto,
-          hasProfilePhoto: user.hasProfilePhoto ?? false,
-          profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
-          blendiModel: user.blendiModel,
-          // .lean() não aplica defaults do schema — contas anteriores a estes
-          // campos não os têm gravados, por isso o fallback explícito.
-          blendiOwnership: user.blendiOwnership ?? 'blendi',
-          otherBlenderModel: user.otherBlenderModel ?? null,
-          dietaryPreferences: user.dietaryPreferences ?? [],
-          goal: user.goal,
-          weightGoal: user.weightGoal,
-          weight: user.weight,
-          height: user.height,
-          targetWeight: user.targetWeight,
-          activityLevel: user.activityLevel,
-          birthDate: user.birthDate,
-          biologicalSex: user.biologicalSex,
-          hasRealBodyProfile: user.hasRealBodyProfile ?? false,
-          preferredLanguage: user.locale,
-          unitSystem: user.unitSystem,
-          timezone: user.timezone,
-          pushToken: user.pushToken ?? null,
-          notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences),
-          dailyPulseTime: normalizeDailyPulseTime(user.dailyPulseTime),
-          dailyProteinTarget: user.dailyProteinTarget,
-          dailyCarbTarget: user.dailyCarbTarget ?? 200,
-          dailyCalorieTarget: user.dailyCalorieTarget,
-          dailyFatTarget:
-            user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
-          dailyHydrationTarget: user.dailyHydrationTarget ?? DEFAULT_DAILY_HYDRATION_TARGET,
-          isPro: user.isPro ?? false,
-          subscriptionId: user.subscriptionId ?? null,
-          subscriptionPlan: user.subscriptionPlan ?? null,
-          subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
-          subscriptionCancelRequestedAt: user.subscriptionCancelRequestedAt ?? null,
-          revenueCatCustomerId: user.revenueCatCustomerId ?? null,
-          createdAt: user.createdAt,
-          currentStreak: user.currentStreak,
-          streakDays: user.currentStreak,
-          longestStreak: user.longestStreak ?? 0,
-          blendCount: user.blendCount,
-          totalXP,
-          lastLevelUp: user.lastLevelUp ?? null,
-          currentLevel: levelInfo.level,
-          levelProgress: levelInfo.progress,
-          totalBlends: user.blendCount,
-          lastCleanedAt: user.lastCleanedAt ?? null,
-        },
+        user: serializeUserProfile(user),
       },
     });
   } catch (err) {
@@ -586,6 +499,9 @@ export async function deleteAccount(
           WeeklyReportModel.deleteMany({ userId }, { session }),
           XPLogModel.deleteMany({ userId }, { session }),
           DailyMissionModel.deleteMany({ userId }, { session }),
+          // Código de login Google ainda não trocado (vive ~2 min por TTL).
+          // Apagado junto para não sobrar documento ligado à conta excluída.
+          GoogleAuthCodeModel.deleteMany({ userId }, { session }),
           invalidateUserCache(userId, session),
         ]);
 

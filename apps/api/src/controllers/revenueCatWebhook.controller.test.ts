@@ -5,7 +5,7 @@
 // simular a requisicao HTTP inteira (auth, body bruto, validacao do payload).
 // Rodar com: pnpm --filter @blendi/api test
 import assert from 'node:assert/strict';
-import { before, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 // Imita o encadeamento de uma query do mongoose (.select().lean() ou .lean() direto)
 // resolvendo sempre para `resolvedValue`, sem precisar de uma conexao real ao Mongo.
@@ -38,13 +38,27 @@ mock.module('../models/User', {
   },
 });
 
+class FakeRevenueCatInvalidPurchaseError extends Error {
+  name = 'RevenueCatInvalidPurchaseError';
+}
+
+class FakeRevenueCatRequestError extends Error {
+  name = 'RevenueCatRequestError';
+  constructor(
+    message: string,
+    public statusCode: number
+  ) {
+    super(message);
+  }
+}
+
 mock.module('../services/revenueCat.service', {
   namedExports: {
     getSubscriberCustomerInfo: getSubscriberCustomerInfoMock,
     extractActiveSubscriptionSnapshot: extractActiveSubscriptionSnapshotMock,
     RevenueCatConfigurationError: class RevenueCatConfigurationError extends Error {},
-    RevenueCatInvalidPurchaseError: class RevenueCatInvalidPurchaseError extends Error {},
-    RevenueCatRequestError: class RevenueCatRequestError extends Error {},
+    RevenueCatInvalidPurchaseError: FakeRevenueCatInvalidPurchaseError,
+    RevenueCatRequestError: FakeRevenueCatRequestError,
   },
 });
 
@@ -82,6 +96,8 @@ beforeEach(() => {
   findByIdAndUpdateMock.mock.resetCalls();
   captureServerEventMock.mock.resetCalls();
   findByIdAndUpdateMock.mock.mockImplementation(() => fakeQuery(null));
+  getSubscriberCustomerInfoMock.mock.resetCalls();
+  getSubscriberCustomerInfoMock.mock.mockImplementation(async () => ({}));
 });
 
 describe('handleInitialPurchaseOrRenewal', () => {
@@ -101,9 +117,96 @@ describe('handleInitialPurchaseOrRenewal', () => {
   it('INITIAL_PURCHASE: NAO dispara nenhum evento (so o app dispara purchase_completed)', async () => {
     const event = buildEvent({ type: 'INITIAL_PURCHASE' });
 
-    await handleInitialPurchaseOrRenewal({ _id: USER_ID }, event as never);
+    const outcome = await handleInitialPurchaseOrRenewal({ _id: USER_ID }, event as never);
 
+    assert.equal(outcome, 'synced');
     assert.equal(captureServerEventMock.mock.callCount(), 0);
+  });
+});
+
+// CP-1.1.1d: erro na sincronizacao da compra/renovacao.
+describe('handleInitialPurchaseOrRenewal — erros de sincronizacao', () => {
+  let consoleErrorMock: ReturnType<typeof mock.method>;
+  let consoleWarnMock: ReturnType<typeof mock.method>;
+
+  beforeEach(() => {
+    consoleErrorMock = mock.method(console, 'error', () => undefined);
+    consoleWarnMock = mock.method(console, 'warn', () => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorMock.mock.restore();
+    consoleWarnMock.mock.restore();
+  });
+
+  const temporaryErrors: Array<[string, () => Error]> = [
+    ['erro HTTP da API da RevenueCat (5xx)', () => new FakeRevenueCatRequestError('down', 503)],
+    ['erro HTTP da API da RevenueCat (429)', () => new FakeRevenueCatRequestError('slow down', 429)],
+    ['falha de rede do fetch', () => new TypeError('fetch failed')],
+    ['timeout', () => Object.assign(new Error('timeout'), { name: 'TimeoutError' })],
+  ];
+
+  for (const eventType of ['RENEWAL', 'INITIAL_PURCHASE']) {
+    for (const [label, buildError] of temporaryErrors) {
+      it(`${eventType} + ${label}: 'retry', sem gravar e sem subscription_renewed`, async () => {
+        getSubscriberCustomerInfoMock.mock.mockImplementation(async () => {
+          throw buildError();
+        });
+
+        const outcome = await handleInitialPurchaseOrRenewal(
+          { _id: USER_ID },
+          buildEvent({ type: eventType }) as never
+        );
+
+        assert.equal(outcome, 'retry');
+        assert.equal(findByIdAndUpdateMock.mock.callCount(), 0);
+        assert.equal(captureServerEventMock.mock.callCount(), 0);
+        assert.equal(consoleErrorMock.mock.callCount(), 1);
+      });
+    }
+
+    it(`${eventType} + compra invalida (permanente): 'invalid-purchase', sem gravar e sem evento`, async () => {
+      getSubscriberCustomerInfoMock.mock.mockImplementation(async () => {
+        throw new FakeRevenueCatInvalidPurchaseError('no active subscription');
+      });
+
+      const outcome = await handleInitialPurchaseOrRenewal(
+        { _id: USER_ID },
+        buildEvent({ type: eventType }) as never
+      );
+
+      assert.equal(outcome, 'invalid-purchase');
+      assert.equal(findByIdAndUpdateMock.mock.callCount(), 0);
+      assert.equal(captureServerEventMock.mock.callCount(), 0);
+      assert.equal(consoleWarnMock.mock.callCount(), 1);
+    });
+  }
+
+  it('RENEWAL: falha temporaria e depois reenvio com sucesso dispara subscription_renewed uma unica vez', async () => {
+    getSubscriberCustomerInfoMock.mock.mockImplementationOnce(async () => {
+      throw new FakeRevenueCatRequestError('down', 502);
+    });
+    const event = buildEvent({ type: 'RENEWAL' });
+
+    assert.equal(await handleInitialPurchaseOrRenewal({ _id: USER_ID }, event as never), 'retry');
+    assert.equal(await handleInitialPurchaseOrRenewal({ _id: USER_ID }, event as never), 'synced');
+
+    assert.equal(findByIdAndUpdateMock.mock.callCount(), 1);
+    assert.equal(captureServerEventMock.mock.callCount(), 1);
+    assert.equal(captureServerEventMock.mock.calls[0]?.arguments[1], 'subscription_renewed');
+  });
+
+  it('log do erro: so nome/status, sem a mensagem da API externa', async () => {
+    getSubscriberCustomerInfoMock.mock.mockImplementation(async () => {
+      throw new FakeRevenueCatRequestError('SECRET-UPSTREAM-DETAIL', 500);
+    });
+
+    await handleInitialPurchaseOrRenewal({ _id: USER_ID }, buildEvent() as never);
+
+    const logged = JSON.stringify(consoleErrorMock.mock.calls.map(call => call.arguments));
+    assert.equal(logged.includes('SECRET-UPSTREAM-DETAIL'), false);
+    assert.equal(logged.includes('RevenueCatRequestError'), true);
+    assert.equal(logged.includes('500'), true);
   });
 });
 

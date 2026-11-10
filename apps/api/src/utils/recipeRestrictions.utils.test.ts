@@ -172,10 +172,25 @@ describe('validateRecipeRestrictions — nut_free', () => {
     ['Polpa de caju', false],
     ['Caju', false],
     ['Cashew fruit juice', false],
-    ['Peanut-free granola', false],
     ['Nut-free protein powder', false],
-    ['Granola sem amendoim', false],
     ['Granola sem castanhas', false],
+    // Granola (CP-1.1.1d): barrada, a não ser que o nome diga que não tem castanhas
+    ['Granola', true],
+    ['Homemade granola', true],
+    ['Granola caseira', true],
+    ['Granola com mel', true],
+    ['Honey granola clusters', true],
+    // "sem amendoim"/"peanut-free" não diz nada sobre castanhas
+    ['Peanut-free granola', true],
+    ['Granola sem amendoim', true],
+    ['Nut-free granola', false],
+    ['Tree-nut-free granola', false],
+    ['Granola (nut-free)', false],
+    ['Granola without nuts', false],
+    ['Granola sem castanhas e sem amendoim', false],
+    ['Granola sem oleaginosas', false],
+    ['Granola sem nozes', false],
+    ['Granola livre de castanhas', false],
     // Coco: decisão documentada — não é oleaginosa
     ['Coconut milk', false],
     ['Coco ralado', false],
@@ -214,6 +229,38 @@ describe('validateRecipeRestrictions — vegan', () => {
     ['Colágeno hidrolisado', true],
     ['Gelatina incolor', true],
     ['Albumina', true],
+    // Proteína em pó sem origem vegetal declarada (CP-1.1.1d)
+    ['Protein powder', true],
+    ['Vanilla protein powder', true],
+    ['Chocolate protein powders', true],
+    ['Protein isolate', true],
+    ['Unflavored protein powder', true],
+    ['Proteína em pó', true],
+    ['Proteína em pó sabor baunilha', true],
+    ['Pó de proteína', true],
+    ['Proteína isolada', true],
+    // conjunção: o qualificador do item vizinho não vale
+    ['Soy milk and protein powder', true],
+    ['Leite de soja e proteína em pó', true],
+    // Com qualificador vegetal: permitidos
+    ['Plant protein powder', false],
+    ['Plant-based protein powder', false],
+    ['Pea protein powder', false],
+    ['Soy protein isolate', false],
+    ['Rice protein powder', false],
+    ['Hemp protein powder', false],
+    ['Vegan protein powder', false],
+    ['Vegan vanilla protein powder', false],
+    ['Pea vanilla protein powder', false],
+    ['Protein powder (pea)', false],
+    ['Proteína em pó vegetal', false],
+    ['Proteína vegetal em pó', false],
+    ['Proteína em pó de ervilha', false],
+    ['Proteína de ervilha em pó', false],
+    ['Proteína em pó de soja', false],
+    ['Proteína em pó de arroz', false],
+    ['Proteína isolada de soja', false],
+    ['Pó de proteína vegana', false],
     // Permitidos
     ['Pea protein', false],
     ['Proteína vegetal', false],
@@ -556,5 +603,77 @@ describe('buildRecipeRestrictionRetryMessage', () => {
     assert.match(message, /the ingredient "Leite de amêndoas" uses "amendoa", which violates the nut-free restriction/);
     assert.match(message, /step 1 uses "gelo", which violates the no ice/);
     assert.match(message, /single JSON object/);
+  });
+
+  it('proteína em pó genérica (vegan): pede a origem vegetal da proteína', () => {
+    const recipe: RestrictedRecipe = {
+      ingredients: [{ name: 'Proteína em pó sabor baunilha', amount: '30 g' }],
+      blendInstruction: 'Bata.',
+    };
+    const result = validateRecipeRestrictions(recipe, ['vegan'], 'ProPlus');
+    assert.equal(result.compliant, false);
+    if (result.compliant) return;
+    const message = buildRecipeRestrictionRetryMessage(recipe, result.violations);
+    assert.match(message, /uses "proteina em po", which violates the vegan restriction/);
+    assert.match(message, /protein powder must name its plant source/);
+    assert.match(message, /pea protein powder/);
+    assert.doesNotMatch(message, /nut-free granola/);
+  });
+
+  it('granola comum (nut_free): pede granola sem castanhas', () => {
+    const recipe: RestrictedRecipe = {
+      ingredients: [{ name: 'Granola', amount: '30 g' }],
+      blendInstruction: 'Blend.',
+    };
+    const result = validateRecipeRestrictions(recipe, ['nut_free'], 'ProPlus');
+    assert.equal(result.compliant, false);
+    if (result.compliant) return;
+    const message = buildRecipeRestrictionRetryMessage(recipe, result.violations);
+    assert.match(message, /uses "granola", which violates the nut-free restriction/);
+    assert.match(message, /nut-free granola/);
+    assert.match(message, /granola sem castanhas/);
+    assert.doesNotMatch(message, /plant source/);
+  });
+
+  it('sem proteína em pó nem granola: mensagem sem orientação extra', () => {
+    const recipe: RestrictedRecipe = {
+      ingredients: [{ name: 'Honey', amount: '1 tbsp' }],
+      blendInstruction: 'Blend.',
+    };
+    const result = validateRecipeRestrictions(recipe, ['vegan'], 'ProPlus');
+    assert.equal(result.compliant, false);
+    if (result.compliant) return;
+    const message = buildRecipeRestrictionRetryMessage(recipe, result.violations);
+    assert.doesNotMatch(message, /plant source|nut-free granola/);
+  });
+});
+
+describe('validateRecipeRestrictions — proteína em pó e granola nos passos', () => {
+  it('vegan: passo com proteína em pó genérica é barrado; com origem vegetal passa', () => {
+    const base: RestrictedRecipe = {
+      ingredients: [{ name: 'Banana', amount: '1' }],
+      blendInstruction: 'Blend.',
+    };
+    const generic = validateRecipeRestrictions(
+      { ...base, steps: [{ text: 'Add one scoop of protein powder.' }] },
+      ['vegan'],
+      'ProPlus'
+    );
+    assert.equal(generic.compliant, false);
+
+    const plant = validateRecipeRestrictions(
+      { ...base, steps: [{ text: 'Adicione um scoop de proteína em pó de ervilha.' }] },
+      ['vegan'],
+      'ProPlus'
+    );
+    assert.equal(plant.compliant, true);
+  });
+
+  it('dairy_free e nut_free não barram proteína em pó genérica (só vegan)', () => {
+    assert.deepEqual(violatedRestrictions('Protein powder', ['dairy_free', 'nut_free']), []);
+  });
+
+  it('granola só é barrada para nut_free', () => {
+    assert.deepEqual(violatedRestrictions('Granola', ['vegan', 'dairy_free']), []);
   });
 });

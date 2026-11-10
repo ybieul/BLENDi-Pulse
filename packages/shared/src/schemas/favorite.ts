@@ -23,6 +23,13 @@ const favoriteStepSchema = z.object({
     .optional(),
 });
 
+// Tetos das listas do favorito (CP-1.1.1d). O favorito é sempre uma receita
+// do Pulse AI ou do Pantry Scanner, que hoje trazem 3–8 ingredientes e 3–5
+// passos (ver promptBuilder.service.ts). Os tetos dão folga de ~4x sobre isso
+// e cortam um array gigante antes de validar item a item.
+export const FAVORITE_INGREDIENTS_MAX_ITEMS = 30;
+export const FAVORITE_STEPS_MAX_ITEMS = 20;
+
 export const createFavoriteSchema = z.object({
   recipeName: z
     .string({ required_error: 'errors.validation.required' })
@@ -30,12 +37,17 @@ export const createFavoriteSchema = z.object({
     .min(1, 'errors.validation.required')
     .max(100, 'errors.validation.too_long'),
 
+  // Teto checado antes dos itens: .pipe só valida cada ingrediente se o
+  // tamanho passou (mesmo padrão de dietaryPreferences em user.ts) — sem
+  // isso, um array de milhares de itens inválidos gerava um issue por item.
   ingredients: z
-    .array(favoriteIngredientSchema, {
+    .array(z.unknown(), {
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.invalid_option',
     })
-    .min(1, 'errors.validation.required'),
+    .min(1, 'errors.validation.required')
+    .max(FAVORITE_INGREDIENTS_MAX_ITEMS, 'errors.validation.too_long')
+    .pipe(z.array(favoriteIngredientSchema)),
 
   protein: z.number({
     required_error: 'errors.validation.required',
@@ -84,7 +96,11 @@ export const createFavoriteSchema = z.object({
     invalid_type_error: 'errors.validation.invalid_option',
   }).default(false),
 
-  steps: z.array(favoriteStepSchema).optional(),
+  steps: z
+    .array(z.unknown(), { invalid_type_error: 'errors.validation.invalid_option' })
+    .max(FAVORITE_STEPS_MAX_ITEMS, 'errors.validation.too_long')
+    .pipe(z.array(favoriteStepSchema))
+    .optional(),
 });
 
 export interface FavoriteItem {

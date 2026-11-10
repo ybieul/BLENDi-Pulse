@@ -12,6 +12,7 @@ import type {
   BlendiOwnership,
   DietaryPreference,
   ForgotPasswordInput,
+  GoogleExchangeInput,
   RegisterInput,
   LoginInput,
   ResetPasswordInput,
@@ -69,6 +70,102 @@ export interface AuthUser {
   dailyPulseTime?: {
     hour: number;
     minute: number;
+  };
+}
+
+/**
+ * Usuário completo como GET /users/me (e POST /auth/google/exchange) o
+ * devolvem — `preferredLanguage` em vez de `locale`. Convertido para
+ * AuthUser por mapCurrentUserProfile.
+ */
+export type CurrentUserProfile = {
+  id: string;
+  email: string;
+  name: string;
+  profilePhoto?: string;
+  hasProfilePhoto?: boolean;
+  profilePhotoUpdatedAt?: string | null;
+  lastCleanedAt?: string | null;
+  pushToken?: string | null;
+  blendiModel: AuthUser['blendiModel'];
+  blendiOwnership: NonNullable<AuthUser['blendiOwnership']>;
+  otherBlenderModel: string | null;
+  dietaryPreferences: NonNullable<AuthUser['dietaryPreferences']>;
+  goal: AuthUser['goal'];
+  preferredLanguage: AuthUser['locale'];
+  unitSystem: AuthUser['unitSystem'];
+  timezone: string;
+  dailyProteinTarget: number;
+  dailyCalorieTarget: number;
+  dailyCarbTarget: number;
+  dailyFatTarget?: number;
+  dailyHydrationTarget?: number;
+  isPro: boolean;
+  subscriptionId?: string | null;
+  subscriptionPlan?: 'monthly' | 'annual' | null;
+  subscriptionExpiresAt?: string | null;
+  subscriptionCancelRequestedAt?: string | null;
+  revenueCatCustomerId?: string | null;
+  longestStreak: number;
+  totalXP: number;
+  createdAt: string;
+  updatedAt?: string;
+  notificationPreferences?: {
+    dailyPulse: boolean;
+    streakReminder: boolean;
+    supplementReminder: boolean;
+    hydrationReminder: boolean;
+    levelUp: boolean;
+  };
+  dailyPulseTime?: {
+    hour: number;
+    minute: number;
+  };
+};
+
+export interface CurrentUserProfileResponse {
+  success: true;
+  data: {
+    user: CurrentUserProfile;
+  };
+}
+
+/** Converte o usuário do GET /users/me no AuthUser usado pelo store. */
+export function mapCurrentUserProfile(user: CurrentUserProfile): AuthUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    profilePhoto: user.profilePhoto,
+    hasProfilePhoto: user.hasProfilePhoto ?? false,
+    profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
+    lastCleanedAt: user.lastCleanedAt ?? null,
+    pushToken: user.pushToken ?? null,
+    blendiModel: user.blendiModel,
+    blendiOwnership: user.blendiOwnership,
+    otherBlenderModel: user.otherBlenderModel,
+    dietaryPreferences: user.dietaryPreferences,
+    goal: user.goal,
+    locale: user.preferredLanguage,
+    unitSystem: user.unitSystem,
+    timezone: user.timezone,
+    dailyProteinTarget: user.dailyProteinTarget,
+    dailyCalorieTarget: user.dailyCalorieTarget,
+    dailyCarbTarget: user.dailyCarbTarget,
+    dailyFatTarget: user.dailyFatTarget,
+    dailyHydrationTarget: user.dailyHydrationTarget,
+    isPro: user.isPro,
+    subscriptionId: user.subscriptionId ?? null,
+    subscriptionPlan: user.subscriptionPlan ?? null,
+    subscriptionExpiresAt: user.subscriptionExpiresAt ?? null,
+    subscriptionCancelRequestedAt: user.subscriptionCancelRequestedAt ?? null,
+    revenueCatCustomerId: user.revenueCatCustomerId ?? null,
+    longestStreak: user.longestStreak,
+    totalXP: user.totalXP ?? 0,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    notificationPreferences: user.notificationPreferences,
+    dailyPulseTime: user.dailyPulseTime,
   };
 }
 
@@ -218,14 +315,43 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
 
 /**
  * Obtém a URL de autorização do Google via backend.
- * GET /auth/google/url → 200 { url: string }
+ * GET /auth/google/url?codeChallenge=... → 200 { url: string }
  *
- * A URL inclui o state JWT (CSRF) gerado pelo backend.
+ * `codeChallenge` é o SHA-256 (base64url) do verificador que o hook guarda
+ * em memória. A URL inclui o state JWT (CSRF + desafio) gerado pelo backend.
  * O app abre essa URL no browser via expo-web-browser.
  */
-export async function getGoogleAuthUrl(): Promise<string> {
-  const response = await api.get<{ success: true; data: { url: string } }>('/auth/google/url');
+export async function getGoogleAuthUrl(codeChallenge: string): Promise<string> {
+  const response = await api.get<{ success: true; data: { url: string } }>('/auth/google/url', {
+    params: { codeChallenge },
+  });
   return response.data.data.url;
+}
+
+interface GoogleExchangeResponse {
+  success: true;
+  data: {
+    user: CurrentUserProfile;
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
+  };
+}
+
+/**
+ * Troca o código de uso único do deep link + o verificador pela sessão.
+ * POST /auth/google/exchange → 200 { user, accessToken, refreshToken, isNewUser }
+ *
+ * O usuário vem no formato do GET /users/me e é convertido para AuthUser.
+ * Qualquer falha (código usado, expirado, verificador errado) volta como
+ * erro genérico 401 do backend.
+ */
+export async function exchangeGoogleCode(
+  input: GoogleExchangeInput
+): Promise<AppleSignInResponse['data']> {
+  const response = await api.post<GoogleExchangeResponse>('/auth/google/exchange', input);
+  const { user, accessToken, refreshToken, isNewUser } = response.data.data;
+  return { user: mapCurrentUserProfile(user), accessToken, refreshToken, isNewUser };
 }
 
 // ─── Apple Sign In ────────────────────────────────────────────────────────────

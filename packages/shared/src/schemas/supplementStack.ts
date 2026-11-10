@@ -46,9 +46,12 @@ export const supplementItemSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
+// Teto checado antes dos itens (CP-1.1.1d) — ver updateItemsSchema em
+// shoppingList.ts.
 export const updateSupplementStackSchema = z
-  .array(supplementItemSchema)
-  .max(MAX_SUPPLEMENT_STACK_ITEMS, 'errors.validation.too_long');
+  .array(z.unknown(), { invalid_type_error: 'errors.validation.invalid_option' })
+  .max(MAX_SUPPLEMENT_STACK_ITEMS, 'errors.validation.too_long')
+  .pipe(z.array(supplementItemSchema));
 
 export const historyQuerySchema = z
   .object({

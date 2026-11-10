@@ -834,13 +834,39 @@ export async function analyzePantry(
 
     // CP-1.1.1c: a IA gerou receitas, mas todas violaram a dieta/gelo no Lite
     // mesmo após o retry. Nada é entregue: devolve o scan e não dá XP.
-    // (Geração vazia ou falha da IA — generatedCount 0 — segue como antes.)
+    // (Geração vazia ou falha da IA — generatedCount 0 — é tratada logo abaixo.)
     if (generatedCount > 0 && recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
       sendErrorResponse(res, {
         statusCode: 422,
         code: DIETARY_RESTRICTION_UNMET_CODE,
         message: 'Pantry Scanner could not generate a recipe that meets the user restrictions.',
+      });
+      return;
+    }
+
+    // CP-1.1.1d: a geração falhou ou voltou vazia (generatedCount 0). O app
+    // recebe a mesma resposta 200 de antes (recipes: [], xpAwarded: 0), mas o
+    // scan é devolvido e não há XP nem progresso de missão — o usuário não
+    // recebeu nada por esse scan.
+    if (recipes.length === 0) {
+      await rollbackPantryScanCount(currentUser);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...buildPantryAnalysisResult({
+            ingredients: usableIngredients,
+            recipes: [],
+            analysisNotes: visionAnalysis.analysisNotes,
+            noFoodDetected: false,
+            scansUsed: Math.max(0, scanIncrement.scanCount - 1),
+            resetDate: scanIncrement.scanResetDate,
+          }),
+          xpAwarded: 0,
+          leveledUp: false,
+          newLevel: null,
+        },
       });
       return;
     }

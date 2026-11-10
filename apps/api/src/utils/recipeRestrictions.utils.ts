@@ -99,6 +99,17 @@ interface RestrictedTerm {
    * de um laticínio). Ver regra 5 do cabeçalho.
    */
   neutralizedBy?: readonly string[];
+  /**
+   * Quantos tokens antes do termo o qualificador pode estar (padrão 1, ou
+   * seja, colado). A busca para em conjunção ("e", "and", "com", "with"...)
+   * para não pegar o qualificador do item vizinho.
+   */
+  qualifierLookback?: number;
+  /**
+   * Frases que, coladas antes ou depois do termo, o tornam permitido
+   * ("nut-free granola", "granola sem castanhas").
+   */
+  allowedWith?: { before?: readonly string[]; after?: readonly string[] };
 }
 
 interface RestrictionRules {
@@ -167,6 +178,37 @@ const EXPLICIT_NON_DAIRY_QUALIFIERS = [
 // Kefir de água / water kefir não é laticínio.
 const KEFIR_QUALIFIERS = [...PLANT_BASE_QUALIFIERS, 'water', 'agua'] as const;
 
+// Origem vegetal declarada da proteína em pó (vegan). Sem isso, "protein
+// powder" pode ser whey ou caseína. Inclui as formas flexionadas de
+// vegan/plant e o cânhamo (proteína vegetal comum).
+const PLANT_PROTEIN_QUALIFIERS = [
+  'plant', 'plantbased', 'vegetal',
+  'vegan', 'vegano', 'vegana',
+  'pea', 'ervilha',
+  'soy', 'soja',
+  'rice', 'arroz',
+  'hemp', 'canhamo',
+] as const;
+
+// Até 2 tokens antes: "pea vanilla protein powder", "vegan unflavored protein powder".
+const PLANT_PROTEIN_LOOKBACK = 2;
+
+// Granola costuma levar castanhas; só é permitida quando o nome diz que não
+// leva. "sem amendoim"/"peanut-free" não basta (ainda pode ter castanhas).
+const NUT_FREE_GRANOLA_BEFORE = ['nut free', 'tree nut free'] as const;
+const NUT_FREE_GRANOLA_AFTER = [
+  'nut free',
+  'without nut',
+  'free of nut',
+  'sem castanha',
+  'sem oleaginosa',
+  'sem noz',
+  'livre de castanha',
+  'livre de oleaginosa',
+  'isenta de castanha',
+  'isenta de oleaginosa',
+] as const;
+
 // ─── Listas por restrição ────────────────────────────────────────────────────
 
 /**
@@ -216,9 +258,19 @@ const DAIRY_RULES: RestrictionRules = {
  * Exceções: noz-moscada (especiaria); caju a fruta (suco/polpa de caju —
  * "caju" sozinho não é termo, só "castanha de caju"/"cashew"); "cashew
  * apple/fruit/juice". "sem amendoim", "nut-free", "peanut-free" são negação.
+ *
+ * Granola (CP-1.1.1d): costuma ter castanhas, então é violação, a não ser
+ * que o nome diga que não tem ("nut-free granola", "granola sem castanhas",
+ * "granola sem oleaginosas"). "Peanut-free granola" e "granola sem
+ * amendoim" continuam barradas — não dizem nada sobre as castanhas.
  */
 const NUT_RULES: RestrictionRules = {
-  en: terms([
+  en: [
+    ...terms(['granola']).map(term => ({
+      ...term,
+      allowedWith: { before: NUT_FREE_GRANOLA_BEFORE, after: NUT_FREE_GRANOLA_AFTER },
+    })),
+    ...terms([
     'nut',
     'peanut',
     'almond',
@@ -235,7 +287,8 @@ const NUT_RULES: RestrictionRules = {
     'gianduja',
     'gianduia',
     'trail mix',
-  ]),
+    ]),
+  ],
   pt: terms([
     'amendoim',
     'amendoa',
@@ -263,12 +316,20 @@ const NUT_RULES: RestrictionRules = {
  * laticínios. Proteína vegetal ("pea protein", "proteína vegetal") não é
  * termo e passa.
  *
- * Fora do escopo (não detectado): "protein powder" genérico sem origem
- * declarada — o prompt manda que seja vegetal, mas o texto não diz.
+ * Proteína em pó (CP-1.1.1d): "protein powder", "protein isolate",
+ * "proteína em pó", "pó de proteína" e "proteína isolada" sem origem
+ * vegetal declarada são violação (podem ser whey ou caseína). Com o
+ * qualificador (até 2 palavras antes, ou logo depois: "pea protein powder",
+ * "vegan vanilla protein powder", "proteína em pó de ervilha", "proteína
+ * em pó vegetal") continuam permitidas.
  */
 const VEGAN_RULES: RestrictionRules = {
   en: [
     ...DAIRY_RULES.en,
+    ...terms(['protein powder', 'protein isolate'], PLANT_PROTEIN_QUALIFIERS).map(term => ({
+      ...term,
+      qualifierLookback: PLANT_PROTEIN_LOOKBACK,
+    })),
     ...terms([
       'egg',
       'egg white',
@@ -286,6 +347,9 @@ const VEGAN_RULES: RestrictionRules = {
   ],
   pt: [
     ...DAIRY_RULES.pt,
+    ...terms(['proteina em po', 'po de proteina', 'proteina isolada'], PLANT_PROTEIN_QUALIFIERS).map(
+      term => ({ ...term, qualifierLookback: PLANT_PROTEIN_LOOKBACK })
+    ),
     ...terms([
       'ovo',
       'clara',
@@ -650,6 +714,9 @@ interface CompiledTerm {
   tokens: string[];
   isEnglish: boolean;
   neutralizedBy?: readonly string[];
+  qualifierLookback: number;
+  allowedBefore: string[][];
+  allowedAfter: string[][];
 }
 
 interface CompiledRules {
@@ -663,6 +730,9 @@ function compileRules(rules: RestrictionRules): CompiledRules {
     tokens: phraseTokens(term.phrase),
     isEnglish,
     ...(term.neutralizedBy ? { neutralizedBy: term.neutralizedBy } : {}),
+    qualifierLookback: term.qualifierLookback ?? 1,
+    allowedBefore: (term.allowedWith?.before ?? []).map(phraseTokens),
+    allowedAfter: (term.allowedWith?.after ?? []).map(phraseTokens),
   });
 
   return {
@@ -723,16 +793,40 @@ function isQualifier(token: string | undefined, qualifiers: readonly string[]): 
   return token !== undefined && qualifiers.some(qualifier => tokenMatches(token, qualifier));
 }
 
+// Conjunções que encerram a busca do qualificador para trás.
+const QUALIFIER_STOP_TOKENS = new Set(['and', 'or', 'with', 'plus', 'e', 'ou', 'com', 'mais']);
+
+/** "nut-free granola", "granola sem castanhas". */
+function isAllowedByAdjacentPhrase(
+  tokens: readonly string[],
+  start: number,
+  end: number,
+  term: CompiledTerm
+): boolean {
+  return (
+    term.allowedBefore.some(phrase => endsWithPhrase(tokens, start, phrase)) ||
+    term.allowedAfter.some(phrase => matchesAt(tokens, end, phrase))
+  );
+}
+
 function isNeutralized(tokens: readonly string[], start: number, end: number, term: CompiledTerm): boolean {
+  if (isAllowedByAdjacentPhrase(tokens, start, end, term)) {
+    return true;
+  }
+
   const qualifiers = term.neutralizedBy;
 
   if (!qualifiers) {
     return false;
   }
 
-  // "oat milk", "unsweetened almond milk", "coconut cream"
-  if (isQualifier(tokens[start - 1], qualifiers)) {
-    return true;
+  // "oat milk", "unsweetened almond milk", "coconut cream"; com lookback
+  // maior, "pea vanilla protein powder" (para na conjunção: "soy milk and
+  // protein powder" não libera a proteína).
+  for (let offset = 1; offset <= term.qualifierLookback; offset += 1) {
+    const token = tokens[start - offset];
+    if (token === undefined || QUALIFIER_STOP_TOKENS.has(token)) break;
+    if (isQualifier(token, qualifiers)) return true;
   }
 
   // "leite vegetal", "iogurte vegano"
@@ -903,9 +997,32 @@ export function buildRecipeRestrictionRetryMessage(
     `${describeViolationLocation(recipe, violation)} uses "${violation.term}", which violates the ${RESTRICTION_LABELS[violation.restriction]} restriction`
   ));
 
+  const hints = [...new Set(violations.flatMap(violation => {
+    const hint = RETRY_HINTS_BY_TERM[violation.term];
+    return hint ? [hint] : [];
+  }))];
+
   return [
     `Your previous response violated the user's mandatory restrictions: ${details.join('; ')}.`,
+    ...hints,
     'Replace every violating ingredient with a compatible substitute and remove those items from the steps and the blend instruction. Keep every restriction active.',
     'Then return only the corrected recipe as a single JSON object, in the same format and language, with recalculated macros.',
   ].join(' ');
 }
+
+const VEGAN_PROTEIN_HINT =
+  'For the vegan restriction, a protein powder must name its plant source in the ingredient name (for example "pea protein powder", "soy protein isolate" or "proteína vegetal de ervilha em pó"); a protein powder without a declared plant source may be whey or casein and is not allowed.';
+
+const NUT_FREE_GRANOLA_HINT =
+  'For the nut-free restriction, regular granola usually contains nuts: either remove it or name it explicitly as nut-free granola (for example "nut-free granola" or "granola sem castanhas").';
+
+// Termos canônicos (ver VEGAN_RULES e NUT_RULES) que pedem uma orientação
+// extra no retry, além de "troque o ingrediente".
+const RETRY_HINTS_BY_TERM: Record<string, string> = {
+  'protein powder': VEGAN_PROTEIN_HINT,
+  'protein isolate': VEGAN_PROTEIN_HINT,
+  'proteina em po': VEGAN_PROTEIN_HINT,
+  'po de proteina': VEGAN_PROTEIN_HINT,
+  'proteina isolada': VEGAN_PROTEIN_HINT,
+  granola: NUT_FREE_GRANOLA_HINT,
+};

@@ -197,15 +197,28 @@ Rotates the refresh token and returns a brand-new token pair.
 | `401` | Refresh token invalid, expired, or user no longer active |
 | `500` | Unexpected server error |
 
+### Google sign-in flow (one-time code + verifier)
+
+Since CP-1.1.1d the Google callback never puts tokens or user data in the deep link. The app proves it started the flow with a PKCE-style verifier (RFC 7636, `S256`):
+
+1. The app generates a random **verifier** (32 bytes, base64url) and keeps it in memory only. The **challenge** is `base64url(SHA-256(verifier))` (43 chars, no padding).
+2. `GET /auth/google/url?codeChallenge=<challenge>` → the backend signs the challenge into the `state` JWT and returns the Google URL.
+3. The app opens the URL with `WebBrowser.openAuthSessionAsync`. After the user authorizes, Google calls `GET /auth/google/callback`; the backend resolves the user (login, link or create) and redirects to `blendipulse://auth/callback?code=<one-time code>`.
+4. The app calls `POST /auth/google/exchange` with `{ code, codeVerifier }` and receives the session.
+
+The one-time code is 32 random bytes (base64url). Only its SHA-256 hash is stored (`googleauthcodes` collection), bound to the user, the challenge from the state and `isNewUser`, with a 2-minute expiry removed by a MongoDB TTL index. A code intercepted from the deep link (for example by another Android app registering the `blendipulse://` scheme) is useless without the verifier.
+
 ### GET /auth/google/url
 
 Returns the Google OAuth authorization URL that the mobile app must open using `expo-web-browser`.
 
 **JWT required:** No
 
-**Request parameters**
+**Query parameters**
 
-None.
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `codeChallenge` | string | Yes | `base64url(SHA-256(codeVerifier))`, exactly 43 chars `[A-Za-z0-9_-]`. Stored inside the signed `state` JWT (`{ csrf: true, codeChallenge }`, 10 min) |
 
 **Success response**
 
@@ -225,13 +238,14 @@ None.
 | Status | Meaning |
 |---|---|
 | `200` | Authorization URL generated successfully |
+| `400` | `codeChallenge` missing or not in the expected format (`validation/invalid-input`) |
 | `500` | Unexpected server error |
 
 ### GET /auth/google/callback
 
 Google OAuth callback endpoint. This endpoint is called by Google after the user authorizes access and is not meant to be called directly by the mobile client.
 
-The backend validates the callback, exchanges the authorization code, logs the user in or creates a new account when needed, and then redirects the browser to the mobile deep link.
+The backend validates the callback (including the challenge inside `state`), exchanges the authorization code with Google, logs the user in, links the Google account, or creates a new account when needed, and then redirects the browser to the mobile deep link with a one-time code.
 
 **JWT required:** No
 
@@ -240,7 +254,7 @@ The backend validates the callback, exchanges the authorization code, logs the u
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `code` | string | Usually yes | Authorization code returned by Google |
-| `state` | string | Yes | CSRF protection token originally issued by `GET /auth/google/url`; implemented as a short-lived JWT signed by the backend |
+| `state` | string | Yes | CSRF protection token originally issued by `GET /auth/google/url`; a short-lived JWT signed by the backend carrying the PKCE challenge. A `state` without a valid challenge is rejected as `invalid_state` |
 | `error` | string | No | Present when the user cancels or Google returns an auth error |
 
 **Success behavior**
@@ -250,27 +264,10 @@ The backend validates the callback, exchanges the authorization code, logs the u
 Redirects to:
 
 ```text
-blendipulse://auth/callback?accessToken=<jwt>&refreshToken=<jwt>&isNewUser=<true|false>&user=<base64-json>
+blendipulse://auth/callback?code=<one-time code>
 ```
 
-The `user` parameter is a Base64-encoded JSON payload containing:
-
-| Field | Type |
-|---|---|
-| `id` | string |
-| `email` | string |
-| `name` | string |
-| `profilePhoto` | string or undefined |
-| `blendiModel` | string |
-| `blendiOwnership` | `blendi`, `other` or `none` |
-| `otherBlenderModel` | string or null |
-| `dietaryPreferences` | array of strings (possibly empty) |
-| `goal` | string |
-| `locale` | string |
-| `timezone` | string |
-| `dailyProteinTarget` | number |
-| `dailyCalorieTarget` | number |
-| `createdAt` | ISO datetime string |
+No access token, refresh token or user data is ever placed in this URL. The app exchanges the code with `POST /auth/google/exchange`.
 
 **Error behavior**
 
@@ -280,13 +277,67 @@ Handled OAuth failures also return a redirect instead of JSON. The backend redir
 blendipulse://auth/callback?error=errors.auth.google_auth_failed
 ```
 
-Possible error keys include `errors.auth.google_cancelled`, `errors.auth.invalid_state`, `errors.validation.required`, and `errors.auth.google_auth_failed`.
+Possible error keys include `errors.auth.google_cancelled`, `errors.auth.invalid_state`, `errors.validation.required`, `errors.auth.email_not_verified`, `errors.auth.google_account_conflict` and `errors.auth.google_auth_failed`.
 
 **Status codes**
 
 | Status | Meaning |
 |---|---|
 | `302` | Redirect to the mobile deep link after successful or handled failed OAuth flow |
+| `500` | Unexpected server error |
+
+### POST /auth/google/exchange
+
+Exchanges the one-time code from the Google deep link, plus the verifier, for the session. Rate limited with the same limiter as `POST /auth/login` (10 failed requests per 15 minutes per IP; successful exchanges do not count).
+
+**JWT required:** No
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `code` | string | Yes | One-time code from `blendipulse://auth/callback?code=...` (43 chars base64url) |
+| `codeVerifier` | string | Yes | The verifier whose SHA-256 was sent as `codeChallenge` (43–128 chars base64url) |
+
+The code is consumed atomically on lookup — it works **once**, even when the verifier check fails afterwards, so a wrong attempt also burns it. The verifier is compared against the stored challenge in constant time.
+
+**Success response**
+
+**Status:** `200 OK`
+
+Same shape as `POST /auth/login`, plus `isNewUser` (as in `POST /auth/apple`). `user` is the full profile, serialized exactly like `GET /users/me` (note `preferredLanguage` instead of `locale`).
+
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "id": "...", "email": "...", "preferredLanguage": "en", "...": "same fields as GET /users/me" },
+    "accessToken": "<jwt>",
+    "refreshToken": "<jwt>",
+    "isNewUser": false
+  }
+}
+```
+
+**Error response**
+
+Every failure — malformed body, unknown code, code already used, expired code, wrong verifier, or the user deleted in the meantime — returns the same generic response, without the reason:
+
+```json
+{
+  "success": false,
+  "code": "auth/google-exchange-failed",
+  "message": "Google sign-in could not be completed. Please try again."
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Code and verifier accepted; session issued |
+| `401` | Generic failure (`auth/google-exchange-failed`) |
+| `429` | Too many failed attempts (`auth/too-many-requests`) |
 | `500` | Unexpected server error |
 
 ### POST /auth/forgot-password
@@ -479,7 +530,7 @@ None.
 }
 ```
 
-`blendiOwnership` (`blendi`, `other` or `none`), `otherBlenderModel` (free text the user typed for an older/other blender, `null` unless `blendiOwnership` is `other`) and `dietaryPreferences` (zero or more of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`) were added by CP-1.1.1a (Onboarding Additions). Accounts created before that CP have none of the three stored; the API reads them as `"blendi"`, `null` and `[]` — no migration. The same three fields are returned by `POST /auth/register`, `POST /auth/login`, `GET /auth/google/callback`, `POST /auth/apple`, `PATCH /users/me` and `POST /purchases/verify`; the mobile client replaces its whole cached user with the purchase response, so a missing field there would silently reset it.
+`blendiOwnership` (`blendi`, `other` or `none`), `otherBlenderModel` (free text the user typed for an older/other blender, `null` unless `blendiOwnership` is `other`) and `dietaryPreferences` (zero or more of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`) were added by CP-1.1.1a (Onboarding Additions). Accounts created before that CP have none of the three stored; the API reads them as `"blendi"`, `null` and `[]` — no migration. The same three fields are returned by `POST /auth/register`, `POST /auth/login`, `POST /auth/google/exchange`, `POST /auth/apple`, `PATCH /users/me` and `POST /purchases/verify`; the mobile client replaces its whole cached user with the purchase response, so a missing field there would silently reset it.
 
 The current implementation also returns compatibility aliases `streakDays` and `totalBlends` with the same numeric values as `currentStreak` and `blendCount`.
 
@@ -1375,7 +1426,7 @@ Replaces the authenticated user's entire supplement stack.
 
 **Request body**
 
-Root payload: array of supplement items, maximum 20 entries.
+Root payload: array of supplement items, maximum 20 entries. The size is checked before the items, so an oversized array returns a single `too_big` error instead of one error per item.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -1681,7 +1732,7 @@ Creates a new favorite recipe for the authenticated user.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `recipeName` | string | Yes | 1 to 100 characters |
-| `ingredients` | array | Yes | At least one ingredient; each item requires `name` and `amount` |
+| `ingredients` | array | Yes | 1 to 30 ingredients (size checked before the items); each item requires `name` and `amount` |
 | `protein` | number | Yes | Minimum 0 |
 | `carbs` | number | Yes | Minimum 0 |
 | `fat` | number | Yes | Minimum 0 |
@@ -1690,7 +1741,7 @@ Creates a new favorite recipe for the authenticated user.
 | `blendInstruction` | string | Yes | Non-empty string |
 | `tip` | string | No | Optional non-empty string |
 | `hasSubstitutes` | boolean | No | Defaults to `false` |
-| `steps` | array | No | Each item requires `text`; `pulseCount` is an optional integer, minimum 1 |
+| `steps` | array | No | Up to 20 steps (size checked before the items); each item requires `text`; `pulseCount` is an optional integer, minimum 1 |
 
 The backend checks duplicates by `recipeName` within the authenticated user's favorites. If a matching favorite already exists, the endpoint returns the existing record and `alreadyExists: true` instead of creating a duplicate.
 
@@ -2048,7 +2099,9 @@ With a diet active, ingredients detected in the photo that violate it are treate
 
 When `noFoodDetected` or `noUsableIngredients` is returned, the response still uses `200 OK` with empty `ingredients` and `recipes`, keeps `scansUsed` unchanged, and does not award XP.
 
-`xpAwarded` is the multi-occurrence Pantry Scanner XP granted only after a successful scan with at least one usable ingredient.
+`xpAwarded` is the multi-occurrence Pantry Scanner XP granted only after a successful scan with at least one usable ingredient and at least one delivered recipe.
+
+When recipe generation fails or the AI returns no recipe (CP-1.1.1d), the response keeps the same `200 OK` shape with `recipes: []` and the usable `ingredients`, but the scan is given back (`scanCount` is decremented, so `scansUsed` is the value before this scan), `xpAwarded` is `0` (`leveledUp: false`, `newLevel: null`) and the `scanPantry` mission is not advanced. A vision failure never consumes a scan, since the increment happens only after the vision step.
 
 **Status codes**
 
@@ -2445,7 +2498,7 @@ Replaces the entire items array of a shopping list.
 
 **Request body**
 
-Root payload: array of shopping list items, maximum 100 entries.
+Root payload: array of shopping list items, maximum 100 entries. The size is checked before the items, so an oversized array returns a single `too_big` error instead of one error per item.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -2708,13 +2761,15 @@ The payload follows RevenueCat's webhook event schema. Relevant fields:
 2. Returns `401` (generic body, no reason) if the `Authorization` header is missing or does not match `REVENUECAT_WEBHOOK_SECRET`.
 3. Parses and validates the JSON payload against the webhook schema; returns `400` on malformed JSON or schema mismatch.
 4. Returns `200` with `ignored: true` when `app_id` is not in `REVENUECAT_APP_IDS`, when the event type is not one of the four handled types, or when no local user matches `app_user_id`, `original_app_user_id`, or `aliases`.
-5. For `INITIAL_PURCHASE` and `RENEWAL`, resynchronizes the user's active subscription from RevenueCat and sets `isPro: true`. For `RENEWAL` only (never `INITIAL_PURCHASE`, which is covered by the mobile app's own `purchase_completed` event), also sends a `subscription_renewed` PostHog event (see below).
+5. For `INITIAL_PURCHASE` and `RENEWAL`, resynchronizes the user's active subscription from RevenueCat and sets `isPro: true`. For `RENEWAL` only (never `INITIAL_PURCHASE`, which is covered by the mobile app's own `purchase_completed` event), also sends a `subscription_renewed` PostHog event (see below) — only after the resynchronization succeeds. Since CP-1.1.1d, a failed resynchronization is handled:
+   - **Temporary failure** (network error or timeout, any HTTP error from the RevenueCat API, missing configuration, database error): returns `503 webhooks/subscription-sync-unavailable` so RevenueCat retries the delivery. Nothing is written and no PostHog event is sent on that attempt; the renewal and its `subscription_renewed` event happen on the retry that succeeds (no duplicate event).
+   - **Permanent failure** (`RevenueCatInvalidPurchaseError`: RevenueCat answered but has no active subscription of a known product for the user): returns `200` with `ignored: true`, so it is not retried forever. Nothing is written and no event is sent.
 6. For `CANCELLATION`, attempts the same resynchronization first; if RevenueCat reports no active entitlement, records `subscriptionCancelRequestedAt` instead — `isPro` is not changed, so access is kept active until expiration. Also sends a `subscription_cancel_requested` PostHog event, unless the subscription was already inactive (see step 4's sibling early-return below).
 7. For `EXPIRATION`, attempts the same resynchronization first in case a new subscription is already active; if none is found and the event's expiration timestamp has passed, sets `isPro: false`, clears `subscriptionCancelRequestedAt`, and sends a `subscription_expired` PostHog event.
 
 **PostHog side effect.** All three events above use `String(user._id)` as the PostHog `distinctId` and include `{ product_id, store }` from the RevenueCat event. Sending to PostHog never affects this endpoint's response time or status code — `captureServerEvent` (`apps/api/src/services/analytics.service.ts`) is a no-op when `POSTHOG_API_KEY` is absent and never throws when it is present.
 
-The endpoint returns `200` for every processed or ignored case so RevenueCat does not retry delivery, with one exception: `RENEWAL`/`INITIAL_PURCHASE` has no catch around the resynchronization call, so it still surfaces a `500` if RevenueCat reports no active entitlement for that user (`RevenueCatInvalidPurchaseError`) — this is expected to be unreachable in real traffic, since RevenueCat only fires these two event types when it already has an active subscription on record for that user. `REVENUECAT_API_KEY` itself was confirmed working end-to-end against the real RevenueCat API on 2026-11-01, after an earlier incompatible-key incident; see [`../fixes/posthog-analytics.md`](../fixes/posthog-analytics.md) for the full investigation and live verification.
+The endpoint returns `200` for every processed or ignored case so RevenueCat does not retry delivery. A non-2xx answer is used on purpose only when a retry can succeed: `503` for a temporary resynchronization failure on `INITIAL_PURCHASE`/`RENEWAL` (step 5), and `500` for an unexpected error on `EXPIRATION`. `REVENUECAT_API_KEY` itself was confirmed working end-to-end against the real RevenueCat API on 2026-11-01, after an earlier incompatible-key incident; see [`../fixes/posthog-analytics.md`](../fixes/posthog-analytics.md) for the full investigation and live verification.
 
 **Success response**
 
@@ -2751,7 +2806,7 @@ Ignored events also return `200 OK`, with a different payload:
 | `400` | Webhook payload failed schema validation |
 | `401` | Missing or invalid `Authorization` header |
 | `404` | Any path other than the exact `/webhooks/revenuecat/{REVENUECAT_WEBHOOK_PATH_SECRET}` |
-| `503` | `REVENUECAT_API_KEY`, `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_APP_IDS` is not configured |
+| `503` | `REVENUECAT_API_KEY`, `REVENUECAT_WEBHOOK_SECRET` or `REVENUECAT_APP_IDS` is not configured, or (`webhooks/subscription-sync-unavailable`) a temporary failure resynchronizing an `INITIAL_PURCHASE`/`RENEWAL` — RevenueCat retries |
 
 ---
 

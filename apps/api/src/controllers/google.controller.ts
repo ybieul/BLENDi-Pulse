@@ -18,11 +18,24 @@
 //
 //   3. Backend valida o state (CSRF), troca o código pelo perfil do usuário
 //      e executa login, vinculação ou registro automático
+//
+//   4. (CP-1.1.1d) Em vez de tokens, o callback cria um código de uso único
+//      e redireciona para blendipulse://auth/callback?code=... — sem tokens
+//      nem dados do usuário na URL. O app troca o código + o verificador
+//      (PKCE) em POST /auth/google/exchange pelos tokens e pelo usuário.
+//      No Android, outro app que registre o esquema blendipulse:// pode
+//      receber o deep link; sem o verificador, que só o app tem em memória,
+//      o código não serve para nada.
 
 import type { Request, Response, NextFunction } from 'express';
 import { addMonths } from 'date-fns';
 import jwt from 'jsonwebtoken';
-import { googleCallbackSchema } from '@blendi/shared';
+import {
+  googleAuthUrlQuerySchema,
+  googleCallbackSchema,
+  googleExchangeSchema,
+  GOOGLE_CODE_CHALLENGE_PATTERN,
+} from '@blendi/shared';
 import { UserModel, type UserDocument } from '../models/User';
 import {
   getAuthorizationUrl,
@@ -34,9 +47,19 @@ import {
   generateRefreshToken,
 } from '../services/auth.service';
 import { EmailService } from '../services/email.service';
+import {
+  consumeGoogleAuthCode,
+  createGoogleAuthCode,
+} from '../services/googleAuthCode.service';
 import { env } from '../config/env';
 import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
 import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
+import {
+  sendErrorResponse,
+  VALIDATION_ERROR_CODE,
+  VALIDATION_ERROR_MESSAGE,
+} from '../utils/error.utils';
+import { serializeUserProfile } from '../utils/userProfile.utils';
 
 // Instância única compartilhada pelos handlers
 const emailService = new EmailService();
@@ -45,28 +68,61 @@ function isDuplicateKeyError(err: unknown): err is { code: number } {
   return typeof err === 'object' && err !== null && 'code' in err && err.code === 11000;
 }
 
+/** Extrai o desafio PKCE do payload do state já verificado. */
+function getCodeChallengeFromState(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null || !('codeChallenge' in payload)) {
+    return null;
+  }
+
+  const { codeChallenge } = payload as { codeChallenge?: unknown };
+  return typeof codeChallenge === 'string' && GOOGLE_CODE_CHALLENGE_PATTERN.test(codeChallenge)
+    ? codeChallenge
+    : null;
+}
+
 // ─── Handler 1: GET /auth/google/url ─────────────────────────────────────────
 
 /**
  * Gera e retorna a URL de autorização do Google para o app mobile.
  *
+ * Query obrigatória: `codeChallenge` — SHA-256 do verificador gerado pelo
+ * app, em base64url (43 caracteres). Sem ele (ou fora do formato): 400.
+ *
  * O `state` é um JWT de 10 minutos assinado com JWT_ACCESS_SECRET.
  * Serve como proteção CSRF: o Google o devolve intacto no callback,
- * onde é verificado antes de processar o código de autorização.
+ * onde é verificado antes de processar o código de autorização. Leva
+ * também o desafio, para o callback ligá-lo ao código de uso único.
  *
  * Resposta: { success: true, data: { url: string } }
  */
 export async function getGoogleUrl(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    // State JWT: payload mínimo, expiração curta, assina com o secret existente.
-    // Não contém dados sensíveis — apenas a flag que identifica a origem da requisição.
-    const state = jwt.sign({ csrf: true }, env.JWT_ACCESS_SECRET, {
-      expiresIn: '10m',
+    const parsed = googleAuthUrlQuerySchema.safeParse({
+      codeChallenge: req.query.codeChallenge,
     });
+
+    if (!parsed.success) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: VALIDATION_ERROR_CODE,
+        message: VALIDATION_ERROR_MESSAGE,
+        errors: [{ field: 'codeChallenge', message: 'errors.validation.invalid_option' }],
+      });
+      return;
+    }
+
+    // State JWT: payload mínimo, expiração curta, assina com o secret existente.
+    // Leva a flag de origem e o desafio PKCE (hash público, não é segredo:
+    // sem o verificador, que nunca sai do app até a troca, ele não serve).
+    const state = jwt.sign(
+      { csrf: true, codeChallenge: parsed.data.codeChallenge },
+      env.JWT_ACCESS_SECRET,
+      { expiresIn: '10m' }
+    );
 
     const url = getAuthorizationUrl(state);
 
@@ -97,7 +153,9 @@ export async function getGoogleUrl(
  *     Primeiro acesso via Google → cria nova conta com valores padrão de onboarding.
  *     O app mobile pedirá os dados complementares (modelo, meta, targets) após o login.
  *
- * Resposta: redirect para blendipulse://auth/callback?accessToken=...&refreshToken=...&isNewUser=...&user=<base64url>
+ * Resposta: redirect para blendipulse://auth/callback?code=<código de uso único>
+ *   - Nenhum token nem dado do usuário na URL (CP-1.1.1d): o app troca o
+ *     código + verificador em POST /auth/google/exchange.
  *   - O browser detecta o esquema blendipulse:// e fecha automaticamente.
  *   - openAuthSessionAsync captura a URL e a entrega ao hook useGoogleAuth.
  *   - Erros redirecionam com ?error=<chave_i18n> para que o app exiba a mensagem correta.
@@ -124,9 +182,18 @@ export async function handleGoogleCallback(
       return;
     }
 
+    let codeChallenge: string | null;
     try {
-      jwt.verify(state, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
+      const statePayload = jwt.verify(state, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
+      codeChallenge = getCodeChallengeFromState(statePayload);
     } catch {
+      res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
+      return;
+    }
+
+    // State sem desafio (ex.: emitido antes desta versão): não há como ligar
+    // o código a um verificador, então é tratado como state inválido.
+    if (!codeChallenge) {
       res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
       return;
     }
@@ -255,46 +322,84 @@ export async function handleGoogleCallback(
       }
     }
 
-    // ── Passo 6: gerar par de tokens e redirecionar para o deep link do app ────
+    // ── Passo 6: código de uso único e redirect para o deep link do app ───────
+    // Sem tokens nem usuário na URL: só o código, que exige o verificador do
+    // app na troca (POST /auth/google/exchange) e vale por ~2 minutos.
     // O browser detecta o esquema blendipulse:// e fecha automaticamente.
-    // openAuthSessionAsync retorna { type: 'success', url } com a URL completa.
-    const accessToken = generateAccessToken(user.id as string, user.email);
-    const refreshToken = generateRefreshToken(user.id as string, user.tokenVersion);
-
-    // O objeto user é serializado como JSON → base64url para transporte via query string.
-    // Não contém dados sensíveis além do que já está no access token.
-    const userPayload = Buffer.from(
-      JSON.stringify({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        profilePhoto: user.profilePhoto,
-        blendiModel: user.blendiModel,
-        blendiOwnership: user.blendiOwnership ?? 'blendi',
-        otherBlenderModel: user.otherBlenderModel ?? null,
-        dietaryPreferences: user.dietaryPreferences ?? [],
-        goal: user.goal,
-        locale: user.locale,
-        unitSystem: user.unitSystem,
-        timezone: user.timezone,
-        dailyProteinTarget: user.dailyProteinTarget,
-        dailyCalorieTarget: user.dailyCalorieTarget,
-        dailyCarbTarget: user.dailyCarbTarget ?? 200,
-        dailyFatTarget:
-          user.dailyFatTarget ?? calculateFatTargetFromCalories(user.dailyCalorieTarget),
-        longestStreak: user.longestStreak ?? 0,
-        createdAt: user.createdAt,
-      })
-    ).toString('base64');
-
-    const params = new URLSearchParams({
-      accessToken,
-      refreshToken,
-      isNewUser: String(isNewUser),
-      user: userPayload,
+    const appCode = await createGoogleAuthCode({
+      userId: user.id as string,
+      codeChallenge,
+      isNewUser,
     });
 
+    const params = new URLSearchParams({ code: appCode });
     res.redirect(`blendipulse://auth/callback?${params.toString()}`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Handler 3: POST /auth/google/exchange ───────────────────────────────────
+
+const GOOGLE_EXCHANGE_FAILED = {
+  statusCode: 401,
+  code: 'auth/google-exchange-failed',
+  message: 'Google sign-in could not be completed. Please try again.',
+} as const;
+
+/**
+ * Troca o código de uso único do deep link + o verificador PKCE pelos tokens
+ * e pelo usuário (CP-1.1.1d).
+ *
+ * Body: { code, codeVerifier }
+ *
+ * O código é consumido de forma atômica (uso único, mesmo que a checagem do
+ * verificador falhe depois). Qualquer falha — corpo inválido, código
+ * inexistente, já usado, expirado ou verificador errado, usuário apagado —
+ * devolve o MESMO erro genérico, sem dizer o motivo.
+ *
+ * Resposta: { success: true, data: { user, accessToken, refreshToken, isNewUser } }
+ *   — mesmo formato do login por e-mail (mais isNewUser, como no Apple), com
+ *   o usuário completo pelo serializador do GET /users/me.
+ */
+export async function exchangeGoogleCode(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = googleExchangeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendErrorResponse(res, GOOGLE_EXCHANGE_FAILED);
+      return;
+    }
+
+    const consumed = await consumeGoogleAuthCode(parsed.data.code, parsed.data.codeVerifier);
+    if (!consumed) {
+      sendErrorResponse(res, GOOGLE_EXCHANGE_FAILED);
+      return;
+    }
+
+    // Lido de novo (e não do callback) para devolver o estado atual completo.
+    const user = await UserModel.findById(consumed.userId).lean();
+    if (!user) {
+      sendErrorResponse(res, GOOGLE_EXCHANGE_FAILED);
+      return;
+    }
+
+    const userId = String(user._id);
+    const accessToken = generateAccessToken(userId, user.email);
+    const refreshToken = generateRefreshToken(userId, user.tokenVersion);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: serializeUserProfile(user),
+        accessToken,
+        refreshToken,
+        isNewUser: consumed.isNewUser,
+      },
+    });
   } catch (err) {
     next(err);
   }
