@@ -1,6 +1,7 @@
 import { useAuthStore } from '../store/auth.store';
 import type { AuthUser } from '../services/auth.service';
 import { formatDecimal } from '../utils/formatNumbers';
+import { mlToFlOz } from '../utils/volumeUnits';
 import { useAppTranslation } from './useAppTranslation';
 
 type UnitSystem = AuthUser['unitSystem'];
@@ -8,7 +9,6 @@ type StorageConversionResult = number | '—';
 
 const POUNDS_PER_KILOGRAM = 2.205;
 const CENTIMETERS_PER_INCH = 2.54;
-const MILLILITERS_PER_FLUID_OUNCE = 29.574;
 const DASH_VALUE = '—';
 
 function isValidNumber(value: number): boolean {
@@ -90,7 +90,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
     }
 
     if (unitSystem === 'imperial') {
-      return `${formatOneDecimal(valueInMl / MILLILITERS_PER_FLUID_OUNCE)} ${volumeUnit}`;
+      return `${formatOneDecimal(mlToFlOz(valueInMl))} ${volumeUnit}`;
     }
 
     return `${formatDecimal(valueInMl, locale)} ${volumeUnit}`;

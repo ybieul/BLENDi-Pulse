@@ -476,6 +476,99 @@ describe('pentest — entradas hostis nos campos', () => {
   });
 });
 
+describe('pentest — hidratação imperial (fl oz, decimal)', () => {
+  beforeEach(() => {
+    mockAuthState = {
+      ...mockAuthState,
+      user: { ...(mockAuthState.user as Record<string, unknown>), unitSystem: 'imperial' },
+    };
+  });
+
+  async function pressSave(utils: ReturnType<typeof renderScreen>) {
+    await act(async () => {
+      fireEvent.press(utils.getByRole('button', SAVE));
+      await Promise.resolve();
+    });
+  }
+
+  it.each([
+    ['duas casas', '84.55'],
+    ['duas casas com vírgula', '84,55'],
+    ['notação científica', '8.4e1'],
+    ['notação científica sem ponto', '84e0'],
+    ['hexadecimal', '0x54'],
+    ['com sinal', '+84.6'],
+    ['negativo', '-84.6'],
+    ['sem parte inteira', '.6'],
+    ['dois separadores', '84.6.1'],
+    ['separador misto', '1,084.6'],
+    ['dígitos de largura total', '８４.６'],
+    ['dígitos arábico-índicos', '٨٤.٦'],
+    ['separador decimal arábico', '84٫6'],
+    ['espaço de largura zero colado', '84.6​'],
+    ['espaço no meio', '84. 6'],
+    ['tentativa de injeção NoSQL', '{"$gt":0}'],
+    ['Infinity', 'Infinity'],
+    ['NaN', 'NaN'],
+    ['só o separador', '.'],
+  ])('%s (%j) nunca vira PATCH', async (_label, text) => {
+    const utils = renderScreen();
+    utils.type(utils.hydration, text);
+
+    expect(utils.getByRole('button', SAVE)).toBeDisabled();
+    await pressSave(utils);
+    expect(mockApiPatch).not.toHaveBeenCalled();
+  });
+
+  it('decimal não vaza para os outros campos: proteína "150.5" segue inválida no imperial', async () => {
+    const utils = renderScreen();
+    utils.type(utils.protein, '150.5');
+
+    expect(utils.getByRole('button', SAVE)).toBeDisabled();
+    await pressSave(utils);
+    expect(mockApiPatch).not.toHaveBeenCalled();
+  });
+
+  it('espaços nas pontas e "84." no meio da digitação: "  100,\n" vale 100.0 fl oz -> 2957 ml', async () => {
+    const utils = renderScreen();
+    utils.type(utils.hydration, '  100,\n');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyHydrationTarget: 2957 });
+  });
+
+  it('zeros à esquerda não enganam o limite: "0000016.9" continua abaixo de 17.0', () => {
+    const utils = renderScreen();
+    utils.type(utils.hydration, '0000016.9');
+
+    expect(utils.getByRole('button', SAVE)).toBeDisabled();
+  });
+
+  it('colar 200.000 dígitos com separador não trava e só mostra o erro de faixa em fl oz', () => {
+    const utils = renderScreen();
+    const startedAt = Date.now();
+
+    utils.type(utils.hydration, `${'9'.repeat(200_000)}.5`);
+
+    expect(Date.now() - startedAt).toBeLessThan(2000);
+    expect(
+      utils.getByText('errors.validation.number_range:{"min":"17.0","max":"270.5"}'),
+    ).toBeTruthy();
+    expect(utils.getByRole('button', SAVE)).toBeDisabled();
+  });
+
+  it('meta salva fora do comum (ml que não é múltiplo exato de 0,1 fl oz) não é reenviada só por abrir e salvar', async () => {
+    const utils = renderScreen({ ...PROFILE, dailyHydrationTarget: 2501 });
+
+    expect(utils.hydration.props.value).toBe('84.6');
+    utils.type(utils.hydration, '84.6');
+    utils.type(utils.protein, '180');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyProteinTarget: 180 });
+  });
+});
+
 // ─── Ciclo de vida: nada vaza ao sair ─────────────────────────────────────────
 
 describe('pentest — ciclo de vida', () => {

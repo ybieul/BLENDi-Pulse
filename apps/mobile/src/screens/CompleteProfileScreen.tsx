@@ -47,7 +47,6 @@ import {
   translateBirthDateError,
 } from '../utils/birthDate.utils';
 import type { RootStackParamList } from '../navigation/types';
-import type { TranslationKey } from '../locales/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -276,7 +275,7 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data as ApiErrorResponse | undefined;
         const translationKey = getApiErrorTranslationKey(responseData?.code);
-        setFormError(t(translationKey as TranslationKey));
+        setFormError(t(translationKey));
         return;
       }
 

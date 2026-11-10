@@ -104,6 +104,15 @@ export async function getFromCache(cacheKey: string): Promise<IAiCache['response
 }
 
 /**
+ * Entrada: cacheKey já gerada por generateCacheKey.
+ * Saída: remove a entrada (ex.: receita em cache que deixou de passar na
+ * validação de restrições — CP-1.1.1c). Sem efeito se a entrada não existe.
+ */
+export async function deleteFromCache(cacheKey: string): Promise<void> {
+  await AiCacheModel.deleteOne({ cacheKey: cacheKey.trim() }).exec();
+}
+
+/**
  * Entrada: cacheKey, metadados da query original e a resposta estruturada do provider configurado.
  * Saída: persiste ou atualiza a entrada de cache com TTL calculado a partir do config central.
  */

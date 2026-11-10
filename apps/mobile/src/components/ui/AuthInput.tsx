@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type TextInputProps,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import {
 import { useColors } from '../../hooks/useColors';
 
 const FIELD_HEIGHT = 56;
+const LABEL_FLOAT_TOP = 10;
 const LABEL_IDLE_TRANSLATE_Y = 12;
 const LABEL_FLOAT_FONT_SIZE = 11;
 const LABEL_IDLE_FONT_SIZE = 15;
@@ -32,6 +34,51 @@ const ICON_SLOT_SIZE = 20;
 const LEADING_GAP = spacing.lg;
 const TRAILING_SLOT_WIDTH = 28;
 const BORDER_SELECTED_COLOR = colors.overlay.pulse[65];
+const INPUT_PADDING_TOP_WITH_LABEL = 24;
+const INPUT_PADDING_BOTTOM_WITH_LABEL = 10;
+
+/**
+ * Teto de ampliação da fonte do sistema no rótulo, no valor e na mensagem de
+ * erro. O campo tem altura fixa (FIELD_HEIGHT): acima disso o valor não cabe.
+ * Quem usa o componente pode passar outro `maxFontSizeMultiplier` para o valor.
+ */
+export const AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER = 1.3;
+
+// Com fonte ampliada, rótulo flutuante e valor crescem dentro da mesma altura.
+// No teto (1,3x; DM Sans ~1,3x de altura de linha) o rótulo ocupa ~10–28,6 px e
+// o valor, centrado na área 24–46, começa em ~22 px: os dois se sobrepõem. Então,
+// à medida que a escala vai de 1 a 1,3, o rótulo sobe até 6 px e a área do valor
+// desce (padding de cima +3, de baixo −6): no teto, rótulo ~4–22,6 e valor
+// ~26,8–52,2. Em escala 1 nada muda (mesmo visual de antes).
+const LABEL_FLOAT_TOP_SHIFT_AT_MAX_SCALE = 6;
+const INPUT_PADDING_TOP_SHIFT_AT_MAX_SCALE = 3;
+const INPUT_PADDING_BOTTOM_SHIFT_AT_MAX_SCALE = 6;
+
+export interface AuthInputLabelLayout {
+  /** top do rótulo quando flutua (o rótulo em repouso fica sempre no mesmo lugar). */
+  labelFloatTop: number;
+  /** translateY do rótulo em repouso, relativo a labelFloatTop. */
+  labelIdleTranslateY: number;
+  inputPaddingTop: number;
+  inputPaddingBottom: number;
+}
+
+/** Posições do rótulo e do valor (campo com rótulo) para a escala de fonte do sistema. */
+export function getAuthInputLabelLayout(systemFontScale: number): AuthInputLabelLayout {
+  const scale = Number.isFinite(systemFontScale)
+    ? Math.min(Math.max(systemFontScale, 1), AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER)
+    : 1;
+  const progress = (scale - 1) / (AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER - 1);
+  const labelFloatTop = LABEL_FLOAT_TOP - LABEL_FLOAT_TOP_SHIFT_AT_MAX_SCALE * progress;
+
+  return {
+    labelFloatTop,
+    labelIdleTranslateY: LABEL_FLOAT_TOP + LABEL_IDLE_TRANSLATE_Y - labelFloatTop,
+    inputPaddingTop: INPUT_PADDING_TOP_WITH_LABEL + INPUT_PADDING_TOP_SHIFT_AT_MAX_SCALE * progress,
+    inputPaddingBottom:
+      INPUT_PADDING_BOTTOM_WITH_LABEL - INPUT_PADDING_BOTTOM_SHIFT_AT_MAX_SCALE * progress,
+  };
+}
 
 type TextInputFocusEvent = Parameters<NonNullable<TextInputProps['onFocus']>>[0];
 type TextInputBlurEvent = Parameters<NonNullable<TextInputProps['onBlur']>>[0];
@@ -53,11 +100,14 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
     onBlur,
     onChangeText,
     editable = true,
+    maxFontSizeMultiplier = AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER,
     ...textInputProps
   },
   ref
 ) {
   const colors = useColors();
+  const { fontScale } = useWindowDimensions();
+  const labelLayout = getAuthInputLabelLayout(fontScale);
   const FIELD_BG_COLOR = colors.overlay.plum[6];
   const FIELD_HIGHLIGHT_COLOR = colors.overlay.plum[3];
 
@@ -157,7 +207,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
 
   const labelTranslateY = labelProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [LABEL_IDLE_TRANSLATE_Y, 0],
+    outputRange: [labelLayout.labelIdleTranslateY, 0],
   });
 
   const labelFontSize = labelProgress.interpolate({
@@ -214,7 +264,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
     },
     label: {
       position: 'absolute',
-      top: 10,
+      top: labelLayout.labelFloatTop,
       color: colors.text.tertiary,
       fontFamily: fonts.body,
       fontWeight: fontWeights.regular,
@@ -235,8 +285,8 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
       paddingLeft: HORIZONTAL_PADDING,
     },
     inputWithLabel: {
-      paddingTop: 24,
-      paddingBottom: 10,
+      paddingTop: labelLayout.inputPaddingTop,
+      paddingBottom: labelLayout.inputPaddingBottom,
     },
     inputWithoutLabel: {
       paddingTop: 0,
@@ -252,6 +302,8 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
       alignItems: 'center',
       justifyContent: 'center',
     },
+    // Sem altura fixa: cresce com o texto (quebra em várias linhas, nada é
+    // cortado) e só existe enquanto há erro — sem erro, não ocupa espaço.
     errorContainer: {
       marginTop: spacing.md,
     },
@@ -277,6 +329,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
 
         {hasLabel ? (
           <Animated.Text
+            maxFontSizeMultiplier={AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER}
             pointerEvents="none"
             style={[
               styles.label,
@@ -297,6 +350,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
           value={value}
           defaultValue={defaultValue}
           editable={editable}
+          maxFontSizeMultiplier={maxFontSizeMultiplier}
           placeholder={undefined}
           placeholderTextColor={colors.overlay.plum[35]}
           selectionColor={colors.brand.pulse}
@@ -329,7 +383,9 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
             },
           ]}
         >
-          <Text style={styles.errorText}>{visibleError}</Text>
+          <Text maxFontSizeMultiplier={AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER} style={styles.errorText}>
+            {visibleError}
+          </Text>
         </Animated.View>
       ) : null}
     </View>

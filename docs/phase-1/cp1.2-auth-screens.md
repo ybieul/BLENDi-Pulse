@@ -109,4 +109,6 @@ Instead of blur, [apps/mobile/src/components/ui/AuthInput.tsx](../../apps/mobile
 3. An animated border that brightens on focus.
 4. Floating-label and success/error animations layered above the surface.
 
+**System font scaling (CP-1.1.1b.1).** The field keeps a fixed 56 pt height, so the label, the value and the error message are capped at `AUTH_INPUT_MAX_FONT_SIZE_MULTIPLIER` (1.3×); callers may still pass their own `maxFontSizeMultiplier` for the value. Between 1× and 1.3× `getAuthInputLabelLayout` moves the floating label up (up to 6 pt) and shifts the value's padding so they never overlap; at 1× the layout is unchanged. The error message has no fixed height: it wraps and only exists while there is an error.
+
 This approach preserves the intended visual softness while staying fully compatible with Expo Go and keeping interaction performance predictable.

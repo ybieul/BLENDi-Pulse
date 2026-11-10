@@ -78,6 +78,7 @@ const SAVE = { name: 'common.actions.save' };
 const PROTEIN_LABEL = 'onboarding.proteinPlaceholder';
 const KCAL_LABEL = 'onboarding.caloriesPlaceholder';
 const HYDRATION_LABEL = 'nutritionGoals.hydrationLabel';
+const HYDRATION_LABEL_IMPERIAL = 'nutritionGoals.hydrationLabelImperial';
 const RANGE = {
   protein: 'errors.validation.number_range:{"min":10,"max":800}',
   carbs: 'errors.validation.number_range:{"min":0,"max":1500}',
@@ -1022,7 +1023,7 @@ describe('NutritionGoalsScreen — teclado e responsividade', () => {
     ]);
   });
 
-  it('fonte do sistema ampliada: os campos têm teto de escala para o valor digitado não ser cortado', () => {
+  it('fonte do sistema ampliada: os campos herdam o teto de escala padrão do AuthInput (a tela não define o seu)', () => {
     const { inputs } = renderScreen();
 
     for (const input of inputs()) {
@@ -1066,15 +1067,205 @@ describe('NutritionGoalsScreen — Android', () => {
 
 // ─── Hidratação ───────────────────────────────────────────────────────────────
 
-describe('NutritionGoalsScreen — hidratação', () => {
-  it('é editada em ml, como no EditSettingSheet do Me (sem conversão de unidade), e o rótulo diz "(ml)"', async () => {
+describe('NutritionGoalsScreen — hidratação, sistema métrico (sem mudança)', () => {
+  it('é editada em ml inteiro, com teclado numérico, e o rótulo diz "(ml)"', async () => {
     const utils = renderScreen({ ...PROFILE, dailyHydrationTarget: 2500 });
 
     expect(utils.hydration.props.value).toBe('2500');
+    expect(utils.hydration.props.keyboardType).toBe('number-pad');
     utils.type(utils.hydration, '3000');
     await pressSave(utils);
 
     expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyHydrationTarget: 3000 });
     expect(utils.getByText(HYDRATION_LABEL)).toBeTruthy();
+    expect(utils.queryByText(HYDRATION_LABEL_IMPERIAL)).toBeNull();
+  });
+
+  it('decimal continua inválido no métrico, com a faixa em ml', () => {
+    const utils = renderScreen();
+
+    for (const text of ['2500.5', '2500,5']) {
+      utils.type(utils.hydration, text);
+      expect(utils.getByText(RANGE.hydration)).toBeTruthy();
+      expect(utils.getByRole('button', SAVE)).toBeDisabled();
+    }
+  });
+
+  it('sem unidade conhecida no usuário local, usa ml', () => {
+    mockAuthState = { ...mockAuthState, user: { dailyProteinTarget: 120, unitSystem: undefined } };
+    const utils = renderScreen();
+
+    expect(utils.hydration.props.value).toBe('2500');
+    expect(utils.getByText(HYDRATION_LABEL)).toBeTruthy();
+  });
+});
+
+describe('NutritionGoalsScreen — hidratação, sistema imperial (fl oz)', () => {
+  const RANGE_FL_OZ = 'errors.validation.number_range:{"min":"17.0","max":"270.5"}';
+
+  beforeEach(() => {
+    mockAuthState = {
+      ...mockAuthState,
+      user: { ...(mockAuthState.user as Record<string, unknown>), unitSystem: 'imperial' },
+    };
+  });
+
+  it('mostra o valor salvo em fl oz com uma casa (2500 ml -> 84.5, igual à Home), rótulo "(fl oz)" e teclado decimal', () => {
+    const utils = renderScreen({ ...PROFILE, dailyHydrationTarget: 2500 });
+
+    expect(utils.hydration.props.value).toBe('84.5');
+    expect(utils.hydration.props.keyboardType).toBe('decimal-pad');
+    expect(utils.getByText(HYDRATION_LABEL_IMPERIAL)).toBeTruthy();
+    expect(utils.queryByText(HYDRATION_LABEL)).toBeNull();
+    expect(propOf(utils.hydration, 'accessibilityLabel')).toBe(HYDRATION_LABEL_IMPERIAL);
+  });
+
+  it.each([
+    [3000, '101.4'],
+    [500, '16.9'],
+    [8000, '270.5'],
+  ])('%i ml aparece como %s', (ml, shown) => {
+    const utils = renderScreen({ ...PROFILE, dailyHydrationTarget: ml });
+    expect(utils.hydration.props.value).toBe(shown);
+  });
+
+  it('os outros campos continuam inteiros e com teclado numérico', () => {
+    const utils = renderScreen();
+
+    expect(utils.protein.props.keyboardType).toBe('number-pad');
+    utils.type(utils.protein, '150.5');
+    expect(utils.getByText(RANGE.protein)).toBeTruthy();
+  });
+
+  it.each([
+    ['ponto', '100.0', 2957],
+    ['vírgula', '100,0', 2957],
+    ['inteiro', '100', 2957],
+    ['ponto com casa', '84.6', 2502],
+    ['vírgula com casa', '84,6', 2502],
+  ])('aceita %s ("%s") e manda ml inteiro (%i) no PATCH', async (_name, text, ml) => {
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, text);
+    expect(utils.queryByText(RANGE_FL_OZ)).toBeNull();
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyHydrationTarget: ml });
+    expect(mockUpdateUserProfile).toHaveBeenCalledWith({ dailyHydrationTarget: ml });
+  });
+
+  it.each(['84.55', '84,55', '-84.5', '+84.5', '8e1', '84.5abc', '.5', '84..5', '84.5.1', '84 .5', '1,000'])(
+    'rejeita "%s": erro com a faixa em fl oz e "Salvar" desabilitado',
+    (text) => {
+      const utils = renderScreen();
+
+      utils.type(utils.hydration, text);
+      expect(utils.getByText(RANGE_FL_OZ)).toBeTruthy();
+      expect(utils.getByRole('button', SAVE)).toBeDisabled();
+    },
+  );
+
+  it.each([
+    ['16.9', false],
+    ['17.0', true],
+    ['17', true],
+    ['270.5', true],
+    ['270.6', false],
+  ])('limites derivados do shared: "%s" válido = %s', (text, valid) => {
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, text);
+    if (valid) {
+      expect(utils.queryByText(RANGE_FL_OZ)).toBeNull();
+      expect(utils.getByRole('button', SAVE)).toBeEnabled();
+    } else {
+      expect(utils.getByText(RANGE_FL_OZ)).toBeTruthy();
+      expect(utils.getByRole('button', SAVE)).toBeDisabled();
+    }
+  });
+
+  it('os extremos válidos viram ml dentro da faixa do backend (17.0 -> 503, 270.5 -> 8000)', async () => {
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, '17.0');
+    await pressSave(utils);
+    expect(mockApiPatch).toHaveBeenLastCalledWith('/users/me', { dailyHydrationTarget: 503 });
+
+    const second = renderScreen();
+    second.type(second.hydration, '270.5');
+    await pressSave(second);
+    expect(mockApiPatch).toHaveBeenLastCalledWith('/users/me', { dailyHydrationTarget: 8000 });
+  });
+
+  it('abrir e salvar sem mexer na hidratação não a manda (nem invalida hydrationToday)', async () => {
+    const utils = renderScreen();
+
+    utils.type(utils.protein, '180');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyProteinTarget: 180 });
+    const keys = utils.invalidateSpy.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).not.toContainEqual(QUERY_KEYS.hydrationToday);
+  });
+
+  it.each(['84.5', '84,5', ' 84.5 ', '084.5'])(
+    'digitar de volta o valor exibido ("%s") não conta como mudança: nada a salvar e sem confirmação ao sair',
+    (text) => {
+      const utils = renderScreen();
+
+      utils.type(utils.hydration, text);
+      expect(utils.getByRole('button', SAVE)).toBeDisabled();
+      const event = leaveWithGuard();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    },
+  );
+
+  it('valor exibido igual ao salvo mais outra mudança: o PATCH não leva a hidratação (2500 não vira 2499)', async () => {
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, '84,5');
+    utils.type(utils.calories, '2100');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyCalorieTarget: 2100 });
+    const keys = utils.invalidateSpy.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).not.toContainEqual(QUERY_KEYS.hydrationToday);
+  });
+
+  it('500 ml salvos aparecem como 16.9: redigitar 16.9 não é erro nem bloqueia salvar outro campo', async () => {
+    const utils = renderScreen({ ...PROFILE, dailyHydrationTarget: 500 });
+
+    utils.type(utils.hydration, '16,9');
+    expect(utils.queryByText(RANGE_FL_OZ)).toBeNull();
+    utils.type(utils.protein, '180');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyProteinTarget: 180 });
+  });
+
+  it('trocar o valor manda ml inteiro e invalida hydrationToday', async () => {
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, '101.4');
+    await pressSave(utils);
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { dailyHydrationTarget: 2999 });
+    const keys = utils.invalidateSpy.mock.calls.map(([filters]) => filters?.queryKey);
+    expect(keys).toContainEqual(QUERY_KEYS.userProfile);
+    expect(keys).toContainEqual(QUERY_KEYS.hydrationToday);
+  });
+
+  it('depois de salvar (com avisos de outro campo), o campo volta a mostrar o salvo em fl oz', async () => {
+    mockApiPatch.mockImplementation(() =>
+      patchResponse({ warnings: [warning('macros/protein-above-range', 'dailyProteinTarget')] }),
+    );
+    const utils = renderScreen();
+
+    utils.type(utils.hydration, '101.4');
+    utils.type(utils.protein, '400');
+    await pressSave(utils);
+
+    expect(utils.hydration.props.value).toBe('101.4');
+    expect(utils.getByRole('button', SAVE)).toBeDisabled();
   });
 });

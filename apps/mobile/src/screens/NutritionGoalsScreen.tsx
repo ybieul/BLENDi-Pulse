@@ -7,6 +7,10 @@
 // • Quatro campos numéricos validados com os limites de @blendi/shared (nada de
 //   número fixo aqui — ver GOAL_LIMITS em nutritionGoals.utils.ts), com erro
 //   inline por campo só depois que a pessoa digitou algo.
+// • Hidratação na unidade do usuário (useUnits, como a Home): ml inteiro no
+//   métrico; fl oz com uma casa decimal no imperial, com faixa derivada da
+//   faixa em ml do shared. O PATCH sempre leva ml inteiro, e "mudou?" é
+//   decidido na unidade exibida (abrir e salvar não troca 2500 ml por 2499).
 // • Dieta em múltipla escolha, com os mesmos cards/textos/alerta de alergia do
 //   onboarding (DietaryPreferencesPicker).
 // • "Salvar" envia no PATCH /users/me SÓ o que mudou. Em sucesso invalida o
@@ -71,16 +75,20 @@ import { AuthInput } from '../components/ui/AuthInput';
 import { DietaryPreferencesPicker } from '../components/ui/DietaryPreferencesPicker';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
+import { useUnits } from '../hooks/useUnits';
 import type { TranslationKey } from '../locales/i18n';
 import type { RootStackParamList } from '../navigation/types';
 import { useAuthStore } from '../store/auth.store';
 import { getAxiosErrorTranslationKey } from '../utils/error.utils';
 import {
   GOAL_FIELDS,
-  GOAL_LIMITS,
   areGoalDraftsValid,
   buildGoalsPatch,
+  formatGoalDisplayValue,
+  formatGoalLimit,
+  getGoalDisplayLimits,
   hasUnsavedGoalChanges,
+  isGoalFieldInFlOz,
   isGoalTextValid,
   parsePatchResponseWarnings,
   toggleDietPreference,
@@ -117,10 +125,11 @@ const GOAL_FIELD_LABELS: Readonly<Record<GoalField, TranslationKey>> = {
   dailyHydrationTarget: 'nutritionGoals.hydrationLabel',
 };
 
+// Rótulo da hidratação no imperial (fl oz); no métrico vale o de GOAL_FIELD_LABELS (ml).
+const HYDRATION_LABEL_IMPERIAL: TranslationKey = 'nutritionGoals.hydrationLabelImperial';
+
 // Mesmo padrão do Me (`?? 2500`) e o default do backend: só vale se nem o
 // perfil nem o usuário local trouxerem a meta de hidratação (campo opcional).
-// A hidratação é editada em ml, como no EditSettingSheet do Me — por isso o
-// rótulo da tela diz "(ml)".
 const FALLBACK_HYDRATION_TARGET_ML = 2500;
 
 const KEYBOARD_ACCESSORY_ID = 'nutritionGoalsKeyboardAccessory';
@@ -129,9 +138,6 @@ const SCREEN_HORIZONTAL_PADDING = spacing.xl;
 const BACK_BUTTON_SIZE = 36;
 const ICON_SIZE = 16;
 const WARNING_ICON_SIZE = 18;
-// Os campos têm altura fixa (AuthInput); com a fonte do sistema muito ampliada
-// o valor digitado passaria da altura. O teto mantém o texto inteiro visível.
-const INPUT_MAX_FONT_SCALE = 1.3;
 const ACCESSORY_BAR_HEIGHT = 44;
 
 async function fetchGoalsProfile(): Promise<GoalsProfileResponse> {
@@ -145,6 +151,8 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
+  // Mesma fonte da unidade que a Home usa; sem unidade conhecida, métrico (ml).
+  const { unitSystem } = useUnits();
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
@@ -205,11 +213,17 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
   }, []);
 
   const patch = useMemo(
-    () => (baseline ? buildGoalsPatch(baseline, textDraft, dietDraft) : {}),
-    [baseline, textDraft, dietDraft],
+    () => (baseline ? buildGoalsPatch(baseline, textDraft, dietDraft, unitSystem) : {}),
+    [baseline, textDraft, dietDraft, unitSystem],
   );
-  const hasUnsavedChanges = baseline ? hasUnsavedGoalChanges(baseline, textDraft, dietDraft) : false;
-  const canSave = !isSaving && Object.keys(patch).length > 0 && areGoalDraftsValid(textDraft);
+  const hasUnsavedChanges = baseline
+    ? hasUnsavedGoalChanges(baseline, textDraft, dietDraft, unitSystem)
+    : false;
+  const canSave =
+    !isSaving &&
+    Object.keys(patch).length > 0 &&
+    baseline !== null &&
+    areGoalDraftsValid(textDraft, unitSystem, baseline);
 
   // ── Teclado e rolagem ──────────────────────────────────────────────────────
 
@@ -533,12 +547,19 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
 
   const renderField = (field: GoalField) => {
     const draftText = textDraft[field];
-    const { min, max } = GOAL_LIMITS[field];
-    const value = draftText ?? String(baseline[field]);
+    const { min, max } = getGoalDisplayLimits(field, unitSystem);
+    const isFlOz = isGoalFieldInFlOz(field, unitSystem);
+    const label = isFlOz ? HYDRATION_LABEL_IMPERIAL : GOAL_FIELD_LABELS[field];
+    const value = draftText ?? formatGoalDisplayValue(field, baseline[field], unitSystem);
     // Só depois que a pessoa digitou algo (mesmo critério do onboarding).
     const error =
-      draftText !== undefined && draftText.length > 0 && !isGoalTextValid(field, draftText)
-        ? t('errors.validation.number_range', { min, max })
+      draftText !== undefined &&
+      draftText.length > 0 &&
+      !isGoalTextValid(field, draftText, unitSystem, baseline)
+        ? t('errors.validation.number_range', {
+            min: formatGoalLimit(field, min, unitSystem),
+            max: formatGoalLimit(field, max, unitSystem),
+          })
         : undefined;
     const fieldWarnings = warnings[field] ?? [];
     const isLast = field === GOAL_FIELDS[GOAL_FIELDS.length - 1];
@@ -556,17 +577,16 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
           ref={(node) => {
             inputRefs.current[field] = node;
           }}
-          accessibilityLabel={t(GOAL_FIELD_LABELS[field])}
+          accessibilityLabel={t(label)}
           editable={!isSaving}
           error={error}
           inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
-          keyboardType="number-pad"
-          maxFontSizeMultiplier={INPUT_MAX_FONT_SCALE}
+          keyboardType={isFlOz ? 'decimal-pad' : 'number-pad'}
           onBlur={() => { handleFieldBlur(field); }}
           onChangeText={(text) => { handleChangeText(field, text); }}
           onFocus={() => { handleFieldFocus(field); }}
           onSubmitEditing={() => { advanceFromField(field); }}
-          placeholder={t(GOAL_FIELD_LABELS[field])}
+          placeholder={t(label)}
           returnKeyType={isLast ? 'done' : 'next'}
           submitBehavior="submit"
           value={value}

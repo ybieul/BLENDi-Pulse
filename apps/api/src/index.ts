@@ -16,10 +16,10 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
-import mongoSanitize from 'express-mongo-sanitize';
 import { requestLogger } from './middlewares/requestLogger';
 import { authenticatedLimiter } from './middlewares/rateLimiter';
 import { errorHandler } from './middlewares/errorHandler';
+import { rejectDeeplyNestedBody, sanitizeRequest } from './middlewares/requestSanitization';
 import { pingRouter } from './routes/ping';
 import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
@@ -118,30 +118,13 @@ app.use((req, res, next) => {
 // 5. Parsing de URL encoded
 app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
-// 6. Sanitização contra injeção de operadores MongoDB ($ne, $gt, $where, etc.)
-// em req.body/req.params/req.headers/req.query — precisa vir depois do
-// parsing do body. Remoção completa de chaves com $ ou . (não substituição):
-// nenhum campo legítimo da API usa esses caracteres em nomes de chave.
-//
-// NÃO usamos app.use(mongoSanitize()) diretamente: a implementação da
-// biblioteca (v2.2.0) reatribui req[key] = target ao final de cada chave
-// sanitizada. No Express 5, req.query é um getter somente-leitura, e essa
-// reatribuição lança "TypeError: Cannot set property query of
-// #<IncomingMessage> which has only a getter" — derrubando toda requisição
-// com 500 (confirmado ao vivo: até GET /ping sem nenhum parâmetro quebrava).
-// A função sanitize() exportada já muta o objeto em memória (delete + nova
-// atribuição de chave) antes dessa reatribuição acontecer — chamá-la
-// diretamente, sem reatribuir req[key], preserva o mesmo efeito de
-// sanitização sem o crash.
-app.use((req, _res, next) => {
-  (['body', 'params', 'headers', 'query'] as const).forEach(key => {
-    const target = req[key];
-    if (target && typeof target === 'object') {
-      mongoSanitize.sanitize(target as Record<string, unknown>);
-    }
-  });
-  next();
-});
+// 6. Corpo aninhado demais → 400, e só então a sanitização contra injeção de
+// operadores MongoDB em body/params/headers/query (a sanitização é recursiva;
+// a checagem de profundidade, não). Os dois vêm depois do parsing do body e
+// valem para todas as rotas abaixo, inclusive as do parser de 4 MB. Detalhes
+// e motivos em middlewares/requestSanitization.ts.
+app.use(rejectDeeplyNestedBody);
+app.use(sanitizeRequest);
 
 // 7. Logger de requisições (apenas em development)
 app.use(requestLogger);

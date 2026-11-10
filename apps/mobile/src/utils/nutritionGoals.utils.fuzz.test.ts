@@ -6,6 +6,10 @@
 //   I2  texto válido => valor dentro dos limites do shared, e só então;
 //   I3  o PATCH nunca leva valor fora da faixa, não-inteiro, igual ao salvo, nem de campo inválido;
 //   I4  bate com o oráculo (regex de dígitos ASCII + trim + comparação com os limites).
+//
+// Hidratação no sistema imperial (fl oz, uma casa decimal): mesmas invariantes,
+// com um oráculo próprio em décimos inteiros e faixa achada por busca (não pela
+// fórmula do código), e o PATCH sempre em ml inteiro dentro da faixa do shared.
 import {
   DAILY_CALORIE_TARGET_MAX,
   DAILY_CALORIE_TARGET_MIN,
@@ -17,12 +21,15 @@ import {
   DAILY_PROTEIN_TARGET_VALIDATION_MIN,
 } from '@blendi/shared';
 
+import { MILLILITERS_PER_FLUID_OUNCE } from './volumeUnits';
 import {
   GOAL_FIELDS,
+  HYDRATION_FL_OZ_LIMITS,
   areGoalDraftsValid,
   buildGoalsPatch,
   hasUnsavedGoalChanges,
   isGoalTextValid,
+  parseGoalDraftText,
   parseGoalText,
   parseGoalWarnings,
   type GoalField,
@@ -207,6 +214,127 @@ describe('fuzz — extremos e desempenho', () => {
     for (const field of GOAL_FIELDS) {
       isGoalTextValid(field, huge);
     }
+    expect(Date.now() - startedAt).toBeLessThan(200);
+  });
+});
+
+describe('fuzz — hidratação imperial em fl oz (20.000 entradas, semente fixa)', () => {
+  const HYDRATION: GoalField = 'dailyHydrationTarget';
+  const random = createRandom(0xf102);
+
+  // Faixa em décimos achada por busca linear (independente da fórmula do código).
+  let minTenths = 0;
+  while ((minTenths / 10) * MILLILITERS_PER_FLUID_OUNCE < DAILY_HYDRATION_TARGET_MIN) {
+    minTenths += 1;
+  }
+  let maxTenths = minTenths;
+  while (((maxTenths + 1) / 10) * MILLILITERS_PER_FLUID_OUNCE <= DAILY_HYDRATION_TARGET_MAX) {
+    maxTenths += 1;
+  }
+  const baselineTenths = Math.round((BASELINE.dailyHydrationTarget / MILLILITERS_PER_FLUID_OUNCE) * 10);
+
+  // Oráculo: décimos (inteiro) do texto, ou null.
+  function flOzOracle(text: string): number | null {
+    const trimmed = text.trim();
+    const match = /^([0-9]+)(?:[.,]([0-9])?)?$/.exec(trimmed);
+    if (!match) {
+      return null;
+    }
+    const tenths = parseInt(match[1] ?? '', 10) * 10 + parseInt(match[2] ?? '0', 10);
+    return tenths >= minTenths && tenths <= maxTenths ? tenths : null;
+  }
+
+  function randomFlOzText(rnd: () => number): string {
+    const kind = rnd();
+    if (kind < 0.35) {
+      const integer = String(Math.floor(rnd() * 320));
+      const separator = rnd() < 0.5 ? '.' : ',';
+      const decimals = ['', '0', String(Math.floor(rnd() * 10)), `${Math.floor(rnd() * 100)}`][Math.floor(rnd() * 4)];
+      return `${rnd() < 0.2 ? ' ' : ''}${integer}${rnd() < 0.8 ? separator + decimals : ''}${rnd() < 0.2 ? ' ' : ''}`;
+    }
+    return randomText(rnd);
+  }
+
+  const samples = Array.from({ length: 20_000 }, () => randomFlOzText(random));
+
+  it('a faixa derivada é 17.0–270.5 e coincide com a busca', () => {
+    expect(HYDRATION_FL_OZ_LIMITS).toEqual({ min: 17, max: 270.5 });
+    expect(minTenths).toBe(170);
+    expect(maxTenths).toBe(2705);
+  });
+
+  it('I1: parseGoalDraftText só devolve null ou número >= 0 com no máximo uma casa', () => {
+    for (const text of samples) {
+      const value = parseGoalDraftText(HYDRATION, text, 'imperial');
+      if (value !== null) {
+        expect(Number.isFinite(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(0);
+        expect(Number.isInteger(Math.round(value * 10))).toBe(true);
+        expect(Math.abs(value * 10 - Math.round(value * 10))).toBeLessThan(1e-9);
+      }
+    }
+  });
+
+  it('I2/I4: isGoalTextValid concorda com o oráculo', () => {
+    let accepted = 0;
+    for (const text of samples) {
+      const expected = flOzOracle(text);
+      expect(isGoalTextValid(HYDRATION, text, 'imperial')).toBe(expected !== null);
+      if (expected !== null) {
+        accepted += 1;
+      }
+    }
+    expect(accepted).toBeGreaterThan(1000);
+    expect(accepted).toBeLessThan(samples.length);
+  });
+
+  it('I3: o PATCH só leva ml inteiro dentro da faixa do shared, e só quando o valor exibido mudou', () => {
+    for (const text of samples) {
+      const draft = { [HYDRATION]: text };
+      const patch = buildGoalsPatch(BASELINE, draft, null, 'imperial');
+      const sent = patch.dailyHydrationTarget;
+      const expected = flOzOracle(text);
+
+      if (expected === null || expected === baselineTenths) {
+        expect(sent).toBeUndefined();
+      } else {
+        expect(sent).toBe(Math.round((expected / 10) * MILLILITERS_PER_FLUID_OUNCE));
+        expect(Number.isInteger(sent)).toBe(true);
+        expect(sent).toBeGreaterThanOrEqual(DAILY_HYDRATION_TARGET_MIN);
+        expect(sent).toBeLessThanOrEqual(DAILY_HYDRATION_TARGET_MAX);
+      }
+      expect(Object.keys(patch).filter((key) => key !== HYDRATION)).toEqual([]);
+      if (expected === null) {
+        expect(areGoalDraftsValid(draft, 'imperial', BASELINE)).toBe(false);
+        expect(hasUnsavedGoalChanges(BASELINE, draft, null, 'imperial')).toBe(true);
+      }
+    }
+  });
+
+  it('os outros campos continuam só inteiros no imperial', () => {
+    for (const text of samples) {
+      for (const field of GOAL_FIELDS.filter((item) => item !== HYDRATION)) {
+        expect(isGoalTextValid(field, text, 'imperial')).toBe(oracle(field, text) !== null);
+      }
+    }
+  });
+
+  it('todo valor exibido possível de 500 a 8000 ml, redigitado, não entra no PATCH', () => {
+    for (let ml = DAILY_HYDRATION_TARGET_MIN; ml <= DAILY_HYDRATION_TARGET_MAX; ml += 1) {
+      const baseline = { ...BASELINE, dailyHydrationTarget: ml };
+      const shown = (Math.round((ml / MILLILITERS_PER_FLUID_OUNCE) * 10) / 10).toFixed(1);
+      for (const text of [shown, shown.replace('.', ',')]) {
+        expect(buildGoalsPatch(baseline, { [HYDRATION]: text }, null, 'imperial')).toEqual({});
+        expect(hasUnsavedGoalChanges(baseline, { [HYDRATION]: text }, null, 'imperial')).toBe(false);
+        expect(areGoalDraftsValid({ [HYDRATION]: text }, 'imperial', baseline)).toBe(true);
+      }
+    }
+  });
+
+  it('texto gigante com separador é tratado em tempo linear', () => {
+    const huge = `${'9'.repeat(1_000_000)}.5`;
+    const startedAt = Date.now();
+    expect(isGoalTextValid(HYDRATION, huge, 'imperial')).toBe(false);
     expect(Date.now() - startedAt).toBeLessThan(200);
   });
 });

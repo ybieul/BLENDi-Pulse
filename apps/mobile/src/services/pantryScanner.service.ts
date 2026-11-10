@@ -28,7 +28,10 @@ const PANTRY_SCANNER_ERROR_TRANSLATION_KEYS = {
   'scanner/invalid-image': 'errors.scanner_invalid_image',
   'scanner/vision-parse-error': 'errors.scanner_vision_parse_error',
   'scanner/vision-unavailable': 'errors.scanner_vision_unavailable',
-} as const;
+  // CP-1.1.1c: todas as receitas violaram a dieta (ou trouxeram gelo para o
+  // Lite) mesmo após o retry; o backend devolveu o scan.
+  'scanner/dietary-restriction-unmet': 'errors.scanner_dietary_restriction_unmet',
+} as const satisfies Record<string, TranslationKey>;
 
 interface ApiErrorResponse {
   success: false;

@@ -48,7 +48,7 @@ The conversion constants used by the unit system are:
 - `1 ml = 0.0338 fl oz`
 - `1 cup = 240 ml`
 
-The first three are either directly encoded or used through their inverse forms in [apps/mobile/src/hooks/useUnits.ts](../../apps/mobile/src/hooks/useUnits.ts): pounds per kilogram, centimeters per inch, and milliliters per fluid ounce. The `1 cup = 240 ml` convention is not a storage conversion constant; it is part of the imperial recipe-language guidance used in Pulse AI prompts.
+The first three are either directly encoded or used through their inverse forms in [apps/mobile/src/hooks/useUnits.ts](../../apps/mobile/src/hooks/useUnits.ts): pounds per kilogram, centimeters per inch, and milliliters per fluid ounce. Since CP-1.1.1b.1 the volume factor (`MILLILITERS_PER_FLUID_OUNCE = 29.574`) and the `mlToFlOz`/`flOzToMl` helpers live in a single place, [apps/mobile/src/utils/volumeUnits.ts](../../apps/mobile/src/utils/volumeUnits.ts), used by `useUnits` and by the "My goals" screen (the only screen that edits a volume in fl oz). The `1 cup = 240 ml` convention is not a storage conversion constant; it is part of the imperial recipe-language guidance used in Pulse AI prompts.
 
 ### Automatic Default Selection
 

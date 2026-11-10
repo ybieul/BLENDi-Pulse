@@ -35,6 +35,7 @@ import {
   type AiProviderResponse,
 } from '../services/aiProvider.service';
 import {
+  deleteFromCache,
   generateCacheKey,
   getFromCache,
   invalidateUserCache,
@@ -52,8 +53,14 @@ import {
   buildProteinGuardrailRetryMessage,
   validateProteinGuardrail,
 } from '../utils/blenderGuardrail.utils';
+import {
+  buildRecipeRestrictionRetryMessage,
+  summarizeRestrictionViolations,
+  validateRecipeRestrictions,
+} from '../utils/recipeRestrictions.utils';
 
 const DAILY_FREE_LIMIT = 3;
+const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
 const INVALID_JSON_RETRY_INSTRUCTION =
   'Your previous response had an invalid format. Return only valid JSON.';
 const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -399,6 +406,75 @@ async function ensureMacroConsistency(
   }
 }
 
+type RecipeRestrictionEnforcement =
+  | { ok: true; recipe: PulseAiRecipe }
+  | { ok: false };
+
+// CP-1.1.1c: última conferência antes de entregar — roda depois do guardrail
+// de proteína e da consistência de macros, porque os retries delas podem
+// trazer de volta um ingrediente proibido. Diferente dessas duas, esta
+// BLOQUEIA: um retry e, se continuar violando (ou o retry falhar), a receita
+// não é entregue. A receita refeita não passa de novo pelos retries de
+// proteína/macros (eles nunca bloqueiam); só o flag macrosValidated é
+// recalculado.
+async function ensureRecipeRestrictions(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  user: Pick<PulseAiUserProfile, 'dietaryPreferences' | 'blendiModel'>
+): Promise<RecipeRestrictionEnforcement> {
+  const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel);
+
+  if (initialCheck.compliant) {
+    return { ok: true, recipe };
+  }
+
+  console.info('[pulseAi.controller] recipe restriction violated, retrying', {
+    violations: summarizeRestrictionViolations(initialCheck.violations),
+  });
+
+  try {
+    const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations);
+    const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+      ...prompt.messages,
+      { role: 'assistant', content: JSON.stringify(recipe) },
+      { role: 'user', content: retryMessage },
+    ]);
+
+    if (!retried.recipe) {
+      console.warn('[pulseAi.controller] recipe restriction retry returned an invalid recipe');
+      return { ok: false };
+    }
+
+    const retriedCheck = validateRecipeRestrictions(
+      retried.recipe,
+      user.dietaryPreferences,
+      user.blendiModel
+    );
+
+    if (!retriedCheck.compliant) {
+      console.warn('[pulseAi.controller] recipe restriction still violated after retry', {
+        violations: summarizeRestrictionViolations(retriedCheck.violations),
+      });
+      return { ok: false };
+    }
+
+    return {
+      ok: true,
+      recipe: {
+        ...retried.recipe,
+        macrosValidated: validateMacroConsistency(retried.recipe).macrosValidated,
+      },
+    };
+  } catch (error) {
+    console.error('[pulseAi.controller] recipe restriction retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return { ok: false };
+  }
+}
+
 function serializeConversationMessage(message: IConversationMessage): PulseAiApiMessage {
   if (message.role === 'user') {
     return { role: 'user', content: message.content as string };
@@ -550,7 +626,33 @@ async function runPulseAiChat(params: {
   if (cachedResponse) {
     const parsedCachedResponse = pulseAiCachedResponseSchema.safeParse(cachedResponse);
 
-    if (parsedCachedResponse.success) {
+    // CP-1.1.1c: receita do cache também passa pela validação de restrições
+    // (pode ter sido gravada antes desta checagem existir). Se violar, a
+    // entrada é removida e o fluxo segue como cache inexistente.
+    const cachedRestrictionCheck = parsedCachedResponse.success
+      ? validateRecipeRestrictions(
+          parsedCachedResponse.data.recipe,
+          currentUser.dietaryPreferences,
+          currentUser.blendiModel
+        )
+      : null;
+
+    if (cachedRestrictionCheck && !cachedRestrictionCheck.compliant) {
+      console.info('[pulseAi.controller] cached recipe violates restrictions, regenerating', {
+        violations: summarizeRestrictionViolations(cachedRestrictionCheck.violations),
+      });
+
+      try {
+        await deleteFromCache(cacheKey);
+      } catch (error) {
+        // Não bloqueia a regeneração: o setInCache abaixo sobrescreve a entrada.
+        console.error('[pulseAi.controller] failed to delete violating cache entry', {
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        });
+      }
+    }
+
+    if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant) {
       const usageReservation = await reservePulseAiUsage(currentUser);
 
       if (!usageReservation.ok) {
@@ -681,6 +783,25 @@ async function runPulseAiChat(params: {
 
     recipe = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
     recipe = await ensureMacroConsistency(recipe, prompt);
+
+    const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser);
+
+    if (!restrictionEnforcement.ok) {
+      // Nada é entregue: devolve a reserva de uso e não grava cache, turno da
+      // conversa nem XP.
+      if (shouldRollbackUsage) {
+        await rollbackPulseAiUsageReservation(currentUser);
+        shouldRollbackUsage = false;
+      }
+
+      return errorOutcome(
+        422,
+        DIETARY_RESTRICTION_UNMET_CODE,
+        'Pulse AI could not generate a recipe that meets the user restrictions.'
+      );
+    }
+
+    recipe = restrictionEnforcement.recipe;
 
     await persistConversationTurn({
       conversationId: conversationContext.conversationId,

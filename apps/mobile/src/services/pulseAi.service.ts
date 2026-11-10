@@ -14,7 +14,10 @@ const PULSE_AI_ERROR_TRANSLATION_KEYS = {
   'pulseai/daily-limit-reached': 'errors.pulseai_daily_limit',
   'pulseai/ai-unavailable': 'errors.pulseai_unavailable',
   'pulseai/invalid-message': 'errors.pulseai_invalid_message',
-} as const;
+  // CP-1.1.1c: a receita violou a dieta (ou trouxe gelo para o Lite) mesmo
+  // após o retry e foi barrada no backend.
+  'pulseai/dietary-restriction-unmet': 'errors.pulseai_dietary_restriction_unmet',
+} as const satisfies Record<string, TranslationKey>;
 
 interface ApiErrorResponse {
   success: false;

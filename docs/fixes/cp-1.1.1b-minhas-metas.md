@@ -42,6 +42,8 @@ própria tela (ver "Correções vindas do pentest" e
    fl oz/ml já existia e continua nas outras telas (Home/Track exibem na unidade do
    usuário). **Decisão sua:** converter para fl oz na edição para quem é imperial
    (é uma mudança de comportamento, fica para um CP).
+   **Resolvido no CP-1.1.1b.1** ([relatório](cp-1.1.1b.1-hidratacao-fl-oz-json-aninhado-authinput.md)): no imperial a tela edita em fl oz
+   com uma casa decimal e envia ml inteiro.
 
 3. **O teclado numérico do iOS não tem tecla de retorno.** `number-pad` (que o
    onboarding usa, com `returnKeyType`) ignora "próximo/concluir" no iPhone. Para
@@ -58,17 +60,21 @@ própria tela (ver "Correções vindas do pentest" e
    fonte muito grande (≥ 1,6×) o rótulo pode encostar no valor. Recomendação para
    um CP: pôr `maxFontSizeMultiplier` também no rótulo do `AuthInput` (beneficia o
    app todo).
+   **Resolvido no CP-1.1.1b.1:** teto de 1,3× no rótulo, no valor e no erro, dentro do
+   próprio `AuthInput`; o teto próprio desta tela foi removido.
 
 5. **Lint: 1 erro que já existia.** `CompleteProfileScreen.tsx:279`
    (`no-unnecessary-type-assertion`) — confirmado em `main` com `git stash` (já
    constava no relatório do CP-1.1.1a, e o arquivo está no "não mexer"). Todo o
    resto do lint está limpo, com `--max-warnings 0`.
+   **Corrigido no CP-1.1.1b.1.**
 
 6. **Achado pré-existente do backend (não corrigido).** O pentest mostrou que um JSON
    aninhado em ~5.000 níveis ou mais (≈ 10 KB) devolve **HTTP 500** em qualquer rota com
    corpo JSON (recursão no `express-mongo-sanitize`); o processo não cai e em produção a
    mensagem é genérica. Como este CP não muda o backend, fica só documentado, com a
    recomendação, em [cp-1.1.1b-testes-pentest.md](cp-1.1.1b-testes-pentest.md#achado-pré-existente-do-backend-não-corrigido-este-cp-não-muda-o-backend).
+   **Resolvido no CP-1.1.1b.1:** corpo com mais de 32 níveis responde 400.
 
 7. **Não validei em aparelho.** Não há simulador/emulador nem `adb` aqui. A lógica
    de teclado/rolagem está coberta por testes, mas **o comportamento real no iOS e

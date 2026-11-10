@@ -1,6 +1,6 @@
 # Inventário Completo de Funcionalidades — BLENDi Pulse
 
-**Data do levantamento:** 2026-10-08 (atualizado em 2026-11-09 pelo CP-1.1.1b: tela "Minhas metas", dieta editável, avisos de meta, limites de validação e badge de modelo — as seções afetadas estão marcadas com "CP-1.1.1b")
+**Data do levantamento:** 2026-10-08 (atualizado em 2026-11-09 pelo CP-1.1.1b: tela "Minhas metas", dieta editável, avisos de meta, limites de validação e badge de modelo — as seções afetadas estão marcadas com "CP-1.1.1b"; atualizado em 2026-11-10 pelo CP-1.1.1b.1: hidratação em fl oz no imperial, limite de profundidade do corpo JSON e escala de fonte do `AuthInput`)
 **Método:** leitura direta do código-fonte do monorepo (`apps/mobile/src`, `apps/api/src`, `packages/shared/src`), sem uso de memória de conversas anteriores. Todas as afirmações abaixo têm evidência em arquivo/linha; onde o código não deixa algo claro ou algo esperado não existe, isso é dito explicitamente em vez de presumido.
 **Propósito:** base técnica completa para depois traduzir em material de apresentação de negócio para o Jon. Este documento é técnico de propósito — nomes de arquivos, funções, variáveis e endpoints estão citados para permitir verificação.
 
@@ -219,12 +219,13 @@ Editadas na tela **"Minhas metas"** (`NutritionGoalsScreen`), aberta pela linha 
 | Meta de proteína (g/dia) | 10–800 |
 | Meta de carboidrato (g/dia) | 0–1.500 |
 | Meta de calorias (kcal/dia) | 300–15.000 |
-| Meta de hidratação (**ml**, sem conversão para fl oz) | 500–8.000 |
+| Meta de hidratação (ml no métrico; **fl oz com uma casa decimal** no imperial — CP-1.1.1b.1) | 500–8.000 ml (17.0–270.5 fl oz, derivados dos limites em ml) |
 | Dieta (4 restrições, múltipla escolha) | `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`; lista vazia = sem restrições |
 
 Comportamento:
 
-- **Validação inline por campo**, só depois que a pessoa digita algo (só aceita inteiros); "Salvar" fica desabilitado sem mudança ou com campo inválido.
+- **Validação inline por campo**, só depois que a pessoa digita algo (só aceita inteiros, exceto a hidratação no imperial, que aceita uma casa decimal com ponto ou vírgula); "Salvar" fica desabilitado sem mudança ou com campo inválido.
+- **Hidratação no imperial (CP-1.1.1b.1):** o campo mostra a meta em fl oz com o mesmo arredondamento da Home (2500 ml → 84.5), com rótulo "(fl oz)" e teclado decimal; ao salvar, o valor vira ml inteiro. Se a pessoa não mexeu ou redigitou o valor exibido, a hidratação não é enviada (abrir e salvar não troca 2500 ml por 2499). A conversão usa a constante única de `utils/volumeUnits.ts`.
 - **PATCH só com o que mudou** (`PATCH /users/me`); a hidratação alterada também invalida a query `hydrationToday` (a Home e o Track leem a meta de lá) e o perfil local é sincronizado (Relatório Semanal e Histórico leem as metas dele).
 - **Avisos de meta do backend:** em edição manual de proteína, carboidratos ou calorias fora de faixas de bom senso, o backend devolve `warnings` e a tela fica aberta mostrando, num quadro âmbar abaixo do campo, que a meta **foi salva** mas vale conferir (6 textos, em inglês e português; a regra é do backend — o app só exibe e ignora `code` desconhecido). Editar o campo apaga o aviso dele. Quem não tem dados de corpo salvos não recebe avisos.
 - **Aviso fixo na tela:** mudar o objetivo ou os dados de corpo recalcula proteína, carboidratos e calorias automaticamente (e sobrescreve o que foi digitado à mão).

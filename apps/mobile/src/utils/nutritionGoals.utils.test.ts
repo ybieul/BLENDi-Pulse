@@ -13,13 +13,21 @@ import {
 
 import en from '../locales/en.json';
 import ptBR from '../locales/pt-BR.json';
+import { flOzToMl } from './volumeUnits';
 import {
   GOAL_FIELDS,
   GOAL_LIMITS,
+  HYDRATION_FL_OZ_LIMITS,
   areGoalDraftsValid,
   buildGoalsPatch,
+  formatGoalDisplayValue,
+  formatGoalLimit,
+  getGoalDisplayLimits,
   hasUnsavedGoalChanges,
+  isGoalFieldInFlOz,
   isGoalTextValid,
+  parseGoalDraftText,
+  toGoalStoredValue,
   isSameDietSelection,
   parseGoalText,
   parseGoalWarnings,
@@ -267,3 +275,77 @@ function EXPECTED_KEYS(): string[] {
     'nutritionGoals.warnings.carbAboveRange',
   ];
 }
+
+describe('hidratação em fl oz (sistema imperial)', () => {
+  const H = 'dailyHydrationTarget' as const;
+
+  it('só a hidratação do imperial é em fl oz', () => {
+    expect(isGoalFieldInFlOz(H, 'imperial')).toBe(true);
+    expect(isGoalFieldInFlOz(H, 'metric')).toBe(false);
+    for (const field of GOAL_FIELDS.filter((item) => item !== H)) {
+      expect(isGoalFieldInFlOz(field, 'imperial')).toBe(false);
+    }
+  });
+
+  it('faixa em fl oz: menor/maior valor com uma casa cuja conversão fica dentro da faixa em ml do shared', () => {
+    const { min, max } = HYDRATION_FL_OZ_LIMITS;
+    expect([min, max]).toEqual([17, 270.5]);
+    expect(flOzToMl(min)).toBeGreaterThanOrEqual(DAILY_HYDRATION_TARGET_MIN);
+    expect(flOzToMl(min - 0.1)).toBeLessThan(DAILY_HYDRATION_TARGET_MIN);
+    expect(flOzToMl(max)).toBeLessThanOrEqual(DAILY_HYDRATION_TARGET_MAX);
+    expect(flOzToMl(max + 0.1)).toBeGreaterThan(DAILY_HYDRATION_TARGET_MAX);
+    expect(getGoalDisplayLimits(H, 'imperial')).toBe(HYDRATION_FL_OZ_LIMITS);
+    expect(getGoalDisplayLimits(H, 'metric')).toBe(GOAL_LIMITS[H]);
+    expect([formatGoalLimit(H, min, 'imperial'), formatGoalLimit(H, max, 'imperial')]).toEqual(['17.0', '270.5']);
+    expect(formatGoalLimit(H, 500, 'metric')).toBe(500);
+  });
+
+  it('exibição: uma casa no imperial, ml inteiro no métrico', () => {
+    expect(formatGoalDisplayValue(H, 2500, 'imperial')).toBe('84.5');
+    expect(formatGoalDisplayValue(H, 3000, 'imperial')).toBe('101.4');
+    expect(formatGoalDisplayValue(H, 2500, 'metric')).toBe('2500');
+    expect(formatGoalDisplayValue('dailyProteinTarget', 150, 'imperial')).toBe('150');
+  });
+
+  it('leitura: ponto e vírgula, no máximo uma casa; o resto só inteiro', () => {
+    expect(parseGoalDraftText(H, '84.5', 'imperial')).toBe(84.5);
+    expect(parseGoalDraftText(H, '84,5', 'imperial')).toBe(84.5);
+    expect(parseGoalDraftText(H, '84', 'imperial')).toBe(84);
+    expect(parseGoalDraftText(H, '84.', 'imperial')).toBe(84);
+    for (const text of ['84.55', '-84.5', '+84.5', '8e1', '.5', '84.5x', '', ' ']) {
+      expect(parseGoalDraftText(H, text, 'imperial')).toBeNull();
+    }
+    expect(parseGoalDraftText(H, '84.5', 'metric')).toBeNull();
+    expect(parseGoalDraftText('dailyCarbTarget', '84.5', 'imperial')).toBeNull();
+  });
+
+  it('armazenamento: fl oz -> ml inteiro arredondado', () => {
+    expect(toGoalStoredValue(H, 84.5, 'imperial')).toBe(2499);
+    expect(toGoalStoredValue(H, 17, 'imperial')).toBe(503);
+    expect(toGoalStoredValue(H, 270.5, 'imperial')).toBe(8000);
+    expect(toGoalStoredValue(H, 2500, 'metric')).toBe(2500);
+  });
+
+  it('validade nos limites: 16.9 e 270.6 inválidos; 17.0 e 270.5 válidos', () => {
+    expect(isGoalTextValid(H, '16.9', 'imperial')).toBe(false);
+    expect(isGoalTextValid(H, '17.0', 'imperial')).toBe(true);
+    expect(isGoalTextValid(H, '270.5', 'imperial')).toBe(true);
+    expect(isGoalTextValid(H, '270.6', 'imperial')).toBe(false);
+  });
+
+  it('PATCH: mudança decidida na unidade exibida, valor enviado em ml', () => {
+    expect(buildGoalsPatch(BASELINE, { [H]: '84.5' }, null, 'imperial')).toEqual({});
+    expect(hasUnsavedGoalChanges(BASELINE, { [H]: '84,5' }, null, 'imperial')).toBe(false);
+    expect(buildGoalsPatch(BASELINE, { [H]: '84.6' }, null, 'imperial')).toEqual({ [H]: 2502 });
+    expect(buildGoalsPatch(BASELINE, { [H]: '16.9' }, null, 'imperial')).toEqual({});
+    expect(areGoalDraftsValid({ [H]: '16.9' }, 'imperial')).toBe(false);
+  });
+
+  it('valor salvo que aparece abaixo de 17.0 (500 ml -> 16.9): redigitar não é erro nem mudança', () => {
+    const baseline = { ...BASELINE, [H]: 500 };
+    expect(isGoalTextValid(H, '16.9', 'imperial', baseline)).toBe(true);
+    expect(areGoalDraftsValid({ [H]: '16,9' }, 'imperial', baseline)).toBe(true);
+    expect(buildGoalsPatch(baseline, { [H]: '16.9' }, null, 'imperial')).toEqual({});
+    expect(isGoalTextValid(H, '16.8', 'imperial', baseline)).toBe(false);
+  });
+});
