@@ -18,17 +18,17 @@ It exposes these fields and helpers:
 - `displayHeight(valueInCm)`
 - `displayVolume(valueInMl)`
 - `displayHydration(valueInMl)`
-- `toStorageWeight(value)`
-- `toStorageHeight(value)`
 - `weightUnit`
 - `volumeUnit`
 - `heightUnit`
 
-The hook also returns `unitSystem` and `inputHeightUnit`, but the display/storage boundary is carried mainly by the functions above.
+The hook also returns `unitSystem`, `inputHeightUnit` and (since CP-1.1.1f) `inputHeightFeetUnit`.
+
+**Since CP-1.1.1f:** the storage helpers `toStorageWeight` and `toStorageHeight` were removed from the hook. Converting typed values back to storage units is done by pure functions in [apps/mobile/src/utils/bodyUnits.ts](../../apps/mobile/src/utils/bodyUnits.ts) (`poundsToKg`, `inchesToCm`, `feetInchesToCm`), used by [apps/mobile/src/utils/bodyFields.utils.ts](../../apps/mobile/src/utils/bodyFields.utils.ts), which holds the field rules of the onboarding body and Complete Profile screens. Imperial height is typed in two fields, feet and inches, and stored in cm with the same rule as before (total inches × 2.54, rounded to one decimal). See [CP-1.1.1f](../fixes/cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md).
 
 ### Storage Boundary
 
-[apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx](../../apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx) uses `toStorageWeight(...)` and `toStorageHeight(...)` before calling `/users/calculate-macros`, and it explicitly sends `unitSystem: 'metric'` in that request. That keeps backend macro calculation and user persistence on one canonical metric representation, even when the UI is collecting imperial input.
+[apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx](../../apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx) converts the typed values to kg and cm (originally with `toStorageWeight(...)`/`toStorageHeight(...)`; since CP-1.1.1f with `evaluateBodyFields` from `bodyFields.utils.ts`) before calling `/users/calculate-macros`, and it explicitly sends `unitSystem: 'metric'` in that request. That keeps backend macro calculation and user persistence on one canonical metric representation, even when the UI is collecting imperial input.
 
 ### Universal Nutrition Units
 
@@ -48,7 +48,7 @@ The conversion constants used by the unit system are:
 - `1 ml = 0.0338 fl oz`
 - `1 cup = 240 ml`
 
-The first three are either directly encoded or used through their inverse forms in [apps/mobile/src/hooks/useUnits.ts](../../apps/mobile/src/hooks/useUnits.ts): pounds per kilogram, centimeters per inch, and milliliters per fluid ounce. Since CP-1.1.1b.1 the volume factor (`MILLILITERS_PER_FLUID_OUNCE = 29.574`) and the `mlToFlOz`/`flOzToMl` helpers live in a single place, [apps/mobile/src/utils/volumeUnits.ts](../../apps/mobile/src/utils/volumeUnits.ts), used by `useUnits` and by the "My goals" screen (the only screen that edits a volume in fl oz). The `1 cup = 240 ml` convention is not a storage conversion constant; it is part of the imperial recipe-language guidance used in Pulse AI prompts.
+The first three are either directly encoded or used through their inverse forms: pounds per kilogram, centimeters per inch, and milliliters per fluid ounce. Since CP-1.1.1f the weight and height factors (`POUNDS_PER_KILOGRAM = 2.205`, `CENTIMETERS_PER_INCH = 2.54`, `INCHES_PER_FOOT = 12`) live in a single place, [apps/mobile/src/utils/bodyUnits.ts](../../apps/mobile/src/utils/bodyUnits.ts), used by `useUnits` and by the body screens. Since CP-1.1.1b.1 the volume factor (`MILLILITERS_PER_FLUID_OUNCE = 29.574`) and the `mlToFlOz`/`flOzToMl` helpers live in a single place, [apps/mobile/src/utils/volumeUnits.ts](../../apps/mobile/src/utils/volumeUnits.ts), used by `useUnits` and by the "My goals" screen (the only screen that edits a volume in fl oz). The `1 cup = 240 ml` convention is not a storage conversion constant; it is part of the imperial recipe-language guidance used in Pulse AI prompts.
 
 ### Automatic Default Selection
 

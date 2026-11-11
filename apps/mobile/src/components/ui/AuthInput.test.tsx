@@ -1,7 +1,7 @@
 // AuthInput: teto de ampliação da fonte do sistema (rótulo, valor e erro),
 // área de erro sem altura fixa e posição do rótulo flutuante com fonte ampliada.
 import { render } from '@testing-library/react-native';
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { Animated, StyleSheet, Text, TextInput } from 'react-native';
 import type { ReactTestInstance, ReactTestRendererJSON } from 'react-test-renderer';
 
 jest.mock('../../hooks/useColors', () => {
@@ -142,5 +142,51 @@ describe('AuthInput — rótulo flutuante com fonte ampliada (altura do campo fi
     const inputStyle = StyleSheet.flatten(utils.UNSAFE_getByType(TextInput).props.style) as Record<string, unknown>;
     expect(inputStyle.paddingTop).toBe(layout.inputPaddingTop);
     expect(inputStyle.paddingBottom).toBe(layout.inputPaddingBottom);
+  });
+});
+
+describe('AuthInput — prop `invalid` (esconde o ícone de "ok" sem mostrar texto)', () => {
+  // O ícone de "ok" anima a opacidade com o driver nativo, que não avança no
+  // jest; então o teste olha o destino da animação: a única com 150 ms
+  // (CHECK_ANIMATION_DURATION). 1 = ícone visível, 0 = oculto.
+  const CHECK_ANIMATION_DURATION = 150;
+
+  type TimingSpy = jest.SpyInstance<ReturnType<typeof Animated.timing>, Parameters<typeof Animated.timing>>;
+
+  function lastCheckTarget(timingSpy: TimingSpy): unknown {
+    const checkCalls = timingSpy.mock.calls.filter(([, config]) => config.duration === CHECK_ANIMATION_DURATION);
+    return checkCalls[checkCalls.length - 1]?.[1].toValue;
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('sem a prop, com conteúdo e sem erro, o ícone aparece (como antes)', () => {
+    const timingSpy = jest.spyOn(Animated, 'timing');
+    render(<AuthInput value="10" placeholder="Inches" />);
+    expect(lastCheckTarget(timingSpy)).toBe(1);
+  });
+
+  it('com `invalid`, o ícone fica oculto e nenhum texto de erro é renderizado', () => {
+    const timingSpy = jest.spyOn(Animated, 'timing');
+    const utils = render(<AuthInput value="10" placeholder="Inches" invalid />);
+    expect(lastCheckTarget(timingSpy)).toBe(0);
+    // Mesmos textos do campo sem `invalid` (rótulo e o glifo do ícone): nada de mensagem.
+    const plain = render(<AuthInput value="10" placeholder="Inches" />);
+    const texts = (u: ReturnType<typeof render>) => u.UNSAFE_getAllByType(Text).map((node) => node.props.children as unknown);
+    expect(texts(utils)).toEqual(texts(plain));
+  });
+
+  it('`invalid` voltando a false mostra o ícone de novo', () => {
+    const timingSpy = jest.spyOn(Animated, 'timing');
+    const utils = render(<AuthInput value="10" placeholder="Inches" invalid />);
+    utils.rerender(<AuthInput value="10" placeholder="Inches" invalid={false} />);
+    expect(lastCheckTarget(timingSpy)).toBe(1);
+  });
+
+  it('`invalid` não mexe no erro: com erro, o texto aparece normalmente', () => {
+    const utils = render(<AuthInput value="10" placeholder="Inches" invalid error="Mensagem" />);
+    expect(utils.getByText('Mensagem')).toBeTruthy();
   });
 });

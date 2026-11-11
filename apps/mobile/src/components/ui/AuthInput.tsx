@@ -86,12 +86,19 @@ type TextInputBlurEvent = Parameters<NonNullable<TextInputProps['onBlur']>>[0];
 export interface AuthInputProps extends TextInputProps {
   error?: string;
   leftIcon?: ReactNode;
+  /**
+   * Marca o campo como inválido sem mostrar texto: só esconde o ícone de "ok".
+   * Para quando a mensagem fica em outro campo do mesmo valor (ex.: a faixa da
+   * altura imperial aparece nos pés; as polegadas usam isto). Padrão: false.
+   */
+  invalid?: boolean;
 }
 
 export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInput(
   {
     error,
     leftIcon,
+    invalid = false,
     style,
     placeholder,
     value,
@@ -128,7 +135,7 @@ export const AuthInput = forwardRef<TextInput, AuthInputProps>(function AuthInpu
   const hasContent = resolvedValue.trim().length > 0;
   const hasLabel = typeof placeholder === 'string' && placeholder.trim().length > 0;
   const shouldFloatLabel = hasLabel && (isFocused || hasContent);
-  const showCheck = hasContent && !error;
+  const showCheck = hasContent && !error && !invalid;
   const leftInset = leftIcon
     ? HORIZONTAL_PADDING + ICON_SLOT_SIZE + LEADING_GAP
     : HORIZONTAL_PADDING;

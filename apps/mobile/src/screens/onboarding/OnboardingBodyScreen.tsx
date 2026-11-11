@@ -1,7 +1,8 @@
 // apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx
 // Passo 4 do fluxo de onboarding: coleta de dados corporais e cálculo de macros.
 //
-// Dois inputs numéricos (peso kg / altura cm) disparam POST /users/calculate-macros
+// Inputs numéricos de peso (kg ou lbs) e altura (cm, ou pés + polegadas no
+// imperial), sempre enviados em kg/cm, disparam POST /users/calculate-macros
 // com debounce de 600ms. O IMC e a classificação são exibidos em tempo real.
 // Um seletor de nível de atividade recalcula ao ser alterado.
 //
@@ -40,7 +41,13 @@ import {
   maskBirthDateInput,
   translateBirthDateError,
 } from '../../utils/birthDate.utils';
-import { parseStrictDecimal } from '../../utils/numericInput.utils';
+import {
+  HEIGHT_FEET_MAX_LENGTH,
+  HEIGHT_INCHES_MAX_LENGTH,
+  evaluateBodyFields,
+  getBodyNumericFields,
+  translateBodyFieldError,
+} from '../../utils/bodyFields.utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,12 +75,6 @@ const FIELD_HEIGHT = 56;
 const UNIT_LABEL_RIGHT = spacing['5xl']; // 40
 const CHIP_SELECTED_BACKGROUND_COLOR = `${colors.brand.pulse}26`;
 
-// Peso e altura: até uma casa decimal, com ponto ou vírgula (mesma precisão que
-// o app exibe e pré-preenche: displayWeight/toFixed(1)).
-const BODY_FRACTION_DIGITS = 1;
-
-// Ordem visual dos campos numéricos (é a ordem do "Próximo").
-const BODY_NUMERIC_FIELDS = ['weight', 'height', 'birthDate'] as const;
 const KEYBOARD_ACCESSORY_ID = 'onboardingBodyKeyboardAccessory';
 
 type ActivityConfig = {
@@ -140,10 +141,14 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
 
   const defaultUnitSystem = useRef(getDefaultUnitSystem()).current;
   const effectiveUnitSystem = selectedUnitSystem ?? defaultUnitSystem;
-  const { inputHeightUnit, toStorageHeight, toStorageWeight, weightUnit } = useUnits(effectiveUnitSystem);
+  const { inputHeightFeetUnit, inputHeightUnit, weightUnit } = useUnits(effectiveUnitSystem);
+  const isImperial = effectiveUnitSystem === 'imperial';
 
   const [weightText, setWeightText] = useState('');
   const [heightText, setHeightText] = useState('');
+  // Altura imperial: pés e polegadas em dois campos.
+  const [feetText, setFeetText] = useState('');
+  const [inchesText, setInchesText] = useState('');
   const [birthDateText, setBirthDateText] = useState('');
   const [biologicalSex, setBiologicalSex] = useState<BiologicalSex | null>(null);
   const [weightGoal, setWeightGoal] = useState<WeightGoalOption | null>(null);
@@ -159,16 +164,23 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     }
   }, [defaultUnitSystem, selectedUnitSystem, setUnitSystem]);
 
-  // Leitura estrita: "70abc", "1.2.3", "-3" e "1e2" são inválidos (antes o
-  // parseFloat aceitava o começo do texto). Os limites seguem os de sempre.
-  const parsedWeight = parseStrictDecimal(weightText, BODY_FRACTION_DIGITS);
-  const parsedHeight = parseStrictDecimal(heightText, BODY_FRACTION_DIGITS);
-  const rawWeightNum = parsedWeight ?? Number.NaN;
-  const rawHeightNum = parsedHeight ?? Number.NaN;
-  const storageWeight = toStorageWeight(rawWeightNum);
-  const storageHeight = toStorageHeight(rawHeightNum);
-  const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
-  const heightValid = typeof storageHeight === 'number' && storageHeight >= 100 && storageHeight <= 250;
+  // Leitura estrita ("70abc", "1.2.3", "-3" e "1e2" são inválidos), conversão
+  // para kg/cm e mensagem de cada campo: bodyFields.utils.ts. Os limites vêm
+  // do shared. Esta tela não tem peso nem altura salvos para pré-preencher.
+  const bodyFields = evaluateBodyFields({
+    unitSystem: effectiveUnitSystem,
+    weightText,
+    heightText,
+    feetText,
+    inchesText,
+    untouchedSavedHeightCm: null,
+    untouchedSavedWeightKg: null,
+    weightUnit,
+    metricHeightUnit: inputHeightUnit,
+  });
+  const storageWeight = bodyFields.weightKg;
+  const storageHeight = bodyFields.heightCm;
+  const { weightValid, heightValid } = bodyFields;
 
   // birthDate validado pelo mesmo schema Zod do backend (calculateMacrosSchema.
   // shape.birthDate, packages/shared/src/schemas/user.ts) — reaproveita a
@@ -184,14 +196,17 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       ? translateBirthDateError(t, birthDateValidation.error.issues[0]?.message ?? '')
       : undefined;
 
-  // Erro de leitura só depois que a pessoa digitou algo (fora da faixa continua
-  // sem mensagem aqui, como antes).
-  const weightFormatError =
-    weightText.trim().length > 0 && parsedWeight === null ? t('errors.validation.decimal_one_place') : undefined;
-  const heightFormatError =
-    heightText.trim().length > 0 && parsedHeight === null ? t('errors.validation.decimal_one_place') : undefined;
+  // Só depois que a pessoa digitou algo: erro de formato primeiro; depois,
+  // fora da faixa (a faixa aceita, na unidade do usuário).
+  const weightError = translateBodyFieldError(t, bodyFields.errors.weight);
+  const heightError = translateBodyFieldError(t, bodyFields.errors.height);
+  const heightFeetError = translateBodyFieldError(t, bodyFields.errors.heightFeet);
+  const heightInchesError = translateBodyFieldError(t, bodyFields.errors.heightInches);
 
-  const { fieldProps, accessoryProps } = useNumericFieldChain(BODY_NUMERIC_FIELDS, KEYBOARD_ACCESSORY_ID);
+  const { fieldProps, accessoryProps } = useNumericFieldChain(
+    getBodyNumericFields(effectiveUnitSystem),
+    KEYBOARD_ACCESSORY_ID,
+  );
 
   const canFetch = weightValid && heightValid && birthDateValid && biologicalSex !== null && weightGoal !== null;
 
@@ -288,8 +303,8 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const handleContinue = () => {
     if (
       !result ||
-      typeof storageWeight !== 'number' ||
-      typeof storageHeight !== 'number' ||
+      storageWeight === null ||
+      storageHeight === null ||
       !birthDateIso ||
       !biologicalSex ||
       !weightGoal
@@ -325,6 +340,8 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     setUnitSystem(nextUnitSystem);
     setWeightText('');
     setHeightText('');
+    setFeetText('');
+    setInchesText('');
     setResult(null);
     setIsCalculating(false);
   };
@@ -332,9 +349,6 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const weightPlaceholder = effectiveUnitSystem === 'imperial'
     ? t('onboarding.weightPlaceholderImperial')
     : t('onboarding.weightPlaceholderMetric');
-  const heightPlaceholder = effectiveUnitSystem === 'imperial'
-    ? t('onboarding.heightPlaceholderImperial')
-    : t('onboarding.heightPlaceholderMetric');
 
   const styles = StyleSheet.create({
     container: {
@@ -359,6 +373,15 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       gap: spacing.md,
     },
     inputContainer: {
+      position: 'relative',
+    },
+    heightRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+    },
+    heightPart: {
+      flex: 1,
       position: 'relative',
     },
     unitOverlay: {
@@ -486,7 +509,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                   value={weightText}
                   onChangeText={setWeightText}
                   placeholder={weightPlaceholder}
-                  error={weightFormatError}
+                  error={weightError}
                   keyboardType="decimal-pad"
                 />
                 <View pointerEvents="none" style={styles.unitOverlay}>
@@ -494,19 +517,53 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                 </View>
               </View>
 
-              <View style={styles.inputContainer}>
-                <AuthInput
-                  {...fieldProps('height')}
-                  value={heightText}
-                  onChangeText={setHeightText}
-                  placeholder={heightPlaceholder}
-                  error={heightFormatError}
-                  keyboardType="decimal-pad"
-                />
-                <View pointerEvents="none" style={styles.unitOverlay}>
-                  <Text style={styles.unitText}>{inputHeightUnit}</Text>
+              {isImperial ? (
+                <View style={styles.heightRow}>
+                  <View style={styles.heightPart}>
+                    <AuthInput
+                      {...fieldProps('heightFeet')}
+                      value={feetText}
+                      onChangeText={setFeetText}
+                      placeholder={t('onboarding.heightFeetPlaceholder')}
+                      error={heightFeetError}
+                      keyboardType="number-pad"
+                      maxLength={HEIGHT_FEET_MAX_LENGTH}
+                    />
+                    <View pointerEvents="none" style={styles.unitOverlay}>
+                      <Text style={styles.unitText}>{inputHeightFeetUnit}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.heightPart}>
+                    <AuthInput
+                      {...fieldProps('heightInches')}
+                      value={inchesText}
+                      onChangeText={setInchesText}
+                      placeholder={t('onboarding.heightInchesPlaceholder')}
+                      error={heightInchesError}
+                      invalid={bodyFields.heightOutOfRange}
+                      keyboardType="number-pad"
+                      maxLength={HEIGHT_INCHES_MAX_LENGTH}
+                    />
+                    <View pointerEvents="none" style={styles.unitOverlay}>
+                      <Text style={styles.unitText}>{inputHeightUnit}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View style={styles.inputContainer}>
+                  <AuthInput
+                    {...fieldProps('height')}
+                    value={heightText}
+                    onChangeText={setHeightText}
+                    placeholder={t('onboarding.heightPlaceholderMetric')}
+                    error={heightError}
+                    keyboardType="decimal-pad"
+                  />
+                  <View pointerEvents="none" style={styles.unitOverlay}>
+                    <Text style={styles.unitText}>{inputHeightUnit}</Text>
+                  </View>
+                </View>
+              )}
 
               <AuthInput
                 {...fieldProps('birthDate')}

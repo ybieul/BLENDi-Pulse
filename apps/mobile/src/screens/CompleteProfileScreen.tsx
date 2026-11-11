@@ -42,7 +42,15 @@ import { useNumericFieldChain } from '../hooks/useNumericFieldChain';
 import { useUnits } from '../hooks/useUnits';
 import { useAuthStore } from '../store/auth.store';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
-import { parseStrictDecimal } from '../utils/numericInput.utils';
+import {
+  HEIGHT_FEET_MAX_LENGTH,
+  HEIGHT_INCHES_MAX_LENGTH,
+  evaluateBodyFields,
+  getBodyNumericFields,
+  heightCmToFeetInchesTexts,
+  translateBodyFieldError,
+} from '../utils/bodyFields.utils';
+import { kgToPounds } from '../utils/bodyUnits';
 import { showToast } from '../utils/toast.utils';
 import {
   BIRTH_DATE_MASKED_LENGTH,
@@ -94,17 +102,9 @@ type CompleteProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'Co
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const POUNDS_PER_KILOGRAM = 2.205;
-const CENTIMETERS_PER_INCH = 2.54;
 const CHIP_SELECTED_BACKGROUND_COLOR = `${colors.brand.pulse}26`;
 const DEFAULT_ACTIVITY: ActivityLevel = 'moderatelyActive';
 
-// Peso e altura: até uma casa decimal, com ponto ou vírgula (a mesma precisão
-// do pré-preenchimento, toFixed(1)).
-const BODY_FRACTION_DIGITS = 1;
-
-// Ordem visual dos campos numéricos (é a ordem do "Próximo").
-const BODY_NUMERIC_FIELDS = ['weight', 'height', 'birthDate'] as const;
 const KEYBOARD_ACCESSORY_ID = 'completeProfileKeyboardAccessory';
 
 type ActivityConfig = {
@@ -168,10 +168,22 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
   const profile = profileResponse?.data.user;
 
   const [unitSystem, setUnitSystemState] = useState<'metric' | 'imperial'>('metric');
-  const { inputHeightUnit, toStorageWeight, toStorageHeight, weightUnit } = useUnits(unitSystem);
+  const { inputHeightFeetUnit, inputHeightUnit, weightUnit } = useUnits(unitSystem);
+  const isImperial = unitSystem === 'imperial';
 
   const [weightText, setWeightText] = useState('');
   const [heightText, setHeightText] = useState('');
+  // Altura imperial: pés e polegadas em dois campos.
+  const [feetText, setFeetText] = useState('');
+  const [inchesText, setInchesText] = useState('');
+  // Altura salva (cm) enquanto a pessoa não mexe em pés nem polegadas: é ela
+  // que vai no PATCH, não a ida e volta cm -> pés/pol -> cm (178 -> 5'10" ->
+  // 177.8). Vira null ao mexer em qualquer um dos dois ou trocar de unidade.
+  const [untouchedSavedHeightCm, setUntouchedSavedHeightCm] = useState<number | null>(null);
+  // Mesma ideia para o peso, nos dois sistemas: sem mexer, vai o peso salvo
+  // (81 kg -> 178.6 lbs -> 80.997 kg era a ida e volta). Vira null ao mexer
+  // no peso ou trocar de unidade.
+  const [untouchedSavedWeightKg, setUntouchedSavedWeightKg] = useState<number | null>(null);
   const [birthDateText, setBirthDateText] = useState('');
   const [biologicalSex, setBiologicalSex] = useState<BiologicalSex | null>(null);
   const [weightGoal, setWeightGoal] = useState<WeightGoalOption | null>(null);
@@ -192,15 +204,20 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     setUnitSystemState(profileUnitSystem);
 
     if (typeof profile.weight === 'number') {
-      const displayValue =
-        profileUnitSystem === 'imperial' ? profile.weight * POUNDS_PER_KILOGRAM : profile.weight;
+      const displayValue = profileUnitSystem === 'imperial' ? kgToPounds(profile.weight) : profile.weight;
       setWeightText(displayValue.toFixed(1));
+      setUntouchedSavedWeightKg(profile.weight);
     }
 
     if (typeof profile.height === 'number') {
-      const displayValue =
-        profileUnitSystem === 'imperial' ? profile.height / CENTIMETERS_PER_INCH : profile.height;
-      setHeightText(displayValue.toFixed(1));
+      if (profileUnitSystem === 'imperial') {
+        const { feetText: savedFeet, inchesText: savedInches } = heightCmToFeetInchesTexts(profile.height);
+        setFeetText(savedFeet);
+        setInchesText(savedInches);
+        setUntouchedSavedHeightCm(profile.height);
+      } else {
+        setHeightText(profile.height.toFixed(1));
+      }
     }
 
     if (profile.birthDate) {
@@ -220,16 +237,23 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     }
   }, [profile]);
 
-  // Leitura estrita: "70abc", "1.2.3", "-3" e "1e2" são inválidos (antes o
-  // parseFloat aceitava o começo do texto). Os limites seguem os de sempre.
-  const parsedWeight = parseStrictDecimal(weightText, BODY_FRACTION_DIGITS);
-  const parsedHeight = parseStrictDecimal(heightText, BODY_FRACTION_DIGITS);
-  const rawWeightNum = parsedWeight ?? Number.NaN;
-  const rawHeightNum = parsedHeight ?? Number.NaN;
-  const storageWeight = toStorageWeight(rawWeightNum);
-  const storageHeight = toStorageHeight(rawHeightNum);
-  const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
-  const heightValid = typeof storageHeight === 'number' && storageHeight >= 100 && storageHeight <= 250;
+  // Leitura estrita ("70abc", "1.2.3", "-3" e "1e2" são inválidos), conversão
+  // para kg/cm e mensagem de cada campo: bodyFields.utils.ts. Os limites vêm
+  // do shared.
+  const bodyFields = evaluateBodyFields({
+    unitSystem,
+    weightText,
+    heightText,
+    feetText,
+    inchesText,
+    untouchedSavedHeightCm,
+    untouchedSavedWeightKg,
+    weightUnit,
+    metricHeightUnit: inputHeightUnit,
+  });
+  const storageWeight = bodyFields.weightKg;
+  const storageHeight = bodyFields.heightCm;
+  const { weightValid, heightValid } = bodyFields;
 
   const birthDateIso = birthDateInputToIso(birthDateText);
   const birthDateValidation = birthDateIso
@@ -241,14 +265,14 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
       ? translateBirthDateError(t, birthDateValidation.error.issues[0]?.message ?? '')
       : undefined;
 
-  // Erro de leitura só depois que a pessoa digitou algo (fora da faixa continua
-  // sem mensagem aqui, como antes).
-  const weightFormatError =
-    weightText.trim().length > 0 && parsedWeight === null ? t('errors.validation.decimal_one_place') : undefined;
-  const heightFormatError =
-    heightText.trim().length > 0 && parsedHeight === null ? t('errors.validation.decimal_one_place') : undefined;
+  // Só depois que a pessoa digitou algo: erro de formato primeiro; depois,
+  // fora da faixa (a faixa aceita, na unidade do usuário).
+  const weightError = translateBodyFieldError(t, bodyFields.errors.weight);
+  const heightError = translateBodyFieldError(t, bodyFields.errors.height);
+  const heightFeetError = translateBodyFieldError(t, bodyFields.errors.heightFeet);
+  const heightInchesError = translateBodyFieldError(t, bodyFields.errors.heightInches);
 
-  const { fieldProps, accessoryProps } = useNumericFieldChain(BODY_NUMERIC_FIELDS, KEYBOARD_ACCESSORY_ID);
+  const { fieldProps, accessoryProps } = useNumericFieldChain(getBodyNumericFields(unitSystem), KEYBOARD_ACCESSORY_ID);
 
   const canSubmit = weightValid && heightValid && birthDateValid && biologicalSex !== null && weightGoal !== null;
 
@@ -257,10 +281,29 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     setUnitSystemState(nextUnitSystem);
     setWeightText('');
     setHeightText('');
+    setFeetText('');
+    setInchesText('');
+    setUntouchedSavedHeightCm(null);
+    setUntouchedSavedWeightKg(null);
+  };
+
+  const handleWeightChange = (text: string) => {
+    setWeightText(text);
+    setUntouchedSavedWeightKg(null);
+  };
+
+  const handleFeetChange = (text: string) => {
+    setFeetText(text);
+    setUntouchedSavedHeightCm(null);
+  };
+
+  const handleInchesChange = (text: string) => {
+    setInchesText(text);
+    setUntouchedSavedHeightCm(null);
   };
 
   const handleSave = async () => {
-    if (!canSubmit || typeof storageWeight !== 'number' || typeof storageHeight !== 'number' || !birthDateIso) {
+    if (!canSubmit || storageWeight === null || storageHeight === null || !birthDateIso) {
       return;
     }
 
@@ -333,8 +376,6 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
 
   const weightPlaceholder =
     unitSystem === 'imperial' ? t('onboarding.weightPlaceholderImperial') : t('onboarding.weightPlaceholderMetric');
-  const heightPlaceholder =
-    unitSystem === 'imperial' ? t('onboarding.heightPlaceholderImperial') : t('onboarding.heightPlaceholderMetric');
 
   const styles = StyleSheet.create({
     flex: {
@@ -388,6 +429,15 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
       gap: spacing.md,
     },
     inputContainer: {
+      position: 'relative',
+    },
+    heightRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+    },
+    heightPart: {
+      flex: 1,
       position: 'relative',
     },
     unitOverlay: {
@@ -492,9 +542,9 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
                 <AuthInput
                   {...fieldProps('weight')}
                   value={weightText}
-                  onChangeText={setWeightText}
+                  onChangeText={handleWeightChange}
                   placeholder={weightPlaceholder}
-                  error={weightFormatError}
+                  error={weightError}
                   keyboardType="decimal-pad"
                   editable={!isProfileLoading}
                 />
@@ -503,20 +553,56 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
                 </View>
               </View>
 
-              <View style={styles.inputContainer}>
-                <AuthInput
-                  {...fieldProps('height')}
-                  value={heightText}
-                  onChangeText={setHeightText}
-                  placeholder={heightPlaceholder}
-                  error={heightFormatError}
-                  keyboardType="decimal-pad"
-                  editable={!isProfileLoading}
-                />
-                <View pointerEvents="none" style={styles.unitOverlay}>
-                  <Text style={styles.unitText}>{inputHeightUnit}</Text>
+              {isImperial ? (
+                <View style={styles.heightRow}>
+                  <View style={styles.heightPart}>
+                    <AuthInput
+                      {...fieldProps('heightFeet')}
+                      value={feetText}
+                      onChangeText={handleFeetChange}
+                      placeholder={t('onboarding.heightFeetPlaceholder')}
+                      error={heightFeetError}
+                      keyboardType="number-pad"
+                      maxLength={HEIGHT_FEET_MAX_LENGTH}
+                      editable={!isProfileLoading}
+                    />
+                    <View pointerEvents="none" style={styles.unitOverlay}>
+                      <Text style={styles.unitText}>{inputHeightFeetUnit}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.heightPart}>
+                    <AuthInput
+                      {...fieldProps('heightInches')}
+                      value={inchesText}
+                      onChangeText={handleInchesChange}
+                      placeholder={t('onboarding.heightInchesPlaceholder')}
+                      error={heightInchesError}
+                      invalid={bodyFields.heightOutOfRange}
+                      keyboardType="number-pad"
+                      maxLength={HEIGHT_INCHES_MAX_LENGTH}
+                      editable={!isProfileLoading}
+                    />
+                    <View pointerEvents="none" style={styles.unitOverlay}>
+                      <Text style={styles.unitText}>{inputHeightUnit}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <View style={styles.inputContainer}>
+                  <AuthInput
+                    {...fieldProps('height')}
+                    value={heightText}
+                    onChangeText={setHeightText}
+                    placeholder={t('onboarding.heightPlaceholderMetric')}
+                    error={heightError}
+                    keyboardType="decimal-pad"
+                    editable={!isProfileLoading}
+                  />
+                  <View pointerEvents="none" style={styles.unitOverlay}>
+                    <Text style={styles.unitText}>{inputHeightUnit}</Text>
+                  </View>
+                </View>
+              )}
 
               <AuthInput
                 {...fieldProps('birthDate')}

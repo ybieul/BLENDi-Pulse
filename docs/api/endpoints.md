@@ -568,9 +568,9 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `dailyCalorieTarget` | number | No | Integer between 300 and 15000 |
 | `dailyFatTarget` | number | No | Integer between 0 and 600 |
 | `dailyHydrationTarget` | number | No | Integer between 500 and 8000 (millilitres; `DAILY_HYDRATION_TARGET_MIN`/`MAX` in `packages/shared`) |
-| `weight` | number | No | Number between 20 and 300 (kg) — current body weight; also triggers the automatic macro recalculation above and, when different from the previously saved value, appends an entry to `weightHistory` (see `GET /users/me/weight-history`) |
-| `height` | number | No | Number between 100 and 250 (cm) — also triggers the automatic macro recalculation above |
-| `targetWeight` | number | No | Number between 20 and 300 (kg) — goal weight, independent of `weight`; when present together with `weight`/`weightGoal`, the response includes a `weightTargetEta` prediction (see below) |
+| `weight` | number | No | Number between 20 and 300 (kg; `BODY_WEIGHT_MIN_KG`/`MAX_KG` in `packages/shared`) — current body weight; also triggers the automatic macro recalculation above and, when different from the previously saved value, appends an entry to `weightHistory` (see `GET /users/me/weight-history`) |
+| `height` | number | No | Number between 100 and 250 (cm; `BODY_HEIGHT_MIN_CM`/`MAX_CM` in `packages/shared`) — also triggers the automatic macro recalculation above |
+| `targetWeight` | number | No | Number between 20 and 300 (kg; same `BODY_WEIGHT_MIN_KG`/`MAX_KG` as `weight`) — goal weight, independent of `weight`; when present together with `weight`/`weightGoal`, the response includes a `weightTargetEta` prediction (see below) |
 | `activityLevel` | string | No | One of `sedentary`, `lightlyActive`, `moderatelyActive`, `veryActive`, `extremelyActive` — also triggers the automatic macro recalculation above |
 | `birthDate` | string | No | ISO 8601 date (`YYYY-MM-DD`); must resolve to a plausible age between 13 and 120 years; also triggers the automatic macro recalculation above |
 | `biologicalSex` | string | No | One of `male`, `female` — also triggers the automatic macro recalculation above |
@@ -797,8 +797,8 @@ Calculates IMC, TDEE, and daily macro targets for onboarding and profile setup.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `weight` | number | Yes | Validated as 20-300 on the raw value *before* unit conversion — effectively kg, regardless of `unitSystem` |
-| `height` | number | Yes | Validated as 100-250 on the raw value *before* unit conversion — effectively cm, regardless of `unitSystem` |
+| `weight` | number | Yes | Validated as 20-300 (`BODY_WEIGHT_MIN_KG`/`MAX_KG`) on the raw value *before* unit conversion — effectively kg, regardless of `unitSystem` |
+| `height` | number | Yes | Validated as 100-250 (`BODY_HEIGHT_MIN_CM`/`MAX_CM`) on the raw value *before* unit conversion — effectively cm, regardless of `unitSystem` |
 | `targetWeight` | number | No | Number between 20 and 300 (kg), same before-conversion caveat as `weight`/`height` above — goal weight, independent of `weight`; when present, the response includes a `weightTargetEta` prediction (see below) |
 | `birthDate` | string | Yes | ISO 8601 date (`YYYY-MM-DD`); must resolve to a plausible age between 13 and 120 years |
 | `biologicalSex` | string | Yes | One of `male`, `female` |
@@ -807,7 +807,7 @@ Calculates IMC, TDEE, and daily macro targets for onboarding and profile setup.
 | `weightGoal` | string | Yes | One of `lose`, `maintain`, `gain` |
 | `unitSystem` | string | Yes | One of `metric`, `imperial` |
 
-The current implementation converts imperial values to metric when needed, computes IMC, then derives TDEE and the daily targets using the Mifflin-St Jeor formula with the user's real age (derived from `birthDate` at the moment of the request, via `calculateAge`) and real `biologicalSex` — never a fixed age or sex. The only real mobile caller (`OnboardingBodyScreen`) always converts to metric locally and hard-codes `unitSystem: 'metric'`, so the before-conversion validation-order caveat on `weight`/`height`/`targetWeight` above is never reached in practice today.
+The current implementation converts imperial values to metric when needed, computes IMC, then derives TDEE and the daily targets using the Mifflin-St Jeor formula with the user's real age (derived from `birthDate` at the moment of the request, via `calculateAge`) and real `biologicalSex` — never a fixed age or sex. The only real mobile caller (`OnboardingBodyScreen`) always converts to metric locally (since CP-1.1.1f, imperial height is typed in feet and inches and converted to cm on the device) and hard-codes `unitSystem: 'metric'`, so the before-conversion validation-order caveat on `weight`/`height`/`targetWeight` above is never reached in practice today.
 
 **Success response**
 

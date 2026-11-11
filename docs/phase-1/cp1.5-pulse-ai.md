@@ -154,10 +154,10 @@ It returns these fields and functions:
 - `displayHeight(valueInCm)`
 - `displayVolume(valueInMl)`
 - `displayHydration(valueInMl)`
-- `toStorageWeight(value)`
-- `toStorageHeight(value)`
 
-The conversion constants currently used are:
+`toStorageWeight(value)` and `toStorageHeight(value)` were also part of the hook until CP-1.1.1f, which removed them; typed values are now converted to kg/cm by the pure functions in `apps/mobile/src/utils/bodyUnits.ts`. Since CP-1.1.1f the hook also returns `inputHeightFeetUnit` (`'ft'`), used by the imperial height field in feet.
+
+The conversion constants currently used are (single sources: `utils/bodyUnits.ts` for weight and height, `utils/volumeUnits.ts` for volume):
 
 - `2.205` pounds per kilogram
 - `2.54` centimeters per inch

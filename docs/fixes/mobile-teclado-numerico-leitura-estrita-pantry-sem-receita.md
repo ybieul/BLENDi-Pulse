@@ -10,7 +10,7 @@ Fecha os achados de mobile das verificações do CP-1.1.1b e do CP-1.1.1d. Nenhu
 | 2 | `parseInt`/`parseFloat` aceitavam "12abc", "150,5", "70abc", "1.2.3" | Corrigido: leitura estrita, com erro no campo |
 | 3 | Pantry sem receita mostrava a etapa de receitas vazia, sem explicação | Corrigido: estado vazio dizendo que o scan não foi descontado |
 | 4 | Completar perfil sem `KeyboardAvoidingView` | Corrigido (só o necessário, ver Tarefa 2) |
-| 5 | ManageStackScreen | Só reportado, sem alteração |
+| 5 | ManageStackScreen | Só reportado, sem alteração (corrigido depois no CP-1.1.1f) |
 
 Verificação: typecheck nos 3 workspaces, lint, API **471/471**, mobile **575/575** (30 suítes).
 
@@ -31,7 +31,7 @@ Verificação: typecheck nos 3 workspaces, lint, API **471/471**, mobile **575/5
 | CompleteProfileScreen | peso → altura → data de nascimento (Concluir) | decimal-pad, decimal-pad, number-pad (sem mudança) |
 
 - A data de nascimento entra na sequência porque também usa number-pad. A leitura dela não mudou: a máscara já descarta o que não é dígito.
-- Altura imperial é **um campo só, em polegadas**. Não há campos separados de pés e polegadas.
+- Altura imperial é **um campo só, em polegadas**. Não há campos separados de pés e polegadas. *Atualização: desde o [CP-1.1.1f](cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md) são dois campos, pés e polegadas, e a ordem no imperial é peso → pés → polegadas → data.*
 - Android: a altura no onboarding passou de `returnKeyType="done"` para `"next"` (agora encadeia para a data), e todos os campos ganharam o `onSubmitEditing` que faltava.
 
 **Padrão de teclado:**
@@ -46,8 +46,8 @@ Verificação: typecheck nos 3 workspaces, lint, API **471/471**, mobile **575/5
 - **Casas decimais de peso e altura: 1.** Hoje a tela não limitava (o `parseFloat` aceitava qualquer quantidade), mas o app pré-preenche e exibe com uma casa (`toFixed(1)`, `displayWeight`). Mantive esse valor. Efeito: "70.55" passa a ser recusado.
 - Erros:
   - Metas do onboarding: o erro inline que já existia (`errors.validation.number_range`), igual à tela de metas.
-  - Peso e altura (corpo e completar perfil): essas telas não mostravam erro para esses campos (fora da faixa só não calcula ou não salva). Mostrei o erro de leitura no próprio `AuthInput`, com a chave nova `errors.validation.decimal_one_place`. Fora da faixa continua sem mensagem, como antes.
-- Os limites não mudaram e continuam vindo de onde vinham: o shared para as metas, 20–300 kg e 100–250 cm nas telas de corpo.
+  - Peso e altura (corpo e completar perfil): essas telas não mostravam erro para esses campos (fora da faixa só não calcula ou não salva). Mostrei o erro de leitura no próprio `AuthInput`, com a chave nova `errors.validation.decimal_one_place`. Fora da faixa continua sem mensagem, como antes. *Atualização: desde o [CP-1.1.1f](cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md), fora da faixa mostra a faixa aceita no campo, na unidade do usuário.*
+- Os limites não mudaram e continuam vindo de onde vinham: o shared para as metas, 20–300 kg e 100–250 cm nas telas de corpo. *Atualização: desde o [CP-1.1.1f](cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md), os de peso e altura também vêm do shared (`BODY_WEIGHT_MIN_KG` etc.), com os mesmos valores.*
 
 ## Tarefa 4 — Pantry sem receita
 
@@ -67,7 +67,7 @@ Todos voltam para a câmera.
 
 ## Tarefa 5 — ManageStackScreen (só reportado)
 
-Tem o mesmo problema, em menor grau. "Meta diária" é o último campo do formulário, em number-pad com `returnKeyType="done"` e sem `onSubmitEditing`. No iPhone não há como fechar o teclado por ele, e no Android a tecla só fecha o teclado. Nome e dose (teclado de texto) já encadeiam o foco. A leitura já é estrita na prática: `onChangeText` descarta o que não é dígito e o `maxLength` é 2. Correção sugerida: aplicar a mesma barra nesse campo.
+Tem o mesmo problema, em menor grau. "Meta diária" é o último campo do formulário, em number-pad com `returnKeyType="done"` e sem `onSubmitEditing`. No iPhone não há como fechar o teclado por ele, e no Android a tecla só fecha o teclado. Nome e dose (teclado de texto) já encadeiam o foco. A leitura já é estrita na prática: `onChangeText` descarta o que não é dígito e o `maxLength` é 2. Correção sugerida: aplicar a mesma barra nesse campo. *Atualização: aplicada no [CP-1.1.1f](cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md) (Tarefa 4).*
 
 ## Testes
 

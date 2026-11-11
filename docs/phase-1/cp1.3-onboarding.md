@@ -99,6 +99,8 @@ Those conversions are implemented directly in [apps/api/src/controllers/user.con
 
 One precision note about the current mobile flow: [apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx](../../apps/mobile/src/screens/onboarding/OnboardingBodyScreen.tsx) already converts imperial input to storage-normalized metric values through [apps/mobile/src/hooks/useUnits.ts](../../apps/mobile/src/hooks/useUnits.ts) before calling `/users/calculate-macros`, and currently sends `unitSystem: 'metric'` in that request. The backend conversion path still exists and remains valid for direct API consumers or future mobile changes.
 
+**Since CP-1.1.1f:** imperial height is no longer typed in total inches. The screen shows two fields, feet and inches (0–11), converted on the device to cm (total inches × 2.54, rounded to one decimal) with [apps/mobile/src/utils/bodyUnits.ts](../../apps/mobile/src/utils/bodyUnits.ts); the request still sends `unitSystem: 'metric'`. Out-of-range weight or height shows the accepted range in the field, in the user's unit. See [CP-1.1.1f](../fixes/cp-1.1.1f-altura-pes-polegadas-faixas-meta-diaria.md).
+
 ## isNewUser Flow
 
 The onboarding gate is controlled by the authentication store and the root navigator.

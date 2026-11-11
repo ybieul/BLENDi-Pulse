@@ -109,6 +109,17 @@ export const DAILY_FAT_TARGET_MAX = 600;
 export const DAILY_HYDRATION_TARGET_MIN = 500;
 export const DAILY_HYDRATION_TARGET_MAX = 8_000;
 
+// Limites de peso corporal (kg) e altura (cm) — os mesmos 20-300 kg e
+// 100-250 cm que updateUserSchema (weight, height, targetWeight),
+// calculateMacrosSchema (weight, height, targetWeight) e o schema Mongoose
+// (apps/api/src/models/User.ts) já aplicavam como números soltos. Exportados
+// aqui para os schemas abaixo e o app mobile usarem uma fonte só; os valores
+// NÃO mudaram. targetWeight usa a mesma faixa de peso (mesmo tipo de valor).
+export const BODY_WEIGHT_MIN_KG = 20;
+export const BODY_WEIGHT_MAX_KG = 300;
+export const BODY_HEIGHT_MIN_CM = 100;
+export const BODY_HEIGHT_MAX_CM = 250;
+
 // Piso de sanidade só da SUGESTÃO automática de dailyCalorieTarget
 // (calculateMacroTargets) — CP-A.2.3. Não é um limite de validação de
 // schema (esse continua DAILY_CALORIE_TARGET_MIN/MAX, 300-15.000, sem
@@ -300,18 +311,18 @@ export const updateUserSchema = z
     weight: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(20, 300),
+        invalid_type_error: rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG),
       })
-      .min(20, rangeErrorMessage(20, 300))
-      .max(300, rangeErrorMessage(20, 300)),
+      .min(BODY_WEIGHT_MIN_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG))
+      .max(BODY_WEIGHT_MAX_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG)),
 
     height: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(100, 250),
+        invalid_type_error: rangeErrorMessage(BODY_HEIGHT_MIN_CM, BODY_HEIGHT_MAX_CM),
       })
-      .min(100, rangeErrorMessage(100, 250))
-      .max(250, rangeErrorMessage(100, 250)),
+      .min(BODY_HEIGHT_MIN_CM, rangeErrorMessage(BODY_HEIGHT_MIN_CM, BODY_HEIGHT_MAX_CM))
+      .max(BODY_HEIGHT_MAX_CM, rangeErrorMessage(BODY_HEIGHT_MIN_CM, BODY_HEIGHT_MAX_CM)),
 
     // Peso-alvo (kg) — opcional, ao contrário de weight/height/birthDate/
     // biologicalSex/weightGoal/activityLevel (obrigatórios desde o CP-A).
@@ -320,10 +331,10 @@ export const updateUserSchema = z
     targetWeight: z
       .number({
         required_error: 'errors.validation.required',
-        invalid_type_error: rangeErrorMessage(20, 300),
+        invalid_type_error: rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG),
       })
-      .min(20, rangeErrorMessage(20, 300))
-      .max(300, rangeErrorMessage(20, 300)),
+      .min(BODY_WEIGHT_MIN_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG))
+      .max(BODY_WEIGHT_MAX_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG)),
 
     birthDate: birthDateSchema,
 
@@ -382,21 +393,21 @@ export const calculateMacrosSchema = z.object({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.number_range',
     })
-    .min(20, rangeErrorMessage(20, 300))
-    .max(300, rangeErrorMessage(20, 300)),
+    .min(BODY_WEIGHT_MIN_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG))
+    .max(BODY_WEIGHT_MAX_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG)),
 
   height: z
     .number({
       required_error: 'errors.validation.required',
       invalid_type_error: 'errors.validation.number_range',
     })
-    .min(100, rangeErrorMessage(100, 250))
-    .max(250, rangeErrorMessage(100, 250)),
+    .min(BODY_HEIGHT_MIN_CM, rangeErrorMessage(BODY_HEIGHT_MIN_CM, BODY_HEIGHT_MAX_CM))
+    .max(BODY_HEIGHT_MAX_CM, rangeErrorMessage(BODY_HEIGHT_MIN_CM, BODY_HEIGHT_MAX_CM)),
 
   // Opcional — calculateMacros é stateless (não lê o perfil do usuário), então
   // a previsão de prazo só aparece na resposta se o próprio payload trouxer
-  // targetWeight. Piso/teto (20-300) alinhados com updateUserSchema.targetWeight
-  // abaixo — mesmos números, mesma unidade (kg). Antes só `.positive()`, o que
+  // targetWeight. Piso/teto (BODY_WEIGHT_MIN_KG/MAX_KG, 20-300) iguais aos de
+  // updateUserSchema.targetWeight — mesmos números, mesma unidade (kg). Antes só `.positive()`, o que
   // deixava este endpoint aceitar um peso-alvo absurdamente baixo (ex.: 0,5kg),
   // já que calculateMacros nunca salva o perfil e por isso nunca passava pela
   // validação de updateUserSchema. Nota: igual a `weight`/`height` abaixo, esta
@@ -409,10 +420,10 @@ export const calculateMacrosSchema = z.object({
   // de `weight`/`height` neste schema, não introduzida aqui.
   targetWeight: z
     .number({
-      invalid_type_error: rangeErrorMessage(20, 300),
+      invalid_type_error: rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG),
     })
-    .min(20, rangeErrorMessage(20, 300))
-    .max(300, rangeErrorMessage(20, 300))
+    .min(BODY_WEIGHT_MIN_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG))
+    .max(BODY_WEIGHT_MAX_KG, rangeErrorMessage(BODY_WEIGHT_MIN_KG, BODY_WEIGHT_MAX_KG))
     .optional(),
 
   birthDate: birthDateSchema,

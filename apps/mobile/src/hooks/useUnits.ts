@@ -1,14 +1,17 @@
 import { useAuthStore } from '../store/auth.store';
 import type { AuthUser } from '../services/auth.service';
+import {
+  cmToFeetInches,
+  formatFeetInches,
+  kgToPounds,
+  roundToOneDecimal,
+} from '../utils/bodyUnits';
 import { formatDecimal } from '../utils/formatNumbers';
 import { mlToFlOz } from '../utils/volumeUnits';
 import { useAppTranslation } from './useAppTranslation';
 
 type UnitSystem = AuthUser['unitSystem'];
-type StorageConversionResult = number | '—';
 
-const POUNDS_PER_KILOGRAM = 2.205;
-const CENTIMETERS_PER_INCH = 2.54;
 const DASH_VALUE = '—';
 
 function isValidNumber(value: number): boolean {
@@ -17,10 +20,6 @@ function isValidNumber(value: number): boolean {
 
 function isNonNegativeNumber(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
-}
-
-function roundToOneDecimal(value: number): number {
-  return Math.round(value * 10) / 10;
 }
 
 function formatOneDecimal(value: number): string {
@@ -33,12 +32,12 @@ export interface UseUnitsResult {
   volumeUnit: 'ml' | 'fl oz';
   heightUnit: 'cm' | 'ft/in';
   inputHeightUnit: 'cm' | 'in';
+  /** Unidade do campo de pés (altura imperial digitada em pés + polegadas). */
+  inputHeightFeetUnit: 'ft';
   displayWeight: (valueInKg: number) => string;
   displayHeight: (valueInCm: number) => string;
   displayVolume: (valueInMl: number) => string;
   displayHydration: (valueInMl: number) => string;
-  toStorageWeight: (value: number) => StorageConversionResult;
-  toStorageHeight: (value: number) => StorageConversionResult;
 }
 
 export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult {
@@ -50,6 +49,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
   const volumeUnit = unitSystem === 'imperial' ? 'fl oz' : 'ml';
   const heightUnit = unitSystem === 'imperial' ? 'ft/in' : 'cm';
   const inputHeightUnit = unitSystem === 'imperial' ? 'in' : 'cm';
+  const inputHeightFeetUnit = 'ft';
 
   const displayWeight = (valueInKg: number): string => {
     if (!isValidNumber(valueInKg)) {
@@ -57,7 +57,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
     }
 
     if (unitSystem === 'imperial') {
-      return `${formatOneDecimal(valueInKg * POUNDS_PER_KILOGRAM)} ${weightUnit}`;
+      return `${formatOneDecimal(kgToPounds(valueInKg))} ${weightUnit}`;
     }
 
     return `${formatOneDecimal(valueInKg)} ${weightUnit}`;
@@ -69,16 +69,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
     }
 
     if (unitSystem === 'imperial') {
-      const totalInches = valueInCm / CENTIMETERS_PER_INCH;
-      let feet = Math.floor(totalInches / 12);
-      let inches = Math.round(totalInches % 12);
-
-      if (inches === 12) {
-        feet += 1;
-        inches = 0;
-      }
-
-      return `${feet}'${inches}"`;
+      return formatFeetInches(cmToFeetInches(valueInCm));
     }
 
     return `${Math.round(valueInCm)} ${heightUnit}`;
@@ -98,37 +89,16 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
 
   const displayHydration = (valueInMl: number): string => displayVolume(valueInMl);
 
-  const toStorageWeight = (value: number): StorageConversionResult => {
-    if (!isValidNumber(value)) {
-      return DASH_VALUE;
-    }
-
-    return unitSystem === 'imperial' ? value / POUNDS_PER_KILOGRAM : value;
-  };
-
-  const toStorageHeight = (value: number): StorageConversionResult => {
-    if (!isValidNumber(value)) {
-      return DASH_VALUE;
-    }
-
-    if (unitSystem === 'imperial') {
-      return roundToOneDecimal(value * CENTIMETERS_PER_INCH);
-    }
-
-    return value;
-  };
-
   return {
     unitSystem,
     weightUnit,
     volumeUnit,
     heightUnit,
     inputHeightUnit,
+    inputHeightFeetUnit,
     displayWeight,
     displayHeight,
     displayVolume,
     displayHydration,
-    toStorageWeight,
-    toStorageHeight,
   };
 }

@@ -35,12 +35,20 @@ import {
 } from '@blendi/shared';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthInput } from '../components/ui/AuthInput';
+import { NumericKeyboardAccessory } from '../components/ui/NumericKeyboardAccessory';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
+import { useNumericFieldChain } from '../hooks/useNumericFieldChain';
 import { useNetworkStore } from '../store/network.store';
 import type { SupplementStackItem } from '../services/supplementStack.service';
 import type { TrackStackParamList } from '../navigation/types';
 import { showToast } from '../utils/toast.utils';
+
+// "Meta diária" usa teclado numérico: no iPhone ele não tem tecla de retorno,
+// então a barra NumericKeyboardAccessory dá o "Concluir" (é o último campo do
+// formulário). No Android, a tecla de ação do teclado fecha.
+const DAILY_TARGET_NUMERIC_FIELDS = ['dailyTarget'] as const;
+const DAILY_TARGET_KEYBOARD_ACCESSORY_ID = 'manageStackDailyTargetKeyboardAccessory';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -262,7 +270,12 @@ export function ManageStackScreen({
   const [nameError, setNameError] = useState<string | undefined>();
   const [dailyTargetError, setDailyTargetError] = useState<string | undefined>();
   const dosageRef = useRef<TextInput>(null);
-  const dailyTargetRef = useRef<TextInput>(null);
+  const dailyTargetRef = useRef<TextInput | null>(null);
+  const { fieldProps: dailyTargetFieldProps, accessoryProps: dailyTargetAccessoryProps } = useNumericFieldChain(
+    DAILY_TARGET_NUMERIC_FIELDS,
+    DAILY_TARGET_KEYBOARD_ACCESSORY_ID,
+  );
+  const { ref: dailyTargetChainRef, ...dailyTargetChainProps } = dailyTargetFieldProps('dailyTarget');
 
   // ── Bottom sheet animation (same pattern as RatingBottomSheet) ──────────
   const translateY = useRef(new Animated.Value(height)).current;
@@ -662,7 +675,13 @@ export function ManageStackScreen({
                 {/* Daily target */}
                 <View style={styles.inputSpacing}>
                   <AuthInput
-                    ref={dailyTargetRef}
+                    {...dailyTargetChainProps}
+                    ref={(node) => {
+                      // O "Próximo" da dosagem foca por dailyTargetRef; a
+                      // corrente usa o próprio ref.
+                      dailyTargetRef.current = node;
+                      dailyTargetChainRef(node);
+                    }}
                     placeholder={t('track.dailyTarget')}
                     value={formDailyTargetCount}
                     onChangeText={(text) => {
@@ -673,7 +692,6 @@ export function ManageStackScreen({
                     inputMode="numeric"
                     keyboardType="number-pad"
                     maxLength={2}
-                    returnKeyType="done"
                   />
                 </View>
 
@@ -726,6 +744,12 @@ export function ManageStackScreen({
               </Animated.View>
             </KeyboardAvoidingView>
           </View>
+
+          {/* Dentro do Modal: no iOS a barra precisa estar na mesma janela do campo. */}
+          <NumericKeyboardAccessory
+            nativeID={DAILY_TARGET_KEYBOARD_ACCESSORY_ID}
+            {...dailyTargetAccessoryProps}
+          />
         </Modal>
       )}
     </View>
