@@ -105,6 +105,8 @@ On Android, RevenueCat identifies a subscription with a base plan as `subscripti
 
 If RevenueCat returns `pulse_pro_monthly:monthly` on Android, these checks would not match and an Android purchase would not unlock Pro. This is not confirmed for this setup, and the code was not changed for it. It has to be verified with a real Android sandbox purchase in the internal-testing phase, before any Play release. Also check what the iOS side returns, which should be the bare ID.
 
+> **Update (2026-11-11): handled in code.** All five checks now compare a normalized ID, which is the part before the first `:` (`normalizeProductId` in both `pricing.config.ts` files), so both `pulse_pro_monthly` and `pulse_pro_monthly:monthly` match. The comparison after normalizing is still exact, so look-alike IDs such as `pulse_pro_monthly_trial` are still rejected. The stored and logged IDs are unchanged. The line numbers above are from before that change. A real Android sandbox purchase and restore are still needed to confirm the format, but either format now works. See [../fixes/ids-produto-android-plano-base.md](../fixes/ids-produto-android-plano-base.md).
+
 ---
 
 ## 3. Cross-check against the code

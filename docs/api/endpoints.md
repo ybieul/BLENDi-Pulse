@@ -2669,9 +2669,11 @@ Resynchronizes the authenticated user's subscription state from RevenueCat and s
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `platform` | string | No | One of `ios`, `android`. Accepted for forward compatibility but currently not read by the handler. |
-| `productId` | string | No | Accepted for forward compatibility but currently not read by the handler. |
+| `productId` | string | No | Accepted for forward compatibility but currently not read by the handler. On restore, the mobile app sends the configured constant (`pulse_pro_monthly` / `pulse_pro_annual`), not the SDK id. |
 
 > As of 2026-11-01, this endpoint only calls `GET https://api.revenuecat.com/v1/subscribers/{userId}` using `REVENUECAT_API_KEY`. An earlier `POST https://api.revenuecat.com/v1/receipts` path (`postReceiptAndGetActiveSubscription`, taking an optional `receipt` field) was removed as dead code — no caller ever sent `receipt` (confirmed by code search across `apps/mobile`), and that RevenueCat endpoint rejects secret REST API keys outright (`403`, code `7243`, "Secret API keys should not be used in your app") — it only accepts the platform-specific public SDK key, so it could never have worked with this backend's single `REVENUECAT_API_KEY`. See [`../fixes/posthog-analytics.md`](../fixes/posthog-analytics.md) for the full investigation. If an active Pulse Pro entitlement is found, the backend updates the user with `isPro: true`, `subscriptionPlan` (`monthly` or `annual`), `subscriptionExpiresAt`, `subscriptionId`, and `revenueCatCustomerId`, and returns the updated profile.
+
+**Product id matching (2026-11-11).** Only `pulse_pro_monthly` and `pulse_pro_annual` count as Pulse Pro. Each key of `subscriber.subscriptions` is compared after taking the part before the first `:`, so the Google Play format `subscriptionId:basePlanId` (e.g. `pulse_pro_monthly:monthly`) matches too. The comparison after that is exact, so `pulse_pro_monthly_trial` does not match. With more than one active tracked subscription, the one that expires last wins. The original key is what is stored (`subscriptionId` falls back to it when there is no `store_transaction_id`). See [`../fixes/ids-produto-android-plano-base.md`](../fixes/ids-produto-android-plano-base.md).
 
 **Success response**
 
@@ -3351,6 +3353,17 @@ When a request fails Zod validation, the API returns `400 Bad Request` and inclu
 | `message` | string | i18n key describing the validation failure |
 | `minimum` | number | Present when the failure comes from a minimum constraint |
 | `maximum` | number | Present when the failure comes from a maximum constraint |
+
+### Request Body Errors
+
+Errors raised while reading the request body, before any route runs, have their own codes in every environment and never include the parser's message or a `stack`:
+
+| Status | Code | When |
+|---|---|---|
+| `413` | `request/payload-too-large` | JSON body above the route's limit (50 kB by default, 4 MB on the large-payload routes) or a raw webhook body above 1 MB |
+| `400` | `request/invalid-json` | `Content-Type: application/json` with a body that is not valid JSON |
+
+Before 2026-11-11 both cases kept the right status but returned the generic `network/internal-server-error` (development) or `unexpected-error` (production) code. The mobile app translates them as `errors.request_payload_too_large` and `errors.request_invalid_json`.
 
 ### Development Diagnostics
 

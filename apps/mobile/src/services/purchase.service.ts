@@ -12,7 +12,7 @@ import Purchases, {
 
 import type { BlendiOwnership, DietaryPreference } from '@blendi/shared';
 import { api } from '../config/api';
-import { PRICING_CONFIG } from '../config/pricing.config';
+import { normalizeProductId, PRICING_CONFIG } from '../config/pricing.config';
 import { getRevenueCatApiKey, isRevenueCatNativePlatform } from '../config/revenuecat.config';
 import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
@@ -163,18 +163,33 @@ async function ensureRevenueCatConfigured(appUserId?: string | null): Promise<bo
   return true;
 }
 
+// Aceita o ID simples (iOS) e o ID com plano base do Google Play
+// ("pulse_pro_monthly:monthly"). Depois de normalizar, a comparação é exata.
+function getTrackedPlanId(productId: string): PurchasePlanId | null {
+  const baseProductId = normalizeProductId(productId);
+
+  if (baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY) {
+    return 'monthly';
+  }
+
+  if (baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL) {
+    return 'annual';
+  }
+
+  return null;
+}
+
 function selectTrackedPackage(offering: PurchasesOffering, planId: PurchasePlanId): PurchasesPackage | null {
+  // O pacote padrão da offering só é usado se o produto dele for mesmo o do
+  // plano. Se o painel da RevenueCat estiver mal configurado (ex.: o pacote
+  // mensal apontando para outro produto), o app não vende esse produto: o
+  // backend não liberaria o Pro para ele.
   const directMatch = planId === 'monthly' ? offering.monthly : offering.annual;
-  if (directMatch) {
+  if (directMatch && getTrackedPlanId(directMatch.product.identifier) === planId) {
     return directMatch;
   }
 
-  const targetProductId =
-    planId === 'monthly'
-      ? PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY
-      : PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL;
-
-  return offering.availablePackages.find((pkg) => pkg.product.identifier === targetProductId) ?? null;
+  return offering.availablePackages.find((pkg) => getTrackedPlanId(pkg.product.identifier) === planId) ?? null;
 }
 
 function toPurchasePlan(planId: PurchasePlanId, pkg: PurchasesPackage): PurchasePlan {
@@ -277,11 +292,25 @@ async function verifySubscriptionOnBackend(productId?: string): Promise<Purchase
   return response.data.data.user;
 }
 
-function hasTrackedSubscription(customerInfo: CustomerInfo): boolean {
-  const activeSubscriptions = Object.keys(customerInfo.activeSubscriptions ?? {});
+// activeSubscriptions é um array de IDs de produto (string[]) no SDK. Antes este
+// trecho usava Object.keys, que devolvia os índices ("0", "1"...) e fazia a
+// restauração nunca encontrar a assinatura, inclusive no iOS.
+// Os dados vêm da ponte nativa: um formato inesperado (não array, item que não é
+// string) é ignorado em vez de derrubar a restauração com erro genérico.
+function getActiveTrackedPlanIds(customerInfo: CustomerInfo): PurchasePlanId[] {
+  const activeSubscriptions: unknown = customerInfo.activeSubscriptions;
+  if (!Array.isArray(activeSubscriptions)) {
+    return [];
+  }
 
-  return activeSubscriptions.includes(PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY)
-    || activeSubscriptions.includes(PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL);
+  return activeSubscriptions
+    .filter((productId): productId is string => typeof productId === 'string')
+    .map(getTrackedPlanId)
+    .filter((planId): planId is PurchasePlanId => planId !== null);
+}
+
+function hasTrackedSubscription(customerInfo: CustomerInfo): boolean {
+  return getActiveTrackedPlanIds(customerInfo).length > 0;
 }
 
 export async function initializePurchases(): Promise<boolean> {
@@ -434,8 +463,10 @@ export async function restorePurchaseHistory(): Promise<PurchaseSyncResult> {
       );
     }
 
+    // Continua mandando o ID da constante: o backend ignora esse campo e decide
+    // o plano consultando a RevenueCat.
     const productIdentifier =
-      customerInfo.activeSubscriptions.includes(PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL)
+      getActiveTrackedPlanIds(customerInfo).includes('annual')
         ? PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL
         : PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY;
 

@@ -20,6 +20,24 @@ import {
 const UNEXPECTED_ERROR_CODE = 'unexpected-error';
 const UNEXPECTED_ERROR_MESSAGE = 'An unexpected error occurred.';
 
+/**
+ * Erros do body-parser (express.json) são do cliente, não do servidor: o
+ * corpo passou do limite ou não é JSON. Sem este mapa eles caíam no código
+ * genérico de erro interno, mesmo com o status certo (413/400).
+ */
+const BODY_PARSER_ERRORS: Record<string, { statusCode: number; code: string; message: string }> = {
+  'entity.too.large': {
+    statusCode: 413,
+    code: 'request/payload-too-large',
+    message: 'Request body is too large.',
+  },
+  'entity.parse.failed': {
+    statusCode: 400,
+    code: 'request/invalid-json',
+    message: 'Request body is not valid JSON.',
+  },
+};
+
 export function errorHandler(
   err: ApiError,
   _req: Request,
@@ -27,8 +45,19 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void {
-  const statusCode = err.statusCode ?? 500;
   const isDev = env.NODE_ENV === 'development';
+
+  const bodyParserError = typeof err.type === 'string' ? BODY_PARSER_ERRORS[err.type] : undefined;
+  if (bodyParserError) {
+    res.status(bodyParserError.statusCode).json({
+      success: false,
+      code: bodyParserError.code,
+      message: bodyParserError.message,
+    });
+    return;
+  }
+
+  const statusCode = err.statusCode ?? 500;
 
   // Erro "deliberado": foi construído com `code` explícito no formato
   // 'domínio/erro' (ex: buildInvalidTimezoneError → 'timezone/invalid') —

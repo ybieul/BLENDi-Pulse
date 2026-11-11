@@ -1465,6 +1465,8 @@
     "shoppingList_free_tier_limit": "O plano gratuito suporta apenas 1 lista ativa.",
     "network_internal_server_error": "Erro no servidor. Estamos resolvendo — tente novamente em breve.",
     "unexpected_error": "Ocorreu um erro inesperado.",
+    "request_payload_too_large": "Os dados enviados são grandes demais.",
+    "request_invalid_json": "Os dados enviados são inválidos.",
     "resource_not_found": "O recurso solicitado não foi encontrado."
   },
 

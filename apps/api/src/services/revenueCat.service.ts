@@ -1,4 +1,4 @@
-import { PRICING_CONFIG } from '../config/pricing.config';
+import { normalizeProductId, PRICING_CONFIG } from '../config/pricing.config';
 import { env, paymentsConfig } from '../config/env';
 import type { UserSubscriptionPlan } from '../models/User';
 
@@ -74,19 +74,24 @@ function getRevenueCatHeaders(): Record<string, string> {
   };
 }
 
-function isTrackedProductId(productId: string): productId is typeof PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY | typeof PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL {
+// As duas funções aceitam o ID simples (iOS) e o ID com plano base (Android),
+// mas a comparação depois de normalizar continua exata.
+function isTrackedProductId(productId: string): boolean {
+  const baseProductId = normalizeProductId(productId);
   return (
-    productId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY ||
-    productId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL
+    baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY ||
+    baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL
   );
 }
 
 function mapProductIdToPlan(productId: string): UserSubscriptionPlan | null {
-  if (productId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY) {
+  const baseProductId = normalizeProductId(productId);
+
+  if (baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_MONTHLY) {
     return 'monthly';
   }
 
-  if (productId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL) {
+  if (baseProductId === PRICING_CONFIG.REVENUECAT_PRODUCT_ID_ANNUAL) {
     return 'annual';
   }
 
@@ -132,7 +137,9 @@ export function extractActiveSubscriptionSnapshot(
     | undefined;
 
   for (const [productId, subscription] of Object.entries(subscriptions)) {
-    if (!isTrackedProductId(productId)) {
+    // Uma entrada que não é objeto (ex.: null) é ignorada em vez de derrubar
+    // o endpoint com TypeError.
+    if (!isTrackedProductId(productId) || !subscription || typeof subscription !== 'object') {
       continue;
     }
 

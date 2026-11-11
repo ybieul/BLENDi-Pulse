@@ -3,6 +3,8 @@ import type { Response } from 'express';
 export interface ApiError extends Error {
   statusCode?: number;
   code?: string;
+  /** Preenchido pelo body-parser (ex.: 'entity.too.large'). */
+  type?: string;
 }
 
 export interface SendErrorResponseOptions {
