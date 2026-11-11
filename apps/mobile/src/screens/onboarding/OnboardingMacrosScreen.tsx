@@ -29,13 +29,16 @@ import {
 import { api } from '../../config/api';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
+import { NumericKeyboardAccessory } from '../../components/ui/NumericKeyboardAccessory';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { useNumericFieldChain } from '../../hooks/useNumericFieldChain';
 import type { OnboardingScreenProps } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth.store';
 import { useOnboardingStore } from '../../store/onboarding.store';
 import { getApiErrorTranslationKey } from '../../utils/error.utils';
+import { parseStrictInteger } from '../../utils/numericInput.utils';
 import type { TranslationKey } from '../../locales/i18n';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -86,6 +89,10 @@ const GOAL_CONFIG: Record<
   Recovery: { proteinMin: 140, proteinMax: 200, caloriesMin: 1700, caloriesMax: 2300, suggestedProtein: 150, suggestedCalories: 2000 },
 };
 const DEFAULT_GOAL_CONFIG = GOAL_CONFIG.Wellness;
+
+// Ordem visual dos campos (é a ordem do "Próximo").
+const MACRO_FIELDS = ['protein', 'calories', 'carbs'] as const;
+const KEYBOARD_ACCESSORY_ID = 'onboardingMacrosKeyboardAccessory';
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
@@ -173,9 +180,11 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const blendiModel: BlendiModel = (selectedModel as BlendiModel | null) ?? 'Lite';
   const goalConfig             = GOAL_CONFIG[goal] ?? DEFAULT_GOAL_CONFIG;
 
-  const proteinNum  = parseInt(proteinText, 10);
-  const caloriesNum = parseInt(caloriesText, 10);
-  const carbsNum = parseInt(carbsText, 10);
+  // Leitura estrita (só dígitos ASCII): "12abc" e "150,5" são inválidos — antes
+  // o parseInt lia 12 e 150. Texto inválido vira NaN e cai no erro do campo.
+  const proteinNum  = parseStrictInteger(proteinText) ?? Number.NaN;
+  const caloriesNum = parseStrictInteger(caloriesText) ?? Number.NaN;
+  const carbsNum = parseStrictInteger(carbsText) ?? Number.NaN;
   const proteinValid  = !isNaN(proteinNum)  && proteinNum  >= PROTEIN_MIN  && proteinNum  <= PROTEIN_MAX;
   const caloriesValid = !isNaN(caloriesNum) && caloriesNum >= CALORIES_MIN && caloriesNum <= CALORIES_MAX;
   const carbsValid = !isNaN(carbsNum) && carbsNum >= CARBS_MIN && carbsNum <= CARBS_MAX;
@@ -194,6 +203,8 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const carbsError = carbsText.length > 0 && !carbsValid
     ? t('errors.validation.number_range', { min: CARBS_MIN, max: CARBS_MAX })
     : undefined;
+
+  const { fieldProps, accessoryProps } = useNumericFieldChain(MACRO_FIELDS, KEYBOARD_ACCESSORY_ID);
 
   const goalLabel = translateKey(`onboarding.goal${goal}`);
 
@@ -328,6 +339,7 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
 
             <View style={styles.fields}>
               <AuthInput
+                {...fieldProps('protein')}
                 value={proteinText}
                 onChangeText={(text) => {
                   setProteinText(text);
@@ -336,9 +348,9 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                 placeholder={t('onboarding.proteinPlaceholder')}
                 error={proteinError}
                 keyboardType="number-pad"
-                returnKeyType="next"
               />
               <AuthInput
+                {...fieldProps('calories')}
                 value={caloriesText}
                 onChangeText={(text) => {
                   setCaloriesText(text);
@@ -347,9 +359,9 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                 placeholder={t('onboarding.caloriesPlaceholder')}
                 error={caloriesError}
                 keyboardType="number-pad"
-                returnKeyType="next"
               />
               <AuthInput
+                {...fieldProps('carbs')}
                 value={carbsText}
                 onChangeText={(text) => {
                   setCarbsText(text);
@@ -358,7 +370,6 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
                 placeholder={t('onboarding.carbTarget')}
                 error={carbsError}
                 keyboardType="number-pad"
-                returnKeyType="done"
               />
             </View>
 
@@ -396,6 +407,8 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
           </View>
         )}
       />
+
+      <NumericKeyboardAccessory nativeID={KEYBOARD_ACCESSORY_ID} {...accessoryProps} />
     </Animated.View>
   );
 }

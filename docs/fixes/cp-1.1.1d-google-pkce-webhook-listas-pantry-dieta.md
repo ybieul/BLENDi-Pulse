@@ -114,6 +114,8 @@ A missão também deixou de avançar. O scan foi devolvido, então contar a miss
 
 **Como o mobile mostra hoje (sem mudança)**: com `recipes: []`, o app vai normalmente para a etapa de ingredientes; ao tocar em gerar receitas, mostra "Receitas Para Você" com o subtítulo "com base em…", **nenhum card** e só o botão "Escanear de novo". Não aparece mensagem explicando que não houve receita nem que o scan foi devolvido (o contador de scans restantes é atualizado com o valor novo). Fica como sugestão para um CP de mobile: um estado vazio com a mensagem.
 
+> **Resolvido depois**: o app mostra um estado vazio dizendo que o scan não foi descontado. Ver [mobile-teclado-numerico-leitura-estrita-pantry-sem-receita.md](mobile-teclado-numerico-leitura-estrita-pantry-sem-receita.md).
+
 ---
 
 ## Tarefa 5 — Lacunas do validador de dieta
@@ -209,6 +211,6 @@ Se o passo 1 ou 2 falhar com "Falha ao entrar com Google. Tente novamente.", o l
 
 ## Achados fora do escopo (não corrigidos)
 
-- **Pantry sem receita no mobile**: a etapa de receitas aparece vazia, sem mensagem (ver Tarefa 4).
+- ~~**Pantry sem receita no mobile**: a etapa de receitas aparece vazia, sem mensagem (ver Tarefa 4).~~ Resolvido em [mobile-teclado-numerico-leitura-estrita-pantry-sem-receita.md](mobile-teclado-numerico-leitura-estrita-pantry-sem-receita.md).
 - **Favoritos sem limite de tamanho nos textos**: `ingredients[].name`, `ingredients[].amount`, `steps[].text`, `blendInstruction` e `tip` do `createFavoriteSchema` não têm `.max()` de caracteres (só `recipeName` tem 100). O teto do corpo (50 KB) limita o total, mas um favorito pode guardar strings bem maiores que qualquer receita real. Fica para um CP de favoritos.
 - **`GET /auth/google/url` sem rate limit**: não grava nada no banco (só assina um JWT), então o risco é baixo. Não mexi porque o prompt pediu limite só no exchange.

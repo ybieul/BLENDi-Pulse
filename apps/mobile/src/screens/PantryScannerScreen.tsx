@@ -64,6 +64,7 @@ const CLOSE_ICON_SIZE = 24;
 const CAMERA_PERMISSION_ICON_SIZE = 64;
 const CAPTURE_BUTTON_SIZE = 72;
 const LOGO_SIZE = 64;
+const NO_RECIPES_ICON_SIZE = 40;
 
 const ANALYZING_STEP_KEYS = [
   'pantryScanner.analyzingStep1',
@@ -611,6 +612,26 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       lineHeight: 18,
       marginBottom: spacing.sm,
     },
+    noRecipes: {
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing['3xl'],
+      paddingHorizontal: spacing.lg,
+    },
+    noRecipesTitle: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.bold,
+      textAlign: 'center',
+    },
+    noRecipesMessage: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
     ghostButton: {
       borderRadius: borderRadius.md,
       borderWidth: 1,
@@ -837,7 +858,18 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           style={styles.flex}
           contentContainerStyle={styles.recipesScrollContent}
         >
-          <Text style={styles.recipeSubtitle}>{recipeSubtitle}</Text>
+          {recipes.length === 0 ? (
+            // CP-1.1.1d: a IA não entregou receita (falha ou lista vazia). O
+            // backend devolveu o scan (scansUsed já veio atualizado) e não deu
+            // XP — explica isso em vez de mostrar a etapa sem nenhum card.
+            <View accessible accessibilityRole="alert" style={styles.noRecipes} testID="pantry-no-recipes">
+              <Ionicons color={themeColors.text.tertiary} name="restaurant-outline" size={NO_RECIPES_ICON_SIZE} />
+              <Text style={styles.noRecipesTitle}>{t('pantryScanner.noRecipesTitle')}</Text>
+              <Text style={styles.noRecipesMessage}>{t('pantryScanner.noRecipesMessage')}</Text>
+            </View>
+          ) : (
+            <Text style={styles.recipeSubtitle}>{recipeSubtitle}</Text>
+          )}
 
           {recipes.map((recipe, index) => {
             const key = getRecipeFavoriteKey(recipe);

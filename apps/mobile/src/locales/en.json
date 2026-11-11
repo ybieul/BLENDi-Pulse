@@ -1337,7 +1337,9 @@
     "additionalIngredients": "+{{count}} more",
     "noFoodDetected": "No food items detected. Try pointing at your pantry or fridge.",
     "noUsableIngredients": "Couldn't identify usable ingredients. Try better lighting or a closer shot.",
-    "scanAgain": "Scan Again"
+    "scanAgain": "Scan Again",
+    "noRecipesTitle": "No recipes this time",
+    "noRecipesMessage": "We couldn't put together recipes with these ingredients this time. Your scan wasn't counted."
   },
 
   "auth": {
@@ -1394,6 +1396,7 @@
       "number_range": "Enter a value between {{min}} and {{max}}.",
       "password_complexity": "Password must contain at least one uppercase letter, one lowercase letter, and one number.",
       "integer": "Must be a whole number.",
+      "decimal_one_place": "Use numbers only, with at most one decimal place.",
       "invalid_option": "Invalid option selected.",
       "timezone_invalid": "Select a valid timezone."
     },

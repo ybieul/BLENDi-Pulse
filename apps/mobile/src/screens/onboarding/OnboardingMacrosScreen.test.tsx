@@ -15,7 +15,8 @@
 // (jest.mock() é hoisted acima de `const`/`let` não prefixados com "mock",
 // então o objeto externo capturava os jest.fn() como `undefined`).
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { TextInput } from 'react-native';
+import { Keyboard, Platform, TextInput } from 'react-native';
+import type { ReactTestInstance } from 'react-test-renderer';
 import axios from 'axios';
 
 // require() dentro das factories abaixo (não import estático no topo) é
@@ -95,6 +96,7 @@ jest.mock('../../store/onboarding.store', () => ({
     }),
 }));
 
+import { AuthInput } from '../../components/ui/AuthInput';
 import { OnboardingMacrosScreen } from './OnboardingMacrosScreen';
 
 function renderScreen() {
@@ -354,5 +356,129 @@ describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', 
       dietaryPreferences: ['no_added_sugar'],
     });
     await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+  });
+});
+
+// ─── Teclado numérico ("Próximo/Concluir") e leitura estrita ───────────────────
+
+function stubFocus(input: ReactTestInstance) {
+  const focus = jest.fn();
+  (input.instance as { focus: () => void }).focus = focus;
+  return focus;
+}
+
+describe('OnboardingMacrosScreen — teclado numérico', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('iOS: proteína, calorias e carboidratos ligados à mesma barra; "Próximo" na ordem e "Concluir" fecha', () => {
+    const dismissSpy = jest.spyOn(Keyboard, 'dismiss');
+    const utils = renderScreen();
+    const [protein, calories, carbs] = utils.UNSAFE_getAllByType(TextInput) as [
+      ReactTestInstance,
+      ReactTestInstance,
+      ReactTestInstance,
+    ];
+    const ids = [protein, calories, carbs].map((input) => input.props.inputAccessoryViewID as unknown);
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toBeTruthy();
+
+    const focusCalories = stubFocus(calories);
+    const focusCarbs = stubFocus(carbs);
+
+    fireEvent(protein, 'focus');
+    fireEvent.press(utils.getByText('nutritionGoals.next'));
+    expect(focusCalories).toHaveBeenCalledTimes(1);
+
+    fireEvent(calories, 'focus');
+    fireEvent.press(utils.getByText('nutritionGoals.next'));
+    expect(focusCarbs).toHaveBeenCalledTimes(1);
+
+    fireEvent(carbs, 'focus');
+    fireEvent.press(utils.getByText('nutritionGoals.done'));
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Android: sem barra; a tecla de ação encadeia o foco e fecha no último', () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const dismissSpy = jest.spyOn(Keyboard, 'dismiss');
+    const utils = renderScreen();
+    const [protein, calories, carbs] = utils.UNSAFE_getAllByType(TextInput) as [
+      ReactTestInstance,
+      ReactTestInstance,
+      ReactTestInstance,
+    ];
+
+    expect(utils.queryByText('nutritionGoals.next')).toBeNull();
+    expect([protein, calories, carbs].map((input) => input.props.inputAccessoryViewID as unknown)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect([protein, calories, carbs].map((input) => input.props.returnKeyType as unknown)).toEqual([
+      'next',
+      'next',
+      'done',
+    ]);
+
+    const focusCalories = stubFocus(calories);
+    const focusCarbs = stubFocus(carbs);
+    fireEvent(protein, 'submitEditing');
+    expect(focusCalories).toHaveBeenCalledTimes(1);
+    fireEvent(calories, 'submitEditing');
+    expect(focusCarbs).toHaveBeenCalledTimes(1);
+    fireEvent(carbs, 'submitEditing');
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OnboardingMacrosScreen — leitura estrita dos números', () => {
+  const fieldErrors = (utils: ReturnType<typeof renderScreen>) =>
+    utils.UNSAFE_getAllByType(AuthInput).map((input) => (input.props.error as string | undefined) ?? null);
+
+  it.each([
+    ['12abc', 0],
+    ['150,5', 0],
+    ['1.2.3', 1],
+    ['-3', 1],
+    ['1e2', 2],
+    ['١٢٠', 2],
+  ])('"%s" mostra erro só no campo %i e mantém o botão desabilitado', (text, fieldIndex) => {
+    const utils = renderScreen();
+    const inputs = utils.UNSAFE_getAllByType(TextInput);
+    const valid = ['150', '2000', '200'];
+    valid.forEach((value, index) => {
+      fireEvent.changeText(inputs[index], index === fieldIndex ? text : value);
+    });
+
+    const errors = fieldErrors(utils);
+    errors.forEach((error, index) => {
+      if (index === fieldIndex) {
+        expect(error).toContain('errors.validation.number_range');
+      } else {
+        expect(error).toBeNull();
+      }
+    });
+    expect(utils.getByRole('button', { name: 'onboarding.finishSetup' })).toBeDisabled();
+  });
+
+  it('espaços nas pontas são ignorados e o PATCH leva o número limpo', async () => {
+    mockPatch.mockResolvedValueOnce({ data: { success: true } });
+    const utils = renderScreen();
+    const inputs = utils.UNSAFE_getAllByType(TextInput);
+    fireEvent.changeText(inputs[0], ' 150 ');
+    fireEvent.changeText(inputs[1], '2000');
+    fireEvent.changeText(inputs[2], '200 ');
+
+    expect(fieldErrors(utils)).toEqual([null, null, null]);
+    fireEvent.press(utils.getByRole('button', { name: 'onboarding.finishSetup' }));
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith(
+        '/users/me',
+        expect.objectContaining({ dailyProteinTarget: 150, dailyCalorieTarget: 2000, dailyCarbTarget: 200 }),
+      );
+    });
   });
 });

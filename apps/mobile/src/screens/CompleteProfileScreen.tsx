@@ -14,6 +14,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,12 +34,15 @@ import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { AuthInput } from '../components/ui/AuthInput';
+import { NumericKeyboardAccessory } from '../components/ui/NumericKeyboardAccessory';
 import { UnitSystemToggle } from '../components/ui/UnitSystemToggle';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
+import { useNumericFieldChain } from '../hooks/useNumericFieldChain';
 import { useUnits } from '../hooks/useUnits';
 import { useAuthStore } from '../store/auth.store';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { parseStrictDecimal } from '../utils/numericInput.utils';
 import { showToast } from '../utils/toast.utils';
 import {
   BIRTH_DATE_MASKED_LENGTH,
@@ -93,6 +98,14 @@ const POUNDS_PER_KILOGRAM = 2.205;
 const CENTIMETERS_PER_INCH = 2.54;
 const CHIP_SELECTED_BACKGROUND_COLOR = `${colors.brand.pulse}26`;
 const DEFAULT_ACTIVITY: ActivityLevel = 'moderatelyActive';
+
+// Peso e altura: até uma casa decimal, com ponto ou vírgula (a mesma precisão
+// do pré-preenchimento, toFixed(1)).
+const BODY_FRACTION_DIGITS = 1;
+
+// Ordem visual dos campos numéricos (é a ordem do "Próximo").
+const BODY_NUMERIC_FIELDS = ['weight', 'height', 'birthDate'] as const;
+const KEYBOARD_ACCESSORY_ID = 'completeProfileKeyboardAccessory';
 
 type ActivityConfig = {
   key: ActivityLevel;
@@ -207,8 +220,12 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     }
   }, [profile]);
 
-  const rawWeightNum = parseFloat(weightText.replace(',', '.'));
-  const rawHeightNum = parseFloat(heightText.replace(',', '.'));
+  // Leitura estrita: "70abc", "1.2.3", "-3" e "1e2" são inválidos (antes o
+  // parseFloat aceitava o começo do texto). Os limites seguem os de sempre.
+  const parsedWeight = parseStrictDecimal(weightText, BODY_FRACTION_DIGITS);
+  const parsedHeight = parseStrictDecimal(heightText, BODY_FRACTION_DIGITS);
+  const rawWeightNum = parsedWeight ?? Number.NaN;
+  const rawHeightNum = parsedHeight ?? Number.NaN;
   const storageWeight = toStorageWeight(rawWeightNum);
   const storageHeight = toStorageHeight(rawHeightNum);
   const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
@@ -223,6 +240,15 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     birthDateText.length === BIRTH_DATE_MASKED_LENGTH && birthDateValidation && !birthDateValidation.success
       ? translateBirthDateError(t, birthDateValidation.error.issues[0]?.message ?? '')
       : undefined;
+
+  // Erro de leitura só depois que a pessoa digitou algo (fora da faixa continua
+  // sem mensagem aqui, como antes).
+  const weightFormatError =
+    weightText.trim().length > 0 && parsedWeight === null ? t('errors.validation.decimal_one_place') : undefined;
+  const heightFormatError =
+    heightText.trim().length > 0 && parsedHeight === null ? t('errors.validation.decimal_one_place') : undefined;
+
+  const { fieldProps, accessoryProps } = useNumericFieldChain(BODY_NUMERIC_FIELDS, KEYBOARD_ACCESSORY_ID);
 
   const canSubmit = weightValid && heightValid && birthDateValid && biologicalSex !== null && weightGoal !== null;
 
@@ -311,6 +337,9 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     unitSystem === 'imperial' ? t('onboarding.heightPlaceholderImperial') : t('onboarding.heightPlaceholderMetric');
 
   const styles = StyleSheet.create({
+    flex: {
+      flex: 1,
+    },
     root: {
       flex: 1,
       backgroundColor: colorsTheme.background.primary,
@@ -421,144 +450,157 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     },
   });
 
+  // KeyboardAvoidingView + keyboardShouldPersistTaps: mesmo padrão de teclado
+  // da tela de metas e do OnboardingLayout (sem isso, no iPhone o "Salvar" e os
+  // chips ficavam atrás do teclado e o primeiro toque só fechava o teclado).
   return (
-    <View style={styles.root}>
-      <AuroraBackground intensity="reduced" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + spacing.lg }]}
-      >
-        <Animated.View style={[styles.innerContent, { opacity, transform: [{ translateY }] }]}>
-          <View style={styles.header}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('common.actions.back')}
-              onPress={navigation.goBack}
-              style={styles.backButton}
-            >
-              <Ionicons name="arrow-back" size={18} color={colorsTheme.text.primary} />
-            </Pressable>
-            <Text style={styles.title}>{t('completeProfile.title')}</Text>
-          </View>
-
-          <Text style={styles.subtitle}>{t('completeProfile.subtitle')}</Text>
-
-          <UnitSystemToggle
-            value={unitSystem}
-            onChange={handleUnitSystemChange}
-            metricLabel={t('onboarding.unitSystemMetric')}
-            imperialLabel={t('onboarding.unitSystemImperial')}
-          />
-
-          <View style={styles.fields}>
-            <View style={styles.inputContainer}>
-              <AuthInput
-                value={weightText}
-                onChangeText={setWeightText}
-                placeholder={weightPlaceholder}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-                editable={!isProfileLoading}
-              />
-              <View pointerEvents="none" style={styles.unitOverlay}>
-                <Text style={styles.unitText}>{weightUnit}</Text>
-              </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.flex}
+    >
+      <View style={styles.root}>
+        <AuroraBackground intensity="reduced" />
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + spacing.lg }]}
+        >
+          <Animated.View style={[styles.innerContent, { opacity, transform: [{ translateY }] }]}>
+            <View style={styles.header}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('common.actions.back')}
+                onPress={navigation.goBack}
+                style={styles.backButton}
+              >
+                <Ionicons name="arrow-back" size={18} color={colorsTheme.text.primary} />
+              </Pressable>
+              <Text style={styles.title}>{t('completeProfile.title')}</Text>
             </View>
 
-            <View style={styles.inputContainer}>
-              <AuthInput
-                value={heightText}
-                onChangeText={setHeightText}
-                placeholder={heightPlaceholder}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-                editable={!isProfileLoading}
-              />
-              <View pointerEvents="none" style={styles.unitOverlay}>
-                <Text style={styles.unitText}>{inputHeightUnit}</Text>
-              </View>
-            </View>
+            <Text style={styles.subtitle}>{t('completeProfile.subtitle')}</Text>
 
-            <AuthInput
-              value={birthDateText}
-              onChangeText={(text) => { setBirthDateText(maskBirthDateInput(text)); }}
-              placeholder={t('onboarding.birthDatePlaceholder')}
-              error={birthDateError}
-              keyboardType="number-pad"
-              maxLength={BIRTH_DATE_MASKED_LENGTH}
-              returnKeyType="done"
-              editable={!isProfileLoading}
+            <UnitSystemToggle
+              value={unitSystem}
+              onChange={handleUnitSystemChange}
+              metricLabel={t('onboarding.unitSystemMetric')}
+              imperialLabel={t('onboarding.unitSystemImperial')}
             />
-          </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.sectionLabel}>{t('onboarding.biologicalSexLabel')}</Text>
-            <View style={styles.chipRow}>
-              {BIOLOGICAL_SEX_OPTIONS.map(({ key, labelKey }) => (
-                <Pressable
-                  key={key}
-                  onPress={() => { setBiologicalSex(key); }}
-                  style={[styles.chip, biologicalSex === key && styles.chipSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: biologicalSex === key }}
-                >
-                  <Text style={[styles.chipLabel, biologicalSex === key && styles.chipLabelSelected]}>
-                    {t(labelKey)}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.fields}>
+              <View style={styles.inputContainer}>
+                <AuthInput
+                  {...fieldProps('weight')}
+                  value={weightText}
+                  onChangeText={setWeightText}
+                  placeholder={weightPlaceholder}
+                  error={weightFormatError}
+                  keyboardType="decimal-pad"
+                  editable={!isProfileLoading}
+                />
+                <View pointerEvents="none" style={styles.unitOverlay}>
+                  <Text style={styles.unitText}>{weightUnit}</Text>
+                </View>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <AuthInput
+                  {...fieldProps('height')}
+                  value={heightText}
+                  onChangeText={setHeightText}
+                  placeholder={heightPlaceholder}
+                  error={heightFormatError}
+                  keyboardType="decimal-pad"
+                  editable={!isProfileLoading}
+                />
+                <View pointerEvents="none" style={styles.unitOverlay}>
+                  <Text style={styles.unitText}>{inputHeightUnit}</Text>
+                </View>
+              </View>
+
+              <AuthInput
+                {...fieldProps('birthDate')}
+                value={birthDateText}
+                onChangeText={(text) => { setBirthDateText(maskBirthDateInput(text)); }}
+                placeholder={t('onboarding.birthDatePlaceholder')}
+                error={birthDateError}
+                keyboardType="number-pad"
+                maxLength={BIRTH_DATE_MASKED_LENGTH}
+                editable={!isProfileLoading}
+              />
             </View>
-          </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.sectionLabel}>{t('onboarding.weightGoalLabel')}</Text>
-            <View style={styles.chipRow}>
-              {WEIGHT_GOAL_OPTIONS.map(({ key, labelKey }) => (
-                <Pressable
-                  key={key}
-                  onPress={() => { setWeightGoal(key); }}
-                  style={[styles.chip, weightGoal === key && styles.chipSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: weightGoal === key }}
-                >
-                  <Text style={[styles.chipLabel, weightGoal === key && styles.chipLabelSelected]}>
-                    {t(labelKey)}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.sectionLabel}>{t('onboarding.biologicalSexLabel')}</Text>
+              <View style={styles.chipRow}>
+                {BIOLOGICAL_SEX_OPTIONS.map(({ key, labelKey }) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => { setBiologicalSex(key); }}
+                    style={[styles.chip, biologicalSex === key && styles.chipSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: biologicalSex === key }}
+                  >
+                    <Text style={[styles.chipLabel, biologicalSex === key && styles.chipLabelSelected]}>
+                      {t(labelKey)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.sectionLabel}>{t('completeProfile.activityLevelLabel')}</Text>
-            <View style={styles.chipRow}>
-              {ACTIVITY_LEVELS.map(({ key, labelKey }) => (
-                <Pressable
-                  key={key}
-                  onPress={() => { setActivityLevel(key); }}
-                  style={[styles.chip, activityLevel === key && styles.chipSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: activityLevel === key }}
-                >
-                  <Text style={[styles.chipLabel, activityLevel === key && styles.chipLabelSelected]}>
-                    {t(labelKey)}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.sectionLabel}>{t('onboarding.weightGoalLabel')}</Text>
+              <View style={styles.chipRow}>
+                {WEIGHT_GOAL_OPTIONS.map(({ key, labelKey }) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => { setWeightGoal(key); }}
+                    style={[styles.chip, weightGoal === key && styles.chipSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: weightGoal === key }}
+                  >
+                    <Text style={[styles.chipLabel, weightGoal === key && styles.chipLabelSelected]}>
+                      {t(labelKey)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
 
-          {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.sectionLabel}>{t('completeProfile.activityLevelLabel')}</Text>
+              <View style={styles.chipRow}>
+                {ACTIVITY_LEVELS.map(({ key, labelKey }) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => { setActivityLevel(key); }}
+                    style={[styles.chip, activityLevel === key && styles.chipSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: activityLevel === key }}
+                  >
+                    <Text style={[styles.chipLabel, activityLevel === key && styles.chipLabelSelected]}>
+                      {t(labelKey)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
 
-          <AuthButton
-            loading={isSubmitting}
-            disabled={!canSubmit || isSubmitting}
-            onPress={() => { void handleSave(); }}
-          >
-            {t('common.actions.save')}
-          </AuthButton>
-        </Animated.View>
-      </ScrollView>
-    </View>
+            {formError ? <Text style={styles.errorText}>{formError}</Text> : null}
+
+            <AuthButton
+              loading={isSubmitting}
+              disabled={!canSubmit || isSubmitting}
+              onPress={() => { void handleSave(); }}
+            >
+              {t('common.actions.save')}
+            </AuthButton>
+          </Animated.View>
+        </ScrollView>
+      </View>
+
+      <NumericKeyboardAccessory nativeID={KEYBOARD_ACCESSORY_ID} {...accessoryProps} />
+    </KeyboardAvoidingView>
   );
 }

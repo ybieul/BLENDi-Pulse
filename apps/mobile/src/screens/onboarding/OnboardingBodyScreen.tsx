@@ -27,9 +27,11 @@ import { api } from '../../config/api';
 import { UnitSystemToggle } from '../../components/ui/UnitSystemToggle';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
+import { NumericKeyboardAccessory } from '../../components/ui/NumericKeyboardAccessory';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { useNumericFieldChain } from '../../hooks/useNumericFieldChain';
 import { useUnits } from '../../hooks/useUnits';
 import { useOnboardingStore } from '../../store/onboarding.store';
 import {
@@ -38,6 +40,7 @@ import {
   maskBirthDateInput,
   translateBirthDateError,
 } from '../../utils/birthDate.utils';
+import { parseStrictDecimal } from '../../utils/numericInput.utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +67,14 @@ const FIELD_HEIGHT = 56;
 // Afasta o label de unidade do ícone de check que fica em right: 16 (tamanho 18)
 const UNIT_LABEL_RIGHT = spacing['5xl']; // 40
 const CHIP_SELECTED_BACKGROUND_COLOR = `${colors.brand.pulse}26`;
+
+// Peso e altura: até uma casa decimal, com ponto ou vírgula (mesma precisão que
+// o app exibe e pré-preenche: displayWeight/toFixed(1)).
+const BODY_FRACTION_DIGITS = 1;
+
+// Ordem visual dos campos numéricos (é a ordem do "Próximo").
+const BODY_NUMERIC_FIELDS = ['weight', 'height', 'birthDate'] as const;
+const KEYBOARD_ACCESSORY_ID = 'onboardingBodyKeyboardAccessory';
 
 type ActivityConfig = {
   key: ActivityLevel;
@@ -148,9 +159,12 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     }
   }, [defaultUnitSystem, selectedUnitSystem, setUnitSystem]);
 
-  // Parse and validate inputs
-  const rawWeightNum = parseFloat(weightText.replace(',', '.'));
-  const rawHeightNum = parseFloat(heightText.replace(',', '.'));
+  // Leitura estrita: "70abc", "1.2.3", "-3" e "1e2" são inválidos (antes o
+  // parseFloat aceitava o começo do texto). Os limites seguem os de sempre.
+  const parsedWeight = parseStrictDecimal(weightText, BODY_FRACTION_DIGITS);
+  const parsedHeight = parseStrictDecimal(heightText, BODY_FRACTION_DIGITS);
+  const rawWeightNum = parsedWeight ?? Number.NaN;
+  const rawHeightNum = parsedHeight ?? Number.NaN;
   const storageWeight = toStorageWeight(rawWeightNum);
   const storageHeight = toStorageHeight(rawHeightNum);
   const weightValid = typeof storageWeight === 'number' && storageWeight >= 20 && storageWeight <= 300;
@@ -169,6 +183,15 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     birthDateText.length === BIRTH_DATE_MASKED_LENGTH && birthDateValidation && !birthDateValidation.success
       ? translateBirthDateError(t, birthDateValidation.error.issues[0]?.message ?? '')
       : undefined;
+
+  // Erro de leitura só depois que a pessoa digitou algo (fora da faixa continua
+  // sem mensagem aqui, como antes).
+  const weightFormatError =
+    weightText.trim().length > 0 && parsedWeight === null ? t('errors.validation.decimal_one_place') : undefined;
+  const heightFormatError =
+    heightText.trim().length > 0 && parsedHeight === null ? t('errors.validation.decimal_one_place') : undefined;
+
+  const { fieldProps, accessoryProps } = useNumericFieldChain(BODY_NUMERIC_FIELDS, KEYBOARD_ACCESSORY_ID);
 
   const canFetch = weightValid && heightValid && birthDateValid && biologicalSex !== null && weightGoal !== null;
 
@@ -459,11 +482,12 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
             <View style={styles.fields}>
               <View style={styles.inputContainer}>
                 <AuthInput
+                  {...fieldProps('weight')}
                   value={weightText}
                   onChangeText={setWeightText}
                   placeholder={weightPlaceholder}
+                  error={weightFormatError}
                   keyboardType="decimal-pad"
-                  returnKeyType="next"
                 />
                 <View pointerEvents="none" style={styles.unitOverlay}>
                   <Text style={styles.unitText}>{weightUnit}</Text>
@@ -472,11 +496,12 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
 
               <View style={styles.inputContainer}>
                 <AuthInput
+                  {...fieldProps('height')}
                   value={heightText}
                   onChangeText={setHeightText}
                   placeholder={heightPlaceholder}
+                  error={heightFormatError}
                   keyboardType="decimal-pad"
-                  returnKeyType="done"
                 />
                 <View pointerEvents="none" style={styles.unitOverlay}>
                   <Text style={styles.unitText}>{inputHeightUnit}</Text>
@@ -484,13 +509,13 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
               </View>
 
               <AuthInput
+                {...fieldProps('birthDate')}
                 value={birthDateText}
                 onChangeText={(text) => { setBirthDateText(maskBirthDateInput(text)); }}
                 placeholder={t('onboarding.birthDatePlaceholder')}
                 error={birthDateError}
                 keyboardType="number-pad"
                 maxLength={BIRTH_DATE_MASKED_LENGTH}
-                returnKeyType="done"
               />
             </View>
 
@@ -592,6 +617,8 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
           </View>
         )}
       />
+
+      <NumericKeyboardAccessory nativeID={KEYBOARD_ACCESSORY_ID} {...accessoryProps} />
     </Animated.View>
   );
 }

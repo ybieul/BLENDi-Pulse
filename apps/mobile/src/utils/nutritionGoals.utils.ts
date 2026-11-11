@@ -28,6 +28,7 @@ import {
 } from '@blendi/shared';
 
 import type { TranslationKey } from '../locales/i18n';
+import { parseStrictDecimalParts, parseStrictInteger } from './numericInput.utils';
 import { flOzToMl, mlToFlOz } from './volumeUnits';
 
 // ─── Campos e limites ─────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ export function isGoalFieldInFlOz(field: GoalField, unitSystem: GoalUnitSystem):
 // Valores em fl oz são tratados em DÉCIMOS inteiros (84.5 -> 845): comparação
 // e checagem de faixa ficam exatas, sem ruído de ponto flutuante.
 const TENTHS_PER_UNIT = 10;
+const FL_OZ_FRACTION_DIGITS = 1;
 
 function toTenths(value: number): number {
   return Math.round(value * TENTHS_PER_UNIT);
@@ -116,15 +118,15 @@ export const HYDRATION_FL_OZ_LIMITS: Readonly<GoalDisplayLimits> = {
  * Texto em fl oz -> décimos. Aceita só dígitos ASCII com no máximo uma casa
  * decimal, separada por ponto ou vírgula ("84", "84.5", "84,5"; "84." no meio
  * da digitação vale 84.0). Sem sinal, sem notação científica, sem ".5".
+ * A leitura em si é a regra comum de numericInput.utils.ts.
  */
 function parseFlOzTextToTenths(text: string): number | null {
-  const match = /^(\d+)(?:[.,](\d?))?$/.exec(text.trim());
-  if (!match) {
+  const parts = parseStrictDecimalParts(text, FL_OZ_FRACTION_DIGITS);
+  if (!parts) {
     return null;
   }
 
-  const [, integerPart, decimalPart] = match;
-  const tenths = Number(integerPart) * TENTHS_PER_UNIT + Number(decimalPart || '0');
+  const tenths = Number(parts.integerPart) * TENTHS_PER_UNIT + Number(parts.fractionPart || '0');
   return Number.isSafeInteger(tenths) ? tenths : null;
 }
 
@@ -132,8 +134,7 @@ function parseFlOzTextToTenths(text: string): number | null {
 
 /** Inteiro positivo ou zero; qualquer outra coisa (vazio, "1,5", "12abc", "-3") vira null. */
 export function parseGoalText(text: string): number | null {
-  const trimmed = text.trim();
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+  return parseStrictInteger(text);
 }
 
 /**

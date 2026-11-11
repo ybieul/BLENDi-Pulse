@@ -35,13 +35,12 @@
 //   teclado aberto. Fora do scroll ele sobe junto com o teclado nas duas
 //   plataformas e o toque nele nunca é engolido pelo ScrollView;
 // • teclado numérico: o do iOS não tem tecla de retorno, então uma barra
-//   "Próximo/Concluir" (InputAccessoryView) faz esse papel; no Android a ação
-//   do próprio teclado (returnKeyType) faz.
+//   "Próximo/Concluir" (NumericKeyboardAccessory, componente compartilhado)
+//   faz esse papel; no Android a ação do próprio teclado (returnKeyType) faz.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -73,6 +72,7 @@ import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { AuthInput } from '../components/ui/AuthInput';
 import { DietaryPreferencesPicker } from '../components/ui/DietaryPreferencesPicker';
+import { NumericKeyboardAccessory, keyboardAccessoryId } from '../components/ui/NumericKeyboardAccessory';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 import { useUnits } from '../hooks/useUnits';
@@ -138,7 +138,6 @@ const SCREEN_HORIZONTAL_PADDING = spacing.xl;
 const BACK_BUTTON_SIZE = 36;
 const ICON_SIZE = 16;
 const WARNING_ICON_SIZE = 18;
-const ACCESSORY_BAR_HEIGHT = 44;
 
 async function fetchGoalsProfile(): Promise<GoalsProfileResponse> {
   const response = await api.get<GoalsProfileResponse>('/users/me');
@@ -515,27 +514,6 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
       fontWeight: fontWeights.medium,
       textAlign: 'center',
     },
-    accessoryBar: {
-      height: ACCESSORY_BAR_HEIGHT,
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      alignItems: 'center',
-      paddingHorizontal: spacing.xl,
-      backgroundColor: colors.background.secondary,
-      borderTopWidth: 1,
-      borderTopColor: colors.overlay.plum[10],
-    },
-    accessoryButton: {
-      minHeight: ACCESSORY_BAR_HEIGHT,
-      justifyContent: 'center',
-      paddingHorizontal: spacing.md,
-    },
-    accessoryButtonText: {
-      color: colors.brand.pulse,
-      fontFamily: fonts.body,
-      fontSize: fontSizes.md,
-      fontWeight: fontWeights.bold,
-    },
   });
 
   // Sem nenhum dado de meta (nem perfil nem usuário local) não há o que editar.
@@ -580,7 +558,7 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
           accessibilityLabel={t(label)}
           editable={!isSaving}
           error={error}
-          inputAccessoryViewID={Platform.OS === 'ios' ? KEYBOARD_ACCESSORY_ID : undefined}
+          inputAccessoryViewID={keyboardAccessoryId(KEYBOARD_ACCESSORY_ID)}
           keyboardType={isFlOz ? 'decimal-pad' : 'number-pad'}
           onBlur={() => { handleFieldBlur(field); }}
           onChangeText={(text) => { handleChangeText(field, text); }}
@@ -685,27 +663,17 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
         </View>
       </View>
 
-      {Platform.OS === 'ios' ? (
-        <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
-          <View style={styles.accessoryBar}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                if (focusedField) {
-                  advanceFromField(focusedField);
-                } else {
-                  Keyboard.dismiss();
-                }
-              }}
-              style={styles.accessoryButton}
-            >
-              <Text style={styles.accessoryButtonText}>
-                {isLastFieldFocused ? t('nutritionGoals.done') : t('nutritionGoals.next')}
-              </Text>
-            </Pressable>
-          </View>
-        </InputAccessoryView>
-      ) : null}
+      <NumericKeyboardAccessory
+        isLastField={isLastFieldFocused}
+        nativeID={KEYBOARD_ACCESSORY_ID}
+        onNext={() => {
+          if (focusedField) {
+            advanceFromField(focusedField);
+          } else {
+            Keyboard.dismiss();
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
