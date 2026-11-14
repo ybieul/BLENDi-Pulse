@@ -93,6 +93,8 @@ The original checkpoint description framed this as an `updateOne(...)` followed 
 
 The controller also rolls the reservation back on provider failure or invalid AI response through `rollbackPulseAiUsageReservation(...)`, so failed generations do not permanently burn a free-tier attempt.
 
+**Since CP-1.1.4a:** when this reservation fails for a free user, the controller tries a second one with the same pattern: one locked preview per day, `dailyAiPreviewUsage` below `DAILY_FREE_PREVIEW_LIMIT` (1), `$inc`, and `$exists: false` for old accounts. It is reset together with `dailyAiUsage`. With that slot, the recipe is generated as usual, but the full recipe is stored in `locked_previews` and the app receives only the macros; the 429 only comes after the preview has been used. `reservePulseAiAccess` / `rollbackPulseAiAccessReservation` pick the right counter to reserve and give back. See [CP-1.1.4a](../fixes/cp-1.1.4a-previa-bloqueada-pulse-ai.md).
+
 ## Language Priority
 
 The language-priority bug fixed later in CP1.9 is already reflected in the current codebase.

@@ -190,6 +190,7 @@ On top of that initial call, each of the 2 recipes is independently checked agai
 - Longer JSON responses
 - Hidden thinking tokens counted inside output pricing
 - Retry calls caused by invalid JSON output (Pulse AI chat, and the Pantry Scanner recipe-generation/guardrail retries)
+- The Pulse AI locked preview (CP-1.1.4a): a free user who uses up the 3 daily messages can trigger **one more generation per day** (the 4th message). The AI runs normally, but only the macros are shown until the user subscribes. Worst case per free user, up to 4 Pulse AI generations a day instead of 3, plus retries. A preview served from the Mongo cache costs nothing, and a preview is not written to the cache. Unlocking after subscribing does not call the AI again
 - Disabling or missing the app-level Mongo cache (Pulse AI chat only — the Pantry Scanner path has no cache to disable)
 - Larger uploaded photos, or photos with an aspect ratio that tiles into more than ~4 tiles (Pantry Scanner)
 - Future use of grounding, tools, Batch API, or additional multimodal inputs

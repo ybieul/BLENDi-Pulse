@@ -6,9 +6,10 @@
 //
 // Ao pressionar "Finish setup":
 //   1. PATCH /users/me → persiste modelo, goal, macros e dados corporais
-//   2. completeOnboarding() → isNewUser: false + MMKV onboarding_completed: true
-//   3. resetOnboarding() → limpa store temporário
-//   O RootNavigator detecta isNewUser: false e navega para AppFlow automaticamente.
+//   2. Sucesso → abre "Montando seu plano" (OnboardingBuildingPlanScreen), que
+//      chama completeOnboarding() + resetOnboarding() quando o anel termina.
+//      O RootNavigator detecta isNewUser: false e navega para AppFlow.
+//   Falha → erro aqui mesmo (formError), sem sair da tela.
 
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
@@ -96,7 +97,7 @@ const KEYBOARD_ACCESSORY_ID = 'onboardingMacrosKeyboardAccessory';
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
-export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'OnboardingMacros'>) {
+export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'OnboardingMacros'>) {
   const colors = useColors();
   const { t } = useAppTranslation();
   const translateKey = (input: string | ValidationIssue) => {
@@ -139,7 +140,6 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
   const calculatedProtein  = useOnboardingStore((state) => state.calculatedProtein);
   const calculatedCalories = useOnboardingStore((state) => state.calculatedCalories);
   const calculatedCarbs    = useOnboardingStore((state) => state.calculatedCarbs);
-  const resetOnboarding  = useOnboardingStore((state) => state.resetOnboarding);
 
   // Pre-fill from calculated values; empty string prompts the placeholder hint.
   const [proteinText, setProteinText]   = useState(() =>
@@ -268,9 +268,25 @@ export function OnboardingMacrosScreen(_props: OnboardingScreenProps<'Onboarding
         unitSystem: unitSystem ?? 'metric',
       });
 
-      await useAuthStore.getState().completeOnboarding();
-      resetOnboarding();
-      // RootNavigator reacts to isNewUser: false — no manual navigation needed.
+      // completeOnboarding() e resetOnboarding() saem daqui e vão para o fim
+      // da tela "Montando seu plano". reset (e não navigate) tira esta tela e
+      // as anteriores do histórico: não há para onde voltar. Os dados vão por
+      // parâmetro porque o resetOnboarding() de lá limpa o store.
+      navigation.reset({
+        index: 0,
+        routes: [{
+          name: 'OnboardingBuildingPlan',
+          params: {
+            blendiModel,
+            blendiOwnership,
+            goal,
+            dailyProteinTarget: proteinNum,
+            dailyCalorieTarget: caloriesNum,
+            dailyCarbTarget: carbsNum,
+            dietaryPreferences,
+          },
+        }],
+      });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const responseData = error.response?.data as ApiErrorResponse | undefined;

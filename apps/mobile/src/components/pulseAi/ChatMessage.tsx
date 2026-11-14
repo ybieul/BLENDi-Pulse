@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { PulseAiRecipe, PulseAiRecipePreview } from '@blendi/shared';
 
 import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
 import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
-import { RecipeCard } from './RecipeCard';
+import { LockedRecipeCard, RecipeCard } from './RecipeCard';
 
 const USER_BUBBLE_BACKGROUND = colors.overlay.pulse[25];
 const USER_BUBBLE_BORDER = colors.overlay.pulse[35];
@@ -37,15 +37,31 @@ interface AssistantChatMessageProps extends BaseChatMessageProps {
   onStartBlend?: () => void;
   isFromCache?: boolean;
   isError?: never;
+  locked?: never;
+}
+
+// CP-1.1.4a: prévia bloqueada — só nome e macros; toque abre os planos.
+interface AssistantLockedChatMessageProps extends BaseChatMessageProps {
+  role: 'assistant';
+  content: PulseAiRecipePreview;
+  locked: true;
+  expired?: boolean;
+  onLockedPress: () => void;
+  isError?: never;
 }
 
 interface AssistantErrorChatMessageProps extends BaseChatMessageProps {
   role: 'assistant';
   content: string;
   isError: true;
+  locked?: never;
 }
 
-export type ChatMessageProps = UserChatMessageProps | AssistantChatMessageProps | AssistantErrorChatMessageProps;
+export type ChatMessageProps =
+  | UserChatMessageProps
+  | AssistantChatMessageProps
+  | AssistantLockedChatMessageProps
+  | AssistantErrorChatMessageProps;
 
 export function ChatMessage(props: ChatMessageProps) {
   const colors = useColors();
@@ -175,6 +191,26 @@ export function ChatMessage(props: ChatMessageProps) {
           <Text style={styles.userMessageText}>{props.content}</Text>
         </View>
         <Text style={styles.userTimestamp}>{formatTime(timestamp)}</Text>
+      </Animated.View>
+    );
+  }
+
+  if (props.locked) {
+    return (
+      <Animated.View
+        style={[
+          styles.assistantMessageWrap,
+          {
+            opacity: entryOpacity,
+            transform: [{ translateY: entryTranslateY }],
+          },
+        ]}
+      >
+        <LockedRecipeCard
+          preview={props.content}
+          expired={props.expired}
+          onPress={props.onLockedPress}
+        />
       </Animated.View>
     );
   }

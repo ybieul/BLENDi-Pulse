@@ -127,7 +127,28 @@
     "caloriesPlaceholder": "Daily calories (kcal)",
     "carbTarget": "Daily carbs (g)",
     "macroRecommendation": "For {{goal}}, we recommend {{proteinMin}}\u2013{{proteinMax}}g protein, {{caloriesMin}}\u2013{{caloriesMax}} kcal, and {{carbsMin}}\u2013{{carbsMax}}g carbs",
-    "finishSetup": "Finish setup"
+    "finishSetup": "Finish setup",
+    "buildingPlan": {
+      "title": "Building your plan",
+      "subtitle": "Putting your choices together. This takes just a few seconds.",
+      "progressLabel": "Plan progress",
+      "stepModel": "Calibrating for your {{model}}",
+      "stepModelNeutral": "Calibrating safe settings for any portable blender",
+      "stepGoal": "Tuning recipes for {{goal}}",
+      "stepTargets": "Setting {{protein}} g protein · {{calories}} kcal · {{carbs}} g carbs",
+      "stepDiet": "Applying: {{diets}}",
+      "stepReady": "Your plan is ready",
+      "stepDone": "Done",
+      "stepPending": "In progress",
+      "factLabel": "Did you know?",
+      "facts": {
+        "dormRoom": "BLENDi started in a Springfield College dorm room in 2016.",
+        "featuredOnTv": "BLENDi has been featured on Good Morning America and The View.",
+        "firstPrototype": "The first prototype paired a drill battery with a blender.",
+        "umassEngineers": "11 UMass engineers helped shape the final design.",
+        "firstBatchSoldOut": "The first 300 BLENDi blenders sold out in 2018."
+      }
+    }
   },
 
   "home": {
@@ -1275,6 +1296,13 @@
     "historyBanner": "Viewing a previous conversation",
     "historyNewFromHere": "Start new",
     "voicePlaceholder": "Voice input coming soon",
+    "lockedPreview": {
+      "genericTitle": "Your Pulse AI recipe",
+      "unlockCta": "Unlock with Pulse Pro",
+      "a11yLabel": "Locked recipe. Tap to unlock with Pulse Pro",
+      "expired": "This preview has expired. Ask again to get the full recipe.",
+      "expiredA11yLabel": "Expired recipe preview. Ask again to get the full recipe"
+    },
     "goals": {
       "muscle": {
         "welcomeTitle": "What should we blend for muscle today?",
@@ -1436,6 +1464,8 @@
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
     "pulseai_dietary_restriction_unmet": "We couldn't put together a recipe that fits your diet and your BLENDi this time. Try asking a different way.",
+    "pulseai_preview_expired": "This recipe preview has expired.",
+    "pulseai_preview_locked": "Unlock this recipe with Pulse Pro.",
     "macros_inconsistent": "Nutrition values estimated — actual macros may vary.",
     "scanner_monthly_limit_reached": "You've reached this month's free Pantry Scanner limit.",
     "scanner_invalid_image": "This image couldn't be analyzed. Try another photo.",

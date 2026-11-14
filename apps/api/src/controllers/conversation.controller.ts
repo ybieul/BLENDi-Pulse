@@ -90,8 +90,17 @@ function serializeConversationDetail(conversation: ConversationDetailRecord) {
     lastRecipeName: conversation.lastRecipeName,
     messages: conversation.messages.map(message => ({
       role: message.role,
+      // Turno bloqueado (CP-1.1.4a): o content gravado já é só nome + macros,
+      // então nada da receita escondida passa por aqui.
       content: message.content,
       timestamp: message.timestamp.toISOString(),
+      ...(message.locked === true && message.previewId
+        ? {
+            locked: true,
+            previewId: String(message.previewId),
+            previewExpiresAt: message.previewExpiresAt?.toISOString(),
+          }
+        : {}),
     })),
   };
 }

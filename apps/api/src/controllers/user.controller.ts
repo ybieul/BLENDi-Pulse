@@ -19,6 +19,7 @@ import { WeeklyReportModel } from '../models/WeeklyReport';
 import { XPLogModel } from '../models/XPLog';
 import { DailyMissionModel } from '../models/DailyMission';
 import { GoogleAuthCodeModel } from '../models/GoogleAuthCode';
+import { LockedPreviewModel } from '../models/LockedPreview';
 import { invalidateUserCache } from '../services/cache.service';
 import { revokeAppleRefreshToken } from '../services/apple.service';
 import {
@@ -502,6 +503,8 @@ export async function deleteAccount(
           // Código de login Google ainda não trocado (vive ~2 min por TTL).
           // Apagado junto para não sobrar documento ligado à conta excluída.
           GoogleAuthCodeModel.deleteMany({ userId }, { session }),
+          // CP-1.1.4a: prévias bloqueadas guardam a receita completa por até 24h.
+          LockedPreviewModel.deleteMany({ userId }, { session }),
           invalidateUserCache(userId, session),
         ]);
 

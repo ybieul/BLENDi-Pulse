@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { PulseAiRecipe, PulseAiRecipePreview } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getAxiosErrorTranslationKey } from '../utils/error.utils';
@@ -20,8 +20,12 @@ export interface ConversationSummary {
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';
-  content: string | PulseAiRecipe;
+  /** Num turno bloqueado (locked), só nome e macros — ver CP-1.1.4a. */
+  content: string | PulseAiRecipe | PulseAiRecipePreview;
   timestamp: string;
+  locked?: true;
+  previewId?: string;
+  previewExpiresAt?: string;
 }
 
 export interface ConversationDetail {

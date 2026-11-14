@@ -86,6 +86,15 @@ Disparados só depois da chamada à API ter sucesso (nunca em caso de erro):
 | `pantryScanner.service.ts` (`analyzePantry`) | `pantry_scan_completed` | — |
 | `purchase.service.ts` (`purchasePlan`) | `purchase_completed` | `planId`, `productIdentifier`, `priceString`, `currencyCode` (de `targetPackage.product`) |
 
+**CP-1.1.4a (prévia bloqueada do Pulse AI):** dois eventos novos, disparados pela `PulseAIScreen` e não pelo serviço, sem nenhum dado da receita:
+
+| Onde | Evento | Propriedades |
+|---|---|---|
+| `PulseAIScreen.tsx` (prévia chega no chat) | `paywall_preview_shown` | `source: 'pulse_ai'` |
+| `PulseAIScreen.tsx` (toque no card bloqueado) | `paywall_preview_tapped` | `source: 'pulse_ai'` |
+
+Na prévia, `sendMessage` **não** dispara `ai_message_sent`: o evento continua contando só receitas entregues de verdade. O CP-1.1.4b deve reaproveitar os mesmos eventos com `source: 'pantry_scanner'`. Ver [cp-1.1.4a-previa-bloqueada-pulse-ai.md](cp-1.1.4a-previa-bloqueada-pulse-ai.md).
+
 ## Tarefa 6 — Ciclo de vida da assinatura (backend)
 
 - `posthog-node` instalado como dependência de produção em `apps/api`.
@@ -136,6 +145,10 @@ identificadas como telas de maior valor para rastrear no futuro; lint do
 adicionando `Blend` e `PantryScanner` — formam funil direto com
 `blend_completed`/`pantry_scan_completed` (Tarefa 5), revelando abandono
 que antes era invisível (só a conclusão era rastreada).
+
+Depois, `OnboardingDiet` entrou no CP-1.1.1a e `OnboardingBuildingPlan`
+("Montando seu plano") no CP-1.1.2. Ela é o último passo antes da Home e,
+a partir do CP-1.1.3, do paywall.
 
 ### Achado 5 — lint quebrado em `apps/api` e `packages/shared`
 

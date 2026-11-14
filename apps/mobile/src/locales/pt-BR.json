@@ -127,7 +127,28 @@
     "caloriesPlaceholder": "Calorias diárias (kcal)",
     "carbTarget": "Carboidratos diários (g)",
     "macroRecommendation": "Para {{goal}}, recomendamos {{proteinMin}}\u2013{{proteinMax}}g de proteína, {{caloriesMin}}\u2013{{caloriesMax}} kcal e {{carbsMin}}\u2013{{carbsMax}}g de carboidratos",
-    "finishSetup": "Finalizar configuração"
+    "finishSetup": "Finalizar configuração",
+    "buildingPlan": {
+      "title": "Montando seu plano",
+      "subtitle": "Juntando suas escolhas. Leva só alguns segundos.",
+      "progressLabel": "Progresso do plano",
+      "stepModel": "Calibrando para o seu {{model}}",
+      "stepModelNeutral": "Calibrando configurações seguras para qualquer liquidificador portátil",
+      "stepGoal": "Ajustando receitas para {{goal}}",
+      "stepTargets": "Definindo {{protein}} g de proteína · {{calories}} kcal · {{carbs}} g de carboidratos",
+      "stepDiet": "Aplicando: {{diets}}",
+      "stepReady": "Seu plano está pronto",
+      "stepDone": "Concluído",
+      "stepPending": "Em andamento",
+      "factLabel": "Você sabia?",
+      "facts": {
+        "dormRoom": "O BLENDi começou num quarto de dormitório da Springfield College, em 2016.",
+        "featuredOnTv": "O BLENDi já apareceu no Good Morning America e no The View.",
+        "firstPrototype": "O primeiro protótipo juntou uma bateria de furadeira com um liquidificador.",
+        "umassEngineers": "11 engenheiros da UMass ajudaram a chegar ao design final.",
+        "firstBatchSoldOut": "Os primeiros 300 BLENDi esgotaram em 2018."
+      }
+    }
   },
 
   "home": {
@@ -1275,6 +1296,13 @@
     "historyBanner": "Você está vendo uma conversa anterior",
     "historyNewFromHere": "Nova conversa",
     "voicePlaceholder": "Entrada por voz em breve",
+    "lockedPreview": {
+      "genericTitle": "Sua receita do Pulse AI",
+      "unlockCta": "Desbloqueie com o Pulse Pro",
+      "a11yLabel": "Receita bloqueada. Toque para desbloquear com o Pulse Pro",
+      "expired": "Esta prévia expirou. Peça de novo para ver a receita completa.",
+      "expiredA11yLabel": "Prévia de receita expirada. Peça de novo para ver a receita completa"
+    },
     "goals": {
       "muscle": {
         "welcomeTitle": "O que vamos bater para músculo hoje?",
@@ -1436,6 +1464,8 @@
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
     "pulseai_dietary_restriction_unmet": "Não conseguimos montar uma receita que respeite a sua dieta e o seu BLENDi desta vez. Tente pedir de outro jeito.",
+    "pulseai_preview_expired": "A prévia desta receita expirou.",
+    "pulseai_preview_locked": "Desbloqueie esta receita com o Pulse Pro.",
     "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar.",
     "scanner_monthly_limit_reached": "Você atingiu o limite gratuito mensal do Pantry Scanner.",
     "scanner_invalid_image": "Não foi possível analisar esta imagem. Tente outra foto.",

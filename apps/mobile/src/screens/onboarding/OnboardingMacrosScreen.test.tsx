@@ -99,11 +99,22 @@ jest.mock('../../store/onboarding.store', () => ({
 import { AuthInput } from '../../components/ui/AuthInput';
 import { OnboardingMacrosScreen } from './OnboardingMacrosScreen';
 
+const mockReset = jest.fn();
+
 function renderScreen() {
   return render(
-    // @ts-expect-error -- props de navegação não são usadas pelo componente
-    <OnboardingMacrosScreen />
+    // @ts-expect-error -- só navigation.reset é usado pelo componente
+    <OnboardingMacrosScreen navigation={{ reset: mockReset }} />
   );
+}
+
+/** Depois do PATCH ok, a tela de metas sai para "Montando seu plano". */
+function expectWentToBuildingPlan() {
+  expect(mockReset).toHaveBeenCalledTimes(1);
+  expect(mockReset).toHaveBeenCalledWith({
+    index: 0,
+    routes: [{ name: 'OnboardingBuildingPlan', params: expect.any(Object) as unknown }],
+  });
 }
 
 function fillValidMacrosAndFinish(
@@ -130,6 +141,7 @@ beforeEach(() => {
   mockUpdateUserProfile.mockReset();
   mockCompleteOnboarding.mockReset().mockResolvedValue(undefined);
   mockResetOnboarding.mockReset();
+  mockReset.mockReset();
 });
 
 describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
@@ -179,8 +191,27 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
       unitSystem: 'metric',
     });
 
-    await waitFor(() => expect(mockCompleteOnboarding).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+    // Salva o perfil local e vai para "Montando seu plano" com o que foi
+    // salvo; quem conclui o onboarding é a tela nova, no fim do anel.
+    await waitFor(() => expect(mockReset).toHaveBeenCalledTimes(1));
+    expect(mockUpdateUserProfile).toHaveBeenCalledTimes(1);
+    expect(mockReset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{
+        name: 'OnboardingBuildingPlan',
+        params: {
+          blendiModel: 'Lite',
+          blendiOwnership: 'blendi',
+          goal: 'Wellness',
+          dailyProteinTarget: 150,
+          dailyCalorieTarget: 2000,
+          dailyCarbTarget: 200,
+          dietaryPreferences: [],
+        },
+      }],
+    });
+    expect(mockCompleteOnboarding).not.toHaveBeenCalled();
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
   });
 
   it('mostra mensagem de erro visível quando o PATCH falha (não fica em silêncio)', async () => {
@@ -204,6 +235,9 @@ describe('OnboardingMacrosScreen — botão "Finalizar configuração"', () => {
     await waitFor(() => expect(getByText(/errors\./)).toBeTruthy());
 
     expect(mockCompleteOnboarding).not.toHaveBeenCalled();
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
+    expect(mockReset).not.toHaveBeenCalled();
+    expect(mockUpdateUserProfile).not.toHaveBeenCalled();
 
     jest.spyOn(axios, 'isAxiosError').mockRestore();
   });
@@ -293,7 +327,8 @@ describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', 
       otherBlenderModel: 'Ninja BN401',
       dietaryPreferences: ['vegan', 'nut_free'],
     });
-    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+    await waitFor(expectWentToBuildingPlan);
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
   });
 
   it('"Other or older model" sem texto: não envia otherBlenderModel', async () => {
@@ -312,7 +347,8 @@ describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', 
       blendiOwnership: 'other',
       dietaryPreferences: [],
     });
-    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+    await waitFor(expectWentToBuildingPlan);
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
   });
 
   it('"No BLENDi yet": modelo Lite, posse "none" e sem texto (mesmo com texto antigo no store)', async () => {
@@ -335,7 +371,8 @@ describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', 
       dietaryPreferences: ['dairy_free'],
     });
     expect(payload).not.toHaveProperty('otherBlenderModel');
-    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+    await waitFor(expectWentToBuildingPlan);
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
   });
 
   it('BLENDi atual (Steel): posse "blendi" e nenhum texto de outro modelo', async () => {
@@ -355,7 +392,8 @@ describe('OnboardingMacrosScreen — posse do liquidificador e dieta no PATCH', 
       blendiOwnership: 'blendi',
       dietaryPreferences: ['no_added_sugar'],
     });
-    await waitFor(() => expect(mockResetOnboarding).toHaveBeenCalledTimes(1));
+    await waitFor(expectWentToBuildingPlan);
+    expect(mockResetOnboarding).not.toHaveBeenCalled();
   });
 });
 

@@ -4,12 +4,14 @@ import mongoose from 'mongoose';
 import {
   pulseAiChatSchema,
   pulseAiRecipeSchema,
+  toPulseAiRecipePreview,
   type PulseAiRecipe,
 } from '@blendi/shared';
 import { ZodError, z } from 'zod';
 
 import { env } from '../config/env';
 import { BlendLogModel } from '../models/BlendLog';
+import { LOCKED_PREVIEW_TTL_MS, LockedPreviewModel } from '../models/LockedPreview';
 import {
   ConversationModel,
   type IConversation,
@@ -44,6 +46,7 @@ import {
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { sendErrorResponse } from '../utils/error.utils';
+import { toLastRecipeName } from '../utils/recipeName.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 import {
   buildMacroInconsistencyRetryMessage,
@@ -60,6 +63,16 @@ import {
 } from '../utils/recipeRestrictions.utils';
 
 const DAILY_FREE_LIMIT = 3;
+// CP-1.1.4a ("Wow Moment Paywall"): prévias bloqueadas por dia para o usuário
+// grátis, depois das DAILY_FREE_LIMIT mensagens normais. Extra: não gasta nem
+// devolve nenhuma das mensagens normais.
+const DAILY_FREE_PREVIEW_LIMIT = 1;
+const LOCKED_PREVIEW_KIND = 'pulse_ai';
+const PREVIEW_NOT_FOUND_CODE = 'pulseai/preview-not-found';
+const PREVIEW_LOCKED_CODE = 'pulseai/preview-locked';
+// O que entra no histórico da IA no lugar de um turno bloqueado.
+const LOCKED_PREVIEW_HISTORY_PLACEHOLDER =
+  '[A recipe was generated here but is locked for this user. Its contents are not available.]';
 const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
 const INVALID_JSON_RETRY_INSTRUCTION =
   'Your previous response had an invalid format. Return only valid JSON.';
@@ -236,6 +249,88 @@ async function rollbackPulseAiUsageReservation(user: PulseAiUserProfile): Promis
   ).exec();
 }
 
+// Mesmo padrão atômico de reservePulseAiUsage: o filtro do findOneAndUpdate é
+// quem garante o limite, então duas requisições simultâneas não passam juntas.
+// Conta antiga sem o campo conta como 0 ($inc cria o campo com 1).
+async function reservePulseAiPreview(user: PulseAiUserProfile): Promise<boolean> {
+  if (user.isPro) {
+    return false;
+  }
+
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: user.id,
+      isPro: false,
+      $or: [
+        { dailyAiPreviewUsage: { $lt: DAILY_FREE_PREVIEW_LIMIT } },
+        { dailyAiPreviewUsage: { $exists: false } },
+      ],
+    },
+    {
+      $inc: {
+        dailyAiPreviewUsage: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  )
+    .select({ dailyAiPreviewUsage: 1 })
+    .lean()
+    .exec();
+
+  return Boolean(updatedUser);
+}
+
+async function rollbackPulseAiPreviewReservation(user: PulseAiUserProfile): Promise<void> {
+  await UserModel.updateOne(
+    {
+      _id: user.id,
+      isPro: false,
+      dailyAiPreviewUsage: { $gt: 0 },
+    },
+    {
+      $inc: {
+        dailyAiPreviewUsage: -1,
+      },
+    }
+  ).exec();
+}
+
+// 'full': mensagem normal (Pro ou dentro das 3 do dia). 'preview': usuário
+// grátis passou do limite e ainda tinha a prévia do dia — a receita é gerada,
+// mas só a parte visível sai do servidor.
+type PulseAiAccessReservation =
+  | { ok: true; mode: 'full'; usageRemaining: number | null }
+  | { ok: true; mode: 'preview' }
+  | { ok: false };
+
+async function reservePulseAiAccess(user: PulseAiUserProfile): Promise<PulseAiAccessReservation> {
+  const usageReservation = await reservePulseAiUsage(user);
+
+  if (usageReservation.ok) {
+    return { ok: true, mode: 'full', usageRemaining: usageReservation.usageRemaining };
+  }
+
+  if (await reservePulseAiPreview(user)) {
+    return { ok: true, mode: 'preview' };
+  }
+
+  return { ok: false };
+}
+
+async function rollbackPulseAiAccessReservation(
+  user: PulseAiUserProfile,
+  reservation: Extract<PulseAiAccessReservation, { ok: true }>
+): Promise<void> {
+  if (reservation.mode === 'preview') {
+    await rollbackPulseAiPreviewReservation(user);
+    return;
+  }
+
+  await rollbackPulseAiUsageReservation(user);
+}
+
 async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfile | null> {
   const user = await UserModel.findById(userId)
     .select({
@@ -294,6 +389,7 @@ async function resetDailyAiUsageIfNeeded(user: PulseAiUserProfile): Promise<void
     {
       $set: {
         dailyAiUsage: 0,
+        dailyAiPreviewUsage: 0,
         aiUsageResetDate: now,
       },
     }
@@ -480,6 +576,14 @@ function serializeConversationMessage(message: IConversationMessage): PulseAiApi
     return { role: 'user', content: message.content as string };
   }
 
+  // Turno de prévia bloqueada (CP-1.1.4a): o content gravado é só macros. Nada
+  // da receita vai para a IA — nem o título, que ela poderia repetir na próxima
+  // resposta ("me passa os ingredientes da receita de ontem" não tem de onde tirar).
+  if (message.locked === true) {
+    return { role: 'assistant', content: LOCKED_PREVIEW_HISTORY_PLACEHOLDER };
+  }
+
+  // Só o título da receita entra no histórico enviado à IA.
   return { role: 'assistant', content: (message.content as PulseAiRecipe).title };
 }
 
@@ -551,7 +655,20 @@ async function persistConversationTurn(params: {
   userMessage: string;
   userSentAt: Date;
   recipe: PulseAiRecipe;
+  /** Prévia bloqueada: grava só a parte visível e o marcador de bloqueio. */
+  lockedPreview?: { previewId: mongoose.Types.ObjectId; expiresAt: Date };
 }): Promise<void> {
+  const assistantMessage = params.lockedPreview
+    ? {
+        role: 'assistant',
+        content: toPulseAiRecipePreview(params.recipe),
+        timestamp: new Date(),
+        locked: true,
+        previewId: params.lockedPreview.previewId,
+        previewExpiresAt: params.lockedPreview.expiresAt,
+      }
+    : { role: 'assistant', content: params.recipe, timestamp: new Date() };
+
   const result = await ConversationModel.updateOne(
     { _id: params.conversationId },
     {
@@ -559,13 +676,15 @@ async function persistConversationTurn(params: {
         messages: {
           $each: [
             { role: 'user', content: params.userMessage, timestamp: params.userSentAt },
-            { role: 'assistant', content: params.recipe, timestamp: new Date() },
+            assistantMessage,
           ],
         },
       },
-      $set: {
-        lastRecipeName: params.recipe.title,
-      },
+      // Prévia bloqueada não grava o nome: lastRecipeName sai na lista de
+      // conversas, e o título também é conteúdo escondido.
+      ...(params.lockedPreview
+        ? {}
+        : { $set: { lastRecipeName: toLastRecipeName(params.recipe.title) } }),
     },
     {
       runValidators: true,
@@ -578,6 +697,58 @@ async function persistConversationTurn(params: {
       { conversationId: String(params.conversationId), userId: params.userId }
     );
   }
+}
+
+// Guarda a receita inteira em LockedPreview, grava na conversa só a parte
+// visível e responde só a parte visível. Sem XP, sem missão, sem cache.
+async function deliverLockedPreview(params: {
+  user: PulseAiUserProfile;
+  conversationId: mongoose.Types.ObjectId | string;
+  userMessage: string;
+  userSentAt: Date;
+  recipe: PulseAiRecipe;
+}): Promise<PulseAiChatOutcome> {
+  const expiresAt = new Date(Date.now() + LOCKED_PREVIEW_TTL_MS);
+  const preview = await LockedPreviewModel.create({
+    kind: LOCKED_PREVIEW_KIND,
+    userId: params.user.id,
+    content: params.recipe,
+    context: {
+      conversationId: String(params.conversationId),
+      userMessage: params.userMessage,
+      userSentAt: params.userSentAt.toISOString(),
+    },
+    expiresAt,
+  });
+
+  try {
+    await persistConversationTurn({
+      conversationId: params.conversationId,
+      userId: params.user.id,
+      userMessage: params.userMessage,
+      userSentAt: params.userSentAt,
+      recipe: params.recipe,
+      lockedPreview: { previewId: preview._id, expiresAt },
+    });
+  } catch (error) {
+    await LockedPreviewModel.deleteOne({ _id: preview._id })
+      .exec()
+      .catch(cleanupError => {
+        console.error('[pulseAi.controller] failed to delete orphan locked preview', {
+          errorName: cleanupError instanceof Error ? cleanupError.name : 'UnknownError',
+        });
+      });
+    throw error;
+  }
+
+  return successOutcome({
+    locked: true,
+    previewId: String(preview._id),
+    previewExpiresAt: expiresAt.toISOString(),
+    preview: toPulseAiRecipePreview(params.recipe),
+    usageRemaining: 0,
+    conversationId: String(params.conversationId),
+  });
 }
 
 async function runPulseAiChat(params: {
@@ -653,10 +824,25 @@ async function runPulseAiChat(params: {
     }
 
     if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant) {
-      const usageReservation = await reservePulseAiUsage(currentUser);
+      const usageReservation = await reservePulseAiAccess(currentUser);
 
       if (!usageReservation.ok) {
         return errorOutcome(429, 'pulseai/daily-limit-reached', 'Daily Pulse AI limit reached.');
+      }
+
+      if (usageReservation.mode === 'preview') {
+        try {
+          return await deliverLockedPreview({
+            user: currentUser,
+            conversationId: conversationContext.conversationId,
+            userMessage: message,
+            userSentAt: requestReceivedAt,
+            recipe: parsedCachedResponse.data.recipe,
+          });
+        } catch (error) {
+          await rollbackPulseAiAccessReservation(currentUser, usageReservation);
+          throw error;
+        }
       }
 
       try {
@@ -668,7 +854,7 @@ async function runPulseAiChat(params: {
           recipe: parsedCachedResponse.data.recipe,
         });
       } catch (error) {
-        await rollbackPulseAiUsageReservation(currentUser);
+        await rollbackPulseAiAccessReservation(currentUser, usageReservation);
         throw error;
       }
 
@@ -718,7 +904,7 @@ async function runPulseAiChat(params: {
     prompt.messages = [...conversationContext.historyMessages, ...prompt.messages];
   }
 
-  const usageReservation = await reservePulseAiUsage(currentUser);
+  const usageReservation = await reservePulseAiAccess(currentUser);
 
   if (!usageReservation.ok) {
     return errorOutcome(429, 'pulseai/daily-limit-reached', 'Daily Pulse AI limit reached.');
@@ -736,7 +922,7 @@ async function runPulseAiChat(params: {
       aiResponse = generatedRecipe.aiResponse;
     } catch (error) {
       if (shouldRollbackUsage) {
-        await rollbackPulseAiUsageReservation(currentUser);
+        await rollbackPulseAiAccessReservation(currentUser, usageReservation);
         shouldRollbackUsage = false;
       }
 
@@ -760,7 +946,7 @@ async function runPulseAiChat(params: {
         aiResponse = regeneratedRecipe.aiResponse;
       } catch (error) {
         if (shouldRollbackUsage) {
-          await rollbackPulseAiUsageReservation(currentUser);
+          await rollbackPulseAiAccessReservation(currentUser, usageReservation);
           shouldRollbackUsage = false;
         }
 
@@ -774,7 +960,7 @@ async function runPulseAiChat(params: {
 
     if (!recipe || !aiResponse) {
       if (shouldRollbackUsage) {
-        await rollbackPulseAiUsageReservation(currentUser);
+        await rollbackPulseAiAccessReservation(currentUser, usageReservation);
         shouldRollbackUsage = false;
       }
 
@@ -790,7 +976,7 @@ async function runPulseAiChat(params: {
       // Nada é entregue: devolve a reserva de uso e não grava cache, turno da
       // conversa nem XP.
       if (shouldRollbackUsage) {
-        await rollbackPulseAiUsageReservation(currentUser);
+        await rollbackPulseAiAccessReservation(currentUser, usageReservation);
         shouldRollbackUsage = false;
       }
 
@@ -802,6 +988,21 @@ async function runPulseAiChat(params: {
     }
 
     recipe = restrictionEnforcement.recipe;
+
+    if (usageReservation.mode === 'preview') {
+      // Prévia: não grava no cache por usuário (senão a receita completa ficaria
+      // acessível por outro caminho enquanto bloqueada). Se a entrega falhar, o
+      // catch abaixo devolve a prévia do dia.
+      const previewOutcome = await deliverLockedPreview({
+        user: currentUser,
+        conversationId: conversationContext.conversationId,
+        userMessage: message,
+        userSentAt: requestReceivedAt,
+        recipe,
+      });
+      shouldRollbackUsage = false;
+      return previewOutcome;
+    }
 
     await persistConversationTurn({
       conversationId: conversationContext.conversationId,
@@ -838,7 +1039,7 @@ async function runPulseAiChat(params: {
     return successOutcome({
       recipe,
       fromCache: false,
-      usageRemaining: usageReservation.usageRemaining,
+      usageRemaining: usageReservation.mode === 'full' ? usageReservation.usageRemaining : 0,
       aiProvider: aiResponse.provider,
       aiModel: aiResponse.model,
       xpAwarded: xpResult.awarded ? xpResult.amount : 0,
@@ -849,7 +1050,7 @@ async function runPulseAiChat(params: {
     });
   } catch (error) {
     if (shouldRollbackUsage) {
-      await rollbackPulseAiUsageReservation(currentUser);
+      await rollbackPulseAiAccessReservation(currentUser, usageReservation);
       shouldRollbackUsage = false;
     }
 
@@ -976,6 +1177,186 @@ export async function invalidateCache(
       success: true,
       data: {
         deletedCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+// ─── Desbloqueio de prévia (CP-1.1.4a) ───────────────────────────────────────
+
+const lockedPreviewContextSchema = z.object({
+  conversationId: z.string().refine(value => mongoose.isValidObjectId(value)),
+  userMessage: z.string().trim().min(1),
+  userSentAt: z.string().datetime(),
+});
+
+function sendPreviewNotFound(res: Response): void {
+  // Mesma resposta para id inválido, inexistente, expirado ou de outro usuário:
+  // não revela que um id existe.
+  sendErrorResponse(res, {
+    statusCode: 404,
+    code: PREVIEW_NOT_FOUND_CODE,
+    message: 'Preview not found or expired.',
+  });
+}
+
+// Troca o turno bloqueado pela receita completa. Se o turno bloqueado não
+// existir mais, grava o turno inteiro — uma vez só: o previewId fica no turno
+// e o filtro do $push impede duplicar em chamadas repetidas ou simultâneas.
+async function persistUnlockedConversationTurn(params: {
+  previewId: mongoose.Types.ObjectId;
+  userId: string;
+  recipe: PulseAiRecipe;
+  context: unknown;
+}): Promise<string | null> {
+  const parsedContext = lockedPreviewContextSchema.safeParse(params.context);
+
+  if (!parsedContext.success) {
+    console.warn('[pulseAi.controller] locked preview without a valid conversation context', {
+      previewId: String(params.previewId),
+    });
+    return null;
+  }
+
+  const { conversationId, userMessage, userSentAt } = parsedContext.data;
+
+  const replaced = await ConversationModel.updateOne(
+    {
+      _id: conversationId,
+      userId: params.userId,
+      messages: { $elemMatch: { previewId: params.previewId, locked: true } },
+    },
+    {
+      $set: {
+        'messages.$[turn].content': params.recipe,
+        'messages.$[turn].locked': false,
+        lastRecipeName: toLastRecipeName(params.recipe.title),
+      },
+      $unset: {
+        'messages.$[turn].previewExpiresAt': '',
+      },
+    },
+    {
+      arrayFilters: [{ 'turn.previewId': params.previewId }],
+    }
+  ).exec();
+
+  if (replaced.matchedCount > 0) {
+    return conversationId;
+  }
+
+  // matchedCount 0 aqui = o turno já tinha sido desbloqueado (chamada repetida)
+  // ou a conversa não existe mais: nos dois casos não há o que gravar.
+  await ConversationModel.updateOne(
+    {
+      _id: conversationId,
+      userId: params.userId,
+      'messages.previewId': { $ne: params.previewId },
+    },
+    {
+      $push: {
+        messages: {
+          $each: [
+            { role: 'user', content: userMessage, timestamp: new Date(userSentAt) },
+            {
+              role: 'assistant',
+              content: params.recipe,
+              timestamp: new Date(),
+              previewId: params.previewId,
+            },
+          ],
+        },
+      },
+      $set: {
+        lastRecipeName: toLastRecipeName(params.recipe.title),
+      },
+    },
+    {
+      runValidators: true,
+    }
+  ).exec();
+
+  return conversationId;
+}
+
+export async function unlockPreview(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const previewId = req.params.id;
+
+    if (typeof previewId !== 'string' || !mongoose.isValidObjectId(previewId)) {
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    const previewObjectId = new mongoose.Types.ObjectId(previewId);
+
+    // Dono e validade no próprio filtro: prévia de outro usuário ou expirada
+    // (o TTL do Mongo pode levar ~1 min para apagar) cai no mesmo 404.
+    const preview = await LockedPreviewModel.findOne({
+      _id: previewObjectId,
+      userId,
+      kind: LOCKED_PREVIEW_KIND,
+      expiresAt: { $gt: new Date() },
+    })
+      .lean()
+      .exec();
+
+    if (!preview) {
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    // isPro lido do banco agora — nada vindo do app decide o desbloqueio.
+    const user = await UserModel.findById(userId).select({ isPro: 1 }).lean().exec();
+
+    if (!user) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    if (user.isPro !== true) {
+      sendErrorResponse(res, {
+        statusCode: 403,
+        code: PREVIEW_LOCKED_CODE,
+        message: 'Pulse Pro is required to unlock this preview.',
+      });
+      return;
+    }
+
+    const parsedRecipe = pulseAiRecipeSchema.safeParse(preview.content);
+
+    if (!parsedRecipe.success) {
+      console.error('[pulseAi.controller] locked preview with an invalid recipe', { previewId });
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    const conversationId = await persistUnlockedConversationTurn({
+      previewId: previewObjectId,
+      userId,
+      recipe: parsedRecipe.data,
+      context: preview.context,
+    });
+
+    // Sem XP e sem missão: o desbloqueio só entrega o que já foi gerado.
+    res.status(200).json({
+      success: true,
+      data: {
+        previewId,
+        recipe: parsedRecipe.data,
+        conversationId,
       },
     });
   } catch (error) {

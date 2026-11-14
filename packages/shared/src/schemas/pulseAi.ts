@@ -112,3 +112,32 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
     .default(true),
   steps: z.array(pulseAiStepSchema).optional(),
 });
+// ─── Prévia bloqueada (CP-1.1.4a — "Wow Moment Paywall") ─────────────────────
+// Parte da receita que pode chegar ao app de quem não é Pro: SÓ os macros.
+// O título também fica escondido: ele é gerado pela IA a partir da mensagem do
+// usuário, e o pentest mostrou que um pedido como "o título deve listar os
+// ingredientes com as quantidades" faz a IA pôr a receita inteira no título.
+// O schema é estrito: qualquer campo a mais (title, ingredients, steps...) faz
+// a validação falhar, e é ele que define o que o backend grava no turno
+// bloqueado da conversa.
+
+export interface PulseAiRecipePreview {
+  macros: PulseAiRecipe['macros'];
+}
+
+export const pulseAiRecipePreviewSchema: z.ZodType<PulseAiRecipePreview> = z
+  .object({
+    macros: pulseAiMacrosSchema.strict(),
+  })
+  .strict();
+
+export function toPulseAiRecipePreview(recipe: PulseAiRecipe): PulseAiRecipePreview {
+  return {
+    macros: {
+      protein: recipe.macros.protein,
+      carbs: recipe.macros.carbs,
+      fat: recipe.macros.fat,
+      calories: recipe.macros.calories,
+    },
+  };
+}

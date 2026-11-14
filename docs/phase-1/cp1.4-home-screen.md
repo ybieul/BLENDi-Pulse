@@ -23,7 +23,7 @@ This checkpoint implements the app home screen, the first screen a user sees aft
 
 ## Goal Ring Architecture
 
-The ring primitive is implemented in [apps/mobile/src/components/ui/GoalRing.tsx](../../apps/mobile/src/components/ui/GoalRing.tsx) with react-native-svg and Animated.
+The ring primitive is implemented in [apps/mobile/src/components/ui/GoalRing.tsx](../../apps/mobile/src/components/ui/GoalRing.tsx) with react-native-svg and Animated. Since CP-1.1.2 the SVG drawing (track and arc) lives in [apps/mobile/src/components/ui/RingArc.tsx](../../apps/mobile/src/components/ui/RingArc.tsx), shared with the onboarding "Building your plan" screen; the GoalRing's geometry, animation and celebration did not change.
 
 ### SVG Progress Math
 

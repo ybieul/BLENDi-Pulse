@@ -8,7 +8,7 @@ import type {
   BottomTabScreenProps,
 } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { BlendiOwnership, DietaryPreference, PulseAiRecipe } from '@blendi/shared';
 import type { ConversationDetail } from '../services/conversation.service';
 
 export type AuthStackParamList = {
@@ -64,6 +64,22 @@ export type OnboardingStackParamList = {
   OnboardingDiet: undefined;
   OnboardingBody: undefined;
   OnboardingMacros: undefined;
+  OnboardingBuildingPlan: OnboardingBuildingPlanParams;
+};
+
+/**
+ * O que a tela "Montando seu plano" mostra: o que acabou de ser salvo no
+ * PATCH /users/me. Vai por parâmetro da rota (e não lido do onboarding
+ * store) porque o resetOnboarding() no fim da tela limpa o store.
+ */
+export type OnboardingBuildingPlanParams = {
+  blendiModel: 'Lite' | 'ProPlus' | 'Steel';
+  blendiOwnership: BlendiOwnership;
+  goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+  dailyProteinTarget: number;
+  dailyCalorieTarget: number;
+  dailyCarbTarget: number;
+  dietaryPreferences: DietaryPreference[];
 };
 
 export type AuthNavigationProp<RouteName extends keyof AuthStackParamList> =

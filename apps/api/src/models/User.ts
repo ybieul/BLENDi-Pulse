@@ -240,6 +240,11 @@ export interface IUser {
   dailyAiUsage: number;
   /** Data em que o contador diário do Pulse AI foi zerado pela última vez. */
   aiUsageResetDate: Date;
+  /**
+   * Prévias bloqueadas do Pulse AI usadas no dia (CP-1.1.4a). Zera junto com
+   * dailyAiUsage (mesmo aiUsageResetDate, mesmo fuso). Só usuário grátis usa.
+   */
+  dailyAiPreviewUsage: number;
   /** Flag de assinatura Pro; usuários Pro terão limite ilimitado no Pulse AI. */
   isPro: boolean;
   /** ID unico da assinatura ativa no provedor de pagamentos. */
@@ -764,6 +769,15 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     aiUsageResetDate: {
       type: Date,
       default: Date.now,
+    },
+    dailyAiPreviewUsage: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
     },
     isPro: {
       type: Boolean,

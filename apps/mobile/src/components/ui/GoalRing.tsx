@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
 
 import {
   colors,
@@ -21,8 +20,7 @@ import {
 } from '../../config/cache.config';
 import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+import { getRingGeometry, RingArc } from './RingArc';
 
 const LABEL_OPACITY = 0.6;
 const SEPARATOR_OPACITY = 0.45;
@@ -90,9 +88,7 @@ export function GoalRing({
   const isComplete = progress >= 1;
   const ringColor = isComplete ? themeColors.feedback.success : color;
 
-  const center = size / 2;
-  const radius = Math.max((size - strokeWidth) / 2, 0);
-  const circumference = 2 * Math.PI * radius;
+  const { circumference } = getRingGeometry(size, strokeWidth);
   const targetDashOffset = circumference * (1 - progress);
 
   const dashOffset = useRef(new Animated.Value(circumference)).current;
@@ -214,29 +210,13 @@ export function GoalRing({
         },
       ]}
     >
-      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <G rotation={-90} originX={center} originY={center}>
-          <Circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={TRACK_STROKE}
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
-          <AnimatedCircle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={ringColor}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-          />
-        </G>
-      </Svg>
+      <RingArc
+        size={size}
+        strokeWidth={strokeWidth}
+        color={ringColor}
+        trackColor={TRACK_STROKE}
+        dashOffset={dashOffset}
+      />
 
       <View pointerEvents="none" style={styles.content}>
         <Text style={[styles.valueRow, { fontSize: valueFontSize }]}>

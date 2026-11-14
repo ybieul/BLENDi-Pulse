@@ -1,5 +1,10 @@
 import axios from 'axios';
-import { calculateLevel, type PulseAiChatInput, type PulseAiRecipe } from '@blendi/shared';
+import {
+  calculateLevel,
+  type PulseAiChatInput,
+  type PulseAiRecipe,
+  type PulseAiRecipePreview,
+} from '@blendi/shared';
 
 import { api } from '../config/api';
 import { trackEvent } from './analytics.service';
@@ -17,6 +22,9 @@ const PULSE_AI_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.1c: a receita violou a dieta (ou trouxe gelo para o Lite) mesmo
   // após o retry e foi barrada no backend.
   'pulseai/dietary-restriction-unmet': 'errors.pulseai_dietary_restriction_unmet',
+  // CP-1.1.4a: desbloqueio de prévia — expirada/inexistente e ainda não Pro.
+  'pulseai/preview-not-found': 'errors.pulseai_preview_expired',
+  'pulseai/preview-locked': 'errors.pulseai_preview_locked',
 } as const satisfies Record<string, TranslationKey>;
 
 interface ApiErrorResponse {
@@ -27,15 +35,12 @@ interface ApiErrorResponse {
 
 interface PulseAiChatResponse {
   success: true;
-  data: {
-    recipe: PulseAiRecipe;
-    fromCache: boolean;
-    usageRemaining: number | null;
-    xpAwarded: number;
-    missionsUpdated?: string[];
-    conversationId: string;
-    macrosValidated: boolean;
-  };
+  data: PulseAiRecipeResult | PulseAiLockedPreviewResult;
+}
+
+interface PulseAiUnlockPreviewResponse {
+  success: true;
+  data: PulseAiUnlockedPreview;
 }
 
 interface PulseAiUsageResponse {
@@ -46,7 +51,8 @@ interface PulseAiUsageResponse {
   };
 }
 
-export interface PulseAiChatResult {
+export interface PulseAiRecipeResult {
+  locked?: undefined;
   recipe: PulseAiRecipe;
   fromCache: boolean;
   usageRemaining: number | null;
@@ -54,6 +60,28 @@ export interface PulseAiChatResult {
   missionsUpdated?: string[];
   conversationId: string;
   macrosValidated: boolean;
+}
+
+/**
+ * CP-1.1.4a: usuário grátis passou das 3 mensagens e recebeu a prévia do dia.
+ * O backend manda só nome e macros; ingredientes e passos ficam no servidor
+ * até o desbloqueio (unlockPreview) de quem já é Pro.
+ */
+export interface PulseAiLockedPreviewResult {
+  locked: true;
+  previewId: string;
+  previewExpiresAt: string;
+  preview: PulseAiRecipePreview;
+  usageRemaining: 0;
+  conversationId: string;
+}
+
+export type PulseAiChatResult = PulseAiRecipeResult | PulseAiLockedPreviewResult;
+
+export interface PulseAiUnlockedPreview {
+  previewId: string;
+  recipe: PulseAiRecipe;
+  conversationId: string | null;
 }
 
 export interface PulseAiUsage {
@@ -116,6 +144,13 @@ export async function sendMessage(
   try {
     const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload);
     const result = response.data.data;
+
+    if (result.locked) {
+      // Prévia não dá XP nem missão; o evento de analytics dela
+      // (paywall_preview_shown) é disparado pela tela que mostra o card.
+      return result;
+    }
+
     handleXPResponse(result);
     handleMissionResponse(result);
     trackEvent('ai_message_sent', { fromCache: result.fromCache });
@@ -128,6 +163,22 @@ export async function sendMessage(
 export async function getUsage(): Promise<PulseAiUsage> {
   try {
     const response = await api.get<PulseAiUsageResponse>('/pulse-ai/usage');
+    return response.data.data;
+  } catch (error) {
+    throw toPulseAiServiceError(error);
+  }
+}
+
+/**
+ * Desbloqueia uma prévia para quem já é Pro (o backend confere isPro no banco).
+ * Erros: 'pulseai/preview-not-found' (expirada ou inexistente) e
+ * 'pulseai/preview-locked' (ainda não Pro), mapeados para chaves próprias.
+ */
+export async function unlockPreview(previewId: string): Promise<PulseAiUnlockedPreview> {
+  try {
+    const response = await api.get<PulseAiUnlockPreviewResponse>(
+      `/pulse-ai/previews/${encodeURIComponent(previewId)}`,
+    );
     return response.data.data;
   } catch (error) {
     throw toPulseAiServiceError(error);

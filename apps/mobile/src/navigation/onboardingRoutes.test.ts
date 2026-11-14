@@ -1,4 +1,5 @@
-// Guarda de fiação do onboarding (ordem final: Model, Goal, Diet, Body, Macros):
+// Guarda de fiação do onboarding (ordem final: Model, Goal, Diet, Body, Macros,
+// e depois a tela "Montando seu plano", fora do indicador de 5 passos):
 // rota registrada no navigator e nos tipos, e instrumentada pelo listener de
 // screen_viewed do App.tsx. Lê o código-fonte porque o navigator real exige
 // NavigationContainer + native-stack, e a regressão que interessa aqui é
@@ -8,23 +9,29 @@ import { join } from 'node:path';
 
 const read = (relativePath: string) => readFileSync(join(__dirname, '..', '..', relativePath), 'utf8');
 
-const EXPECTED_ORDER = ['OnboardingModel', 'OnboardingGoal', 'OnboardingDiet', 'OnboardingBody', 'OnboardingMacros'];
+const STEP_ROUTES = ['OnboardingModel', 'OnboardingGoal', 'OnboardingDiet', 'OnboardingBody', 'OnboardingMacros'];
+const EXPECTED_ORDER = [...STEP_ROUTES, 'OnboardingBuildingPlan'];
 
 describe('rotas do onboarding', () => {
-  it('OnboardingNavigator registra as 5 telas na ordem Model, Goal, Diet, Body, Macros', () => {
+  it('OnboardingNavigator registra as 5 telas na ordem Model, Goal, Diet, Body, Macros e depois BuildingPlan', () => {
     const source = read('src/navigation/OnboardingNavigator.tsx');
-    const registered = [...source.matchAll(/<Stack\.Screen name="(\w+)"/g)].map((match) => match[1]);
+    const registered = [...source.matchAll(/<Stack\.Screen\s+name="(\w+)"/g)].map((match) => match[1]);
     expect(registered).toEqual(EXPECTED_ORDER);
   });
 
-  it('OnboardingStackParamList tem as 5 rotas', () => {
+  it('OnboardingStackParamList tem as 6 rotas (BuildingPlan com parâmetros)', () => {
     const source = read('src/navigation/types.ts');
     const block = /export type OnboardingStackParamList = \{([^}]*)\}/.exec(source)?.[1] ?? '';
-    const declared = [...block.matchAll(/(\w+): undefined/g)].map((match) => match[1]);
+    const declared = [...block.matchAll(/(\w+): (?:undefined|OnboardingBuildingPlanParams)/g)].map((match) => match[1]);
     expect(declared).toEqual(EXPECTED_ORDER);
   });
 
-  it('App.tsx: as 5 rotas de onboarding estão em TRACKED_SCREEN_NAMES (screen_viewed)', () => {
+  it('BuildingPlan: sem gesto de voltar no iOS', () => {
+    const source = read('src/navigation/OnboardingNavigator.tsx');
+    expect(source).toMatch(/name="OnboardingBuildingPlan"[\s\S]*?gestureEnabled: false/);
+  });
+
+  it('App.tsx: as rotas de onboarding estão em TRACKED_SCREEN_NAMES (screen_viewed)', () => {
     const source = read('App.tsx');
     const block = /const TRACKED_SCREEN_NAMES = new Set\(\[([^\]]*)\]\)/.exec(source)?.[1] ?? '';
     const tracked = [...block.matchAll(/'(\w+)'/g)].map((match) => match[1]);
@@ -42,6 +49,11 @@ describe('rotas do onboarding', () => {
     for (const [screen, step] of steps) {
       expect(read(`src/screens/onboarding/${screen}.tsx`)).toContain(`step={${step}}`);
     }
+  });
+
+  it('BuildingPlan não entra no indicador de passos (não usa OnboardingLayout, que continua com 5)', () => {
+    expect(read('src/screens/onboarding/OnboardingBuildingPlanScreen.tsx')).not.toContain('OnboardingLayout');
+    expect(read('src/components/ui/OnboardingLayout.tsx')).toContain('const TOTAL_STEPS = 5;');
   });
 
   it('o goal navega para a dieta e a dieta para o corpo', () => {

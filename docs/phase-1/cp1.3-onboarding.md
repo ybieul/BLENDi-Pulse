@@ -131,6 +131,8 @@ The final onboarding step in [apps/mobile/src/screens/onboarding/OnboardingMacro
 
 Because RootNavigator reacts directly to `isNewUser`, navigation into the main app happens automatically with no imperative redirect from the onboarding screen.
 
+**Since CP-1.1.2:** steps 2 to 4 moved out of the macros screen. After a successful PATCH (and `updateUserProfile`), `handleFinish` calls `navigation.reset` to the new `OnboardingBuildingPlan` route ("Building your plan"), passing what was saved as route params. That screen runs for 6 seconds (progress ring, personalized steps, BLENDi facts) and then calls `completeOnboarding()` followed by `resetOnboarding()` from a single exit function, `concluirOnboarding()`, where CP-1.1.3 will insert the paywall. A failed PATCH still shows the error on the macros screen. Back is blocked on that screen (Android back button and iOS swipe), and it is not part of the 5-step indicator. If the app is closed during the animation, the profile is already saved but `onboarding_completed` is still `false`, so onboarding starts over on the next launch. See [CP-1.1.2](../fixes/cp-1.1.2-tela-montando-seu-plano.md).
+
 ## Pending Items
 
 | Item | Status |

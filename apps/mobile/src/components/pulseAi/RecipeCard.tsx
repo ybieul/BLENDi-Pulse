@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,8 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { PulseAiRecipe, PulseAiRecipePreview } from '@blendi/shared';
 
 import {
   colors,
@@ -23,6 +25,7 @@ import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
+import { useThemeStore } from '../../store/theme.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
 import { showToast } from '../../utils/toast.utils';
 import {
@@ -65,6 +68,37 @@ export interface RecipeCardProps {
   favoriteId?: string;
   onStartBlend: () => void;
   isFromCache?: boolean;
+}
+
+function useMacroPills(macros: PulseAiRecipe['macros']): MacroPillData[] {
+  const { t } = useAppTranslation();
+
+  return useMemo<MacroPillData[]>(() => [
+    {
+      tone: 'protein',
+      icon: 'barbell-outline',
+      value: macros.protein,
+      unit: t('common.units.grams'),
+    },
+    {
+      tone: 'carbs',
+      icon: 'leaf-outline',
+      value: macros.carbs,
+      unit: t('common.units.grams'),
+    },
+    {
+      tone: 'fat',
+      icon: 'water-outline',
+      value: macros.fat,
+      unit: t('common.units.grams'),
+    },
+    {
+      tone: 'calories',
+      icon: 'flame-outline',
+      value: macros.calories,
+      unit: t('common.units.kilocalories'),
+    },
+  ], [macros, t]);
 }
 
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
@@ -166,32 +200,7 @@ export function RecipeCard({
     };
   }, [pendingShareFormat]);
 
-  const macroPills = useMemo<MacroPillData[]>(() => [
-    {
-      tone: 'protein',
-      icon: 'barbell-outline',
-      value: recipe.macros.protein,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'carbs',
-      icon: 'leaf-outline',
-      value: recipe.macros.carbs,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'fat',
-      icon: 'water-outline',
-      value: recipe.macros.fat,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'calories',
-      icon: 'flame-outline',
-      value: recipe.macros.calories,
-      unit: t('common.units.kilocalories'),
-    },
-  ], [recipe.macros, t]);
+  const macroPills = useMacroPills(recipe.macros);
 
   const substitutesText = recipe.tip?.trim();
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
@@ -605,5 +614,211 @@ export function RecipeCard({
         />
       ) : null}
     </View>
+  );
+}
+
+// ─── Variante bloqueada (CP-1.1.4a — "Wow Moment Paywall") ───────────────────
+// Prévia do usuário grátis depois das 3 mensagens do dia. O app só recebe os
+// macros — nem o nome: a IA pode ser induzida a pôr a receita no título, então
+// o card mostra um título genérico. No lugar de ingredientes e modo de preparo
+// vão linhas falsas (sem texto nenhum) sob o desfoque. O card inteiro é um
+// botão que abre os planos.
+
+// Larguras das linhas falsas: placeholder genérico, nunca derivado da receita.
+const LOCKED_PLACEHOLDER_SECTIONS = [
+  ['92%', '78%', '85%', '64%'],
+  ['96%', '88%', '52%'],
+] as const;
+const LOCKED_PLACEHOLDER_LINE_HEIGHT = 10;
+const LOCKED_BLUR_INTENSITY = 18;
+
+export interface LockedRecipeCardProps {
+  preview: PulseAiRecipePreview;
+  /** Prévia expirou antes do desbloqueio: card informativo, sem ação. */
+  expired?: boolean;
+  onPress: () => void;
+}
+
+export function LockedRecipeCard({ preview, expired = false, onPress }: LockedRecipeCardProps) {
+  const colors = useColors();
+  const themeMode = useThemeStore((state) => state.mode);
+  const { t } = useAppTranslation();
+  const macroPills = useMacroPills(preview.macros);
+
+  const styles = StyleSheet.create({
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.overlay.plum[10],
+      backgroundColor: colors.overlay.plum[7],
+      padding: 16,
+      overflow: 'hidden',
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.lg,
+    },
+    badgePill: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+      backgroundColor: BADGE_BACKGROUND,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    badgeLabel: {
+      color: colors.brand.pulse,
+      fontFamily: fonts.body,
+      fontSize: 10,
+      fontWeight: fontWeights.medium,
+    },
+    title: {
+      marginBottom: spacing.lg,
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: 20,
+      fontWeight: fontWeights.bold,
+      letterSpacing: -0.5,
+      lineHeight: 26,
+    },
+    macroRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    separator: {
+      height: 0.5,
+      marginVertical: spacing.lg,
+      backgroundColor: colors.overlay.plum[8],
+    },
+    lockedArea: {
+      position: 'relative',
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    placeholderSection: {
+      gap: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    placeholderSectionGap: {
+      marginTop: spacing.lg,
+    },
+    placeholderLine: {
+      height: LOCKED_PLACEHOLDER_LINE_HEIGHT,
+      borderRadius: LOCKED_PLACEHOLDER_LINE_HEIGHT / 2,
+      backgroundColor: colors.overlay.plum[12],
+    },
+    // Android: véu semitransparente no lugar do BlurView (ver comentário no JSX).
+    androidVeil: {
+      backgroundColor: colors.overlay.white[80],
+    },
+    lockOverlay: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+    },
+    lockIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: BADGE_BACKGROUND,
+      borderWidth: 1,
+      borderColor: BADGE_BORDER,
+    },
+    ctaText: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+      textAlign: 'center',
+    },
+  });
+
+  const accessibilityLabel = expired
+    ? t('pulseAi.lockedPreview.expiredA11yLabel')
+    : t('pulseAi.lockedPreview.a11yLabel');
+
+  return (
+    <Pressable
+      testID="locked-recipe-card"
+      accessible
+      accessibilityRole={expired ? 'text' : 'button'}
+      accessibilityLabel={accessibilityLabel}
+      disabled={expired}
+      onPress={onPress}
+      style={styles.card}
+    >
+      <View style={styles.headerRow}>
+        <View style={styles.badgePill}>
+          <Text style={styles.badgeLabel}>{t('navigation.pulseAI')}</Text>
+        </View>
+        <Ionicons name="lock-closed" size={16} color={colors.brand.pulse} />
+      </View>
+
+      <Text style={styles.title}>{t('pulseAi.lockedPreview.genericTitle')}</Text>
+
+      <View style={styles.macroRow}>
+        {macroPills.map((macro) => (
+          <MacroPill key={macro.tone} {...macro} />
+        ))}
+      </View>
+
+      <View style={styles.separator} />
+
+      <View style={styles.lockedArea}>
+        {/* Linhas falsas: só Views, sem texto, escondidas do leitor de tela. */}
+        <View
+          testID="locked-recipe-placeholder"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {LOCKED_PLACEHOLDER_SECTIONS.map((lines, sectionIndex) => (
+            <View
+              key={sectionIndex}
+              style={[
+                styles.placeholderSection,
+                sectionIndex > 0 ? styles.placeholderSectionGap : null,
+              ]}
+            >
+              {lines.map((width, lineIndex) => (
+                <View key={lineIndex} style={[styles.placeholderLine, { width }]} />
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* iOS: desfoque real. Android: o BlurView do expo-blur sem o método
+            experimental só aplica uma tinta (não desfoca), e o método
+            experimental pesa dentro de FlatList — então um véu com token do
+            tema cumpre o mesmo papel. */}
+        {Platform.OS === 'ios' ? (
+          <BlurView
+            intensity={LOCKED_BLUR_INTENSITY}
+            tint={themeMode === 'dark' ? 'dark' : 'light'}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.androidVeil]} />
+        )}
+
+        <View style={[StyleSheet.absoluteFill, styles.lockOverlay]}>
+          <View style={styles.lockIconCircle}>
+            <Ionicons
+              name={expired ? 'time-outline' : 'lock-closed'}
+              size={18}
+              color={colors.brand.pulse}
+            />
+          </View>
+          <Text style={styles.ctaText}>
+            {expired ? t('pulseAi.lockedPreview.expired') : t('pulseAi.lockedPreview.unlockCta')}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }

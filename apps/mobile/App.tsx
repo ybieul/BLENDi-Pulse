@@ -93,6 +93,7 @@ const TRACKED_SCREEN_NAMES = new Set([
   'OnboardingDiet',
   'OnboardingBody',
   'OnboardingMacros',
+  'OnboardingBuildingPlan',
   'Upgrade',
   'Blend',
   'PantryScanner',

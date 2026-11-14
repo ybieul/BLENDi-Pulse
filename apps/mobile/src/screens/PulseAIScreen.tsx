@@ -20,9 +20,15 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { type NavigationProp } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { FavoriteItem, PantryAnalysisResult, PulseAiRecipe } from '@blendi/shared';
+import type {
+  FavoriteItem,
+  PantryAnalysisResult,
+  PulseAiRecipe,
+  PulseAiRecipePreview,
+} from '@blendi/shared';
 
 import {
   borderRadius,
@@ -48,8 +54,14 @@ import * as pulseAiService from '../services/pulseAi.service';
 import * as conversationService from '../services/conversation.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { PulseAiServiceError } from '../services/pulseAi.service';
+import { trackEvent } from '../services/analytics.service';
+import { showToast } from '../utils/toast.events';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
-import type { AppTabParamList, PulseAIStackScreenProps } from '../navigation/types';
+import type {
+  AppTabParamList,
+  PulseAIStackScreenProps,
+  RootStackParamList,
+} from '../navigation/types';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -71,18 +83,30 @@ const SCANNER_BADGE_BACKGROUND = colors.overlay.warning[90];
 const TAKING_LONGER_THRESHOLD_SECONDS = 8;
 const TAKING_LONGER_FADE_DURATION_MS = 300;
 
+// CP-1.1.4a: código do backend para prévia expirada/inexistente no desbloqueio.
+const PREVIEW_NOT_FOUND_CODE = 'pulseai/preview-not-found';
+const PAYWALL_PREVIEW_SOURCE = 'pulse_ai';
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery';
 
+interface LockedPreviewState {
+  previewId: string;
+  /** 'expired': o desbloqueio respondeu 404 ou a validade já passou. */
+  status: 'locked' | 'expired';
+}
+
 interface ChatMessageItem {
   id: string;
   role: 'user' | 'assistant';
-  content: string | PulseAiRecipe;
+  /** Com lockedPreview, content é só nome + macros (PulseAiRecipePreview). */
+  content: string | PulseAiRecipe | PulseAiRecipePreview;
   timestamp: Date;
   isError?: boolean;
   isFromCache?: boolean;
+  lockedPreview?: LockedPreviewState;
 }
 
 type PantryScanStatus = Pick<PantryAnalysisResult, 'scansUsed' | 'scansLimit' | 'resetDate'>;
@@ -128,11 +152,24 @@ function conversationMessagesToChatItems(
   conversationId: string,
   messages: conversationService.ConversationMessage[],
 ): ChatMessageItem[] {
+  const now = Date.now();
+
   return messages.map((message, index) => ({
     id: `${conversationId}-${index}`,
     role: message.role,
     content: message.content,
     timestamp: new Date(message.timestamp),
+    ...(message.locked && message.previewId
+      ? {
+          lockedPreview: {
+            previewId: message.previewId,
+            status:
+              message.previewExpiresAt && new Date(message.previewExpiresAt).getTime() <= now
+                ? 'expired'
+                : 'locked',
+          } satisfies LockedPreviewState,
+        }
+      : {}),
   }));
 }
 
@@ -446,6 +483,25 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       try {
         const result = await pulseAiService.sendMessage(trimmed);
 
+        if (result.locked) {
+          // Prévia bloqueada: só nome e macros; o chat fica como no limite
+          // (usageRemaining 0 → campo desabilitado e botão "Upgrade").
+          const lockedMessage: ChatMessageItem = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: result.preview,
+            timestamp: new Date(),
+            lockedPreview: { previewId: result.previewId, status: 'locked' },
+          };
+
+          setMessages((prev) => [...prev, lockedMessage].slice(-MAX_MESSAGES));
+          setUsageRemaining(0);
+          setActiveConversationId(result.conversationId);
+          trackEvent('paywall_preview_shown', { source: PAYWALL_PREVIEW_SOURCE });
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
+          return;
+        }
+
         const assistantMessage: ChatMessageItem = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -511,6 +567,73 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     },
     [queryClient, t],
   );
+
+  // ── Prévia bloqueada: toque abre os planos; virou Pro → desbloqueia ──────
+  const handleLockedPreviewPress = useCallback(() => {
+    trackEvent('paywall_preview_tapped', { source: PAYWALL_PREVIEW_SOURCE });
+    navigation
+      .getParent()
+      ?.getParent<NavigationProp<RootStackParamList>>()
+      ?.navigate('Upgrade');
+  }, [navigation]);
+
+  const unlockingPreviewIdsRef = useRef(new Set<string>());
+
+  const unlockPreview = useCallback(
+    async (previewId: string) => {
+      unlockingPreviewIdsRef.current.add(previewId);
+
+      try {
+        const unlocked = await pulseAiService.unlockPreview(previewId);
+
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.lockedPreview?.previewId === previewId
+              ? { ...item, content: unlocked.recipe, lockedPreview: undefined }
+              : item,
+          ),
+        );
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
+      } catch (err) {
+        if (err instanceof PulseAiServiceError && err.apiCode === PREVIEW_NOT_FOUND_CODE) {
+          setMessages((prev) =>
+            prev.map((item) =>
+              item.lockedPreview?.previewId === previewId
+                ? { ...item, lockedPreview: { previewId, status: 'expired' } }
+                : item,
+            ),
+          );
+          showToast(t(err.translationKey));
+        }
+        // 403 (backend ainda não vê o Pro) ou falha de rede: o card continua
+        // bloqueado e a próxima mudança tenta de novo.
+      } finally {
+        unlockingPreviewIdsRef.current.delete(previewId);
+      }
+    },
+    [queryClient, t],
+  );
+
+  // Dispara quando o perfil vira Pro (a compra atualiza o auth store antes do
+  // goBack da tela de planos, então ao voltar o card já foi trocado) e quando
+  // uma conversa com turno bloqueado é aberta por quem já é Pro.
+  useEffect(() => {
+    if (!isPro) {
+      return;
+    }
+
+    messages.forEach((item) => {
+      const previewId = item.lockedPreview?.previewId;
+
+      if (
+        previewId &&
+        item.lockedPreview?.status === 'locked' &&
+        !unlockingPreviewIdsRef.current.has(previewId)
+      ) {
+        void unlockPreview(previewId);
+      }
+    });
+  }, [isPro, messages, unlockPreview]);
 
   // ── Auto-envio do protocolo vindo da Home (transitório via store) ─────────
   useEffect(() => {
@@ -710,6 +833,19 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       );
     }
 
+    if (item.lockedPreview) {
+      return (
+        <ChatMessage
+          role="assistant"
+          content={item.content as PulseAiRecipePreview}
+          locked
+          expired={item.lockedPreview.status === 'expired'}
+          onLockedPress={handleLockedPreviewPress}
+          timestamp={item.timestamp}
+        />
+      );
+    }
+
     const recipe = item.content as PulseAiRecipe;
     const favoriteKey = getRecipeFavoriteKey(recipe);
 
@@ -724,7 +860,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         onStartBlend={() => handleStartBlend(recipe)}
       />
     );
-  }, [favoriteIdsByRecipeKey, handleStartBlend]);
+  }, [favoriteIdsByRecipeKey, handleLockedPreviewPress, handleStartBlend]);
 
   const ListFooterComponent = isLoading ? (
     <View>
