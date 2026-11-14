@@ -2,17 +2,22 @@ import type { NextFunction, Request, Response } from 'express';
 import {
   pantryAnalysisResultSchema,
   pantryIngredientSchema,
+  pantryLockedPreviewResultSchema,
   pantryScanSchema,
   pulseAiRecipeSchema,
+  toPulseAiRecipePreview,
   type PantryAnalysisResult,
   type PantryIngredient,
+  type PantryLockedPreviewResult,
   type PantryScanInput,
   type PulseAiRecipe,
 } from '@blendi/shared';
 import { addMonths } from 'date-fns';
+import mongoose from 'mongoose';
 import { ZodError, z } from 'zod';
 
 import { BlendLogModel } from '../models/BlendLog';
+import { LOCKED_PREVIEW_TTL_MS_BY_KIND, LockedPreviewModel } from '../models/LockedPreview';
 import {
   UserModel,
   type BlendiModel,
@@ -50,6 +55,11 @@ import {
 } from '../utils/recipeRestrictions.utils';
 
 const FREE_MONTHLY_SCAN_LIMIT = 3;
+// CP-1.1.4b: prévias bloqueadas por ciclo mensal, depois dos scans grátis.
+const FREE_MONTHLY_SCAN_PREVIEW_LIMIT = 1;
+const LOCKED_PREVIEW_KIND = 'pantry_scanner';
+const PREVIEW_NOT_FOUND_CODE = 'scanner/preview-not-found';
+const PREVIEW_LOCKED_CODE = 'scanner/preview-locked';
 const DIETARY_RESTRICTION_UNMET_CODE = 'scanner/dietary-restriction-unmet';
 const PANTRY_RECIPE_COUNT = 2;
 // gemini-2.5-flash consome parte do orçamento de saída com "thinking" interno
@@ -511,6 +521,8 @@ async function resetScanCycleIfNeeded(
     {
       $set: {
         scanCount: 0,
+        // CP-1.1.4b: a prévia do ciclo volta junto com os scans.
+        monthlyScanPreviewUsage: 0,
         scanResetDate: nextScanResetDate,
       },
     }
@@ -613,6 +625,107 @@ async function rollbackPantryScanCount(user: PantryScannerUserProfile): Promise<
   ).exec();
 }
 
+// CP-1.1.4b: reserva a prévia do ciclo ANTES de chamar a IA de visão. Mesmo
+// padrão atômico de reservePulseAiPreview (pulseAi.controller.ts): o filtro do
+// findOneAndUpdate garante grátis, scans do ciclo esgotados e prévia ainda
+// livre — duas requisições simultâneas não passam juntas. Conta antiga sem o
+// campo conta como 0 ($inc cria o campo com 1). Não toca em scanCount.
+async function reservePantryScanPreview(user: PantryScannerUserProfile): Promise<boolean> {
+  if (user.isPro) {
+    return false;
+  }
+
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: user.id,
+      isPro: false,
+      scanCount: { $gte: FREE_MONTHLY_SCAN_LIMIT },
+      $or: [
+        { monthlyScanPreviewUsage: { $lt: FREE_MONTHLY_SCAN_PREVIEW_LIMIT } },
+        { monthlyScanPreviewUsage: { $exists: false } },
+      ],
+    },
+    {
+      $inc: {
+        monthlyScanPreviewUsage: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  )
+    .select({ monthlyScanPreviewUsage: 1 })
+    .lean()
+    .exec();
+
+  return Boolean(updatedUser);
+}
+
+// Devolve a prévia quando nenhuma receita é entregue. Mesmo padrão de
+// rollbackPulseAiPreviewReservation.
+async function rollbackPantryScanPreview(userId: string): Promise<void> {
+  await UserModel.updateOne(
+    {
+      _id: userId,
+      isPro: false,
+      monthlyScanPreviewUsage: { $gt: 0 },
+    },
+    {
+      $inc: {
+        monthlyScanPreviewUsage: -1,
+      },
+    }
+  ).exec();
+}
+
+// Guarda as receitas inteiras em locked_previews e devolve só a parte visível:
+// ingredientes detectados, dados do ciclo e os macros de cada receita. Sem XP,
+// sem missão, sem cache, sem scanCount.
+async function deliverPantryLockedPreview(params: {
+  userId: string;
+  ingredients: PantryIngredient[];
+  recipes: PulseAiRecipe[];
+  scansUsed: number;
+  resetDate: Date;
+}): Promise<PantryLockedPreviewResult> {
+  const expiresAt = new Date(Date.now() + LOCKED_PREVIEW_TTL_MS_BY_KIND[LOCKED_PREVIEW_KIND]);
+  const preview = await LockedPreviewModel.create({
+    kind: LOCKED_PREVIEW_KIND,
+    userId: params.userId,
+    content: { recipes: params.recipes },
+    context: { ingredients: params.ingredients },
+    expiresAt,
+  });
+
+  try {
+    // O schema estrito é quem define a parte visível: um campo a mais falha
+    // aqui, e a prévia órfã é apagada (o caller devolve a reserva).
+    return pantryLockedPreviewResultSchema.parse({
+      locked: true,
+      previewId: String(preview._id),
+      previewExpiresAt: expiresAt.toISOString(),
+      ingredients: params.ingredients.map(ingredient => ({
+        name: ingredient.name,
+        ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
+        confidence: ingredient.confidence,
+      })),
+      recipes: params.recipes.map(toPulseAiRecipePreview),
+      scansUsed: params.scansUsed,
+      scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+      resetDate: params.resetDate.toISOString(),
+    });
+  } catch (error) {
+    await LockedPreviewModel.deleteOne({ _id: preview._id })
+      .exec()
+      .catch(cleanupError => {
+        console.error('[pantryScanner] failed to delete orphan locked preview', {
+          errorName: cleanupError instanceof Error ? cleanupError.name : 'UnknownError',
+        });
+      });
+    throw error;
+  }
+}
+
 async function getRecentBlendRecipeNames(userId: string): Promise<string[]> {
   const recentBlendLogs = await BlendLogModel.find({ userId })
     .sort({ createdAt: -1 })
@@ -705,6 +818,22 @@ export async function analyzePantry(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  // CP-1.1.4b: id do dono da prévia reservada e ainda não entregue. Enquanto
+  // estiver preenchido, qualquer saída sem receita entregue devolve a prévia
+  // (releasePreview) — nos caminhos conhecidos antes de responder, e no catch
+  // para erros inesperados.
+  let heldPreviewUserId: string | null = null;
+
+  const releasePreview = async (): Promise<void> => {
+    if (!heldPreviewUserId) {
+      return;
+    }
+
+    const userIdToRelease = heldPreviewUserId;
+    heldPreviewUserId = null;
+    await rollbackPantryScanPreview(userIdToRelease);
+  };
+
   try {
     const parsed = pantryScanSchema.safeParse(req.body);
 
@@ -744,9 +873,18 @@ export async function analyzePantry(
 
     const currentUser = await resetScanCycleIfNeeded(initialUser);
 
-    if (!currentUser.isPro && currentUser.scanCount >= FREE_MONTHLY_SCAN_LIMIT) {
-      sendMonthlyLimitReached(res, currentUser.scanResetDate);
-      return;
+    // CP-1.1.4b: grátis com os scans do ciclo esgotados ainda tem 1 prévia
+    // bloqueada por ciclo. Reservada aqui, antes da visão: sem prévia livre,
+    // o 429 de hoje sai sem chamar a IA.
+    const isPreviewScan = !currentUser.isPro && currentUser.scanCount >= FREE_MONTHLY_SCAN_LIMIT;
+
+    if (isPreviewScan) {
+      if (!(await reservePantryScanPreview(currentUser))) {
+        sendMonthlyLimitReached(res, currentUser.scanResetDate);
+        return;
+      }
+
+      heldPreviewUserId = currentUser.id;
     }
 
     let visionResponseContent: string;
@@ -761,6 +899,7 @@ export async function analyzePantry(
       visionResponseContent = visionResponse.content;
     } catch (error) {
       if (error instanceof AiProviderRequestError) {
+        await releasePreview();
         sendErrorResponse(res, {
           statusCode: 503,
           code: 'scanner/vision-unavailable',
@@ -775,6 +914,7 @@ export async function analyzePantry(
     const visionAnalysis = parsePantryVisionAnalysis(visionResponseContent);
 
     if (!visionAnalysis) {
+      await releasePreview();
       sendErrorResponse(res, {
         statusCode: 500,
         code: 'scanner/vision-parse-error',
@@ -784,6 +924,7 @@ export async function analyzePantry(
     }
 
     if (visionAnalysis.noFoodDetected) {
+      await releasePreview();
       res.status(200).json({
         success: true,
         data: buildPantryAnalysisResult({
@@ -803,6 +944,7 @@ export async function analyzePantry(
     ));
 
     if (usableIngredients.length === 0) {
+      await releasePreview();
       res.status(200).json({
         success: true,
         data: buildPantryAnalysisResult({
@@ -814,6 +956,20 @@ export async function analyzePantry(
           scansUsed: currentUser.scanCount,
           resetDate: currentUser.scanResetDate,
         }),
+      });
+      return;
+    }
+
+    if (isPreviewScan) {
+      await runPantryPreviewScan({
+        res,
+        user: currentUser,
+        usableIngredients,
+        analysisNotes: visionAnalysis.analysisNotes,
+        releasePreview,
+        markDelivered: () => {
+          heldPreviewUserId = null;
+        },
       });
       return;
     }
@@ -837,11 +993,7 @@ export async function analyzePantry(
     // (Geração vazia ou falha da IA — generatedCount 0 — é tratada logo abaixo.)
     if (generatedCount > 0 && recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
-      sendErrorResponse(res, {
-        statusCode: 422,
-        code: DIETARY_RESTRICTION_UNMET_CODE,
-        message: 'Pantry Scanner could not generate a recipe that meets the user restrictions.',
-      });
+      sendDietaryRestrictionUnmet(res);
       return;
     }
 
@@ -852,21 +1004,11 @@ export async function analyzePantry(
     if (recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
 
-      res.status(200).json({
-        success: true,
-        data: {
-          ...buildPantryAnalysisResult({
-            ingredients: usableIngredients,
-            recipes: [],
-            analysisNotes: visionAnalysis.analysisNotes,
-            noFoodDetected: false,
-            scansUsed: Math.max(0, scanIncrement.scanCount - 1),
-            resetDate: scanIncrement.scanResetDate,
-          }),
-          xpAwarded: 0,
-          leveledUp: false,
-          newLevel: null,
-        },
+      sendNoRecipesGenerated(res, {
+        ingredients: usableIngredients,
+        analysisNotes: visionAnalysis.analysisNotes,
+        scansUsed: Math.max(0, scanIncrement.scanCount - 1),
+        resetDate: scanIncrement.scanResetDate,
       });
       return;
     }
@@ -888,6 +1030,194 @@ export async function analyzePantry(
         xpAwarded: xpResult.awarded ? xpResult.amount : 0,
         leveledUp: xpResult.leveledUp,
         newLevel: xpResult.newLevel,
+      },
+    });
+  } catch (error) {
+    // Erro inesperado com a prévia ainda reservada (ex.: falha ao gravar a
+    // prévia): devolve antes de seguir para o handler de erro.
+    await releasePreview().catch(rollbackError => {
+      console.error('[pantryScanner] failed to roll back the scan preview', {
+        errorName: rollbackError instanceof Error ? rollbackError.name : 'UnknownError',
+      });
+    });
+    next(error);
+  }
+}
+
+function sendDietaryRestrictionUnmet(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 422,
+    code: DIETARY_RESTRICTION_UNMET_CODE,
+    message: 'Pantry Scanner could not generate a recipe that meets the user restrictions.',
+  });
+}
+
+function sendNoRecipesGenerated(
+  res: Response,
+  params: {
+    ingredients: PantryIngredient[];
+    analysisNotes?: string;
+    scansUsed: number;
+    resetDate: Date;
+  }
+): void {
+  res.status(200).json({
+    success: true,
+    data: {
+      ...buildPantryAnalysisResult({
+        ingredients: params.ingredients,
+        recipes: [],
+        analysisNotes: params.analysisNotes,
+        noFoodDetected: false,
+        scansUsed: params.scansUsed,
+        resetDate: params.resetDate,
+      }),
+      xpAwarded: 0,
+      leveledUp: false,
+      newLevel: null,
+    },
+  });
+}
+
+// CP-1.1.4b: scan de prévia (grátis, scans do ciclo esgotados, prévia
+// reservada). Gera as receitas com as mesmas validações de hoje, mas não
+// incrementa scanCount, não dá XP, não conta para missão e não grava cache.
+// Sem receita entregue, devolve a prévia e responde como o fluxo de hoje.
+async function runPantryPreviewScan(params: {
+  res: Response;
+  user: PantryScannerUserProfile;
+  usableIngredients: PantryIngredient[];
+  analysisNotes?: string;
+  releasePreview: () => Promise<void>;
+  markDelivered: () => void;
+}): Promise<void> {
+  const { res, user, usableIngredients } = params;
+  const { recipes, generatedCount } = await generatePantryRecipes(user, usableIngredients);
+
+  if (generatedCount > 0 && recipes.length === 0) {
+    await params.releasePreview();
+    sendDietaryRestrictionUnmet(res);
+    return;
+  }
+
+  if (recipes.length === 0) {
+    await params.releasePreview();
+    sendNoRecipesGenerated(res, {
+      ingredients: usableIngredients,
+      analysisNotes: params.analysisNotes,
+      scansUsed: user.scanCount,
+      resetDate: user.scanResetDate,
+    });
+    return;
+  }
+
+  const preview = await deliverPantryLockedPreview({
+    userId: user.id,
+    ingredients: usableIngredients,
+    recipes,
+    scansUsed: user.scanCount,
+    resetDate: user.scanResetDate,
+  });
+
+  params.markDelivered();
+
+  res.status(200).json({
+    success: true,
+    data: preview,
+  });
+}
+
+// ─── Desbloqueio de prévia (CP-1.1.4b) ───────────────────────────────────────
+
+const pantryLockedPreviewContentSchema = z.object({
+  recipes: z.array(pulseAiRecipeSchema).min(1),
+});
+
+const pantryLockedPreviewContextSchema = z.object({
+  ingredients: z.array(pantryIngredientSchema),
+});
+
+function sendPreviewNotFound(res: Response): void {
+  // Mesma resposta para id inválido, inexistente, expirado, de outro usuário
+  // ou de outro recurso (kind): não revela que um id existe.
+  sendErrorResponse(res, {
+    statusCode: 404,
+    code: PREVIEW_NOT_FOUND_CODE,
+    message: 'Preview not found or expired.',
+  });
+}
+
+export async function unlockPantryPreview(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const previewId = req.params.id;
+
+    if (typeof previewId !== 'string' || !mongoose.isValidObjectId(previewId)) {
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    const previewObjectId = new mongoose.Types.ObjectId(previewId);
+
+    // Dono, kind e validade no próprio filtro: prévia de outro usuário, do
+    // Pulse AI ou expirada (o TTL do Mongo pode levar ~1 min) cai no mesmo 404.
+    const preview = await LockedPreviewModel.findOne({
+      _id: previewObjectId,
+      userId,
+      kind: LOCKED_PREVIEW_KIND,
+      expiresAt: { $gt: new Date() },
+    })
+      .lean()
+      .exec();
+
+    if (!preview) {
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    // isPro lido do banco agora — nada vindo do app decide o desbloqueio.
+    const user = await UserModel.findById(userId).select({ isPro: 1 }).lean().exec();
+
+    if (!user) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    if (user.isPro !== true) {
+      sendErrorResponse(res, {
+        statusCode: 403,
+        code: PREVIEW_LOCKED_CODE,
+        message: 'Pulse Pro is required to unlock this preview.',
+      });
+      return;
+    }
+
+    const parsedContent = pantryLockedPreviewContentSchema.safeParse(preview.content);
+    const parsedContext = pantryLockedPreviewContextSchema.safeParse(preview.context);
+
+    if (!parsedContent.success || !parsedContext.success) {
+      console.error('[pantryScanner] locked preview with invalid content', { previewId });
+      sendPreviewNotFound(res);
+      return;
+    }
+
+    // Sem XP e sem missão: o desbloqueio só entrega o que já foi gerado.
+    res.status(200).json({
+      success: true,
+      data: {
+        previewId,
+        ingredients: parsedContext.data.ingredients,
+        recipes: parsedContent.data.recipes,
       },
     });
   } catch (error) {

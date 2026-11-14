@@ -211,7 +211,7 @@ const previewCreateMock = mock.fn(async (doc: Omit<FakePreview, '_id'>) => {
 
 mock.module('../models/LockedPreview', {
   namedExports: {
-    LOCKED_PREVIEW_TTL_MS: 24 * 60 * 60 * 1000,
+    LOCKED_PREVIEW_TTL_MS_BY_KIND: { pulse_ai: 24 * 60 * 60 * 1000, pantry_scanner: 7 * 24 * 60 * 60 * 1000 },
     LockedPreviewModel: {
       create: previewCreateMock,
       deleteOne: ({ _id }: { _id: mongoose.Types.ObjectId }) => lazyChain(() => {

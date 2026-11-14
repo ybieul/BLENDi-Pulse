@@ -1368,7 +1368,18 @@
     "noUsableIngredients": "Couldn't identify usable ingredients. Try better lighting or a closer shot.",
     "scanAgain": "Scan Again",
     "noRecipesTitle": "No recipes this time",
-    "noRecipesMessage": "We couldn't put together recipes with these ingredients this time. Your scan wasn't counted."
+    "noRecipesMessage": "We couldn't put together recipes with these ingredients this time. Your scan wasn't counted.",
+    "lockedPreview": {
+      "badge": "Pantry Scanner",
+      "genericTitle": "Your pantry recipe",
+      "unlockCta": "Unlock with Pulse Pro",
+      "a11yLabel": "Locked recipe. Tap to unlock with Pulse Pro",
+      "expired": "This preview has expired. Scan again to get new recipes.",
+      "expiredA11yLabel": "Expired recipe preview. Scan again to get new recipes",
+      "lastScanTitle": "Recipes from your last scan",
+      "lastScanA11yLabel": "Open the recipes from your last scan",
+      "lastScanDismiss": "Dismiss recipes from your last scan"
+    }
   },
 
   "auth": {
@@ -1474,6 +1485,8 @@
     "scanner_vision_unavailable": "Pantry Scanner is temporarily unavailable. Please try again shortly.",
     "scanner_image_processing_failed": "We couldn't prepare this image for analysis. Try another photo.",
     "scanner_dietary_restriction_unmet": "We couldn't put together a recipe that fits your diet and your BLENDi with these ingredients. This scan didn't count toward your limit — try another photo.",
+    "scanner_preview_expired": "These recipes have expired. Scan again to get new ones.",
+    "scanner_preview_locked": "Unlock these recipes with Pulse Pro.",
     "favorites_invalid_data": "This recipe couldn't be saved. Please review the data and try again.",
     "favorites_not_found": "This favorite no longer exists.",
     "favorites_forbidden": "You don't have permission to change this favorite.",

@@ -236,6 +236,12 @@ export interface IUser {
    * A lógica de reset por timezone será implementada no CP1.5.
    */
   scanResetDate: Date;
+  /**
+   * Prévias bloqueadas do Pantry Scanner usadas no ciclo mensal (CP-1.1.4b).
+   * Zera junto com scanCount (resetScanCycleIfNeeded, mesmo update e mesma
+   * condição). Só usuário grátis usa; não conta como scan.
+   */
+  monthlyScanPreviewUsage: number;
   /** Quantas consultas ao Pulse AI o usuário consumiu no dia atual do seu timezone. */
   dailyAiUsage: number;
   /** Data em que o contador diário do Pulse AI foi zerado pela última vez. */
@@ -756,6 +762,15 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     scanResetDate: {
       type: Date,
       default: Date.now,
+    },
+    monthlyScanPreviewUsage: {
+      type: Number,
+      default: 0,
+      min: [0, 'errors.validation.number_range'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'errors.validation.integer',
+      },
     },
     dailyAiUsage: {
       type: Number,

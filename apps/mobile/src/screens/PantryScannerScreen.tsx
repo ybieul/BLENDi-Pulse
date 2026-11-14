@@ -1,6 +1,8 @@
 // apps/mobile/src/screens/PantryScannerScreen.tsx
 // Tela Pantry Scanner — CP1.12.
 // Fluxo de 5 passos: permission → capture → analyzing → ingredients → recipes.
+// CP-1.1.4b: depois dos scans grátis do ciclo, 1 prévia bloqueada por ciclo —
+// o mesmo fluxo, com cards bloqueados (só macros) na etapa das receitas.
 
 import { type ElementRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -33,6 +35,7 @@ import {
   type PantryAnalysisResult,
   type PantryIngredient,
   type PulseAiRecipe,
+  type PulseAiRecipePreview,
 } from '@blendi/shared';
 
 import { useAuthStore } from '../store/auth.store';
@@ -42,13 +45,25 @@ import { useColors } from '../hooks/useColors';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { IngredientCheckItem } from '../components/pantryScanner/IngredientCheckItem';
-import { RecipeCard } from '../components/pulseAi/RecipeCard';
+import { LockedRecipeCard, RecipeCard } from '../components/pulseAi/RecipeCard';
 import { images } from '../assets';
 import {
   analyzePantry,
   compressAndEncodeImage,
+  isPantryLockedPreview,
+  PANTRY_PREVIEW_NOT_FOUND_CODE,
   PantryScannerServiceError,
+  unlockPantryPreview,
 } from '../services/pantryScanner.service';
+import { trackEvent } from '../services/analytics.service';
+import {
+  clearLastPantryPreview,
+  clearLastPantryPreviewIfSeen,
+  markLastPantryPreviewSeen,
+  readLastPantryPreview,
+  saveLastPantryPreview,
+  type PantryLastPreview,
+} from '../utils/pantryLastPreview.utils';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { showToast } from '../utils/toast.events';
@@ -65,6 +80,8 @@ const CAMERA_PERMISSION_ICON_SIZE = 64;
 const CAPTURE_BUTTON_SIZE = 72;
 const LOGO_SIZE = 64;
 const NO_RECIPES_ICON_SIZE = 40;
+// CP-1.1.4b: origem da prévia bloqueada nos eventos e no card.
+const PAYWALL_PREVIEW_SOURCE = 'pantry_scanner';
 
 const ANALYZING_STEP_KEYS = [
   'pantryScanner.analyzingStep1',
@@ -95,6 +112,12 @@ interface CheckedIngredient extends PantryIngredient {
   checked: boolean;
 }
 
+interface LockedPreviewState {
+  previewId: string;
+  /** 'expired': o desbloqueio respondeu 404. */
+  status: 'locked' | 'expired';
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDaysUntilReset(resetDateStr?: string): number {
@@ -116,6 +139,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const queryClient = useQueryClient();
   const { favorites } = useFavorites();
   const isPro = useAuthStore((state) => state.user?.isPro ?? false);
+  const userId = useAuthStore((state) => state.user?.id);
   const isFreeTier = !isPro;
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -132,10 +156,18 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newIngredientText, setNewIngredientText] = useState('');
   const [analyzingStepIndex, setAnalyzingStepIndex] = useState(0);
+  // CP-1.1.4b: prévia bloqueada (só macros) e a última prévia guardada.
+  const [lockedPreview, setLockedPreview] = useState<LockedPreviewState | null>(null);
+  const [previewRecipes, setPreviewRecipes] = useState<PulseAiRecipePreview[]>([]);
+  const [unlockedPreviewId, setUnlockedPreviewId] = useState<string | null>(null);
+  const [lastPreview, setLastPreview] = useState<PantryLastPreview | null>(null);
+  const [isOpeningLastPreview, setIsOpeningLastPreview] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const cameraRef = useRef<ElementRef<typeof CameraView>>(null);
   const analyzingTextOpacity = useRef(new Animated.Value(1)).current;
+  const unlockingPreviewIdRef = useRef<string | null>(null);
+  const shownPreviewIdsRef = useRef(new Set<string>());
 
   // ── Check permission on mount ──────────────────────────────────────────────
   useEffect(() => {
@@ -221,6 +253,28 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         setScansUsed(nextScansUsed);
         setScansLimit(nextScansLimit);
 
+        if (isPantryLockedPreview(result)) {
+          // Prévia: ingredientes detectados e só os macros de cada receita.
+          // O id fica no aparelho para quem virar Pro dentro da validade.
+          if (userId) {
+            saveLastPantryPreview(userId, {
+              previewId: result.previewId,
+              expiresAt: result.previewExpiresAt,
+            });
+          }
+          setIngredients(result.ingredients.map((i) => ({ ...i, checked: true })));
+          setRecipes([]);
+          setPreviewRecipes(result.recipes);
+          setLockedPreview({ previewId: result.previewId, status: 'locked' });
+          setUnlockedPreviewId(null);
+          setStep('ingredients');
+          return;
+        }
+
+        setPreviewRecipes([]);
+        setLockedPreview(null);
+        setUnlockedPreviewId(null);
+
         if (result.noFoodDetected) {
           setIngredients([]);
           setRecipes([]);
@@ -268,7 +322,120 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     return () => {
       cancelled = true;
     };
-  }, [handleUpgradePress, queryClient, step, capturedBase64, t]);
+  }, [handleUpgradePress, queryClient, step, capturedBase64, t, userId]);
+
+  // ── Prévia bloqueada (CP-1.1.4b) ───────────────────────────────────────────
+  const handleLockedPreviewPress = useCallback(() => {
+    trackEvent('paywall_preview_tapped', { source: PAYWALL_PREVIEW_SOURCE });
+    handleUpgradePress();
+  }, [handleUpgradePress]);
+
+  // paywall_preview_shown quando os cards bloqueados aparecem (uma vez por prévia).
+  useEffect(() => {
+    if (step !== 'recipes' || lockedPreview?.status !== 'locked') {
+      return;
+    }
+
+    if (shownPreviewIdsRef.current.has(lockedPreview.previewId)) {
+      return;
+    }
+
+    shownPreviewIdsRef.current.add(lockedPreview.previewId);
+    trackEvent('paywall_preview_shown', { source: PAYWALL_PREVIEW_SOURCE });
+  }, [lockedPreview, step]);
+
+  // Virou Pro com a prévia na tela (a compra atualiza o auth store antes do
+  // goBack da tela de planos): troca os cards bloqueados pelas receitas.
+  // 404 = expirada; 403 ou rede: nada muda e a próxima mudança tenta de novo.
+  useEffect(() => {
+    if (!isPro || lockedPreview?.status !== 'locked') {
+      return;
+    }
+
+    const { previewId } = lockedPreview;
+
+    if (unlockingPreviewIdRef.current === previewId) {
+      return;
+    }
+
+    unlockingPreviewIdRef.current = previewId;
+
+    unlockPantryPreview(previewId)
+      .then((unlocked) => {
+        setRecipes(unlocked.recipes);
+        setPreviewRecipes([]);
+        setLockedPreview(null);
+        setUnlockedPreviewId(previewId);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof PantryScannerServiceError && err.apiCode === PANTRY_PREVIEW_NOT_FOUND_CODE) {
+          setLockedPreview({ previewId, status: 'expired' });
+          if (userId) {
+            clearLastPantryPreview(userId);
+          }
+          showToast(t(err.translationKey));
+        }
+      })
+      .finally(() => {
+        unlockingPreviewIdRef.current = null;
+      });
+  }, [isPro, lockedPreview, t, userId]);
+
+  // Receitas desbloqueadas vistas: o próximo scan novo limpa a prévia guardada.
+  useEffect(() => {
+    if (step === 'recipes' && unlockedPreviewId && userId) {
+      markLastPantryPreviewSeen(userId, unlockedPreviewId);
+    }
+  }, [step, unlockedPreviewId, userId]);
+
+  // Aviso "Receitas do seu último scan": só para Pro, na captura, com a
+  // prévia guardada e válida (a leitura já apaga a expirada).
+  useEffect(() => {
+    if (step !== 'capture' || !isPro || !userId) {
+      setLastPreview(null);
+      return;
+    }
+
+    setLastPreview(readLastPantryPreview(userId));
+  }, [isPro, step, userId]);
+
+  const handleOpenLastPreview = useCallback(async () => {
+    if (!lastPreview || !userId || isOpeningLastPreview) {
+      return;
+    }
+
+    setIsOpeningLastPreview(true);
+
+    try {
+      const unlocked = await unlockPantryPreview(lastPreview.previewId);
+      setIngredients(unlocked.ingredients.map((i) => ({ ...i, checked: true })));
+      setRecipes(unlocked.recipes);
+      setPreviewRecipes([]);
+      setLockedPreview(null);
+      setUnlockedPreviewId(lastPreview.previewId);
+      setStep('recipes');
+    } catch (err) {
+      if (err instanceof PantryScannerServiceError && err.apiCode === PANTRY_PREVIEW_NOT_FOUND_CODE) {
+        clearLastPantryPreview(userId);
+        setLastPreview(null);
+      }
+
+      showToast(
+        err instanceof PantryScannerServiceError
+          ? t(err.translationKey)
+          : t('errors.network_internal_server_error'),
+      );
+    } finally {
+      setIsOpeningLastPreview(false);
+    }
+  }, [isOpeningLastPreview, lastPreview, t, userId]);
+
+  const handleDismissLastPreview = useCallback(() => {
+    if (userId) {
+      clearLastPantryPreview(userId);
+    }
+    setLastPreview(null);
+  }, [userId]);
 
   // ── Dismiss isGeneratingRecipes when recipes step is active ───────────────
   useEffect(() => {
@@ -334,11 +501,15 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         showToast(t(result.error.translationKey));
         return;
       }
+      // Scan novo depois de ver as receitas desbloqueadas: a prévia guardada sai.
+      if (userId) {
+        clearLastPantryPreviewIfSeen(userId);
+      }
       setCapturedUri(uri);
       setCapturedBase64(result.imageBase64);
       setStep('analyzing');
     },
-    [t],
+    [t, userId],
   );
 
   const handleCapture = useCallback(async () => {
@@ -397,6 +568,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setCapturedBase64(null);
     setIngredients([]);
     setRecipes([]);
+    setPreviewRecipes([]);
+    setLockedPreview(null);
+    setUnlockedPreviewId(null);
     setNewIngredientText('');
     setError(null);
     setStep('capture');
@@ -493,6 +667,36 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     },
     cameraCenter: {
       flex: 1,
+    },
+    lastPreviewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'center',
+      marginTop: spacing.md,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: SCANS_PILL_BORDER,
+      backgroundColor: SCANS_PILL_BG,
+    },
+    lastPreviewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingLeft: spacing.lg,
+      paddingRight: spacing.xs,
+      paddingVertical: spacing.sm,
+    },
+    lastPreviewText: {
+      color: CAMERA_PILL_TEXT_COLOR,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    lastPreviewDismiss: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     cameraBottomBar: {
       flexDirection: 'row',
@@ -718,8 +922,42 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             ) : null}
           </View>
 
-          {/* Center spacer — camera viewfinder */}
-          <View style={styles.cameraCenter} />
+          {/* Center spacer — camera viewfinder. CP-1.1.4b: aviso discreto da
+              última prévia, só para Pro dentro da validade. */}
+          <View style={styles.cameraCenter}>
+            {lastPreview ? (
+              <View style={styles.lastPreviewRow} testID="pantry-last-preview">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pantryScanner.lockedPreview.lastScanA11yLabel')}
+                  accessibilityState={{ busy: isOpeningLastPreview }}
+                  disabled={isOpeningLastPreview}
+                  onPress={() => {
+                    void handleOpenLastPreview();
+                  }}
+                  style={styles.lastPreviewButton}
+                  testID="pantry-last-preview-open"
+                >
+                  <Ionicons name="restaurant-outline" size={16} color={CAMERA_ICON_COLOR} />
+                  <Text style={styles.lastPreviewText}>
+                    {t('pantryScanner.lockedPreview.lastScanTitle')}
+                  </Text>
+                  {isOpeningLastPreview ? (
+                    <ActivityIndicator color={CAMERA_ICON_COLOR} size="small" />
+                  ) : null}
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pantryScanner.lockedPreview.lastScanDismiss')}
+                  onPress={handleDismissLastPreview}
+                  style={styles.lastPreviewDismiss}
+                  testID="pantry-last-preview-dismiss"
+                >
+                  <Ionicons name="close" size={16} color={CAMERA_ICON_COLOR} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
 
           {/* Bottom bar */}
           <View style={styles.cameraBottomBar}>
@@ -858,7 +1096,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           style={styles.flex}
           contentContainerStyle={styles.recipesScrollContent}
         >
-          {recipes.length === 0 ? (
+          {recipes.length === 0 && previewRecipes.length === 0 ? (
             // CP-1.1.1d: a IA não entregou receita (falha ou lista vazia). O
             // backend devolveu o scan (scansUsed já veio atualizado) e não deu
             // XP — explica isso em vez de mostrar a etapa sem nenhum card.
@@ -870,6 +1108,20 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           ) : (
             <Text style={styles.recipeSubtitle}>{recipeSubtitle}</Text>
           )}
+
+          {/* CP-1.1.4b: prévia bloqueada — só macros, título genérico,
+              toque abre os planos. */}
+          {lockedPreview
+            ? previewRecipes.map((preview, index) => (
+                <LockedRecipeCard
+                  key={`${lockedPreview.previewId}-${index}`}
+                  preview={preview}
+                  expired={lockedPreview.status === 'expired'}
+                  onPress={handleLockedPreviewPress}
+                  source={PAYWALL_PREVIEW_SOURCE}
+                />
+              ))
+            : null}
 
           {recipes.map((recipe, index) => {
             const key = getRecipeFavoriteKey(recipe);

@@ -503,7 +503,9 @@ export async function deleteAccount(
           // Código de login Google ainda não trocado (vive ~2 min por TTL).
           // Apagado junto para não sobrar documento ligado à conta excluída.
           GoogleAuthCodeModel.deleteMany({ userId }, { session }),
-          // CP-1.1.4a: prévias bloqueadas guardam a receita completa por até 24h.
+          // CP-1.1.4a/b: prévias bloqueadas guardam as receitas completas (24h no
+          // Pulse AI, 7 dias no Pantry Scanner). O filtro só por userId apaga
+          // todos os kinds.
           LockedPreviewModel.deleteMany({ userId }, { session }),
           invalidateUserCache(userId, session),
         ]);

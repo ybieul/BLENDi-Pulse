@@ -11,7 +11,7 @@ import { ZodError, z } from 'zod';
 
 import { env } from '../config/env';
 import { BlendLogModel } from '../models/BlendLog';
-import { LOCKED_PREVIEW_TTL_MS, LockedPreviewModel } from '../models/LockedPreview';
+import { LOCKED_PREVIEW_TTL_MS_BY_KIND, LockedPreviewModel } from '../models/LockedPreview';
 import {
   ConversationModel,
   type IConversation,
@@ -708,7 +708,7 @@ async function deliverLockedPreview(params: {
   userSentAt: Date;
   recipe: PulseAiRecipe;
 }): Promise<PulseAiChatOutcome> {
-  const expiresAt = new Date(Date.now() + LOCKED_PREVIEW_TTL_MS);
+  const expiresAt = new Date(Date.now() + LOCKED_PREVIEW_TTL_MS_BY_KIND[LOCKED_PREVIEW_KIND]);
   const preview = await LockedPreviewModel.create({
     kind: LOCKED_PREVIEW_KIND,
     userId: params.user.id,

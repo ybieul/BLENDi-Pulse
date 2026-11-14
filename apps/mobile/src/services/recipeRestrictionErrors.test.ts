@@ -101,6 +101,9 @@ describe('pantryScanner.service', () => {
     });
 
     const result = await pantry.analyzePantry('base64', 'image/jpeg');
+    // CP-1.1.4b: analyzePantry também pode devolver a prévia bloqueada; aqui
+    // é um scan normal (só estreita o tipo).
+    if (pantry.isPantryLockedPreview(result)) throw new Error('esperava scan normal');
 
     expect(result.recipes).toHaveLength(1);
     expect(result.recipes[0].title).toBe('Oat Banana');

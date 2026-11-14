@@ -36,6 +36,7 @@ import {
 import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
+import type { TranslationKey } from '../../locales/i18n';
 
 const BADGE_BACKGROUND = colors.overlay.pulse[20];
 const BADGE_BORDER = colors.overlay.pulse[35];
@@ -618,7 +619,8 @@ export function RecipeCard({
 }
 
 // ─── Variante bloqueada (CP-1.1.4a — "Wow Moment Paywall") ───────────────────
-// Prévia do usuário grátis depois das 3 mensagens do dia. O app só recebe os
+// Prévia do usuário grátis depois do limite: 3 mensagens do dia no Pulse AI,
+// 3 scans do ciclo no Pantry Scanner (CP-1.1.4b). O app só recebe os
 // macros — nem o nome: a IA pode ser induzida a pôr a receita no título, então
 // o card mostra um título genérico. No lugar de ingredientes e modo de preparo
 // vão linhas falsas (sem texto nenhum) sob o desfoque. O card inteiro é um
@@ -632,18 +634,57 @@ const LOCKED_PLACEHOLDER_SECTIONS = [
 const LOCKED_PLACEHOLDER_LINE_HEIGHT = 10;
 const LOCKED_BLUR_INTENSITY = 18;
 
+/** Recurso de origem da prévia; decide só os textos do card. */
+export type LockedRecipeSource = 'pulse_ai' | 'pantry_scanner';
+
+interface LockedRecipeTextKeys {
+  badge: TranslationKey;
+  genericTitle: TranslationKey;
+  unlockCta: TranslationKey;
+  a11yLabel: TranslationKey;
+  expired: TranslationKey;
+  expiredA11yLabel: TranslationKey;
+}
+
+const LOCKED_RECIPE_TEXT_KEYS = {
+  pulse_ai: {
+    badge: 'navigation.pulseAI',
+    genericTitle: 'pulseAi.lockedPreview.genericTitle',
+    unlockCta: 'pulseAi.lockedPreview.unlockCta',
+    a11yLabel: 'pulseAi.lockedPreview.a11yLabel',
+    expired: 'pulseAi.lockedPreview.expired',
+    expiredA11yLabel: 'pulseAi.lockedPreview.expiredA11yLabel',
+  },
+  pantry_scanner: {
+    badge: 'pantryScanner.lockedPreview.badge',
+    genericTitle: 'pantryScanner.lockedPreview.genericTitle',
+    unlockCta: 'pantryScanner.lockedPreview.unlockCta',
+    a11yLabel: 'pantryScanner.lockedPreview.a11yLabel',
+    expired: 'pantryScanner.lockedPreview.expired',
+    expiredA11yLabel: 'pantryScanner.lockedPreview.expiredA11yLabel',
+  },
+} as const satisfies Record<LockedRecipeSource, LockedRecipeTextKeys>;
+
 export interface LockedRecipeCardProps {
   preview: PulseAiRecipePreview;
   /** Prévia expirou antes do desbloqueio: card informativo, sem ação. */
   expired?: boolean;
   onPress: () => void;
+  /** Padrão 'pulse_ai' (CP-1.1.4a). O Pantry Scanner passa 'pantry_scanner'. */
+  source?: LockedRecipeSource;
 }
 
-export function LockedRecipeCard({ preview, expired = false, onPress }: LockedRecipeCardProps) {
+export function LockedRecipeCard({
+  preview,
+  expired = false,
+  onPress,
+  source = 'pulse_ai',
+}: LockedRecipeCardProps) {
   const colors = useColors();
   const themeMode = useThemeStore((state) => state.mode);
   const { t } = useAppTranslation();
   const macroPills = useMacroPills(preview.macros);
+  const textKeys = LOCKED_RECIPE_TEXT_KEYS[source];
 
   const styles = StyleSheet.create({
     card: {
@@ -740,8 +781,8 @@ export function LockedRecipeCard({ preview, expired = false, onPress }: LockedRe
   });
 
   const accessibilityLabel = expired
-    ? t('pulseAi.lockedPreview.expiredA11yLabel')
-    : t('pulseAi.lockedPreview.a11yLabel');
+    ? t(textKeys.expiredA11yLabel)
+    : t(textKeys.a11yLabel);
 
   return (
     <Pressable
@@ -755,12 +796,12 @@ export function LockedRecipeCard({ preview, expired = false, onPress }: LockedRe
     >
       <View style={styles.headerRow}>
         <View style={styles.badgePill}>
-          <Text style={styles.badgeLabel}>{t('navigation.pulseAI')}</Text>
+          <Text style={styles.badgeLabel}>{t(textKeys.badge)}</Text>
         </View>
         <Ionicons name="lock-closed" size={16} color={colors.brand.pulse} />
       </View>
 
-      <Text style={styles.title}>{t('pulseAi.lockedPreview.genericTitle')}</Text>
+      <Text style={styles.title}>{t(textKeys.genericTitle)}</Text>
 
       <View style={styles.macroRow}>
         {macroPills.map((macro) => (
@@ -815,7 +856,7 @@ export function LockedRecipeCard({ preview, expired = false, onPress }: LockedRe
             />
           </View>
           <Text style={styles.ctaText}>
-            {expired ? t('pulseAi.lockedPreview.expired') : t('pulseAi.lockedPreview.unlockCta')}
+            {expired ? t(textKeys.expired) : t(textKeys.unlockCta)}
           </Text>
         </View>
       </View>

@@ -7,7 +7,11 @@ import {
 import {
   calculateLevel,
   pantryAnalysisResultSchema,
+  pantryLockedPreviewResultSchema,
+  pantryPreviewUnlockResultSchema,
   type PantryAnalysisResult,
+  type PantryLockedPreviewResult,
+  type PantryPreviewUnlockResult,
   type PantryScanInput,
 } from '@blendi/shared';
 
@@ -31,6 +35,9 @@ const PANTRY_SCANNER_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.1c: todas as receitas violaram a dieta (ou trouxeram gelo para o
   // Lite) mesmo após o retry; o backend devolveu o scan.
   'scanner/dietary-restriction-unmet': 'errors.scanner_dietary_restriction_unmet',
+  // CP-1.1.4b: desbloqueio da prévia — expirada/inexistente e ainda não Pro.
+  'scanner/preview-not-found': 'errors.scanner_preview_expired',
+  'scanner/preview-locked': 'errors.scanner_preview_locked',
 } as const satisfies Record<string, TranslationKey>;
 
 interface ApiErrorResponse {
@@ -39,12 +46,34 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+/** CP-1.1.4b: código do desbloqueio para prévia expirada, inexistente ou de outro recurso. */
+export const PANTRY_PREVIEW_NOT_FOUND_CODE = 'scanner/preview-not-found';
+
 interface PantryScannerAnalyzeResponse {
   success: true;
-  data: PantryAnalysisResult & {
-    xpAwarded: number;
-    missionsUpdated?: string[];
-  };
+  data:
+    | (PantryAnalysisResult & {
+        locked?: undefined;
+        xpAwarded: number;
+        missionsUpdated?: string[];
+      })
+    | PantryLockedPreviewResult;
+}
+
+interface PantryPreviewUnlockResponse {
+  success: true;
+  data: PantryPreviewUnlockResult;
+}
+
+/**
+ * CP-1.1.4b: resultado de um scan. Prévia bloqueada (grátis, depois dos scans
+ * do ciclo) traz `locked: true`, os ingredientes detectados e só os macros de
+ * cada receita; o resto fica no servidor até o desbloqueio de quem é Pro.
+ */
+export type PantryScanResult = PantryAnalysisResult | PantryLockedPreviewResult;
+
+export function isPantryLockedPreview(result: PantryScanResult): result is PantryLockedPreviewResult {
+  return 'locked' in result && result.locked === true;
 }
 
 interface LocalImageSize {
@@ -201,7 +230,7 @@ export async function compressAndEncodeImage(
 export async function analyzePantry(
   imageBase64: PantryScanInput['imageBase64'],
   mimeType: PantryScanInput['mimeType']
-): Promise<PantryAnalysisResult> {
+): Promise<PantryScanResult> {
   try {
     const response = await api.post<PantryScannerAnalyzeResponse>(
       '/pantry-scanner/analyze',
@@ -211,11 +240,34 @@ export async function analyzePantry(
       }
     );
 
+    // Prévia: sem XP, sem missão e sem pantry_scan_completed (que conta só
+    // scans entregues de verdade). O schema estrito descarta qualquer campo a
+    // mais; o paywall_preview_shown é disparado pela tela que mostra os cards.
+    if (response.data.data.locked === true) {
+      return pantryLockedPreviewResultSchema.parse(response.data.data);
+    }
+
     handleXPResponse(response.data.data);
     handleMissionResponse(response.data.data);
     const result = pantryAnalysisResultSchema.parse(response.data.data);
     trackEvent('pantry_scan_completed');
     return result;
+  } catch (error) {
+    throw toPantryScannerServiceError(error);
+  }
+}
+
+/**
+ * CP-1.1.4b: desbloqueia a prévia do Pantry. O backend só devolve as receitas
+ * para o dono que já é Pro (403 scanner/preview-locked caso contrário) e
+ * responde 404 scanner/preview-not-found para expirada ou inexistente.
+ */
+export async function unlockPantryPreview(previewId: string): Promise<PantryPreviewUnlockResult> {
+  try {
+    const response = await api.get<PantryPreviewUnlockResponse>(
+      `/pantry-scanner/previews/${encodeURIComponent(previewId)}`,
+    );
+    return pantryPreviewUnlockResultSchema.parse(response.data.data);
   } catch (error) {
     throw toPantryScannerServiceError(error);
   }

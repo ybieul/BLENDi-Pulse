@@ -35,6 +35,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { api } from '../config/api';
 import { createAppStorage } from '../config/storage';
+import { clearLastPantryPreview } from '../utils/pantryLastPreview.utils';
 import { useGamificationStore } from './gamification.store';
 import * as AuthService from '../services/auth.service';
 import {
@@ -150,6 +151,20 @@ async function deleteRefreshToken(): Promise<void> {
     // Não relança — o objetivo (limpar a sessão local) deve ser considerado
     // alcançado mesmo se o SecureStore falhar, para o logout sempre funcionar.
     console.warn('[auth.store] Falha ao remover o refresh token do SecureStore.', error);
+  }
+}
+
+// CP-1.1.4b: dados locais ligados à conta que não podem sobrar para a próxima
+// sessão no aparelho (hoje, a última prévia do Pantry Scanner).
+function clearUserDeviceData(userId: string | undefined): void {
+  if (!userId) {
+    return;
+  }
+
+  try {
+    clearLastPantryPreview(userId);
+  } catch {
+    // Melhor esforço: não bloqueia sair da conta.
   }
 }
 
@@ -311,6 +326,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // Remove do Secure Store (melhor esforço — não bloqueia o logout se falhar)
     await deleteRefreshToken();
 
+    clearUserDeviceData(get().user?.id);
     get().setUser(null);
 
     set({
@@ -337,6 +353,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // estado de "deslogado" que um logout normal.
     await deleteRefreshToken();
 
+    clearUserDeviceData(get().user?.id);
     get().setUser(null);
 
     set({
