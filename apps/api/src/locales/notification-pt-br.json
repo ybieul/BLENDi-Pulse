@@ -17,6 +17,10 @@
       "Recovery": {
         "withRecipe": "Hora de recuperar! Seu blend {recipeName} é perfeito para hoje 🔄",
         "generic": "Hora de recuperar! Um blend nutritivo é perfeito para hoje 🔄"
+      },
+      "WeightLoss": {
+        "withRecipe": "Mantenha o ritmo! Seu blend {recipeName} cabe no plano de hoje 🍓",
+        "generic": "Mantenha o ritmo! Um blend rico em proteína e que sacia cabe no plano de hoje 🍓"
       }
     }
   },

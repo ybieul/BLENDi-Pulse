@@ -24,6 +24,7 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
+import type { UserGoal } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useAuthStore } from '../../store/auth.store';
@@ -43,8 +44,7 @@ const KEYBOARD_CLEARANCE = spacing.md;
 const OFFLINE_INPUT_OPACITY = 0.5;
 const RECONNECT_OPACITY_DURATION = 300;
 
-type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
-type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery';
+type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery' | 'weightLoss';
 
 export interface ChatInputHandle {
   setText: (text: string) => void;
@@ -61,6 +61,7 @@ const GOAL_I18N_KEYS: Record<UserGoal, PulseAiGoalKey> = {
   Wellness: 'wellness',
   Energy: 'energy',
   Recovery: 'recovery',
+  WeightLoss: 'weightLoss',
 };
 
 const INPUT_PLACEHOLDER_FIELDS = [

@@ -176,6 +176,10 @@ const GOAL_CONTEXT: Record<UserGoal, string> = {
   Wellness: 'prioritize balanced nutrition, satiety, micronutrient density, and daily consistency',
   Energy: 'prioritize steady energy, performance support, and practical pre/post-activity fueling',
   Recovery: 'prioritize recovery, inflammation-aware ingredient choices, and easy digestion',
+  // CP-1.1.9 — soma-se à seção "Weight goal guidance (lose)" (WeightLoss
+  // sempre tem weightGoal 'lose'), que já cobre bases líquidas e o que evitar;
+  // aqui fica só o foco da receita.
+  WeightLoss: 'prioritize satiety, high protein and fiber, and lower calories per serving',
 };
 
 const LANGUAGE_CONTEXT: Record<UserLocale, string> = {
@@ -424,6 +428,8 @@ function buildBlenderGuardrailsSection(
   return [
     `Physical blender guardrails (${modelContext.displayName}):`,
     `- The combined volume of all ingredients in the recipe must not exceed ${maxVolume}.`,
+    // CP-1.1.9: a mesma conta que o backend faz para validar (recipeVolume.utils.ts).
+    '- When adding up the volume, count each gram of a solid ingredient as 1ml.',
     `- Total protein in this recipe must not exceed ${limits.maxProteinGrams}g.`,
     "- Never suggest an ingredient combination that exceeds the physical capacity of the user's blender.",
   ].join('\n');

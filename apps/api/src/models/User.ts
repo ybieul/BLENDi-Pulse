@@ -25,6 +25,10 @@ import {
   MAX_PLAUSIBLE_AGE_YEARS,
   MIN_PLAUSIBLE_AGE_YEARS,
   OTHER_BLENDER_MODEL_MAX_LENGTH,
+  USER_GOAL_VALUES,
+  WEIGHT_LOSS_GOAL,
+  WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL,
+  type UserGoal as SharedUserGoal,
 } from '@blendi/shared';
 
 // Reaproveitada pelo validador de idade plausível de `birthDate` (abaixo) —
@@ -39,7 +43,8 @@ import { calculateAge } from '../utils/macroCalculation.utils';
 export type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 export type BlendiOwnership = 'blendi' | 'other' | 'none';
 export type DietaryPreference = 'dairy_free' | 'vegan' | 'nut_free' | 'no_added_sugar';
-export type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+// Lista única no shared (USER_GOAL_VALUES) desde o CP-1.1.9.
+export type UserGoal = SharedUserGoal;
 export type BiologicalSex = 'male' | 'female';
 export type WeightGoal = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel =
@@ -571,7 +576,7 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     },
     goal: {
       type: String,
-      enum: ['Muscle', 'Wellness', 'Energy', 'Recovery'] satisfies UserGoal[],
+      enum: USER_GOAL_VALUES,
       required: [true, 'errors.validation.required'],
     },
     weightGoal: {
@@ -844,6 +849,18 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     timestamps: true,
   }
 );
+
+// ─── Middleware: Weight Loss sempre com weightGoal 'lose' (CP-1.1.9) ──────────
+// Rede de segurança dos caminhos que criam/salvam o documento (cadastro,
+// Google, Apple, user.save()). As atualizações por PATCH /users/me não passam
+// por aqui (findByIdAndUpdate): lá a regra é aplicada de forma atômica por
+// resolveWeightLossGoalCoherence (utils/weightLossGoal.utils.ts).
+userSchema.pre('validate', function (next) {
+  if (this.goal === WEIGHT_LOSS_GOAL && this.weightGoal !== WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL) {
+    this.invalidate('weightGoal', 'errors.validation.invalid_option', this.weightGoal);
+  }
+  next();
+});
 
 // ─── Middleware: hash da senha antes de salvar ────────────────────────────────
 

@@ -54,4 +54,25 @@ describe('OnboardingGoalScreen', () => {
     expect(navigate).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith('OnboardingDiet');
   });
+
+  it('mostra as 5 opções, com Weight Loss por último', () => {
+    const { getByText } = render(<OnboardingGoalScreen navigation={{ navigate: jest.fn() }} />);
+
+    for (const goal of ['Muscle', 'Wellness', 'Energy', 'Recovery', 'WeightLoss']) {
+      expect(getByText(`onboarding.goal${goal}`)).toBeTruthy();
+      expect(getByText(`onboarding.goal${goal}Desc`)).toBeTruthy();
+    }
+  });
+
+  it('escolher Weight Loss grava o goal e weightGoal "lose" no store', () => {
+    const navigate = jest.fn();
+    const { getByText, getByRole } = render(<OnboardingGoalScreen navigation={{ navigate }} />);
+
+    fireEvent.press(getByText('onboarding.goalWeightLoss'));
+    fireEvent.press(getByRole('button', { name: 'onboarding.continue' }));
+
+    expect(useOnboardingStore.getState().selectedGoal).toBe('WeightLoss');
+    expect(useOnboardingStore.getState().weightGoal).toBe('lose');
+    expect(navigate).toHaveBeenCalledWith('OnboardingDiet');
+  });
 });

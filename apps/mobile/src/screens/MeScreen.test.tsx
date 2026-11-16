@@ -6,7 +6,7 @@
 // MMKV...). Aqui só os pontos que importam ao teste são reais: o card de
 // configurações (SettingRow), o React Query e a tradução em inglês de verdade
 // (en.json) — o resto é mockado.
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
 
@@ -87,10 +87,17 @@ jest.mock('../store/theme.store', () => ({
 }));
 
 const mockApiGet = jest.fn<Promise<unknown>, unknown[]>();
+const mockApiPatch = jest.fn<Promise<unknown>, unknown[]>();
 jest.mock('../config/api', () => ({
-  api: { get: (...args: unknown[]) => mockApiGet(...args), patch: jest.fn(), delete: jest.fn(), post: jest.fn() },
+  api: {
+    get: (...args: unknown[]) => mockApiGet(...args),
+    patch: (...args: unknown[]) => mockApiPatch(...args),
+    delete: jest.fn(() => Promise.resolve()),
+    post: jest.fn(),
+  },
 }));
 
+const mockUpdateUserProfile = jest.fn();
 jest.mock('../store/auth.store', () => ({
   useAuthStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
@@ -109,7 +116,7 @@ jest.mock('../store/auth.store', () => ({
       },
       logout: jest.fn(),
       deleteAccount: jest.fn(),
-      updateUserProfile: jest.fn(),
+      updateUserProfile: mockUpdateUserProfile,
     }),
 }));
 
@@ -171,6 +178,8 @@ function renderMe(profile: Record<string, unknown> = PROFILE) {
 beforeEach(() => {
   mockNavigate.mockReset();
   mockApiGet.mockReset().mockResolvedValue({ data: { success: true, data: { user: PROFILE } } });
+  mockApiPatch.mockReset();
+  mockUpdateUserProfile.mockReset();
   (calculateUserBadges as jest.Mock).mockClear();
 });
 
@@ -288,3 +297,75 @@ describe('MeScreen — badges de modelo', () => {
     );
   });
 });
+
+describe('MeScreen — troca de objetivo (CP-1.1.9)', () => {
+  async function switchGoalTo(title: string) {
+    const utils = renderMe();
+    fireEvent.press(utils.getByText(en.profile.fields.goal));
+    fireEvent.press(await utils.findByText(title));
+    // "Salvar" aparece no subtítulo e no botão do sheet: o botão é o último.
+    const confirmButtons = utils.getAllByRole('button', { name: en.me.edit.confirm });
+    fireEvent.press(confirmButtons[confirmButtons.length - 1]);
+    return utils;
+  }
+
+  it('o sheet de objetivo lista as 5 opções', async () => {
+    const utils = renderMe();
+    fireEvent.press(utils.getByText(en.profile.fields.goal));
+
+    for (const title of ['Muscle', 'Wellness', 'Energy', 'Recovery', 'Weight Loss']) {
+      expect(await utils.findAllByText(title)).not.toHaveLength(0);
+    }
+  });
+
+  it('manda só o goal; o backend devolve lose e as metas com déficit, que vão para o usuário local', async () => {
+    mockApiPatch.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          user: { goal: 'WeightLoss', weightGoal: 'lose', dailyProteinTarget: 160, dailyCalorieTarget: 1600, dailyCarbTarget: 150, dailyFatTarget: 53 },
+        },
+      },
+    });
+
+    await switchGoalTo('Weight Loss');
+
+    await waitFor(() => expect(mockUpdateUserProfile).toHaveBeenCalled());
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { goal: 'WeightLoss' });
+    expect(mockUpdateUserProfile).toHaveBeenCalledWith({
+      goal: 'WeightLoss',
+      dailyProteinTarget: 160,
+      dailyCalorieTarget: 1600,
+      dailyCarbTarget: 150,
+      dailyFatTarget: 53,
+    });
+  });
+
+  it('trocar para outro goal também leva ao usuário local as metas recalculadas (proteína do goal novo)', async () => {
+    mockApiPatch.mockResolvedValueOnce({
+      data: { success: true, data: { user: { goal: 'Energy', dailyProteinTarget: 135, dailyCalorieTarget: 2100, dailyCarbTarget: 200 } } },
+    });
+
+    await switchGoalTo('Energy');
+
+    await waitFor(() => expect(mockUpdateUserProfile).toHaveBeenCalled());
+    expect(mockApiPatch).toHaveBeenCalledWith('/users/me', { goal: 'Energy' });
+    // dailyFatTarget não veio na resposta: não é aplicado (nada de undefined).
+    expect(mockUpdateUserProfile).toHaveBeenCalledWith({
+      goal: 'Energy',
+      dailyProteinTarget: 135,
+      dailyCalorieTarget: 2100,
+      dailyCarbTarget: 200,
+    });
+  });
+
+  it('resposta sem metas: atualiza só o goal', async () => {
+    mockApiPatch.mockResolvedValueOnce(undefined);
+
+    await switchGoalTo('Recovery');
+
+    await waitFor(() => expect(mockUpdateUserProfile).toHaveBeenCalled());
+    expect(mockUpdateUserProfile).toHaveBeenCalledWith({ goal: 'Recovery' });
+  });
+});
+

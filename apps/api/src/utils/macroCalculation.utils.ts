@@ -41,6 +41,10 @@ const PROTEIN_MULTIPLIERS: Record<UserGoal, number> = {
   Wellness: 1.6,
   Energy: 1.8,
   Recovery: 2.2,
+  // CP-1.1.9 — 2,0 g/kg para preservar massa magra em déficit calórico
+  // (WeightLoss sempre vem com weightGoal 'lose', -500 kcal). Limites do
+  // clamp (DAILY_PROTEIN_TARGET_MIN/MAX) inalterados.
+  WeightLoss: 2.0,
 };
 
 // Aproximação padrão de mercado pra variação de peso corporal (1kg de

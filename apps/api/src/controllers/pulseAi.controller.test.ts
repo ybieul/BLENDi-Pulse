@@ -283,14 +283,17 @@ describe('Pulse AI — validação de restrições', () => {
     assert.equal(awardXPMock.mock.callCount(), 0);
   });
 
-  it('retry que falha (IA indisponível) também vira o erro novo, com rollback', async () => {
+  // CP-1.1.9 (decisão do Gabriel): retry que falha no provedor não é mais
+  // "dieta não atendida" — a receita nem foi julgada. Responde como IA
+  // indisponível (503), com o mesmo rollback. Antes: 422 dietary-restriction-unmet.
+  it('retry que falha (IA indisponível) responde IA indisponível, com rollback', async () => {
     fakeUser.blendiModel = 'Lite';
     aiResponses = [withIngredient('Ice cubes'), new FakeAiProviderRequestError('down')];
 
     const res = await send(uniqueMessage('a smoothie with lots of ice'));
 
-    assert.equal(res.statusCode, 422);
-    assert.equal(res.body?.code, 'pulseai/dietary-restriction-unmet');
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body?.code, 'pulseai/ai-unavailable');
     assert.equal(usageRollbackCalls().length, 1);
     assert.equal(setInCacheMock.mock.callCount(), 0);
     assert.equal(conversationUpdateOneMock.mock.callCount(), 0);

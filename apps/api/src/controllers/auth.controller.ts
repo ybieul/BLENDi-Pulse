@@ -120,7 +120,7 @@ export async function register(
         dailyProteinTarget,
         dailyCalorieTarget,
         dailyFatTarget: calculateFatTargetFromCalories(dailyCalorieTarget),
-        ...getAccountCreationBodyProfileDefaults(),
+        ...getAccountCreationBodyProfileDefaults(goal),
       });
     } catch (err) {
       // Corrida entre a pré-checagem (linha 89) e este create: outra requisição

@@ -53,8 +53,9 @@ import {
   validateMacroConsistency,
 } from '../utils/macroValidation.utils';
 import {
-  buildProteinGuardrailRetryMessage,
-  validateProteinGuardrail,
+  buildBlenderLimitRetryMessage,
+  summarizeBlenderLimitViolation,
+  validateBlenderLimits,
 } from '../utils/blenderGuardrail.utils';
 import {
   buildRecipeRestrictionRetryMessage,
@@ -74,6 +75,8 @@ const PREVIEW_LOCKED_CODE = 'pulseai/preview-locked';
 const LOCKED_PREVIEW_HISTORY_PLACEHOLDER =
   '[A recipe was generated here but is locked for this user. Its contents are not available.]';
 const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
+// CP-1.1.9: receita acima do limite físico do BLENDi (proteína ou volume) mesmo após o retry.
+const BLENDER_LIMIT_UNMET_CODE = 'pulseai/blender-limit-unmet';
 const INVALID_JSON_RETRY_INSTRUCTION =
   'Your previous response had an invalid format. Return only valid JSON.';
 const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -426,38 +429,69 @@ async function generatePulseAiRecipe(
   };
 }
 
+// Por que uma verificação não entregou a receita (CP-1.1.9):
+// - 'unmet': a IA respondeu, mas a receita refeita continua fora da regra (ou
+//   veio inválida) — bloqueio por limite/dieta (422).
+// - 'aiUnavailable': a nova tentativa nem rodou (falha do provedor de IA:
+//   cota, rede, indisponibilidade) — a receita não foi julgada; a resposta é
+//   a de IA indisponível (503), não a de limite/dieta.
+type EnforcementFailure = 'unmet' | 'aiUnavailable';
+
+type BlenderLimitEnforcement =
+  | { ok: true; recipe: PulseAiRecipe }
+  | { ok: false; failure: EnforcementFailure };
+
+// Limite físico do BLENDi (proteína e volume — blenderGuardrail.utils.ts).
+// CP-1.1.9: um retry e, se continuar acima do limite (ou vier inválido), a
+// receita NÃO é entregue ('unmet') — antes ela seguia mesmo acima do limite.
+// Se o retry falhar no provedor, 'aiUnavailable' (a receita não foi julgada).
 async function ensureBlenderGuardrail(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
   blendiModel: BlendiModel
-): Promise<PulseAiRecipe> {
-  const initialGuardrail = validateProteinGuardrail(recipe, blendiModel);
+): Promise<BlenderLimitEnforcement> {
+  const initialCheck = validateBlenderLimits(recipe, blendiModel);
 
-  if (initialGuardrail.withinGuardrail) {
-    return recipe;
+  if (initialCheck.withinLimits) {
+    return { ok: true, recipe };
   }
 
-  console.info('[pulseAi.controller] protein guardrail exceeded, retrying', {
+  console.info('[pulseAi.controller] blender limit exceeded, retrying', {
     blendiModel,
-    discrepancy: initialGuardrail.discrepancy,
+    violation: summarizeBlenderLimitViolation(initialCheck.violation),
   });
 
   try {
-    const retryMessage = buildProteinGuardrailRetryMessage(initialGuardrail.discrepancy);
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation);
     const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
       ...prompt.messages,
       { role: 'assistant', content: JSON.stringify(recipe) },
       { role: 'user', content: retryMessage },
     ]);
 
-    return retried.recipe ?? recipe;
+    if (!retried.recipe) {
+      console.warn('[pulseAi.controller] blender limit retry returned an invalid recipe');
+      return { ok: false, failure: 'unmet' };
+    }
+
+    const retriedCheck = validateBlenderLimits(retried.recipe, blendiModel);
+
+    if (!retriedCheck.withinLimits) {
+      console.warn('[pulseAi.controller] blender limit still exceeded after retry', {
+        blendiModel,
+        violation: summarizeBlenderLimitViolation(retriedCheck.violation),
+      });
+      return { ok: false, failure: 'unmet' };
+    }
+
+    return { ok: true, recipe: retried.recipe };
   } catch (error) {
-    console.error('[pulseAi.controller] protein guardrail retry failed', {
+    console.error('[pulseAi.controller] blender limit retry failed', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return recipe;
+    return { ok: false, failure: 'aiUnavailable' };
   }
 }
 
@@ -504,13 +538,14 @@ async function ensureMacroConsistency(
 
 type RecipeRestrictionEnforcement =
   | { ok: true; recipe: PulseAiRecipe }
-  | { ok: false };
+  | { ok: false; failure: EnforcementFailure };
 
 // CP-1.1.1c: última conferência antes de entregar — roda depois do guardrail
 // de proteína e da consistência de macros, porque os retries delas podem
 // trazer de volta um ingrediente proibido. Diferente dessas duas, esta
-// BLOQUEIA: um retry e, se continuar violando (ou o retry falhar), a receita
-// não é entregue. A receita refeita não passa de novo pelos retries de
+// BLOQUEIA: um retry e, se continuar violando (ou vier inválido), a receita
+// não é entregue ('unmet'). Se o retry falhar no provedor, 'aiUnavailable'
+// (CP-1.1.9: responde como IA indisponível, não como dieta). A receita refeita não passa de novo pelos retries de
 // proteína/macros (eles nunca bloqueiam); só o flag macrosValidated é
 // recalculado.
 async function ensureRecipeRestrictions(
@@ -538,7 +573,7 @@ async function ensureRecipeRestrictions(
 
     if (!retried.recipe) {
       console.warn('[pulseAi.controller] recipe restriction retry returned an invalid recipe');
-      return { ok: false };
+      return { ok: false, failure: 'unmet' };
     }
 
     const retriedCheck = validateRecipeRestrictions(
@@ -551,7 +586,7 @@ async function ensureRecipeRestrictions(
       console.warn('[pulseAi.controller] recipe restriction still violated after retry', {
         violations: summarizeRestrictionViolations(retriedCheck.violations),
       });
-      return { ok: false };
+      return { ok: false, failure: 'unmet' };
     }
 
     return {
@@ -567,7 +602,7 @@ async function ensureRecipeRestrictions(
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return { ok: false };
+    return { ok: false, failure: 'aiUnavailable' };
   }
 }
 
@@ -808,9 +843,21 @@ async function runPulseAiChat(params: {
         )
       : null;
 
-    if (cachedRestrictionCheck && !cachedRestrictionCheck.compliant) {
-      console.info('[pulseAi.controller] cached recipe violates restrictions, regenerating', {
-        violations: summarizeRestrictionViolations(cachedRestrictionCheck.violations),
+    // CP-1.1.9: idem para o limite físico (receitas gravadas antes do bloqueio
+    // por proteína/volume, ou antes do ajuste dos limites de volume).
+    const cachedWithinBlenderLimits = parsedCachedResponse.success
+      ? validateBlenderLimits(parsedCachedResponse.data.recipe, currentUser.blendiModel).withinLimits
+      : false;
+
+    if (
+      (cachedRestrictionCheck && !cachedRestrictionCheck.compliant) ||
+      (parsedCachedResponse.success && !cachedWithinBlenderLimits)
+    ) {
+      console.info('[pulseAi.controller] cached recipe violates restrictions or blender limits, regenerating', {
+        violations: cachedRestrictionCheck && !cachedRestrictionCheck.compliant
+          ? summarizeRestrictionViolations(cachedRestrictionCheck.violations)
+          : [],
+        withinBlenderLimits: cachedWithinBlenderLimits,
       });
 
       try {
@@ -823,7 +870,7 @@ async function runPulseAiChat(params: {
       }
     }
 
-    if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant) {
+    if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant && cachedWithinBlenderLimits) {
       const usageReservation = await reservePulseAiAccess(currentUser);
 
       if (!usageReservation.ok) {
@@ -967,27 +1014,54 @@ async function runPulseAiChat(params: {
       return errorOutcome(500, 'pulseai/invalid-ai-response', 'Pulse AI returned an invalid response.');
     }
 
-    recipe = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
-    recipe = await ensureMacroConsistency(recipe, prompt);
-
-    const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser);
-
-    if (!restrictionEnforcement.ok) {
-      // Nada é entregue: devolve a reserva de uso e não grava cache, turno da
-      // conversa nem XP.
+    // Receita não entregue por limite físico ou dieta: nada é entregue, a
+    // reserva de uso volta e não há cache, turno de conversa nem XP. Falha do
+    // provedor na nova tentativa responde como IA indisponível (CP-1.1.9).
+    const sendEnforcementFailure = async (failure: EnforcementFailure, unmetCode: string, unmetMessage: string) => {
       if (shouldRollbackUsage) {
         await rollbackPulseAiAccessReservation(currentUser, usageReservation);
         shouldRollbackUsage = false;
       }
 
-      return errorOutcome(
-        422,
+      if (failure === 'aiUnavailable') {
+        return errorOutcome(503, 'pulseai/ai-unavailable', 'Pulse AI is temporarily unavailable.');
+      }
+
+      return errorOutcome(422, unmetCode, unmetMessage);
+    };
+    const sendBlenderLimitUnmet = () =>
+      sendEnforcementFailure('unmet', BLENDER_LIMIT_UNMET_CODE, 'Pulse AI could not generate a recipe within the blender limits.');
+
+    const blenderLimitEnforcement = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
+
+    if (!blenderLimitEnforcement.ok) {
+      return sendEnforcementFailure(
+        blenderLimitEnforcement.failure,
+        BLENDER_LIMIT_UNMET_CODE,
+        'Pulse AI could not generate a recipe within the blender limits.'
+      );
+    }
+
+    recipe = await ensureMacroConsistency(blenderLimitEnforcement.recipe, prompt);
+
+    const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser);
+
+    if (!restrictionEnforcement.ok) {
+      return sendEnforcementFailure(
+        restrictionEnforcement.failure,
         DIETARY_RESTRICTION_UNMET_CODE,
         'Pulse AI could not generate a recipe that meets the user restrictions.'
       );
     }
 
     recipe = restrictionEnforcement.recipe;
+
+    // Conferência final do limite físico (CP-1.1.9): os retries de macros e de
+    // restrições refazem a receita e podem passar do limite de novo.
+    if (!validateBlenderLimits(recipe, currentUser.blendiModel).withinLimits) {
+      console.warn('[pulseAi.controller] blender limit exceeded after later retries');
+      return sendBlenderLimitUnmet();
+    }
 
     if (usageReservation.mode === 'preview') {
       // Prévia: não grava no cache por usuário (senão a receita completa ficaria

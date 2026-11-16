@@ -1,3 +1,5 @@
+import type { UserGoal } from '../models/User';
+
 export interface MissionDefinition {
   type: string;
   titleKey: string;
@@ -12,7 +14,7 @@ export interface MissionPoolEntry {
   weight: number;
 }
 
-export type MissionGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+export type MissionGoal = UserGoal;
 
 export const MISSION_DEFINITIONS: MissionDefinition[] = [
   {
@@ -123,6 +125,18 @@ export const MISSION_POOLS: Record<MissionGoal, MissionPoolEntry[]> = {
     { type: 'makeBlend', weight: 1 },
     { type: 'favoriteRecipe', weight: 1 },
     { type: 'scanPantry', weight: 1 },
+  ],
+  // CP-1.1.9 — proteína e constância. hitCalorieGoal fica de fora: o foco é
+  // proteína, e "bater a meta de calorias" não é um incentivo útil em déficit.
+  // (Para WeightLoss, o XP/conclusão de calorias só vale entre 90% e 100% da
+  // meta — getCalorieGoalXpRange, utils/weightLossGoal.utils.ts.)
+  WeightLoss: [
+    { type: 'hitProteinGoal', weight: 3 },
+    { type: 'makeBlend', weight: 3 },
+    { type: 'hitHydrationGoal', weight: 2 },
+    { type: 'makeBlendFromFavorite', weight: 2 },
+    { type: 'usePulseAI', weight: 1 },
+    { type: 'favoriteRecipe', weight: 1 },
   ],
 };
 

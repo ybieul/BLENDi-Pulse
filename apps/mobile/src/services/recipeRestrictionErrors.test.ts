@@ -109,3 +109,32 @@ describe('pantryScanner.service', () => {
     expect(result.recipes[0].title).toBe('Oat Banana');
   });
 });
+
+describe('limite físico do BLENDi (CP-1.1.9)', () => {
+  it('textos existem em en e pt-BR', () => {
+    for (const locale of [en, ptBR]) {
+      expect(locale.errors.pulseai_blender_limit_unmet).toEqual(expect.any(String));
+      expect(locale.errors.scanner_blender_limit_unmet).toEqual(expect.any(String));
+    }
+  });
+
+  it('pulseai/blender-limit-unmet → errors.pulseai_blender_limit_unmet', async () => {
+    mockPost.mockRejectedValueOnce(axiosError(422, 'pulseai/blender-limit-unmet'));
+
+    await expect(pulseAi.sendMessage('o maior shake possível')).rejects.toMatchObject({
+      name: 'PulseAiServiceError',
+      translationKey: 'errors.pulseai_blender_limit_unmet',
+      apiCode: 'pulseai/blender-limit-unmet',
+    });
+  });
+
+  it('scanner/blender-limit-unmet → errors.scanner_blender_limit_unmet', async () => {
+    mockPost.mockRejectedValueOnce(axiosError(422, 'scanner/blender-limit-unmet'));
+
+    await expect(pantry.analyzePantry('base64', 'image/jpeg')).rejects.toMatchObject({
+      name: 'PantryScannerServiceError',
+      translationKey: 'errors.scanner_blender_limit_unmet',
+      apiCode: 'scanner/blender-limit-unmet',
+    });
+  });
+});

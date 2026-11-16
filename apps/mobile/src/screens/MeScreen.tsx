@@ -53,7 +53,7 @@ import {
   fonts,
   fontWeights,
 } from "@blendi/shared";
-import type { BlendiOwnership, DietaryPreference } from "@blendi/shared";
+import type { BlendiOwnership, DietaryPreference, UserGoal } from "@blendi/shared";
 
 import { useColors } from "../hooks/useColors";
 import { api } from "../config/api";
@@ -222,7 +222,6 @@ function SwitchRow({ label, description, value, onValueChange }: SwitchRowProps)
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type BlendiModel = "Lite" | "ProPlus" | "Steel";
-type UserGoal = "Muscle" | "Wellness" | "Energy" | "Recovery";
 
 interface UserProfileData {
   id: string;
@@ -251,6 +250,33 @@ interface UserProfileData {
   isPro: boolean;
   createdAt: string;
   hasRealBodyProfile?: boolean;
+}
+
+/** Só as metas da resposta do PATCH /users/me (usadas ao trocar de objetivo). */
+interface GoalPatchResponse {
+  data?: {
+    user?: ReturnedTargets;
+  };
+}
+
+const RETURNED_TARGET_FIELDS = [
+  "dailyProteinTarget",
+  "dailyCalorieTarget",
+  "dailyCarbTarget",
+  "dailyFatTarget",
+] as const;
+
+type ReturnedTargets = Partial<Pick<UserProfileData, (typeof RETURNED_TARGET_FIELDS)[number]>>;
+
+function pickReturnedTargets(user: ReturnedTargets | undefined): ReturnedTargets {
+  const targets: ReturnedTargets = {};
+  for (const field of RETURNED_TARGET_FIELDS) {
+    const value = user?.[field];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      targets[field] = value;
+    }
+  }
+  return targets;
 }
 
 interface LocalImageSize {
@@ -319,6 +345,7 @@ function getGoalKey(goal: UserGoal): TranslationKey {
     Wellness: "onboarding.goalWellness",
     Energy: "onboarding.goalEnergy",
     Recovery: "onboarding.goalRecovery",
+    WeightLoss: "onboarding.goalWeightLoss",
   };
   return keys[goal];
 }
@@ -739,7 +766,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       }
 
       try {
-        await api.patch("/users/me", body);
+        const response = await api.patch<GoalPatchResponse | undefined>("/users/me", body);
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
 
         switch (editingType) {
@@ -755,9 +782,18 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               });
             }
             break;
-          case "goal":
-            updateUserProfile({ goal: nextValue as UserGoal });
+          case "goal": {
+            // Trocar o goal recalcula as metas no backend (proteína sempre; com
+            // Weight Loss, também as calorias, já que o weightGoal vira 'lose').
+            // O usuário local recebe as metas devolvidas no PATCH, porque
+            // WeeklyReport/History leem dele, e não da query. Só os campos
+            // numéricos que vieram na resposta são aplicados.
+            updateUserProfile({
+              goal: nextValue as UserGoal,
+              ...pickReturnedTargets(response?.data?.data?.user),
+            });
             break;
+          }
           case "fat":
             updateUserProfile({ dailyFatTarget: Number(nextValue) });
             break;

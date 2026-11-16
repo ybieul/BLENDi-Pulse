@@ -4,6 +4,7 @@
 
 export type * from './types';
 export * from './tokens';
+export * from './blenderLimits';
 
 // Schemas Zod + tipos inferidos (backend e mobile)
 export * from './schemas/auth';
@@ -16,6 +17,7 @@ export * from './schemas/supplementStack';
 export * from './schemas/user';
 export * from './schemas/weeklyReport';
 export * from './utils/level.utils';
+export * from './utils/homeRecipeCompatibility';
 export type { HistoryQuery, SupplementItem, UpdateSupplementStackInput } from './schemas/supplementStack';
 export type {
   CalculateMacrosInput,

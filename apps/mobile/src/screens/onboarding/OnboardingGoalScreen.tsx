@@ -1,9 +1,10 @@
 // apps/mobile/src/screens/onboarding/OnboardingGoalScreen.tsx
 // Passo 2 do fluxo de onboarding: seleção do objetivo principal do usuário.
 //
-// O usuário escolhe entre Muscle, Wellness, Energy ou Recovery. O CTA só fica
-// habilitado após a seleção; ao confirmar, o valor é gravado no onboarding
-// store e o fluxo avança para as restrições alimentares.
+// O usuário escolhe entre Muscle, Wellness, Energy, Recovery ou Weight Loss.
+// O CTA só fica habilitado após a seleção; ao confirmar, o valor é gravado no
+// onboarding store e o fluxo avança para as restrições alimentares. Weight
+// Loss já grava weightGoal 'lose' no store (setGoal, onboarding.store.ts).
 
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import type { ComponentProps } from 'react';
 import { fontSizes, fonts, spacing } from '@blendi/shared';
+import type { UserGoal } from '@blendi/shared';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { SelectionCard } from '../../components/ui/SelectionCard';
@@ -29,9 +31,9 @@ type OnboardingGoalScreenProps = {
 };
 
 const GOALS: ReadonlyArray<{
-  key: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
-  titleKey: 'onboarding.goalMuscle' | 'onboarding.goalWellness' | 'onboarding.goalEnergy' | 'onboarding.goalRecovery';
-  descKey: 'onboarding.goalMuscleDesc' | 'onboarding.goalWellnessDesc' | 'onboarding.goalEnergyDesc' | 'onboarding.goalRecoveryDesc';
+  key: UserGoal;
+  titleKey: `onboarding.goal${UserGoal}`;
+  descKey: `onboarding.goal${UserGoal}Desc`;
   iconName: IoniconName;
 }> = [
   {
@@ -57,6 +59,12 @@ const GOALS: ReadonlyArray<{
     titleKey: 'onboarding.goalRecovery',
     descKey: 'onboarding.goalRecoveryDesc',
     iconName: 'moon-outline',
+  },
+  {
+    key: 'WeightLoss',
+    titleKey: 'onboarding.goalWeightLoss',
+    descKey: 'onboarding.goalWeightLossDesc',
+    iconName: 'trending-down-outline',
   },
 ];
 

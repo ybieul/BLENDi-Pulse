@@ -15,6 +15,7 @@ import type {
   GoogleExchangeInput,
   RegisterInput,
   LoginInput,
+  UserGoal,
   ResetPasswordInput,
   VerifyOtpInput,
 } from '@blendi/shared';
@@ -40,7 +41,7 @@ export interface AuthUser {
   blendiOwnership?: BlendiOwnership;
   otherBlenderModel?: string | null;
   dietaryPreferences?: DietaryPreference[];
-  goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+  goal: UserGoal;
   locale: 'en' | 'pt-BR';
   unitSystem: 'metric' | 'imperial';
   /** Timezone IANA do usuário (ex: 'America/Sao_Paulo'). Sincronizado com o dispositivo. */

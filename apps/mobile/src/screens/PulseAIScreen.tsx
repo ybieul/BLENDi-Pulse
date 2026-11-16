@@ -28,6 +28,7 @@ import type {
   PantryAnalysisResult,
   PulseAiRecipe,
   PulseAiRecipePreview,
+  UserGoal,
 } from '@blendi/shared';
 
 import {
@@ -89,8 +90,7 @@ const PAYWALL_PREVIEW_SOURCE = 'pulse_ai';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
-type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery';
+type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery' | 'weightLoss';
 
 interface LockedPreviewState {
   previewId: string;
@@ -116,6 +116,7 @@ const GOAL_I18N_KEYS: Record<UserGoal, PulseAiGoalKey> = {
   Wellness: 'wellness',
   Energy: 'energy',
   Recovery: 'recovery',
+  WeightLoss: 'weightLoss',
 };
 
 const GOAL_SUGGESTION_FIELDS = ['suggestion1', 'suggestion2', 'suggestion3'] as const;

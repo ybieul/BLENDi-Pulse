@@ -49,11 +49,13 @@ jest.mock('../../store/auth.store', () => ({
 // Sistema de unidades do store, lido a cada render; setUnitSystem o altera
 // (a tela re-renderiza porque limpa os campos na mesma troca).
 let mockUnitSystem: 'metric' | 'imperial' = 'metric';
+// Goal escolhido no passo 2 (CP-1.1.9: Weight Loss trava "perder peso").
+let mockSelectedGoal = 'Wellness';
 const mockSetBodyData = jest.fn();
 jest.mock('../../store/onboarding.store', () => ({
   useOnboardingStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
-      selectedGoal: 'Wellness',
+      selectedGoal: mockSelectedGoal,
       unitSystem: mockUnitSystem,
       setBodyData: (...args: unknown[]) => {
         mockSetBodyData(...args);
@@ -90,6 +92,7 @@ afterEach(() => {
   mockPost.mockReset();
   mockSetBodyData.mockReset();
   mockUnitSystem = 'metric';
+  mockSelectedGoal = 'Wellness';
 });
 
 describe('OnboardingBodyScreen — teclado numérico (iOS)', () => {
@@ -499,3 +502,59 @@ describe('OnboardingBodyScreen — polegadas sem "ok" com altura fora da faixa',
     }
   });
 });
+
+// ─── CP-1.1.9: Weight Loss trava o objetivo de peso em "perder" ─────────────
+
+describe('OnboardingBodyScreen — goal Weight Loss', () => {
+  function weightGoalChip(utils: ReturnType<typeof render>, labelKey: string) {
+    return utils.getByRole('button', { name: labelKey });
+  }
+
+  it('"perder peso" já aparece marcado, "manter" e "ganhar" desabilitados, com a explicação', () => {
+    mockSelectedGoal = 'WeightLoss';
+    const utils = render(<OnboardingBodyScreen navigation={{ navigate: jest.fn() }} />);
+
+    expect(weightGoalChip(utils, 'onboarding.weightGoalLose').props.accessibilityState).toEqual({ selected: true, disabled: false });
+    for (const key of ['onboarding.weightGoalMaintain', 'onboarding.weightGoalGain']) {
+      expect(weightGoalChip(utils, key).props.accessibilityState).toEqual({ selected: false, disabled: true });
+    }
+    expect(utils.getByText('onboarding.weightGoalLockedByWeightLoss')).toBeTruthy();
+
+    fireEvent.press(weightGoalChip(utils, 'onboarding.weightGoalGain'));
+    expect(weightGoalChip(utils, 'onboarding.weightGoalLose').props.accessibilityState).toEqual({ selected: true, disabled: false });
+  });
+
+  it('o cálculo vai com goal WeightLoss e weightGoal lose sem a pessoa tocar no objetivo de peso', async () => {
+    mockSelectedGoal = 'WeightLoss';
+    jest.useFakeTimers();
+    mockPost.mockResolvedValue(MACROS_RESPONSE);
+
+    try {
+      const utils = renderScreen();
+      fireEvent.changeText(utils.weight, '80');
+      fireEvent.changeText(utils.height, '175');
+      fireEvent.changeText(utils.birthDate, '15061990');
+      fireEvent.press(utils.getByText('onboarding.biologicalSexFemale'));
+
+      await act(async () => {
+        jest.advanceTimersByTime(700);
+        await Promise.resolve();
+      });
+
+      expect(mockPost).toHaveBeenCalledTimes(1);
+      expect(mockPost.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ goal: 'WeightLoss', weightGoal: 'lose' }));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('com outro goal nada fica desabilitado nem marcado de início', () => {
+    const utils = render(<OnboardingBodyScreen navigation={{ navigate: jest.fn() }} />);
+
+    for (const key of ['onboarding.weightGoalLose', 'onboarding.weightGoalMaintain', 'onboarding.weightGoalGain']) {
+      expect(weightGoalChip(utils, key).props.accessibilityState).toEqual({ selected: false, disabled: false });
+    }
+    expect(utils.queryByText('onboarding.weightGoalLockedByWeightLoss')).toBeNull();
+  });
+});
+

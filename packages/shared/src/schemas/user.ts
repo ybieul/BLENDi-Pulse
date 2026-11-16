@@ -18,11 +18,34 @@ import { z } from 'zod';
 import { isValidIanaTimezone } from '../utils/timezone.utils';
 import { rangeErrorMessage } from '../utils/validationRange.utils';
 
-const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const;
+// Fonte única dos valores de `goal` (proposta do blend). Backend (Zod,
+// Mongoose, missões, favoritos) e app importam esta lista em vez de repeti-la.
+// 'WeightLoss' (CP-1.1.9): sempre acompanhado de weightGoal 'lose' — ver
+// WEIGHT_LOSS_GOAL abaixo.
+export const USER_GOAL_VALUES = ['Muscle', 'Wellness', 'Energy', 'Recovery', 'WeightLoss'] as const;
+export type UserGoal = (typeof USER_GOAL_VALUES)[number];
+
+export const WEIGHT_GOAL_VALUES = ['lose', 'maintain', 'gain'] as const;
+export type WeightGoal = (typeof WEIGHT_GOAL_VALUES)[number];
+
+// Regra do CP-1.1.9: goal 'WeightLoss' só existe com weightGoal 'lose'. O
+// backend grava 'lose' quando o goal vira WeightLoss sem weightGoal no corpo
+// e recusa (400, WEIGHT_LOSS_REQUIRES_LOSE_ERROR_CODE) um weightGoal
+// diferente; o app trava a opção "perder peso" nas telas de corpo.
+export const WEIGHT_LOSS_GOAL = 'WeightLoss' as const satisfies UserGoal;
+export const WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL = 'lose' as const satisfies WeightGoal;
+export const WEIGHT_LOSS_REQUIRES_LOSE_ERROR_CODE = 'user/weight-loss-requires-lose';
+
+/** weightGoal permitido para o goal? Só WeightLoss restringe (a 'lose'). */
+export function isWeightGoalAllowedForGoal(goal: UserGoal | null | undefined, weightGoal: WeightGoal): boolean {
+  return goal !== WEIGHT_LOSS_GOAL || weightGoal === WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL;
+}
+
+const userGoalValues = USER_GOAL_VALUES;
 const imcClassificationValues = ['underweight', 'normal', 'overweight', 'obese'] as const;
 const unitSystemValues = ['metric', 'imperial'] as const;
 const biologicalSexValues = ['male', 'female'] as const;
-const weightGoalValues = ['lose', 'maintain', 'gain'] as const;
+const weightGoalValues = WEIGHT_GOAL_VALUES;
 const activityLevelValues = [
   'sedentary',
   'lightlyActive',
@@ -80,6 +103,7 @@ export const DAILY_PROTEIN_TARGET_MAX = 400;
 // mudar); teto (800) confirmado por calculo: maior peso aceito pelo schema
 // (300kg) × maior multiplicador de PROTEIN_MULTIPLIERS (Recovery, 2.2g/kg)
 // = 660g — 800 fica acima com margem, mesmo numa edição manual extrema.
+// WeightLoss (2.0g/kg, CP-1.1.9) não passa do Recovery: o teto continua valendo.
 export const DAILY_PROTEIN_TARGET_VALIDATION_MIN = 10;
 export const DAILY_PROTEIN_TARGET_VALIDATION_MAX = 800;
 

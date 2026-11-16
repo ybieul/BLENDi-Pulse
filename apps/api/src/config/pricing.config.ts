@@ -1,7 +1,7 @@
 // Fonte unica de verdade para precos e IDs comerciais do Pulse Pro no backend.
 // Qualquer ajuste de preco deve ser feito somente neste arquivo.
 
-import type { BlendiModel } from '../models/User';
+import { BLENDER_LIMITS, type BlenderLimit } from '@blendi/shared';
 
 export const PRO_MONTHLY_PRICE_USD = 6.99;
 export const PRO_ANNUAL_PRICE_USD = 39.99;
@@ -19,32 +19,10 @@ export function normalizeProductId(productId: string): string {
   return separatorIndex === -1 ? productId : productId.slice(0, separatorIndex);
 }
 
-// Capacidade física de cada modelo BLENDi. Usado pelo promptBuilder do Pulse AI
-// para nunca sugerir um volume de ingredientes ou uma proteina por receita
-// acima do que o hardware do usuario comporta.
-export interface BlenderLimit {
-  maxVolumeMl: number;
-  maxVolumeOz: number;
-  maxProteinGrams: number;
-}
-
-export const BLENDER_LIMITS: Record<BlendiModel, BlenderLimit> = {
-  Lite: {
-    maxVolumeMl: 400,
-    maxVolumeOz: 17.5,
-    maxProteinGrams: 35,
-  },
-  ProPlus: {
-    maxVolumeMl: 400,
-    maxVolumeOz: 17.5,
-    maxProteinGrams: 45,
-  },
-  Steel: {
-    maxVolumeMl: 600,
-    maxVolumeOz: 21,
-    maxProteinGrams: 55,
-  },
-} as const;
+// Capacidade física de cada modelo BLENDi — desde o CP-1.1.9 mora no shared
+// (fonte única também para o filtro das receitas da Home no app). Reexportado
+// aqui para os consumidores do backend continuarem importando deste arquivo.
+export { BLENDER_LIMITS, type BlenderLimit };
 
 export const PRICING_CONFIG = {
   PRO_MONTHLY_PRICE_USD,

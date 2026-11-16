@@ -1,8 +1,10 @@
 import mongoose, { type Document } from 'mongoose';
-import type { BlendiModel, UserGoal } from './User';
+import { USER_GOAL_VALUES, type UserGoal } from '@blendi/shared';
+
+import type { BlendiModel } from './User';
 
 const blendiModelValues = ['Lite', 'ProPlus', 'Steel'] as const satisfies readonly BlendiModel[];
-const userGoalValues = ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const satisfies readonly UserGoal[];
+const userGoalValues = USER_GOAL_VALUES;
 
 export interface IFavoriteIngredient {
   name: string;

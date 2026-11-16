@@ -82,27 +82,33 @@ const TITLE_KEYS: Record<EditSettingType, TranslationKey> = {
 const GOAL_OPTIONS = [
   {
     value: 'Muscle',
-    titleKey: 'onboarding.goalMuscle' as TranslationKey,
-    descriptionKey: 'onboarding.goalMuscleDesc' as TranslationKey,
+    titleKey: 'onboarding.goalMuscle',
+    descriptionKey: 'onboarding.goalMuscleDesc',
     iconName: 'barbell-outline' as IoniconName,
   },
   {
     value: 'Wellness',
-    titleKey: 'onboarding.goalWellness' as TranslationKey,
-    descriptionKey: 'onboarding.goalWellnessDesc' as TranslationKey,
+    titleKey: 'onboarding.goalWellness',
+    descriptionKey: 'onboarding.goalWellnessDesc',
     iconName: 'heart-outline' as IoniconName,
   },
   {
     value: 'Energy',
-    titleKey: 'onboarding.goalEnergy' as TranslationKey,
-    descriptionKey: 'onboarding.goalEnergyDesc' as TranslationKey,
+    titleKey: 'onboarding.goalEnergy',
+    descriptionKey: 'onboarding.goalEnergyDesc',
     iconName: 'flash-outline' as IoniconName,
   },
   {
     value: 'Recovery',
-    titleKey: 'onboarding.goalRecovery' as TranslationKey,
-    descriptionKey: 'onboarding.goalRecoveryDesc' as TranslationKey,
+    titleKey: 'onboarding.goalRecovery',
+    descriptionKey: 'onboarding.goalRecoveryDesc',
     iconName: 'moon-outline' as IoniconName,
+  },
+  {
+    value: 'WeightLoss',
+    titleKey: 'onboarding.goalWeightLoss',
+    descriptionKey: 'onboarding.goalWeightLossDesc',
+    iconName: 'trending-down-outline' as IoniconName,
   },
 ] as const;
 

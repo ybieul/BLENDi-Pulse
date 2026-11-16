@@ -60,9 +60,11 @@ All five are prompt-level instructions: they shape what the model is asked to do
 
 | Model | Max volume | Max protein |
 |---|---|---|
-| Lite | 400ml / 17.5oz | 35g |
-| ProPlus | 400ml / 17.5oz | 45g |
-| Steel | 600ml / 21oz | 55g |
+| Lite | 400ml / 13.5oz | 35g |
+| ProPlus | 400ml / 13.5oz | 45g |
+| Steel | 600ml / 20.2oz | 55g |
+
+> Updated in CP-1.1.9: the oz values were 17.5 / 17.5 / 21 and did not match the ml. The ml (the cup's MAX line, confirmed by Jon) is now the source of truth and the oz is derived from it, rounded down; `BLENDER_LIMITS` moved to `packages/shared/src/blenderLimits.ts`. Since CP-1.1.9, volume **is** validated by the backend and recipes above the protein or volume limit are blocked after one retry — see [cp-1.1.9-weight-loss-filtro-home.md](../fixes/cp-1.1.9-weight-loss-filtro-home.md#achado-7--limite-físico-do-blendi).
 
 If the recipe's protein exceeds the model's limit, the handler sends one retry call to the AI provider with a message stating the exact violation (declared protein vs. the maximum allowed) and asking for a corrected recipe. This retry exists specifically because the prompt instruction alone is not always enough — under an adversarial request like "give me the maximum protein possible," the model can ignore it.
 

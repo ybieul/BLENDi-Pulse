@@ -54,7 +54,7 @@ import { usePulseAIStore } from '../store/pulseAi.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
 import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
 import type { AppTabScreenProps } from '../navigation/types';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { DietaryPreference, PulseAiRecipe, UserGoal } from '@blendi/shared';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ProfileSkeleton, RecipeCardSkeleton, SkeletonLoader } from '../components/ui';
@@ -93,7 +93,6 @@ const DEFAULT_MISSION_ICON: IoniconName = 'trophy-outline';
 
 // ─── Response types ───────────────────────────────────────────────────────────
 
-type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 
 interface UserProfileData {
@@ -102,6 +101,7 @@ interface UserProfileData {
   email: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
+  dietaryPreferences?: DietaryPreference[];
   preferredLanguage: string;
   timezone: string;
   dailyProteinTarget: number;
@@ -255,6 +255,12 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   // Pro se o modelo for ProPlus ou Steel; Free se for Lite ou indefinido
   const isPro = profile?.isPro ?? authUser?.isPro ?? false;
 
+  // Filtro da receita do dia (CP-1.1.9). A tela de metas atualiza o usuário
+  // local e invalida a query do perfil ao salvar a dieta: a Home re-renderiza
+  // com a dieta nova sem reiniciar o app.
+  const dietaryPreferences = profile?.dietaryPreferences ?? authUser?.dietaryPreferences ?? [];
+  const blendiModel: BlendiModel = profile?.blendiModel ?? authUser?.blendiModel ?? 'Lite';
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleLogWater = useCallback(async () => {
@@ -295,6 +301,16 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const handleStartBlend = useCallback((recipe: PulseAiRecipe) => {
     navigation.navigate('Blend', { recipe });
   }, [navigation]);
+
+  // Nenhuma receita fixa compatível com a dieta: leva à Pulse AI com o pedido
+  // já preenchido (mesmo caminho dos Quick Protocols).
+  const handleAskPulseAiForRecipe = useCallback(
+    (prompt: string) => {
+      setPendingProtocol(prompt);
+      navigation.navigate('PulseAI', { screen: 'PulseAIChat' });
+    },
+    [navigation, setPendingProtocol],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -604,7 +620,10 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
             <View style={styles.rowPad}>
               <DailyRecipeCard
                 goal={profile?.goal ?? 'Wellness'}
+                dietaryPreferences={dietaryPreferences}
+                blendiModel={blendiModel}
                 onStartBlend={handleStartBlend}
+                onAskPulseAi={handleAskPulseAiForRecipe}
               />
             </View>
 

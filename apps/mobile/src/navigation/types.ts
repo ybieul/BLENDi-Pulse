@@ -8,7 +8,7 @@ import type {
   BottomTabScreenProps,
 } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { BlendiOwnership, DietaryPreference, PulseAiRecipe } from '@blendi/shared';
+import type { BlendiOwnership, DietaryPreference, PulseAiRecipe, UserGoal } from '@blendi/shared';
 import type { ConversationDetail } from '../services/conversation.service';
 
 export type AuthStackParamList = {
@@ -75,7 +75,7 @@ export type OnboardingStackParamList = {
 export type OnboardingBuildingPlanParams = {
   blendiModel: 'Lite' | 'ProPlus' | 'Steel';
   blendiOwnership: BlendiOwnership;
-  goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
+  goal: UserGoal;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
   dailyCarbTarget: number;

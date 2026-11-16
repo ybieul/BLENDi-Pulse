@@ -25,6 +25,7 @@ import {
   DAILY_CALORIE_TARGET_MIN,
   DAILY_PROTEIN_TARGET_VALIDATION_MAX,
   DAILY_PROTEIN_TARGET_VALIDATION_MIN,
+  USER_GOAL_VALUES,
 } from './user';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ export const registerSchema = z.object({
     message: 'errors.validation.invalid_option',
   }),
 
-  goal: z.enum(['Muscle', 'Wellness', 'Energy', 'Recovery'], {
+  goal: z.enum(USER_GOAL_VALUES, {
     required_error: 'errors.validation.required',
     message: 'errors.validation.invalid_option',
   }),

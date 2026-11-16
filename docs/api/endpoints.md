@@ -53,7 +53,7 @@ Creates a new user account and returns the initial session tokens.
 | `password` | string | Yes | Minimum 8 characters, maximum 72, must include uppercase, lowercase, and a digit |
 | `name` | string | Yes | 2 to 60 characters |
 | `blendiModel` | string | Yes | One of `Lite`, `ProPlus`, `Steel` |
-| `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
+| `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery`, `WeightLoss` |
 | `preferredLanguage` | string | No | One of `en`, `pt-BR`; defaults to `en` when omitted |
 | `dailyProteinTarget` | number | Yes | Integer between 10 and 800 |
 | `dailyCalorieTarget` | number | Yes | Integer between 300 and 15000 |
@@ -75,7 +75,7 @@ Creates a new user account and returns the initial session tokens.
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": null,
       "dietaryPreferences": [],
-      "goal": "Muscle | Wellness | Energy | Recovery",
+      "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
       "timezone": "string",
@@ -94,7 +94,7 @@ Creates a new user account and returns the initial session tokens.
 
 `blendiOwnership`, `otherBlenderModel` and `dietaryPreferences` are **not** accepted at registration (the Zod schema strips them) — a new account always starts as `blendiOwnership: "blendi"`, `otherBlenderModel: null`, `dietaryPreferences: []`, and the real values are collected by the onboarding and saved through `PATCH /users/me`. They are returned here (and in every other endpoint that returns the full user, see `GET /users/me`) so the client never has to guess their defaults.
 
-`dailyFatTarget` is derived automatically from `dailyCalorieTarget` (30% of calories, converted to grams) at account creation — it is never part of the request body. The body-composition profile fields collected later in the onboarding flow (`weightGoal`, `activityLevel`, `targetWeight`, `birthDate`, `biologicalSex`) are **not** part of registration: they are not accepted in this request body and are not present in this response. The account is created with internal placeholder defaults for them, which are overwritten by the first real `PATCH /users/me` that completes the onboarding body step (see `completingBodyOnboarding` under `PATCH /users/me` below).
+`dailyFatTarget` is derived automatically from `dailyCalorieTarget` (30% of calories, converted to grams) at account creation — it is never part of the request body. The body-composition profile fields collected later in the onboarding flow (`weightGoal`, `activityLevel`, `targetWeight`, `birthDate`, `biologicalSex`) are **not** part of registration: they are not accepted in this request body and are not present in this response. The account is created with internal placeholder defaults for them, which are overwritten by the first real `PATCH /users/me` that completes the onboarding body step (see `completingBodyOnboarding` under `PATCH /users/me` below). Exception (CP-1.1.9): an account registered with `goal: "WeightLoss"` is created with `weightGoal: "lose"` instead of the `maintain` placeholder — `WeightLoss` never exists without `lose` (a `weightGoal` sent in this body is still stripped). The same rule is enforced on every document `create`/`save` by a Mongoose `pre('validate')` hook.
 
 **Status codes**
 
@@ -134,7 +134,7 @@ Authenticates an existing user and returns a fresh access token and refresh toke
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": null,
       "dietaryPreferences": [],
-      "goal": "Muscle | Wellness | Energy | Recovery",
+      "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
       "timezone": "string",
@@ -481,7 +481,7 @@ None.
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": "Ninja BN401",
       "dietaryPreferences": ["vegan", "nut_free"],
-      "goal": "Muscle | Wellness | Energy | Recovery",
+      "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "weightGoal": "lose | maintain | gain",
       "weight": 78,
       "height": 180,
@@ -561,8 +561,8 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `blendiOwnership` | string | No | One of `blendi`, `other` (older model or another brand), `none` (no BLENDi yet) — see *Blender ownership rules* below |
 | `otherBlenderModel` | string | No | Free text with brand/model for `blendiOwnership: "other"`. Control characters (including line breaks and bidi overrides) are replaced by a space, then the text is trimmed; at most 60 characters after trimming (`errors.validation.too_long`); an empty/blank string clears the field. Never sent to the AI, to analytics or to logs |
 | `dietaryPreferences` | string[] | No | At most 16 items, each one of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`; duplicates are removed (order of first occurrence is kept); `[]` means "no restrictions". Unknown value, wrong type or more than 16 items → `400` with a single `errors.validation.invalid_option` issue. Applied by the Pulse AI and Pantry Scanner prompts (see those endpoints) |
-| `goal` | string | No | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
-| `weightGoal` | string | No | One of `lose`, `maintain`, `gain` — weight direction goal, independent of `goal`; triggers an automatic recalculation of `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` (see below) |
+| `goal` | string | No | One of `Muscle`, `Wellness`, `Energy`, `Recovery`, `WeightLoss` |
+| `weightGoal` | string | No | One of `lose`, `maintain`, `gain` — weight direction goal, independent of `goal`; triggers an automatic recalculation of `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` (see below). With `goal: "WeightLoss"` (sent or saved) only `lose` is accepted — see *Weight Loss goal rule* below |
 | `dailyProteinTarget` | number | No | Integer between 10 and 800 |
 | `dailyCarbTarget` | number | No | Integer between 0 and 1500 |
 | `dailyCalorieTarget` | number | No | Integer between 300 and 15000 |
@@ -577,6 +577,16 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `completingBodyOnboarding` | boolean | No | Must be exactly `true` when present; transient signal (never persisted as-is) that marks this specific PATCH as the real onboarding body-step completion — this is the only way the backend sets `hasRealBodyProfile: true` |
 | `preferredLanguage` | string | No | One of `en`, `pt-BR`; stored internally as `locale` |
 | `unitSystem` | string | No | One of `metric`, `imperial` |
+
+**Weight Loss goal rule (CP-1.1.9).** `goal: "WeightLoss"` always comes with `weightGoal: "lose"`. The rule looks at the user's **final** state (the `goal` in the body, or the saved one):
+
+| Request | Result |
+|---|---|
+| Final goal `WeightLoss`, no `weightGoal` in the body | `weightGoal: "lose"` is written in the same update as the goal; if this changes the saved `weightGoal`, it counts as a recalculation trigger |
+| Final goal `WeightLoss` + `weightGoal` `maintain`/`gain` in the body (changing the goal, or only the `weightGoal` with `WeightLoss` saved) | `400` `user/weight-loss-requires-lose`; nothing is saved |
+| Leaving `WeightLoss` for another goal | `weightGoal` kept |
+
+Atomicity: a request that sends only `weightGoal: "maintain"`/`"gain"` is written with a `{ goal: { $ne: "WeightLoss" } }` filter; if another request switched the goal to `WeightLoss` between the read and the write, the update does not match and the response is the same `400`. The database never holds `WeightLoss` with a `weightGoal` other than `lose`.
 
 When the body includes `weight`, `height`, `activityLevel`, `weightGoal`, `birthDate`, `biologicalSex`, or `goal`, and the user's profile has all of weight/height/birthDate/biologicalSex/activityLevel/weightGoal/goal available (merging this request's values with whatever is already saved), the backend recalculates `dailyProteinTarget`, `dailyCalorieTarget`, `dailyCarbTarget`, and `dailyFatTarget` from scratch (same Mifflin-St Jeor formula as `POST /users/calculate-macros`) and that recalculated value **overrides** any `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` sent in the same request body.
 
@@ -644,7 +654,7 @@ Changing the diet or the model does not touch `AiCache` entries by itself: the d
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": null,
       "dietaryPreferences": [],
-      "goal": "Muscle | Wellness | Energy | Recovery",
+      "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "weightGoal": "lose | maintain | gain",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
@@ -691,6 +701,7 @@ The request field `preferredLanguage` is normalized to the persisted `locale` fi
 |---|---|
 | `200` | Profile updated successfully (the response may carry `warnings`, see above) |
 | `400` | Request body failed Zod validation; **nothing** is saved — a single invalid field rejects the whole request |
+| `400` | `user/weight-loss-requires-lose`: `WeightLoss` goal (sent or saved) with `weightGoal` `maintain`/`gain` — see *Weight Loss goal rule* (CP-1.1.9) |
 | `401` | Missing, invalid, or expired Bearer token |
 | `404` | Authenticated user record not found |
 | `413` | Request body larger than 50 kB |
@@ -803,8 +814,8 @@ Calculates IMC, TDEE, and daily macro targets for onboarding and profile setup.
 | `birthDate` | string | Yes | ISO 8601 date (`YYYY-MM-DD`); must resolve to a plausible age between 13 and 120 years |
 | `biologicalSex` | string | Yes | One of `male`, `female` |
 | `activityLevel` | string | Yes | One of `sedentary`, `lightlyActive`, `moderatelyActive`, `veryActive`, `extremelyActive` |
-| `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery` |
-| `weightGoal` | string | Yes | One of `lose`, `maintain`, `gain` |
+| `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery`, `WeightLoss` |
+| `weightGoal` | string | Yes | One of `lose`, `maintain`, `gain`. With `goal: "WeightLoss"`: when omitted, `lose` is used (not the saved `weightGoal` of the profile fallback); `maintain`/`gain` → `400 user/weight-loss-requires-lose` (CP-1.1.9) |
 | `unitSystem` | string | Yes | One of `metric`, `imperial` |
 
 The current implementation converts imperial values to metric when needed, computes IMC, then derives TDEE and the daily targets using the Mifflin-St Jeor formula with the user's real age (derived from `birthDate` at the moment of the request, via `calculateAge`) and real `biologicalSex` — never a fixed age or sex. The only real mobile caller (`OnboardingBodyScreen`) always converts to metric locally (since CP-1.1.1f, imperial height is typed in feet and inches and converted to cm on the device) and hard-codes `unitSystem: 'metric'`, so the before-conversion validation-order caveat on `weight`/`height`/`targetWeight` above is never reached in practice today.
@@ -841,6 +852,7 @@ The current implementation converts imperial values to metric when needed, compu
 |---|---|
 | `200` | Macro targets calculated successfully |
 | `400` | Request body failed Zod validation |
+| `400` | `user/weight-loss-requires-lose`: `goal: "WeightLoss"` with `weightGoal` `maintain`/`gain` (CP-1.1.9) |
 | `401` | Missing, invalid, or expired Bearer token |
 | `500` | Unexpected server error |
 
@@ -1080,7 +1092,7 @@ Creates a new blend log and updates the user's derived streak and blend counters
 }
 ```
 
-`xpAwarded` is the sum of direct blend XP, any protein or calorie goal XP unlocked by this blend, and any mission XP completed by the same action. `leveledUp` and `newLevel` are derived by comparing the level before and after all XP operations executed in parallel.
+`xpAwarded` is the sum of direct blend XP, any protein or calorie goal XP unlocked by this blend, and any mission XP completed by the same action. Calorie goal XP (and the `hitCalorieGoal` mission progress) is given when the day's blend calories reach `dailyCalorieTarget` — with no upper bound — except for `goal: "WeightLoss"`, where it is only given while the day's total is between 90% and 100% of the target, so exceeding the target in a deficit is never rewarded (CP-1.1.9). `leveledUp` and `newLevel` are derived by comparing the level before and after all XP operations executed in parallel.
 
 **Status codes**
 
@@ -1863,9 +1875,11 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 4. Normalizes the message, generates a MongoDB cache key using user context (including the user's `dietaryPreferences`, normalized and order-independent) plus `AI_PROVIDER` and `AI_MODEL`, and checks the `AiCache` collection. Because the diet is part of the key, changing it never returns a recipe generated under the previous diet, and returning to the same diet reuses the original entry.
 5. On a cache hit, returns the cached recipe immediately with `fromCache: true` and the remaining daily quota.
 6. On a cache miss, fetches the last 5 blend recipe names for prompt context.
-7. Builds the final prompt through `promptBuilder.service`, personalizing it with the user's `blendiModel` (physical blender guardrails — power/protein limits per model), `goal` (Muscle/Wellness/Energy/Recovery), `weightGoal` (lose/maintain/gain — adds explicit calorie/recipe bias guidance for the chosen weight direction) and `dietaryPreferences` (see *Dietary restrictions in the prompt* below) in addition to macro targets, unit system, and recent blend history. The free-text `otherBlenderModel` is never read by this endpoint.
+7. Builds the final prompt through `promptBuilder.service`, personalizing it with the user's `blendiModel` (physical blender guardrails — power/protein limits per model), `goal` (Muscle/Wellness/Energy/Recovery/WeightLoss — `WeightLoss` adds "prioritize satiety, high protein and fiber, and lower calories per serving" on top of the `lose` guidance), `weightGoal` (lose/maintain/gain — adds explicit calorie/recipe bias guidance for the chosen weight direction) and `dietaryPreferences` (see *Dietary restrictions in the prompt* below) in addition to macro targets, unit system, and recent blend history. The free-text `otherBlenderModel` is never read by this endpoint.
 8. Calls the configured AI provider abstraction, which is selected at runtime through `AI_PROVIDER`, `AI_MODEL`, and `AI_API_KEY`.
 9. Parses the returned JSON and validates it against `pulseAiRecipeSchema`; if the first response is invalid JSON, the backend retries once with a strict JSON-only instruction.
+9a. **Physical blender limits (CP-1.1.9, blocking).** The recipe must fit `BLENDER_LIMITS[blendiModel]` (`packages/shared/src/blenderLimits.ts`): protein ≤ 35 / 45 / 55 g and volume ≤ 400 / 400 / 600 ml (Lite / Pro+ / Steel — the cup's MAX line; the ml is the source of truth and the prompt shows imperial users 13.5 / 13.5 / 20.2 oz, derived from it and rounded down). Volume is estimated from each ingredient's free-text `amount` (`apps/api/src/utils/recipeVolume.utils.ts`: g, ml, cups, tbsp/tsp, oz, fl oz, lb, en and pt-BR, fractions; 1 g of a solid counts as 1 ml; amounts without a measurable unit count as 0, so the estimate is a lower bound). Above a limit → one retry; still above or invalid → `422 pulseai/blender-limit-unmet`. The limits are checked again after the macro and diet retries, and a cached recipe above the limits is deleted and regenerated.
+9b. **Retry failures.** When a blocking retry (blender limits or diet/ice) throws — provider down, quota, network — the recipe was never judged, so the response is `503 pulseai/ai-unavailable`, not the limit/diet code (CP-1.1.9). Any blocked answer returns the daily usage and writes no cache, conversation turn or XP.
 10. Persists the validated recipe in MongoDB cache and returns it with `fromCache: false` and `usageRemaining`.
 
 **Success response**
@@ -1936,7 +1950,7 @@ The diet is enforced **by the prompt only**: there is no ingredient validation o
 When a **free** user has already used the 3 messages of the day (`dailyAiUsage` reached `DAILY_FREE_LIMIT`) and still has the daily preview (`dailyAiPreviewUsage < DAILY_FREE_PREVIEW_LIMIT`, which is 1), the request is not rejected:
 
 1. The preview slot is reserved atomically (`findOneAndUpdate` with `isPro: false` and `dailyAiPreviewUsage` below the limit, or the field missing on old accounts, plus `$inc`). `dailyAiUsage` is not touched.
-2. The recipe is produced exactly like a normal answer, from the cache or from a fresh generation with the protein guardrail, the macro check and the diet/ice validation.
+2. The recipe is produced exactly like a normal answer, from the cache or from a fresh generation with the blender limits (protein and volume, blocking since CP-1.1.9), the macro check and the diet/ice validation.
 3. The full recipe is stored in `locked_previews` (`kind: 'pulse_ai'`, `expiresAt` = now + 24 h, TTL index).
 4. The conversation gets a **locked turn**: `content` is `{ macros }` only, with `locked: true`, `previewId` and `previewExpiresAt`. `lastRecipeName` is not set.
 5. The response carries only the macros:
@@ -1970,9 +1984,10 @@ The preview counter is reset together with `dailyAiUsage` (same `aiUsageResetDat
 | `401` | Missing, invalid, or expired Bearer token |
 | `404` | Authenticated user record not found |
 | `422` | `pulseai/dietary-restriction-unmet`: the recipe still violated the user's diet (or brought ice for the Lite) after the retry |
+| `422` | `pulseai/blender-limit-unmet`: the recipe was still above the blender's protein or volume limit after the retry, or went above it after the later retries (CP-1.1.9) |
 | `429` | Daily Pulse AI limit reached for a non-Pro user, and the daily locked preview was already used |
 | `500` | AI provider returned invalid JSON after retry, or another unexpected server error occurred |
-| `503` | Configured AI provider is temporarily unavailable |
+| `503` | `pulseai/ai-unavailable`: the AI provider is temporarily unavailable — on the main generation or on a blocking retry (blender limits or diet), see step 9b |
 
 ### GET /pulse-ai/previews/:id
 
@@ -2117,6 +2132,7 @@ Analyzes a pantry image, filters low-confidence ingredients, and generates up to
 6. Parses and validates the returned JSON; if `noFoodDetected: true`, returns `200 OK` with empty arrays and does not increment the scanner.
 7. Filters the detected ingredients to confidence levels `high` and `medium`; if the filtered array becomes empty, returns `200 OK` with `noUsableIngredients: true` and does not increment the scanner.
 8. Only after valid ingredients are confirmed, increments `scanCount` atomically with `$inc`, then generates recipes through `promptBuilder.service.ts` (the same internal prompt function as Pulse AI, so the user's `dietaryPreferences` produce the same "Dietary restrictions (mandatory)" block — see `POST /pulse-ai/chat`) and returns the Pantry Scanner XP payload.
+9. Each generated recipe goes through the blender limits (protein and volume, one retry, then discarded — same rules as `POST /pulse-ai/chat` step 9a, CP-1.1.9), the macro check and the diet/ice check (one retry, then discarded), and the blender limits once more at the end. A recipe whose blocking retry fails at the AI provider is lost as "AI unavailable"; if no recipe is left, the response code says why (see the status codes below).
 
 With a diet active, ingredients detected in the photo that violate it are treated by the prompt as unavailable (the recipes are built from the compliant remaining ones, and the list is empty only when fewer than 2 distinct compliant recipes are possible), and ingredient names are declared to be data, never instructions. The backend does not filter ingredients by name.
 
@@ -2196,7 +2212,9 @@ When recipe generation fails or the AI returns no recipe (CP-1.1.1d), the respon
 | `404` | Authenticated user record not found |
 | `429` | Free-tier monthly Pantry Scanner limit reached |
 | `500` | Vision provider returned invalid JSON after parsing |
-| `503` | Vision provider is temporarily unavailable |
+| `422` | `scanner/dietary-restriction-unmet`: every generated recipe was discarded and at least one by the diet/ice check (scan returned, no XP) |
+| `422` | `scanner/blender-limit-unmet`: every generated recipe was discarded, all of them by the blender protein/volume limit (scan returned, no XP; CP-1.1.9) |
+| `503` | `scanner/vision-unavailable`: the vision provider is temporarily unavailable, or every recipe was lost and at least one because a blocking retry failed at the AI provider (CP-1.1.9) |
 
 ---
 
@@ -2213,6 +2231,8 @@ Returns the authenticated user's daily missions for the current local day, gener
 None.
 
 Mission generation uses a goal-based weighted pool with dynamic filtering so impossible missions are removed before selection, while fallback mission types ensure that exactly three unique missions are always returned.
+
+The `WeightLoss` pool (CP-1.1.9) focuses on protein and consistency (`hitProteinGoal` 3, `makeBlend` 3, `hitHydrationGoal` 2, `makeBlendFromFavorite` 2, `usePulseAI` 1, `favoriteRecipe` 1) and never includes `hitCalorieGoal`.
 
 **Success response**
 
@@ -2775,7 +2795,7 @@ Resynchronizes the authenticated user's subscription state from RevenueCat and s
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": null,
       "dietaryPreferences": [],
-      "goal": "Muscle | Wellness | Energy | Recovery",
+      "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "locale": "en | pt-BR",
       "unitSystem": "metric | imperial",
       "timezone": "America/Sao_Paulo",

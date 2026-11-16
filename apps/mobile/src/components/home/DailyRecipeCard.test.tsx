@@ -17,7 +17,7 @@
 // mesma função exportada, em vez de hardcodar qual receita "deveria" ser
 // — isso evita que os testes fiquem acoplados ao fuso de quem os executa.
 import { fireEvent, render } from '@testing-library/react-native';
-import type { PulseAiRecipe } from '@blendi/shared';
+import type { PulseAiRecipe, UserGoal } from '@blendi/shared';
 
 jest.mock('../../hooks/useColors', () => ({
   useColors: () => ({
@@ -38,9 +38,19 @@ import { DAILY_RECIPES, DailyRecipeCard, getLocalDayIndex } from './DailyRecipeC
 const MS_PER_DAY = 86400000;
 const MUSCLE_POOL_SIZE = DAILY_RECIPES.Muscle.length;
 
-function renderAndPressStart(goal: 'Muscle' | 'Wellness' | 'Energy' | 'Recovery') {
+// Sem dieta e fora do Lite (CP-1.1.9): o pool é o do goal inteiro, na mesma
+// ordem de antes do filtro — as expectativas abaixo não mudaram.
+function renderAndPressStart(goal: UserGoal) {
   const onStartBlend = jest.fn<void, [PulseAiRecipe]>();
-  const { getByRole, unmount } = render(<DailyRecipeCard goal={goal} onStartBlend={onStartBlend} />);
+  const { getByRole, unmount } = render(
+    <DailyRecipeCard
+      goal={goal}
+      dietaryPreferences={[]}
+      blendiModel="ProPlus"
+      onStartBlend={onStartBlend}
+      onAskPulseAi={jest.fn()}
+    />
+  );
 
   fireEvent.press(getByRole('button'));
   unmount();

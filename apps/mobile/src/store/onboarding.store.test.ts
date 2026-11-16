@@ -83,3 +83,41 @@ describe('onboarding.store — reset', () => {
     expect(store().selectedGoal).toBeNull();
   });
 });
+
+describe('onboarding.store — goal Weight Loss (CP-1.1.9)', () => {
+  const BODY = {
+    weight: 80,
+    height: 175,
+    activityLevel: 'moderatelyActive',
+    birthDate: '1990-06-15',
+    biologicalSex: 'female',
+  };
+
+  it('escolher Weight Loss já grava weightGoal "lose"', () => {
+    store().setGoal('WeightLoss');
+    expect(store().selectedGoal).toBe('WeightLoss');
+    expect(store().weightGoal).toBe('lose');
+  });
+
+  it('os outros goals não mexem no weightGoal', () => {
+    for (const goal of ['Muscle', 'Wellness', 'Energy', 'Recovery'] as const) {
+      store().resetOnboarding();
+      store().setGoal(goal);
+      expect(store().weightGoal).toBeNull();
+    }
+  });
+
+  it('trocar de Weight Loss para outro goal antes da tela de corpo desfaz o "lose" automático', () => {
+    store().setGoal('WeightLoss');
+    store().setGoal('Energy');
+    expect(store().selectedGoal).toBe('Energy');
+    expect(store().weightGoal).toBeNull();
+  });
+
+  it('depois da tela de corpo, trocar de Weight Loss mantém o weightGoal escolhido lá', () => {
+    store().setGoal('WeightLoss');
+    store().setBodyData({ ...BODY, weightGoal: 'lose' });
+    store().setGoal('Muscle');
+    expect(store().weightGoal).toBe('lose');
+  });
+});

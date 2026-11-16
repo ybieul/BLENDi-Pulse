@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { getLocales } from 'expo-localization';
 
-import type { CalculateMacrosResponse } from '@blendi/shared';
+import type { CalculateMacrosResponse, UserGoal } from '@blendi/shared';
 import { calculateMacrosSchema, colors, fontSizes, fonts, fontWeights, spacing } from '@blendi/shared';
 import { api } from '../../config/api';
 import { UnitSystemToggle } from '../../components/ui/UnitSystemToggle';
@@ -48,11 +48,16 @@ import {
   getBodyNumericFields,
   translateBodyFieldError,
 } from '../../utils/bodyFields.utils';
+import {
+  LOCKED_WEIGHT_GOAL_CHIP_OPACITY,
+  isWeightGoalLockedByGoal,
+  isWeightGoalOptionDisabled,
+  resolveDisplayedWeightGoal,
+} from '../../utils/weightGoalLock.utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ActivityLevel = 'sedentary' | 'lightlyActive' | 'moderatelyActive' | 'veryActive';
-type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type BiologicalSex = 'male' | 'female';
 type WeightGoalOption = 'lose' | 'maintain' | 'gain';
 
@@ -151,7 +156,11 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const [inchesText, setInchesText] = useState('');
   const [birthDateText, setBirthDateText] = useState('');
   const [biologicalSex, setBiologicalSex] = useState<BiologicalSex | null>(null);
-  const [weightGoal, setWeightGoal] = useState<WeightGoalOption | null>(null);
+  const [chosenWeightGoal, setWeightGoal] = useState<WeightGoalOption | null>(null);
+  // Weight Loss trava "perder peso" (CP-1.1.9): a opção já aparece marcada e
+  // as outras desabilitadas.
+  const isWeightGoalLocked = isWeightGoalLockedByGoal(selectedGoal);
+  const weightGoal = resolveDisplayedWeightGoal(selectedGoal, chosenWeightGoal);
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<CalculateMacrosResponse | null>(null);
@@ -220,7 +229,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       return;
     }
 
-    const goal: UserGoal = (selectedGoal as UserGoal | null) ?? DEFAULT_GOAL;
+    const goal: UserGoal = selectedGoal ?? DEFAULT_GOAL;
     const requestId = calculationRequestIdRef.current + 1;
     calculationRequestIdRef.current = requestId;
 
@@ -465,6 +474,16 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
       color: colors.text.primary,
       fontWeight: fontWeights.medium,
     },
+    chipDisabled: {
+      opacity: LOCKED_WEIGHT_GOAL_CHIP_OPACITY,
+    },
+    weightGoalLockedHint: {
+      color: colors.text.tertiary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      lineHeight: 18,
+      paddingHorizontal: spacing.xs,
+    },
     sectionLabel: {
       color: colors.text.secondary,
       fontFamily: fonts.body,
@@ -644,20 +663,32 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
             {/* Seletor de objetivo de peso */}
             <Text style={styles.sectionLabel}>{t('onboarding.weightGoalLabel')}</Text>
             <View style={styles.chipRow}>
-              {WEIGHT_GOAL_OPTIONS.map(({ key, labelKey }) => (
-                <Pressable
-                  key={key}
-                  onPress={() => { setWeightGoal(key); }}
-                  style={[styles.chip, weightGoal === key && styles.chipSelected]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: weightGoal === key }}
-                >
-                  <Text style={[styles.chipLabel, weightGoal === key && styles.chipLabelSelected]}>
-                    {t(labelKey)}
-                  </Text>
-                </Pressable>
-              ))}
+              {WEIGHT_GOAL_OPTIONS.map(({ key, labelKey }) => {
+                const isDisabled = isWeightGoalOptionDisabled(selectedGoal, key);
+
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => { setWeightGoal(key); }}
+                    disabled={isDisabled}
+                    style={[
+                      styles.chip,
+                      weightGoal === key && styles.chipSelected,
+                      isDisabled && styles.chipDisabled,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: weightGoal === key, disabled: isDisabled }}
+                  >
+                    <Text style={[styles.chipLabel, weightGoal === key && styles.chipLabelSelected]}>
+                      {t(labelKey)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
+            {isWeightGoalLocked ? (
+              <Text style={styles.weightGoalLockedHint}>{t('onboarding.weightGoalLockedByWeightLoss')}</Text>
+            ) : null}
           </View>
         )}
         bottomContent={(

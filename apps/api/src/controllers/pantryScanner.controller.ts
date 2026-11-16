@@ -41,8 +41,9 @@ import {
 } from '../services/promptBuilder.service';
 import { sendErrorResponse } from '../utils/error.utils';
 import {
-  buildProteinGuardrailRetryMessage,
-  validateProteinGuardrail,
+  buildBlenderLimitRetryMessage,
+  summarizeBlenderLimitViolation,
+  validateBlenderLimits,
 } from '../utils/blenderGuardrail.utils';
 import {
   buildMacroInconsistencyRetryMessage,
@@ -61,6 +62,8 @@ const LOCKED_PREVIEW_KIND = 'pantry_scanner';
 const PREVIEW_NOT_FOUND_CODE = 'scanner/preview-not-found';
 const PREVIEW_LOCKED_CODE = 'scanner/preview-locked';
 const DIETARY_RESTRICTION_UNMET_CODE = 'scanner/dietary-restriction-unmet';
+// CP-1.1.9: todas as receitas passaram do limite físico do BLENDi mesmo após o retry.
+const BLENDER_LIMIT_UNMET_CODE = 'scanner/blender-limit-unmet';
 const PANTRY_RECIPE_COUNT = 2;
 // gemini-2.5-flash consome parte do orçamento de saída com "thinking" interno
 // antes do JSON visível — 1600 truncava as 2 receitas quase sempre. Testado:
@@ -293,31 +296,39 @@ function parsePantryRecipe(content: string): PulseAiRecipe | null {
   }
 }
 
-// Camada 2 do guardrail físico de proteína (blenderGuardrail.utils.ts), mesma
-// rede de segurança já aplicada às receitas do chat do Pulse AI
-// (pulseAi.controller.ts, ensureBlenderGuardrail) — aqui replicada por
-// receita individual, mesmo padrão de ensurePantryRecipeMacroConsistency
-// abaixo (callAi direto, maxTokens 2000, um único retry). Antes desta função,
-// o Pantry Scanner nunca rodava essa camada — uma receita podia declarar
-// proteína acima do limite físico do blender sem nenhuma correção automática.
-async function ensurePantryRecipeProteinGuardrail(
+// Resultado das verificações que podem descartar uma receita (CP-1.1.9):
+// 'unmet' = a receita refeita continua fora da regra (ou veio inválida);
+// 'aiUnavailable' = a nova tentativa falhou no provedor de IA (a receita não
+// foi julgada).
+type PantryEnforcementFailure = 'unmet' | 'aiUnavailable';
+type PantryRecipeEnforcement =
+  | { recipe: PulseAiRecipe; failure?: undefined }
+  | { recipe: null; failure: PantryEnforcementFailure };
+
+// Limite físico do BLENDi (proteína e volume — blenderGuardrail.utils.ts),
+// mesma rede de segurança das receitas do chat do Pulse AI
+// (pulseAi.controller.ts, ensureBlenderGuardrail), por receita: um único
+// retry (callAi direto, maxTokens 2000). CP-1.1.9: se continuar acima do
+// limite (ou vier inválida), a receita é descartada ('unmet') — antes seguia
+// mesmo acima do limite; se o retry falhar no provedor, 'aiUnavailable'.
+async function ensurePantryRecipeBlenderLimits(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
   blendiModel: BlendiModel
-): Promise<PulseAiRecipe> {
-  const initialGuardrail = validateProteinGuardrail(recipe, blendiModel);
+): Promise<PantryRecipeEnforcement> {
+  const initialCheck = validateBlenderLimits(recipe, blendiModel);
 
-  if (initialGuardrail.withinGuardrail) {
-    return recipe;
+  if (initialCheck.withinLimits) {
+    return { recipe };
   }
 
-  console.info('[pantryScanner] protein guardrail exceeded, retrying', {
+  console.info('[pantryScanner] blender limit exceeded, retrying', {
     blendiModel,
-    discrepancy: initialGuardrail.discrepancy,
+    violation: summarizeBlenderLimitViolation(initialCheck.violation),
   });
 
   try {
-    const retryMessage = buildProteinGuardrailRetryMessage(initialGuardrail.discrepancy);
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation);
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
       messages: [
@@ -329,14 +340,29 @@ async function ensurePantryRecipeProteinGuardrail(
     });
     const retriedRecipe = parsePantryRecipe(retryResponse.content);
 
-    return retriedRecipe ?? recipe;
+    if (!retriedRecipe) {
+      console.warn('[pantryScanner] blender limit retry returned an invalid recipe, discarding');
+      return { recipe: null, failure: 'unmet' };
+    }
+
+    const retriedCheck = validateBlenderLimits(retriedRecipe, blendiModel);
+
+    if (!retriedCheck.withinLimits) {
+      console.warn('[pantryScanner] blender limit still exceeded after retry, discarding', {
+        blendiModel,
+        violation: summarizeBlenderLimitViolation(retriedCheck.violation),
+      });
+      return { recipe: null, failure: 'unmet' };
+    }
+
+    return { recipe: retriedRecipe };
   } catch (error) {
-    console.error('[pantryScanner] protein guardrail retry failed', {
+    console.error('[pantryScanner] blender limit retry failed, discarding', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return recipe;
+    return { recipe: null, failure: 'aiUnavailable' };
   }
 }
 
@@ -396,17 +422,17 @@ async function ensurePantryRecipeMacroConsistency(
 // (recipeRestrictions.utils.ts), por receita, como ÚLTIMA conferência — depois
 // do guardrail de proteína e da consistência de macros, cujos retries podem
 // trazer de volta um ingrediente proibido. Um retry só desta receita, no mesmo
-// padrão de ensurePantryRecipeProteinGuardrail; se continuar violando (ou o
+// padrão de ensurePantryRecipeBlenderLimits; se continuar violando (ou o
 // retry falhar), a receita é descartada (null).
 async function ensurePantryRecipeRestrictions(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
   user: Pick<PantryScannerUserProfile, 'dietaryPreferences' | 'blendiModel'>
-): Promise<PulseAiRecipe | null> {
+): Promise<PantryRecipeEnforcement> {
   const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel);
 
   if (initialCheck.compliant) {
-    return recipe;
+    return { recipe };
   }
 
   console.info('[pantryScanner] recipe restriction violated, retrying', {
@@ -428,7 +454,7 @@ async function ensurePantryRecipeRestrictions(
 
     if (!retriedRecipe) {
       console.warn('[pantryScanner] recipe restriction retry returned an invalid recipe, discarding');
-      return null;
+      return { recipe: null, failure: 'unmet' };
     }
 
     const retriedCheck = validateRecipeRestrictions(
@@ -441,12 +467,14 @@ async function ensurePantryRecipeRestrictions(
       console.warn('[pantryScanner] recipe restriction still violated after retry, discarding', {
         violations: summarizeRestrictionViolations(retriedCheck.violations),
       });
-      return null;
+      return { recipe: null, failure: 'unmet' };
     }
 
     return {
-      ...retriedRecipe,
-      macrosValidated: validateMacroConsistency(retriedRecipe).macrosValidated,
+      recipe: {
+        ...retriedRecipe,
+        macrosValidated: validateMacroConsistency(retriedRecipe).macrosValidated,
+      },
     };
   } catch (error) {
     console.error('[pantryScanner] recipe restriction retry failed, discarding', {
@@ -454,7 +482,7 @@ async function ensurePantryRecipeRestrictions(
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return null;
+    return { recipe: null, failure: 'aiUnavailable' };
   }
 }
 
@@ -742,7 +770,17 @@ interface PantryRecipeGeneration {
   recipes: PulseAiRecipe[];
   /** Quantas a IA gerou antes do descarte por restrição. */
   generatedCount: number;
+  /** Descartadas por dieta/gelo no Lite (CP-1.1.9: para escolher o código de erro). */
+  restrictionDiscards: number;
+  /** Descartadas por limite físico (proteína ou volume). */
+  blenderLimitDiscards: number;
+  /** Perdidas porque a nova tentativa falhou no provedor de IA (não julgadas). */
+  aiUnavailableDiscards: number;
 }
+
+type PantryRecipeCheck =
+  | { recipe: PulseAiRecipe; discardedBy?: undefined }
+  | { recipe: null; discardedBy: 'restriction' | 'blenderLimit' | 'aiUnavailable' };
 
 async function generatePantryRecipes(
   user: PantryScannerUserProfile,
@@ -776,23 +814,36 @@ async function generatePantryRecipes(
     const recipes = parsePantryRecipes(aiResponse.content);
 
     const checkedRecipes = await Promise.all(
-      recipes.map(async recipe => {
-        const proteinGuardedRecipe = await ensurePantryRecipeProteinGuardrail(
-          recipe,
-          prompt,
-          user.blendiModel
-        );
-        const macroCheckedRecipe = await ensurePantryRecipeMacroConsistency(
-          proteinGuardedRecipe,
-          prompt
-        );
-        return ensurePantryRecipeRestrictions(macroCheckedRecipe, prompt, user);
+      recipes.map(async (recipe): Promise<PantryRecipeCheck> => {
+        const limited = await ensurePantryRecipeBlenderLimits(recipe, prompt, user.blendiModel);
+        if (!limited.recipe) {
+          return { recipe: null, discardedBy: limited.failure === 'aiUnavailable' ? 'aiUnavailable' : 'blenderLimit' };
+        }
+
+        const macroCheckedRecipe = await ensurePantryRecipeMacroConsistency(limited.recipe, prompt);
+        const restricted = await ensurePantryRecipeRestrictions(macroCheckedRecipe, prompt, user);
+        if (!restricted.recipe) {
+          return { recipe: null, discardedBy: restricted.failure === 'aiUnavailable' ? 'aiUnavailable' : 'restriction' };
+        }
+        const restrictedRecipe = restricted.recipe;
+
+        // Conferência final: os retries de macros e de restrições refazem a
+        // receita e podem passar do limite físico de novo.
+        if (!validateBlenderLimits(restrictedRecipe, user.blendiModel).withinLimits) {
+          console.warn('[pantryScanner] blender limit exceeded after later retries, discarding');
+          return { recipe: null, discardedBy: 'blenderLimit' };
+        }
+
+        return { recipe: restrictedRecipe };
       })
     );
 
-    const compliantRecipes = checkedRecipes.filter(
-      (recipe): recipe is PulseAiRecipe => recipe !== null
-    );
+    const compliantRecipes = checkedRecipes
+      .map(check => check.recipe)
+      .filter((recipe): recipe is PulseAiRecipe => recipe !== null);
+    const restrictionDiscards = checkedRecipes.filter(check => check.discardedBy === 'restriction').length;
+    const blenderLimitDiscards = checkedRecipes.filter(check => check.discardedBy === 'blenderLimit').length;
+    const aiUnavailableDiscards = checkedRecipes.filter(check => check.discardedBy === 'aiUnavailable').length;
 
     if (compliantRecipes.length < recipes.length) {
       console.info('[pantryScanner] recipes discarded by restriction check', {
@@ -801,7 +852,13 @@ async function generatePantryRecipes(
       });
     }
 
-    return { recipes: compliantRecipes, generatedCount: recipes.length };
+    return {
+      recipes: compliantRecipes,
+      generatedCount: recipes.length,
+      restrictionDiscards,
+      blenderLimitDiscards,
+      aiUnavailableDiscards,
+    };
   } catch (error) {
     console.error('[pantryScanner] recipe generation failed', {
       userId: user.id,
@@ -809,7 +866,7 @@ async function generatePantryRecipes(
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return { recipes: [], generatedCount: 0 };
+    return { recipes: [], generatedCount: 0, restrictionDiscards: 0, blenderLimitDiscards: 0, aiUnavailableDiscards: 0 };
   }
 }
 
@@ -986,14 +1043,15 @@ export async function analyzePantry(
       return;
     }
 
-    const { recipes, generatedCount } = await generatePantryRecipes(currentUser, usableIngredients);
+    const generation = await generatePantryRecipes(currentUser, usableIngredients);
+    const { recipes, generatedCount } = generation;
 
     // CP-1.1.1c: a IA gerou receitas, mas todas violaram a dieta/gelo no Lite
     // mesmo após o retry. Nada é entregue: devolve o scan e não dá XP.
     // (Geração vazia ou falha da IA — generatedCount 0 — é tratada logo abaixo.)
     if (generatedCount > 0 && recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
-      sendDietaryRestrictionUnmet(res);
+      sendAllRecipesDiscarded(res, generation);
       return;
     }
 
@@ -1044,6 +1102,34 @@ export async function analyzePantry(
   }
 }
 
+// Todas as receitas geradas foram descartadas: o código diz por quê.
+// - Alguma se perdeu porque a nova tentativa falhou no provedor de IA: 503
+//   scanner/vision-unavailable ("temporariamente indisponível") — tentar de
+//   novo pode dar certo; não é culpa da dieta nem do copo.
+// - Senão, se alguma caiu pela dieta, o motivo é a dieta (como antes do
+//   CP-1.1.9); só quando todas caíram pelo limite físico o código é o novo.
+function sendAllRecipesDiscarded(res: Response, generation: PantryRecipeGeneration): void {
+  if (generation.aiUnavailableDiscards > 0) {
+    sendErrorResponse(res, {
+      statusCode: 503,
+      code: 'scanner/vision-unavailable',
+      message: 'Pantry Scanner is temporarily unavailable.',
+    });
+    return;
+  }
+
+  if (generation.restrictionDiscards === 0 && generation.blenderLimitDiscards > 0) {
+    sendErrorResponse(res, {
+      statusCode: 422,
+      code: BLENDER_LIMIT_UNMET_CODE,
+      message: 'Pantry Scanner could not generate a recipe within the blender limits.',
+    });
+    return;
+  }
+
+  sendDietaryRestrictionUnmet(res);
+}
+
 function sendDietaryRestrictionUnmet(res: Response): void {
   sendErrorResponse(res, {
     statusCode: 422,
@@ -1092,11 +1178,12 @@ async function runPantryPreviewScan(params: {
   markDelivered: () => void;
 }): Promise<void> {
   const { res, user, usableIngredients } = params;
-  const { recipes, generatedCount } = await generatePantryRecipes(user, usableIngredients);
+  const generation = await generatePantryRecipes(user, usableIngredients);
+  const { recipes, generatedCount } = generation;
 
   if (generatedCount > 0 && recipes.length === 0) {
     await params.releasePreview();
-    sendDietaryRestrictionUnmet(res);
+    sendAllRecipesDiscarded(res, generation);
     return;
   }
 

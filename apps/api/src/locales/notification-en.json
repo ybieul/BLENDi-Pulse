@@ -17,6 +17,10 @@
       "Recovery": {
         "withRecipe": "Time to recover! Your {recipeName} blend is perfect for today 🔄",
         "generic": "Time to recover! A nourishing blend is perfect for today 🔄"
+      },
+      "WeightLoss": {
+        "withRecipe": "Keep the rhythm! Your {recipeName} blend fits today's plan 🍓",
+        "generic": "Keep the rhythm! A filling, protein-rich blend fits today's plan 🍓"
       }
     }
   },
@@ -28,7 +32,7 @@
   },
   "supplementReminder": {
     "title": "Supplement check-in 💊",
-    "empty": "You still have supplements pending in today’s routine 💊",
+    "empty": "You still have supplements pending in today's routine 💊",
     "withSummary": "You still have {supplementSummary} pending today 💊",
     "summaryMoreSuffix": ", +{count} more"
   },

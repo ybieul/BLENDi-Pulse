@@ -5,6 +5,9 @@ import {
   dailyPulseTimeSchema,
   notificationPreferencesSchema,
   updateUserSchema,
+  isWeightGoalAllowedForGoal,
+  WEIGHT_LOSS_GOAL,
+  WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL,
 } from '@blendi/shared';
 import { UserModel } from '../models/User';
 import { UserPhotoModel } from '../models/UserPhoto';
@@ -35,6 +38,11 @@ import {
   type MacroEditWarning,
 } from '../utils/macroCalculation.utils';
 import { resolveBlenderOwnershipUpdates } from '../utils/blenderOwnership.utils';
+import {
+  WEIGHT_LOSS_REQUIRES_LOSE_ERROR_CODE,
+  WEIGHT_LOSS_REQUIRES_LOSE_MESSAGE,
+  resolveWeightLossGoalCoherence,
+} from '../utils/weightLossGoal.utils';
 import {
   DEFAULT_DAILY_HYDRATION_TARGET,
   normalizeDailyPulseTime,
@@ -137,6 +145,14 @@ function sendValidationError(res: Response, err: ZodError): void {
     code: VALIDATION_ERROR_CODE,
     message: VALIDATION_ERROR_MESSAGE,
     errors: formatZodErrors(err),
+  });
+}
+
+function sendWeightLossRequiresLose(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 400,
+    code: WEIGHT_LOSS_REQUIRES_LOSE_ERROR_CODE,
+    message: WEIGHT_LOSS_REQUIRES_LOSE_MESSAGE,
   });
 }
 
@@ -856,7 +872,6 @@ export async function updateMe(
     const updates: Record<string, unknown> = {
       ...(dietaryPreferences !== undefined && { dietaryPreferences }),
       ...(goal !== undefined && { goal }),
-      ...(weightGoal !== undefined && { weightGoal }),
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
       ...(dailyCalorieTarget !== undefined && { dailyCalorieTarget }),
       ...(dailyCarbTarget !== undefined && { dailyCarbTarget }),
@@ -907,6 +922,33 @@ export async function updateMe(
       return;
     }
 
+    // CP-1.1.9 — WeightLoss sempre com weightGoal 'lose', sobre o estado final
+    // (corpo + salvo). Recusa antes de qualquer escrita; o 'lose' imposto vai
+    // no mesmo $set do goal (ver utils/weightLossGoal.utils.ts).
+    const weightLossCoherence = resolveWeightLossGoalCoherence({
+      bodyGoal: goal,
+      bodyWeightGoal: weightGoal,
+      savedGoal: currentUser.goal,
+      savedWeightGoal: currentUser.weightGoal,
+    });
+
+    if (!weightLossCoherence.ok) {
+      sendWeightLossRequiresLose(res);
+      return;
+    }
+
+    const effectiveWeightGoal = weightLossCoherence.weightGoalToSet;
+    if (effectiveWeightGoal !== undefined) {
+      updates.weightGoal = effectiveWeightGoal;
+    }
+
+    // Filtro do update: com requireGoalNotWeightLoss, um 'maintain'/'gain'
+    // enviado sozinho só grava se o goal salvo continuar não sendo WeightLoss
+    // no instante da escrita (corrida com outro PATCH que troca o goal).
+    const weightLossGuardFilter = weightLossCoherence.requireGoalNotWeightLoss
+      ? { goal: { $ne: WEIGHT_LOSS_GOAL } }
+      : {};
+
     // blendiModel/blendiOwnership/otherBlenderModel — regras de coerência
     // centralizadas em resolveBlenderOwnershipUpdates. blendiModel não é
     // gatilho de recálculo de macro (ver shouldRecalculateMacroTargets).
@@ -921,7 +963,7 @@ export async function updateMe(
     const mergedBirthDate = birthDate ?? currentUser.birthDate;
     const mergedBiologicalSex = biologicalSex ?? currentUser.biologicalSex;
     const mergedActivityLevel = activityLevel ?? currentUser.activityLevel;
-    const mergedWeightGoal = weightGoal ?? currentUser.weightGoal;
+    const mergedWeightGoal = effectiveWeightGoal ?? currentUser.weightGoal;
     const mergedGoal = goal ?? currentUser.goal;
     const mergedTargetWeight = targetWeight ?? currentUser.targetWeight;
 
@@ -930,11 +972,15 @@ export async function updateMe(
     // blend) não afeta mais dailyCalorieTarget (isso migrou pra weightGoal),
     // mas ainda alimenta PROTEIN_MULTIPLIERS — por isso também é gatilho:
     // trocar só `goal` recalcula proteína/carboidrato, calorias não muda.
+    //
+    // CP-1.1.9: o weightGoal trocado pela regra do WeightLoss (sem vir no
+    // corpo) também conta como mudança.
     const shouldRecalculateMacroTargets =
       weight !== undefined ||
       height !== undefined ||
       activityLevel !== undefined ||
       weightGoal !== undefined ||
+      weightLossCoherence.weightGoalChangedByRule ||
       birthDate !== undefined ||
       biologicalSex !== undefined ||
       goal !== undefined;
@@ -1053,14 +1099,14 @@ export async function updateMe(
     // descartado — o mesmo resultado de enviá-lo a uma conta que não é 'other'.
     if (ownershipUpdates.onlyIfOwnershipIsOther) {
       await UserModel.updateOne(
-        { _id: userId, blendiOwnership: 'other' },
+        { _id: userId, blendiOwnership: 'other', ...weightLossGuardFilter },
         { $set: ownershipUpdates.onlyIfOwnershipIsOther },
         { runValidators: true }
       );
     }
 
-    const user = await UserModel.findByIdAndUpdate(
-      userId,
+    const user = await UserModel.findOneAndUpdate(
+      { _id: userId, ...weightLossGuardFilter },
       {
         $set: updates,
         ...(ownershipUpdates.unsetOtherBlenderModel && { $unset: { otherBlenderModel: 1 } }),
@@ -1073,6 +1119,13 @@ export async function updateMe(
     ).lean();
 
     if (!user) {
+      // Com o filtro do WeightLoss, "não casou" pode ser o goal que virou
+      // WeightLoss entre a leitura e a escrita — não um usuário inexistente.
+      if (weightLossCoherence.requireGoalNotWeightLoss && (await UserModel.exists({ _id: userId }))) {
+        sendWeightLossRequiresLose(res);
+        return;
+      }
+
       sendErrorResponse(res, {
         statusCode: 404,
         code: 'resource/not-found',
@@ -1174,6 +1227,14 @@ export async function calculateMacros(
   next: NextFunction
 ): Promise<void> {
   try {
+    // CP-1.1.9 — WeightLoss sempre com weightGoal 'lose': sem weightGoal no
+    // corpo, usa 'lose' (e não o weightGoal salvo do fallback abaixo); com um
+    // weightGoal diferente, 400 depois da validação do Zod.
+    const requestBody: Record<string, unknown> | undefined =
+      req.body?.goal === WEIGHT_LOSS_GOAL && req.body?.weightGoal === undefined
+        ? { ...req.body, weightGoal: WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL }
+        : req.body;
+
     // Stopgap até o CP-B coletar birthDate/biologicalSex/weightGoal numa
     // tela própria do onboarding mobile (ver
     // docs/fixes/cp-a.7-fallback-onboarding-calculate-macros.md). Hoje
@@ -1183,11 +1244,11 @@ export async function calculateMacros(
     // diferente do salvo) sempre prevalece; o perfil salvo só entra quando o
     // campo vem undefined.
     const needsProfileFallback =
-      req.body?.birthDate === undefined ||
-      req.body?.biologicalSex === undefined ||
-      req.body?.weightGoal === undefined;
+      requestBody?.birthDate === undefined ||
+      requestBody?.biologicalSex === undefined ||
+      requestBody?.weightGoal === undefined;
 
-    let body: unknown = req.body;
+    let body: unknown = requestBody;
 
     if (needsProfileFallback) {
       const userId = req.user?.sub;
@@ -1210,14 +1271,14 @@ export async function calculateMacros(
       }
 
       body = {
-        ...req.body,
+        ...requestBody,
         birthDate:
-          req.body?.birthDate !== undefined
-            ? req.body.birthDate
+          requestBody?.birthDate !== undefined
+            ? requestBody.birthDate
             : user.birthDate.toISOString().slice(0, 10),
         biologicalSex:
-          req.body?.biologicalSex !== undefined ? req.body.biologicalSex : user.biologicalSex,
-        weightGoal: req.body?.weightGoal !== undefined ? req.body.weightGoal : user.weightGoal,
+          requestBody?.biologicalSex !== undefined ? requestBody.biologicalSex : user.biologicalSex,
+        weightGoal: requestBody?.weightGoal !== undefined ? requestBody.weightGoal : user.weightGoal,
       };
     }
 
@@ -1229,6 +1290,11 @@ export async function calculateMacros(
 
     const { weight, height, birthDate, biologicalSex, activityLevel, goal, weightGoal, targetWeight, unitSystem } =
       parsed.data;
+
+    if (!isWeightGoalAllowedForGoal(goal, weightGoal)) {
+      sendWeightLossRequiresLose(res);
+      return;
+    }
 
     const metricWeight = unitSystem === 'imperial' ? weight / POUNDS_PER_KILOGRAM : weight;
     const metricHeight = unitSystem === 'imperial' ? height * CENTIMETERS_PER_INCH : height;

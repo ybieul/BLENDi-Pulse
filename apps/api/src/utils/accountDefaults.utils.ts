@@ -23,7 +23,8 @@
 // escondida dentro do cálculo.
 import { subYears } from 'date-fns';
 
-import type { ActivityLevel, BiologicalSex, WeightGoal } from '../models/User';
+import type { ActivityLevel, BiologicalSex, UserGoal, WeightGoal } from '../models/User';
+import { resolveAccountCreationWeightGoal } from './weightLossGoal.utils';
 
 export interface AccountCreationBodyProfileDefaults {
   weightGoal: WeightGoal;
@@ -32,9 +33,13 @@ export interface AccountCreationBodyProfileDefaults {
   birthDate: Date;
 }
 
-export function getAccountCreationBodyProfileDefaults(): AccountCreationBodyProfileDefaults {
+const WEIGHT_GOAL_PLACEHOLDER: WeightGoal = 'maintain';
+
+// `goal` (CP-1.1.9): uma conta criada já com WeightLoss nasce com weightGoal
+// 'lose' em vez do placeholder 'maintain' — WeightLoss nunca existe sem 'lose'.
+export function getAccountCreationBodyProfileDefaults(goal?: UserGoal): AccountCreationBodyProfileDefaults {
   return {
-    weightGoal: 'maintain',
+    weightGoal: goal ? resolveAccountCreationWeightGoal(goal, WEIGHT_GOAL_PLACEHOLDER) : WEIGHT_GOAL_PLACEHOLDER,
     biologicalSex: 'male',
     activityLevel: 'moderatelyActive',
     birthDate: subYears(new Date(), 30),

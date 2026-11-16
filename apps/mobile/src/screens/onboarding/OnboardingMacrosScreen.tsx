@@ -16,6 +16,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import axios from 'axios';
 
 import {
+  AUTO_CALORIE_TARGET_MIN_SUGGESTION,
   DAILY_CALORIE_TARGET_MAX,
   DAILY_CALORIE_TARGET_MIN,
   DAILY_CARB_TARGET_MAX,
@@ -27,6 +28,7 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
+import type { UserGoal } from '@blendi/shared';
 import { api } from '../../config/api';
 import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
@@ -44,7 +46,6 @@ import type { TranslationKey } from '../../locales/i18n';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type UserGoal = 'Muscle' | 'Wellness' | 'Energy' | 'Recovery';
 type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
@@ -88,6 +89,13 @@ const GOAL_CONFIG: Record<
   Wellness: { proteinMin: 100, proteinMax: 160, caloriesMin: 1600, caloriesMax: 2400, suggestedProtein: 110, suggestedCalories: 2000 },
   Energy:   { proteinMin: 120, proteinMax: 180, caloriesMin: 1700, caloriesMax: 2300, suggestedProtein: 130, suggestedCalories: 1900 },
   Recovery: { proteinMin: 140, proteinMax: 200, caloriesMin: 1700, caloriesMax: 2300, suggestedProtein: 150, suggestedCalories: 2000 },
+  // CP-1.1.9 — déficit e proteína alta. Proteína: 2,0 g/kg (PROTEIN_MULTIPLIERS
+  // do backend) na mesma faixa de peso de referência do Muscle (70-100 kg;
+  // sugerido 75 kg → 150 g). Calorias: faixa do Wellness (manutenção,
+  // 1.600-2.400, sugerido 2.000) com o ajuste de 'lose' do backend (-500,
+  // WEIGHT_GOAL_CALORIE_ADJUSTMENTS) → 1.100-1.900 e 1.500; o piso sobe para
+  // 1.200, o mesmo da sugestão automática (AUTO_CALORIE_TARGET_MIN_SUGGESTION).
+  WeightLoss: { proteinMin: 140, proteinMax: 200, caloriesMin: AUTO_CALORIE_TARGET_MIN_SUGGESTION, caloriesMax: 1900, suggestedProtein: 150, suggestedCalories: 1500 },
 };
 const DEFAULT_GOAL_CONFIG = GOAL_CONFIG.Wellness;
 
@@ -176,7 +184,7 @@ export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'On
 
   // ── Derived ──────────────────────────────────────────────────────────────────
 
-  const goal: UserGoal         = (selectedGoal  as UserGoal   | null) ?? 'Wellness';
+  const goal: UserGoal         = selectedGoal ?? 'Wellness';
   const blendiModel: BlendiModel = (selectedModel as BlendiModel | null) ?? 'Lite';
   const goalConfig             = GOAL_CONFIG[goal] ?? DEFAULT_GOAL_CONFIG;
 
@@ -239,6 +247,8 @@ export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'On
       if (height  !== null) payload['height']  = height;
       if (birthDate !== null) payload['birthDate'] = birthDate;
       if (biologicalSex !== null) payload['biologicalSex'] = biologicalSex;
+      // Com Weight Loss, weightGoal já é 'lose' no store desde a escolha do
+      // objetivo (setGoal) — vai mesmo quando a tela de corpo foi pulada.
       if (weightGoal !== null) payload['weightGoal'] = weightGoal;
       if (activityLevel !== null) payload['activityLevel'] = activityLevel;
 

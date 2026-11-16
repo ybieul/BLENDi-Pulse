@@ -266,6 +266,8 @@ export const BLENDER_LIMITS: Record<BlendiModel, BlenderLimit> = {
 } as const;
 ```
 
+> Nota (CP-1.1.9): trecho mantido como estava na época. Hoje os limites ficam em `packages/shared/src/blenderLimits.ts`, com o ml como fonte da verdade (400/400/600, a linha de MAX do copo, confirmada pelo Jon) e o oz derivado e arredondado para baixo (13,5/13,5/20,2). Ver [cp-1.1.9-weight-loss-filtro-home.md](cp-1.1.9-weight-loss-filtro-home.md#achado-7--limite-físico-do-blendi).
+
 Não é o `dailyProteinTarget` do usuário — é um teto físico por hardware,
 independente da meta nutricional. Os dois conceitos (limite físico do
 blender vs. meta diária de proteína) são intencionalmente distintos, e o

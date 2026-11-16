@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { XP_EVENTS, createBlendLogSchema, historyQuerySchema } from '@blendi/shared';
 import { BlendLogModel } from '../models/BlendLog';
-import { UserModel } from '../models/User';
+import { UserModel, type UserGoal } from '../models/User';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import {
@@ -17,12 +17,18 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
+import {
+  getCalorieGoalXpRange,
+  isWithinCalorieGoalXpRange,
+  type CalorieGoalXpRange,
+} from '../utils/weightLossGoal.utils';
 
 interface BlendUserContext {
   timezone: string;
   blendCount: number;
   dailyProteinTarget: number;
   dailyCalorieTarget: number;
+  goal?: UserGoal;
 }
 
 interface BlendHistorySummary {
@@ -167,6 +173,7 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
       blendCount: 1,
       dailyProteinTarget: 1,
       dailyCalorieTarget: 1,
+      goal: 1,
     })
     .lean();
 
@@ -179,6 +186,7 @@ async function getBlendUserContext(userId: string): Promise<BlendUserContext | n
     blendCount: user.blendCount ?? 0,
     dailyProteinTarget: user.dailyProteinTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
+    goal: user.goal,
   };
 }
 
@@ -198,7 +206,9 @@ async function awardDailyBlendGoalXP(
   startOfDay: Date,
   target: number,
   xpType: keyof typeof DAILY_BLEND_GOAL_XP_AMOUNTS,
-  metricField: 'protein' | 'calories'
+  metricField: 'protein' | 'calories',
+  // Teto opcional (CP-1.1.9): sem ele, como antes, basta chegar à meta.
+  range: CalorieGoalXpRange = { min: target }
 ): Promise<BlendGoalXPOutcome> {
   if (target <= 0 || DAILY_BLEND_GOAL_XP_AMOUNTS[xpType] <= 0) {
     return {
@@ -230,7 +240,7 @@ async function awardDailyBlendGoalXP(
     },
   ]);
 
-  if ((aggregate?.total ?? 0) < target) {
+  if (!isWithinCalorieGoalXpRange(aggregate?.total ?? 0, range)) {
     return {
       goalHit: false,
       xpResult: createSkippedXPResult(),
@@ -412,7 +422,9 @@ export async function createBlendLog(
         startOfDay,
         user.dailyCalorieTarget,
         'calorieGoal',
-        'calories'
+        'calories',
+        // WeightLoss: só entre 90% e 100% da meta (não premia passar dela).
+        getCalorieGoalXpRange(user.goal, user.dailyCalorieTarget)
       ),
     ]);
     const xpResults = [blendXPResult, proteinGoalXPOutcome.xpResult, calorieGoalXPOutcome.xpResult];

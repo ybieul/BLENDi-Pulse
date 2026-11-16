@@ -520,3 +520,34 @@ describe('OnboardingMacrosScreen — leitura estrita dos números', () => {
     });
   });
 });
+
+describe('OnboardingMacrosScreen — goal Weight Loss (CP-1.1.9)', () => {
+  it('pulando a tela de corpo, o PATCH final manda weightGoal lose (gravado no store ao escolher o goal)', async () => {
+    // Estado do store depois de setGoal('WeightLoss') + "Pular por agora".
+    mockOnboardingOverrides = { selectedGoal: 'WeightLoss', weightGoal: 'lose' };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', {
+      blendiModel: 'Lite',
+      blendiOwnership: 'blendi',
+      dietaryPreferences: [],
+      ...BASE_MACROS_PAYLOAD,
+      goal: 'WeightLoss',
+      weightGoal: 'lose',
+    });
+    // Sem os dados de corpo, não é a conclusão real do onboarding de corpo.
+    expect(mockPatch.mock.calls[0]?.[1]).not.toHaveProperty('completingBodyOnboarding');
+  });
+
+  it('a recomendação usa a faixa do Weight Loss (déficit, proteína alta)', () => {
+    mockOnboardingOverrides = { selectedGoal: 'WeightLoss', weightGoal: 'lose' };
+    const { getByText } = renderScreen();
+
+    expect(getByText(
+      'onboarding.macroRecommendation:' +
+      '{"goal":"onboarding.goalWeightLoss","proteinMin":140,"proteinMax":200,"caloriesMin":1200,"caloriesMax":1900,"carbsMin":50,"carbsMax":800}'
+    )).toBeTruthy();
+  });
+});

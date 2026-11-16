@@ -530,3 +530,42 @@ describe('CompleteProfileScreen — polegadas sem "ok" com altura fora da faixa'
     expect(inchesInvalid(utils)).toBe(false);
   });
 });
+
+describe('CompleteProfileScreen — goal Weight Loss (CP-1.1.9)', () => {
+  const PROFILE = {
+    weight: 80,
+    height: 175,
+    birthDate: '1990-06-15T00:00:00.000Z',
+    biologicalSex: 'female',
+    activityLevel: 'moderatelyActive',
+    unitSystem: 'metric',
+  };
+
+  it('com Weight Loss, "perder" fica marcado, "manter"/"ganhar" desabilitados, e o PATCH manda lose', async () => {
+    // Mesmo com um weightGoal salvo antigo, a tela mostra "perder".
+    mockProfile = { ...PROFILE, goal: 'WeightLoss', weightGoal: 'maintain' };
+    mockPatch.mockResolvedValueOnce({
+      data: { success: true, data: { user: { dailyProteinTarget: 160, dailyCalorieTarget: 1500, dailyCarbTarget: 150 } } },
+    });
+    const utils = renderScreen();
+
+    expect(utils.getByRole('button', { name: 'onboarding.weightGoalLose' }).props.accessibilityState).toEqual({ selected: true, disabled: false });
+    for (const key of ['onboarding.weightGoalMaintain', 'onboarding.weightGoalGain']) {
+      expect(utils.getByRole('button', { name: key }).props.accessibilityState).toEqual({ selected: false, disabled: true });
+    }
+    expect(utils.getByText('onboarding.weightGoalLockedByWeightLoss')).toBeTruthy();
+
+    fireEvent.press(utils.getByRole('button', { name: 'common.actions.save' }));
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ weightGoal: 'lose' }));
+  });
+
+  it('com outro goal, as três opções seguem livres e sem explicação', () => {
+    mockProfile = { ...PROFILE, goal: 'Muscle', weightGoal: 'gain' };
+    const utils = renderScreen();
+
+    expect(utils.getByRole('button', { name: 'onboarding.weightGoalGain' }).props.accessibilityState).toEqual({ selected: true, disabled: false });
+    expect(utils.getByRole('button', { name: 'onboarding.weightGoalMaintain' }).props.accessibilityState).toEqual({ selected: false, disabled: false });
+    expect(utils.queryByText('onboarding.weightGoalLockedByWeightLoss')).toBeNull();
+  });
+});
