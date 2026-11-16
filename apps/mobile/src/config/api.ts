@@ -20,9 +20,14 @@ if (!API_URL) {
   );
 }
 
+// Timeout padrão de todas as rotas. As duas rotas de IA (Pulse AI chat e
+// Pantry analyze) passam o próprio timeout por requisição —
+// AI_CLIENT_TIMEOUT_MS em @blendi/shared (CP-B1).
+export const DEFAULT_API_TIMEOUT_MS = 10_000;
+
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 10_000,
+  timeout: DEFAULT_API_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',

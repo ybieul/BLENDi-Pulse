@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
+  AI_REQUEST_BUDGET_MS,
   pantryAnalysisResultSchema,
   pantryIngredientSchema,
   pantryLockedPreviewResultSchema,
@@ -32,6 +33,7 @@ import {
   callAi,
   callVisionAi,
 } from '../services/aiProvider.service';
+import { runWithAiRequestBudget } from '../services/aiRequestBudget.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.service';
@@ -39,6 +41,7 @@ import {
   buildPantryRecipePrompt,
   type BuildPulseAiPromptResult,
 } from '../services/promptBuilder.service';
+import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import {
   buildBlenderLimitRetryMessage,
@@ -64,7 +67,17 @@ const PREVIEW_LOCKED_CODE = 'scanner/preview-locked';
 const DIETARY_RESTRICTION_UNMET_CODE = 'scanner/dietary-restriction-unmet';
 // CP-1.1.9: todas as receitas passaram do limite físico do BLENDi mesmo após o retry.
 const BLENDER_LIMIT_UNMET_CODE = 'scanner/blender-limit-unmet';
+// CP-B1: o prompt pede 2 receitas e aceita 1 quando os ingredientes não dão
+// para 2; mais que isso é resposta fora do formato.
 const PANTRY_RECIPE_COUNT = 2;
+// CP-B1: código e texto que o app já mostra para "IA indisponível" no Pantry.
+const AI_UNAVAILABLE_CODE = 'scanner/vision-unavailable';
+// CP-B1: o system prompt do Pantry exige um array; as novas tentativas por
+// receita (limite, macros, dieta) pedem a receita corrigida, e a IA ora
+// respondia em objeto, ora no array do system prompt — que era descartado.
+// Agora o formato é dito explicitamente, e o parser aceita os dois.
+const PANTRY_SINGLE_RECIPE_RETRY_FORMAT_INSTRUCTION =
+  'Return only this one corrected recipe, as a JSON array containing exactly 1 recipe object with the same structure.';
 // gemini-2.5-flash consome parte do orçamento de saída com "thinking" interno
 // antes do JSON visível — 1600 truncava as 2 receitas quase sempre. Testado:
 // 4000 ainda truncava, 6000 completou de forma confiável; 7000 dá margem.
@@ -119,15 +132,6 @@ const pantryVisionAnalysisSchema = z.object({
     })
     .optional()
     .default(false),
-});
-
-const pantryRecipeArraySchema = z.array(pulseAiRecipeSchema, {
-  required_error: 'errors.validation.required',
-  invalid_type_error: 'errors.validation.invalid_option',
-}).length(PANTRY_RECIPE_COUNT);
-
-const pantryRecipeWrapperSchema = z.object({
-  recipes: pantryRecipeArraySchema,
 });
 
 function formatZodErrors(err: ZodError) {
@@ -268,32 +272,180 @@ function parsePantryVisionAnalysis(content: string): z.infer<typeof pantryVision
   }
 }
 
-function parsePantryRecipes(content: string): PulseAiRecipe[] {
-  try {
-    const payload: unknown = JSON.parse(content);
-    const directRecipes = pantryRecipeArraySchema.safeParse(payload);
+// CP-B1: motivo do resultado da leitura da resposta da IA, para log e para
+// decidir a nova tentativa. Nunca carrega o conteúdo da receita — só o
+// caminho e o código do primeiro erro do Zod.
+type PantryRecipesParseResult =
+  | { status: 'ok'; recipes: PulseAiRecipe[]; invalidCount: number; issuePath?: string }
+  | { status: 'empty' }
+  | { status: 'invalid-json' }
+  | { status: 'invalid-schema'; issuePath: string };
 
-    if (directRecipes.success) {
-      return directRecipes.data;
-    }
-
-    const wrappedRecipes = pantryRecipeWrapperSchema.safeParse(payload);
-
-    return wrappedRecipes.success ? wrappedRecipes.data.recipes : [];
-  } catch {
-    return [];
-  }
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parsePantryRecipe(content: string): PulseAiRecipe | null {
-  try {
-    const payload: unknown = JSON.parse(content);
-    const parsed = pulseAiRecipeSchema.safeParse(payload);
+function describeZodIssue(error: ZodError, prefix?: string): string {
+  const issue = error.issues[0];
+  const path = [...(prefix !== undefined ? [prefix] : []), ...(issue?.path ?? [])].join('.');
 
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
+  return `${path || 'root'} (${issue?.code ?? 'unknown'})`;
+}
+
+// Lista de receitas da resposta: array direto (o formato do prompt), o
+// envelope { recipes: [...] } ou uma receita solta (objeto) — os dois últimos
+// aceitos como sempre foram/como a nova tentativa pode responder.
+function extractPantryRecipeList(payload: unknown): unknown[] | null {
+  if (Array.isArray(payload)) {
+    return payload;
   }
+
+  if (isPlainObject(payload)) {
+    if (Array.isArray(payload.recipes)) {
+      return payload.recipes;
+    }
+
+    return 'recipes' in payload ? null : [payload];
+  }
+
+  return null;
+}
+
+/**
+ * Lê a resposta da geração do Pantry. Cada receita é validada sozinha: uma
+ * receita boa não se perde porque a outra veio fora do schema (CP-B1). Só
+ * quando nenhuma é válida o resultado é 'invalid-schema' (→ nova tentativa).
+ */
+function parsePantryRecipes(content: string): PantryRecipesParseResult {
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(content);
+  } catch {
+    return { status: 'invalid-json' };
+  }
+
+  const list = extractPantryRecipeList(payload);
+
+  if (!list) {
+    return { status: 'invalid-schema', issuePath: 'root (invalid_type)' };
+  }
+
+  if (list.length === 0) {
+    return { status: 'empty' };
+  }
+
+  if (list.length > PANTRY_RECIPE_COUNT) {
+    return { status: 'invalid-schema', issuePath: 'root (too_big)' };
+  }
+
+  const recipes: PulseAiRecipe[] = [];
+  let firstIssuePath: string | undefined;
+
+  list.forEach((item, index) => {
+    const parsed = pulseAiRecipeSchema.safeParse(item);
+
+    if (parsed.success) {
+      recipes.push(parsed.data);
+    } else {
+      firstIssuePath ??= describeZodIssue(parsed.error, String(index));
+    }
+  });
+
+  if (recipes.length === 0) {
+    return { status: 'invalid-schema', issuePath: firstIssuePath ?? 'root' };
+  }
+
+  return {
+    status: 'ok',
+    recipes,
+    invalidCount: list.length - recipes.length,
+    ...(firstIssuePath ? { issuePath: firstIssuePath } : {}),
+  };
+}
+
+function logPantryRecipesParse(
+  attempt: number,
+  content: string,
+  result: PantryRecipesParseResult
+): void {
+  const details = {
+    attempt,
+    reason: result.status,
+    responseLength: content.length,
+    ...(result.status === 'ok'
+      ? { recipeCount: result.recipes.length, invalidCount: result.invalidCount }
+      : {}),
+    ...('issuePath' in result && result.issuePath ? { issuePath: result.issuePath } : {}),
+  };
+
+  if (result.status === 'ok' && result.invalidCount === 0) {
+    console.info('[pantryScanner] recipe generation parsed', details);
+    return;
+  }
+
+  console.warn('[pantryScanner] recipe generation parsed with issues', details);
+}
+
+type PantryRecipeParseResult =
+  | { status: 'ok'; recipe: PulseAiRecipe }
+  | { status: 'invalid-json' }
+  | { status: 'invalid-schema'; issuePath: string };
+
+/**
+ * Lê a resposta de uma nova tentativa por receita (limite, macros, dieta).
+ * CP-B1: aceita o objeto da receita OU um array com exatamente 1 receita (o
+ * formato que a nova tentativa pede e que o system prompt do Pantry exige) —
+ * antes só o objeto, e a resposta em array era descartada.
+ */
+function parsePantryRecipe(content: string): PantryRecipeParseResult {
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(content);
+  } catch {
+    return { status: 'invalid-json' };
+  }
+
+  const list = extractPantryRecipeList(payload);
+
+  if (!list || list.length !== 1) {
+    return {
+      status: 'invalid-schema',
+      issuePath: `root (${list ? `array of ${list.length}` : 'invalid_type'})`,
+    };
+  }
+
+  const parsed = pulseAiRecipeSchema.safeParse(list[0]);
+
+  return parsed.success
+    ? { status: 'ok', recipe: parsed.data }
+    : { status: 'invalid-schema', issuePath: describeZodIssue(parsed.error) };
+}
+
+function describeRetryParseFailure(
+  content: string,
+  result: Exclude<PantryRecipeParseResult, { status: 'ok' }>
+) {
+  return {
+    reason: result.status,
+    responseLength: content.length,
+    ...(result.status === 'invalid-schema' ? { issuePath: result.issuePath } : {}),
+  };
+}
+
+// Conversa da nova tentativa de uma receita: a receita como turno da IA e o
+// pedido de correção + o formato de resposta (CP-B1) como turno do usuário.
+function buildPantryRecipeRetryMessages(
+  prompt: BuildPulseAiPromptResult,
+  recipe: PulseAiRecipe,
+  retryMessage: string
+): BuildPulseAiPromptResult['messages'] {
+  return [
+    ...prompt.messages,
+    { role: 'assistant', content: JSON.stringify(recipe) },
+    { role: 'user', content: `${retryMessage} ${PANTRY_SINGLE_RECIPE_RETRY_FORMAT_INSTRUCTION}` },
+  ];
 }
 
 // Resultado das verificações que podem descartar uma receita (CP-1.1.9):
@@ -331,19 +483,20 @@ async function ensurePantryRecipeBlenderLimits(
     const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation);
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
-      messages: [
-        ...prompt.messages,
-        { role: 'assistant', content: JSON.stringify(recipe) },
-        { role: 'user', content: retryMessage },
-      ],
+      messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
       maxTokens: 2000,
     });
-    const retriedRecipe = parsePantryRecipe(retryResponse.content);
+    const retryParse = parsePantryRecipe(retryResponse.content);
 
-    if (!retriedRecipe) {
-      console.warn('[pantryScanner] blender limit retry returned an invalid recipe, discarding');
+    if (retryParse.status !== 'ok') {
+      console.warn(
+        '[pantryScanner] blender limit retry returned an invalid recipe, discarding',
+        describeRetryParseFailure(retryResponse.content, retryParse)
+      );
       return { recipe: null, failure: 'unmet' };
     }
+
+    const retriedRecipe = retryParse.recipe;
 
     const retriedCheck = validateBlenderLimits(retriedRecipe, blendiModel);
 
@@ -393,21 +546,21 @@ async function ensurePantryRecipeMacroConsistency(
     );
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
-      messages: [
-        ...prompt.messages,
-        { role: 'assistant', content: JSON.stringify(recipe) },
-        { role: 'user', content: retryMessage },
-      ],
+      messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
       maxTokens: 2000,
     });
-    const retriedRecipe = parsePantryRecipe(retryResponse.content);
+    const retryParse = parsePantryRecipe(retryResponse.content);
 
-    if (!retriedRecipe) {
+    if (retryParse.status !== 'ok') {
+      console.warn(
+        '[pantryScanner] macro consistency retry returned an invalid recipe, keeping the original',
+        describeRetryParseFailure(retryResponse.content, retryParse)
+      );
       return { ...recipe, macrosValidated: false };
     }
 
-    const retriedConsistency = validateMacroConsistency(retriedRecipe);
-    return { ...retriedRecipe, macrosValidated: retriedConsistency.macrosValidated };
+    const retriedConsistency = validateMacroConsistency(retryParse.recipe);
+    return { ...retryParse.recipe, macrosValidated: retriedConsistency.macrosValidated };
   } catch (error) {
     console.error('[pantryScanner] macro consistency retry failed', {
       errorName: error instanceof Error ? error.name : 'UnknownError',
@@ -443,19 +596,20 @@ async function ensurePantryRecipeRestrictions(
     const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations);
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
-      messages: [
-        ...prompt.messages,
-        { role: 'assistant', content: JSON.stringify(recipe) },
-        { role: 'user', content: retryMessage },
-      ],
+      messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
       maxTokens: 2000,
     });
-    const retriedRecipe = parsePantryRecipe(retryResponse.content);
+    const retryParse = parsePantryRecipe(retryResponse.content);
 
-    if (!retriedRecipe) {
-      console.warn('[pantryScanner] recipe restriction retry returned an invalid recipe, discarding');
+    if (retryParse.status !== 'ok') {
+      console.warn(
+        '[pantryScanner] recipe restriction retry returned an invalid recipe, discarding',
+        describeRetryParseFailure(retryResponse.content, retryParse)
+      );
       return { recipe: null, failure: 'unmet' };
     }
+
+    const retriedRecipe = retryParse.recipe;
 
     const retriedCheck = validateRecipeRestrictions(
       retriedRecipe,
@@ -765,7 +919,14 @@ async function getRecentBlendRecipeNames(userId: string): Promise<string[]> {
   return recentBlendLogs.flatMap(log => (log.recipeName ? [log.recipeName] : []));
 }
 
-interface PantryRecipeGeneration {
+// CP-B1: 'aiUnavailable' = a geração falhou no provedor (qualquer exceção da
+// chamada) ou voltou fora do formato duas vezes — responde 503, não "sem
+// receitas". 'generated' = a IA respondeu (com 0, 1 ou 2 receitas).
+type PantryRecipeGeneration =
+  | { kind: 'aiUnavailable' }
+  | ({ kind: 'generated' } & PantryGeneratedRecipes);
+
+interface PantryGeneratedRecipes {
   /** Receitas conformes, prontas para entregar. */
   recipes: PulseAiRecipe[];
   /** Quantas a IA gerou antes do descarte por restrição. */
@@ -811,8 +972,32 @@ async function generatePantryRecipes(
       maxTokens: PANTRY_RECIPE_MAX_TOKENS,
     });
 
-    const recipes = parsePantryRecipes(aiResponse.content);
+    let parseResult = parsePantryRecipes(aiResponse.content);
+    logPantryRecipesParse(1, aiResponse.content, parseResult);
 
+    // CP-B1: JSON ou schema inválido → 1 nova tentativa, no mesmo padrão do
+    // Pulse AI (a conversa original + INVALID_JSON_RETRY_INSTRUCTION).
+    if (parseResult.status === 'invalid-json' || parseResult.status === 'invalid-schema') {
+      const retryResponse = await callAi({
+        systemPrompt: prompt.systemPrompt,
+        messages: [...prompt.messages, { role: 'user', content: INVALID_JSON_RETRY_INSTRUCTION }],
+        maxTokens: PANTRY_RECIPE_MAX_TOKENS,
+      });
+
+      parseResult = parsePantryRecipes(retryResponse.content);
+      logPantryRecipesParse(2, retryResponse.content, parseResult);
+
+      if (parseResult.status === 'invalid-json' || parseResult.status === 'invalid-schema') {
+        console.error('[pantryScanner] recipe generation invalid after retry, responding as unavailable', {
+          reason: parseResult.status,
+        });
+        return { kind: 'aiUnavailable' };
+      }
+    }
+
+    // 'empty': a IA devolveu array vazio (sem receita possível com esses
+    // ingredientes) — segue para a resposta de hoje (200 sem receitas).
+    const recipes = parseResult.status === 'ok' ? parseResult.recipes : [];
     const checkedRecipes = await Promise.all(
       recipes.map(async (recipe): Promise<PantryRecipeCheck> => {
         const limited = await ensurePantryRecipeBlenderLimits(recipe, prompt, user.blendiModel);
@@ -853,6 +1038,7 @@ async function generatePantryRecipes(
     }
 
     return {
+      kind: 'generated',
       recipes: compliantRecipes,
       generatedCount: recipes.length,
       restrictionDiscards,
@@ -860,17 +1046,28 @@ async function generatePantryRecipes(
       aiUnavailableDiscards,
     };
   } catch (error) {
+    // CP-B1: falha do provedor na geração (ou na nova tentativa de formato)
+    // é "IA indisponível" — antes virava 200 com recipes: [] e o app dizia
+    // que não dava para montar receitas com esses ingredientes.
     console.error('[pantryScanner] recipe generation failed', {
-      userId: user.id,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    return { recipes: [], generatedCount: 0, restrictionDiscards: 0, blenderLimitDiscards: 0, aiUnavailableDiscards: 0 };
+    return { kind: 'aiUnavailable' };
   }
 }
 
-export async function analyzePantry(
+// CP-B1: teto de tempo de IA da requisição (visão + geração + novas
+// tentativas somadas). Estourado, a chamada seguinte falha como IA
+// indisponível (503) e o scan/prévia volta pelos caminhos de hoje.
+export function analyzePantry(req: Request, res: Response, next: NextFunction): Promise<void> {
+  return runWithAiRequestBudget(AI_REQUEST_BUDGET_MS.pantryScannerAnalyze, () =>
+    analyzePantryWithinBudget(req, res, next)
+  );
+}
+
+async function analyzePantryWithinBudget(
   req: Request,
   res: Response,
   next: NextFunction
@@ -957,11 +1154,7 @@ export async function analyzePantry(
     } catch (error) {
       if (error instanceof AiProviderRequestError) {
         await releasePreview();
-        sendErrorResponse(res, {
-          statusCode: 503,
-          code: 'scanner/vision-unavailable',
-          message: 'Pantry Scanner is temporarily unavailable.',
-        });
+        sendPantryAiUnavailable(res);
         return;
       }
 
@@ -1044,6 +1237,14 @@ export async function analyzePantry(
     }
 
     const generation = await generatePantryRecipes(currentUser, usableIngredients);
+
+    // CP-B1: a IA falhou na geração — devolve o scan, sem XP, 503.
+    if (generation.kind === 'aiUnavailable') {
+      await rollbackPantryScanCount(currentUser);
+      sendPantryAiUnavailable(res);
+      return;
+    }
+
     const { recipes, generatedCount } = generation;
 
     // CP-1.1.1c: a IA gerou receitas, mas todas violaram a dieta/gelo no Lite
@@ -1055,7 +1256,8 @@ export async function analyzePantry(
       return;
     }
 
-    // CP-1.1.1d: a geração falhou ou voltou vazia (generatedCount 0). O app
+    // CP-1.1.1d: a geração voltou vazia (generatedCount 0; CP-B1: falha da IA
+    // já saiu acima como 503). O app
     // recebe a mesma resposta 200 de antes (recipes: [], xpAwarded: 0), mas o
     // scan é devolvido e não há XP nem progresso de missão — o usuário não
     // recebeu nada por esse scan.
@@ -1108,13 +1310,9 @@ export async function analyzePantry(
 //   novo pode dar certo; não é culpa da dieta nem do copo.
 // - Senão, se alguma caiu pela dieta, o motivo é a dieta (como antes do
 //   CP-1.1.9); só quando todas caíram pelo limite físico o código é o novo.
-function sendAllRecipesDiscarded(res: Response, generation: PantryRecipeGeneration): void {
+function sendAllRecipesDiscarded(res: Response, generation: PantryGeneratedRecipes): void {
   if (generation.aiUnavailableDiscards > 0) {
-    sendErrorResponse(res, {
-      statusCode: 503,
-      code: 'scanner/vision-unavailable',
-      message: 'Pantry Scanner is temporarily unavailable.',
-    });
+    sendPantryAiUnavailable(res);
     return;
   }
 
@@ -1128,6 +1326,14 @@ function sendAllRecipesDiscarded(res: Response, generation: PantryRecipeGenerati
   }
 
   sendDietaryRestrictionUnmet(res);
+}
+
+function sendPantryAiUnavailable(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 503,
+    code: AI_UNAVAILABLE_CODE,
+    message: 'Pantry Scanner is temporarily unavailable.',
+  });
 }
 
 function sendDietaryRestrictionUnmet(res: Response): void {
@@ -1179,6 +1385,14 @@ async function runPantryPreviewScan(params: {
 }): Promise<void> {
   const { res, user, usableIngredients } = params;
   const generation = await generatePantryRecipes(user, usableIngredients);
+
+  // CP-B1: a IA falhou na geração — devolve a prévia, 503.
+  if (generation.kind === 'aiUnavailable') {
+    await params.releasePreview();
+    sendPantryAiUnavailable(res);
+    return;
+  }
+
   const { recipes, generatedCount } = generation;
 
   if (generatedCount > 0 && recipes.length === 0) {

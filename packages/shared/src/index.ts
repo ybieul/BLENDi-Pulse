@@ -5,6 +5,7 @@
 export type * from './types';
 export * from './tokens';
 export * from './blenderLimits';
+export * from './aiRequestBudget';
 
 // Schemas Zod + tipos inferidos (backend e mobile)
 export * from './schemas/auth';

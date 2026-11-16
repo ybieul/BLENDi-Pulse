@@ -187,6 +187,11 @@ const envSchema = z.object({
   AI_PROVIDER: providerEnum('AI_PROVIDER'),
   AI_MODEL: requiredString('AI_MODEL'),
   AI_API_KEY: requiredApiKey('AI_API_KEY'),
+  // CP-B1: modelo reserva OPCIONAL (mesmo provider e chave de AI_MODEL; hoje
+  // só usado com AI_PROVIDER=google). Sem valor padrão: ausente = nada muda.
+  // Definido: depois de esgotar as tentativas no AI_MODEL por sobrecarga
+  // (429/500/503), 1 tentativa nele (fromFallback: true). Não vale para a visão.
+  AI_FALLBACK_MODEL: optionalString(),
 
   // Vision AI Provider
   VISION_PROVIDER: providerEnum('VISION_PROVIDER'),

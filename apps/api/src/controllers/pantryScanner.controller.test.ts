@@ -304,12 +304,15 @@ describe('Pantry Scanner — IA sem receita (CP-1.1.1d)', () => {
     assert.equal(updateMissionProgressMock.mock.callCount(), 0);
   });
 
-  it('falha da IA na geração: devolve o scan, sem XP e sem progresso de missão', async () => {
+  // CP-B1: falha do provedor na geração deixou de ser "200 sem receitas" —
+  // agora é IA indisponível (503), com o scan devolvido e sem XP.
+  it('falha da IA na geração: 503 indisponível, devolve o scan, sem XP e sem progresso de missão', async () => {
     generationError = new Error('provider down');
 
     const res = await analyze();
 
-    assertNoRecipeResponse(res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body?.code, 'scanner/vision-unavailable');
     assert.equal(scanRollbackCalls().length, 1);
     assert.equal(awardXPMock.mock.callCount(), 0);
     await new Promise(resolve => setImmediate(resolve));

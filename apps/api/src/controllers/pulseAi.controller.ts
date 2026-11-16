@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
+  AI_REQUEST_BUDGET_MS,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
   toPulseAiRecipePreview,
@@ -43,8 +44,10 @@ import {
   invalidateUserCache,
   setInCache,
 } from '../services/cache.service';
+import { runWithAiRequestBudget } from '../services/aiRequestBudget.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
+import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
@@ -77,8 +80,6 @@ const LOCKED_PREVIEW_HISTORY_PLACEHOLDER =
 const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
 // CP-1.1.9: receita acima do limite físico do BLENDi (proteína ou volume) mesmo após o retry.
 const BLENDER_LIMIT_UNMET_CODE = 'pulseai/blender-limit-unmet';
-const INVALID_JSON_RETRY_INSTRUCTION =
-  'Your previous response had an invalid format. Return only valid JSON.';
 const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
 // 6 exchanges = 6 user messages + 6 assistant messages, interleaved.
 const CONVERSATION_HISTORY_MESSAGE_LIMIT = 12;
@@ -1173,13 +1174,18 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     let requestPromise = inFlightRequests.get(inFlightKey);
 
     if (!requestPromise) {
-      requestPromise = runPulseAiChat({
-        userId,
-        message,
-        normalizedMessage,
-        normalizedMessageHash,
-        requestedLanguage,
-      }).finally(() => {
+      // CP-B1: teto de tempo de IA da requisição (todas as chamadas e novas
+      // tentativas somadas); estourado, a chamada seguinte falha como IA
+      // indisponível (503) e o uso volta pelos caminhos de hoje.
+      requestPromise = runWithAiRequestBudget(AI_REQUEST_BUDGET_MS.pulseAiChat, () =>
+        runPulseAiChat({
+          userId,
+          message,
+          normalizedMessage,
+          normalizedMessageHash,
+          requestedLanguage,
+        })
+      ).finally(() => {
         inFlightRequests.delete(inFlightKey);
       });
 

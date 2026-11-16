@@ -5,6 +5,7 @@ import {
   manipulateAsync,
 } from 'expo-image-manipulator';
 import {
+  AI_CLIENT_TIMEOUT_MS,
   calculateLevel,
   pantryAnalysisResultSchema,
   pantryLockedPreviewResultSchema,
@@ -234,12 +235,15 @@ export async function analyzePantry(
   mimeType: PantryScanInput['mimeType']
 ): Promise<PantryScanResult> {
   try {
+    // CP-B1: visão + geração + novas tentativas passam dos 10 s do axios; o
+    // app espera o teto do servidor + folga (só nesta rota).
     const response = await api.post<PantryScannerAnalyzeResponse>(
       '/pantry-scanner/analyze',
       {
         imageBase64,
         mimeType,
-      }
+      },
+      { timeout: AI_CLIENT_TIMEOUT_MS.pantryScannerAnalyze }
     );
 
     // Prévia: sem XP, sem missão e sem pantry_scan_completed (que conta só

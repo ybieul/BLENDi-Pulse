@@ -123,11 +123,12 @@ describe('promptBuilder — bloco de dieta', () => {
   it('Pantry: com dieta, itens proibidos da lista são tratados como indisponíveis; sem dieta o texto é o de sempre', () => {
     const withDiet = buildBothPaths(['nut_free']).pantry;
     assert.ok(withDiet.includes('Some listed ingredients may be off-limits because of the dietary restrictions below.'));
-    assert.ok(withDiet.includes('Return an empty JSON array only when fewer than 2 distinct recipes'));
-    assert.ok(!withDiet.includes('If you cannot produce exactly 2 valid recipes using only the available ingredients'));
+    // CP-B1: pede 2 e aceita 1; lista vazia só sem nenhuma receita possível.
+    assert.ok(withDiet.includes('If the compliant ingredients only allow 1 valid recipe, return an array with that 1 recipe. Return an empty JSON array only when not even 1 recipe can be made'));
+    assert.ok(!withDiet.includes('If you can produce only 1 valid recipe using only the available ingredients'));
 
     const withoutDiet = buildBothPaths().pantry;
-    assert.ok(withoutDiet.includes('If you cannot produce exactly 2 valid recipes using only the available ingredients, return an empty JSON array.'));
+    assert.ok(withoutDiet.includes('If you can produce only 1 valid recipe using only the available ingredients, return an array with that 1 recipe. Return an empty JSON array only when not even 1 valid recipe can be made.'));
     assert.ok(!withoutDiet.includes('off-limits'));
 
     // O caminho da Pulse AI não ganha nada disso.

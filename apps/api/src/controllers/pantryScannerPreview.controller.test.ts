@@ -654,13 +654,14 @@ describe('Pantry Scanner — prévia devolvida em todo caminho sem receita', () 
     assertPreviewReturned();
   });
 
-  it('falha da IA na geração (200 sem receitas)', async () => {
+  // CP-B1: antes 200 sem receitas; agora IA indisponível (503).
+  it('falha da IA na geração (503 indisponível)', async () => {
     generationError = new Error('provider down');
 
     const res = await scan();
 
-    assert.equal(res.statusCode, 200);
-    assert.deepEqual((res.body?.data as { recipes: unknown[] }).recipes, []);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body?.code, 'scanner/vision-unavailable');
     assertPreviewReturned();
   });
 

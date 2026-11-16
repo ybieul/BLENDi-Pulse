@@ -1,5 +1,6 @@
 import axios from 'axios';
 import {
+  AI_CLIENT_TIMEOUT_MS,
   calculateLevel,
   type PulseAiChatInput,
   type PulseAiRecipe,
@@ -145,7 +146,12 @@ export async function sendMessage(
   };
 
   try {
-    const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload);
+    // CP-B1: a resposta pode levar mais que os 10 s do axios (novas tentativas
+    // e sobrecarga do Gemini); o app espera o teto do servidor + folga (só
+    // nesta rota).
+    const response = await api.post<PulseAiChatResponse>('/pulse-ai/chat', payload, {
+      timeout: AI_CLIENT_TIMEOUT_MS.pulseAiChat,
+    });
     const result = response.data.data;
 
     if (result.locked) {

@@ -57,6 +57,7 @@ The current backend path for `POST /pulse-ai/chat` is simple and text-only:
 2. The API sends one user message.
 3. Gemini returns one JSON recipe object.
 4. If the first response is not valid JSON for the schema, the backend sends one retry call with this extra instruction: `Your previous response had an invalid format. Return only valid JSON.`
+5. If Gemini answers `500`/`503` (overloaded), the same call is repeated up to 3 attempts in total, inside the same time window, and an optional `AI_FALLBACK_MODEL` may get one last attempt (CP-B1 — see *Overload retries and the fallback model* below).
 
 Files that define this behavior:
 
@@ -181,7 +182,17 @@ vision_call_ceiling_usd = $0.0029656
 
 When Step 1 finds at least one usable ingredient, the backend makes a second, separate call through the same `callAi` abstraction used by Pulse AI chat, reusing `promptBuilder.service` with the detected ingredients added as context, and generates an array of 2 recipes at once with a much higher output ceiling (`PANTRY_RECIPE_MAX_TOKENS = 7000` — [apps/api/src/controllers/pantryScanner.controller.ts](../apps/api/src/controllers/pantryScanner.controller.ts)).
 
-On top of that initial call, each of the 2 recipes is independently checked against two safety layers (the physical blender protein guardrail, and macro-math consistency); either check failing on a given recipe triggers its own extra retry call for that recipe (`maxTokens: 2000` each). In the worst case this means up to 1 initial call (7000-token ceiling) plus up to 4 extra retry calls (2000-token ceiling each, 2 recipes × 2 guardrail layers) — a wide enough range, and dependent enough on the actual ingredients/recipes generated, that this document does not attempt a single worked number for it the way the sections above do. Apply the same `cost_usd` formula above with these real ceilings if an exact worst-case figure is needed; for exact production accounting, the same advice as the rest of this document applies — capture real Gemini usage metadata per call.
+The prompt asks for 2 recipes and, since CP-B1, accepts 1 when the ingredients only make 1. If the generation answer is not valid JSON or matches no recipe schema, the backend sends **one format retry** with the same instruction as Pulse AI chat and the same 7000-token ceiling (CP-B1; before, an invalid answer was silently dropped).
+
+On top of that, each recipe is independently checked against three safety layers (the physical blender limits — protein and volume —, macro-math consistency, and the diet/ice check); each check failing on a given recipe triggers its own extra retry call for that recipe (`maxTokens: 2000` each). Before CP-B1 the blender-limit and diet retries were always discarded (the Pantry prompt demands an array and the parser only read an object), so they cost tokens without ever helping; they now work. In the worst case this means up to 2 generation calls (7000-token ceiling each) plus up to 6 extra retry calls (2000-token ceiling each, 2 recipes × 3 layers) — a wide enough range, and dependent enough on the actual ingredients/recipes generated, that this document does not attempt a single worked number for it the way the sections above do. Apply the same `cost_usd` formula above with these real ceilings if an exact worst-case figure is needed; for exact production accounting, the same advice as the rest of this document applies — capture real Gemini usage metadata per call.
+
+## Overload retries and the fallback model (CP-B1)
+
+When Gemini answers `500` or `503` ("This model is currently experiencing high demand"), the backend repeats the same request up to 3 attempts in total, with waits of about 1 s and 3 s, all inside the original call window (30 s text, 45 s vision). This applies to every Gemini call: Pulse AI chat, the Pantry vision step, the Pantry generation and every retry call above. These errors return no generated content, so the repeated attempt is the one that produces the billable output; the extra attempts add latency, not output tokens. Confirm against real usage metadata before relying on this for accounting. `429` (quota) is not repeated on the same model.
+
+`AI_FALLBACK_MODEL` is optional and has no default. When it is set, a text call whose primary model is exhausted by `429`/`500`/`503` gets one attempt on that model, which is then billed **at that model's price**. Choosing it is a cost decision: pick a model whose pricing has been checked like the ones in this document. It is never used for the vision step.
+
+Each AI request also has a total time budget (55 s Pulse AI, 85 s Pantry). A call that would start with less than 5 s left is not sent at all, which caps the number of calls a single request can make under heavy overload.
 
 ## What can make the bill go up
 
@@ -189,7 +200,8 @@ On top of that initial call, each of the 2 recipes is independently checked agai
 - More recent recipe names injected into the system prompt
 - Longer JSON responses
 - Hidden thinking tokens counted inside output pricing
-- Retry calls caused by invalid JSON output (Pulse AI chat, and the Pantry Scanner recipe-generation/guardrail retries)
+- Retry calls caused by invalid JSON output (Pulse AI chat, and the Pantry Scanner format retry since CP-B1) and by the per-recipe guardrail retries (blender limits, macros, diet)
+- A configured `AI_FALLBACK_MODEL` with a higher price than `AI_MODEL` (only used when the primary model is overloaded or out of quota)
 - The Pulse AI locked preview (CP-1.1.4a): a free user who uses up the 3 daily messages can trigger **one more generation per day** (the 4th message). The AI runs normally, but only the macros are shown until the user subscribes. Worst case per free user, up to 4 Pulse AI generations a day instead of 3, plus retries. A preview served from the Mongo cache costs nothing, and a preview is not written to the cache. Unlocking after subscribing does not call the AI again
 - Disabling or missing the app-level Mongo cache (Pulse AI chat only — the Pantry Scanner path has no cache to disable)
 - Larger uploaded photos, or photos with an aspect ratio that tiles into more than ~4 tiles (Pantry Scanner)

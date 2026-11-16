@@ -442,7 +442,8 @@ function buildResponseFormatRequirements(
   if (responseMode === 'recipe-array') {
     return [
       '- Always return a valid JSON array and nothing else. Do not include markdown, code fences, explanations, or text before or after the JSON.',
-      `- Return exactly ${recipeCount} recipe objects in the array.`,
+      // CP-B1: o Pantry aceita 1 receita quando os ingredientes não dão para 2.
+      `- Return ${recipeCount} recipe objects in the array, or 1 when the available ingredients only allow 1 valid recipe.`,
       `- Each recipe object in the array must follow this exact structure: ${PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE}.`,
       `- The full response must match this exact array shape: ${PANTRY_RECIPES_JSON_ARRAY_STRUCTURE}.`,
     ];
@@ -593,7 +594,9 @@ export function buildPantryRecipePrompt({
       responseMode: 'recipe-array',
       recipeCount: 2,
       additionalBehaviorRequirements: [
-        '- Generate exactly 2 distinct blend or smoothie recipes.',
+        // CP-B1: antes "exactly 2" — sem 2 possíveis, a IA devolvia array
+        // vazio e a receita boa se perdia. Agora pede 2 e aceita 1.
+        '- Generate 2 distinct blend or smoothie recipes. If the available ingredients only allow 1 valid recipe, generate 1.',
         '- Use only the ingredients listed in the Available ingredients section.',
         '- Do not invent, substitute, or recommend ingredients that are not listed as available.',
         '- Set hasSubstitutes to false for every recipe.',
@@ -605,10 +608,10 @@ export function buildPantryRecipePrompt({
         ...(hasDietaryRestrictions
           ? [
               '- Some listed ingredients may be off-limits because of the dietary restrictions below. Treat those as not available: skip them silently and build both recipes only from the remaining compliant ingredients. Two distinct recipes can reuse the same few ingredients in different combinations and proportions.',
-              '- Return an empty JSON array only when fewer than 2 distinct recipes can be made from the compliant ingredients alone.',
+              '- If the compliant ingredients only allow 1 valid recipe, return an array with that 1 recipe. Return an empty JSON array only when not even 1 recipe can be made from the compliant ingredients alone.',
             ]
           : [
-              '- If you cannot produce exactly 2 valid recipes using only the available ingredients, return an empty JSON array.',
+              '- If you can produce only 1 valid recipe using only the available ingredients, return an array with that 1 recipe. Return an empty JSON array only when not even 1 valid recipe can be made.',
             ]),
       ],
       additionalContextSections: [buildAvailableIngredientsSection(availableIngredients)],
@@ -617,7 +620,7 @@ export function buildPantryRecipePrompt({
       {
         role: 'user',
         content:
-          'Generate exactly 2 distinct blend recipes using only the available ingredients list. Do not use ingredients outside the list.',
+          'Generate 2 distinct blend recipes (or 1 if the available ingredients only allow 1) using only the available ingredients list. Do not use ingredients outside the list.',
       },
     ],
   };
