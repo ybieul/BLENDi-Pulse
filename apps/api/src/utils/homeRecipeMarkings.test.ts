@@ -20,6 +20,12 @@
 // Também confere as 20 receitas do WeightLoss: macros somados ingrediente a
 // ingrediente (tabela abaixo), volume dentro do Lite (CP-B2: sem teto de proteína), 180-320 kcal,
 // sem gelo nem açúcar adicionado, e a variedade mínima para o filtro.
+//
+// CP-A: trava as regras das 100 receitas (bloco "regras das 100 receitas"):
+// volume ≤ 400 ml no leitor do backend, nada barrado no Lite (congelado ou
+// gelo), passos sem "BLENDi", kcal a ±10% de 4/4/9, nenhum par com os mesmos
+// ingredientes, mesma quantidade em en e pt-BR e pelo menos 2 receitas
+// veganas e 2 sem laticínios por goal.
 // Rodar com: pnpm --filter @blendi/api test
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,8 +43,8 @@ import {
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import type { DietaryPreference } from '../models/User';
-import { isIceTerm, validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
-import { estimateRecipeVolumeMl } from './recipeVolume.utils';
+import { isIceTerm, tokenizeSegments, validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
+import { estimateIngredientVolumeMl, estimateRecipeVolumeMl } from './recipeVolume.utils';
 
 const MOBILE_SRC = path.resolve(__dirname, '../../../mobile/src');
 
@@ -104,8 +110,8 @@ function deriveContains(recipe: HomeRecipe): HomeRecipeContent[] {
   if (veganTerms.some(term => !dairyTerms.includes(term))) derived.add('animal');
   if (violatedTerms(restricted, ['nut_free'], 'ProPlus').length > 0) derived.add('nuts');
   if (violatedTerms(restricted, ['no_added_sugar'], 'ProPlus').length > 0) derived.add('added_sugar');
-  // CP-B2: o Lite também barra congelados, mas a marcação 'ice' da Home é só
-  // gelo — as receitas da Home com congelado ficam para o CP-A.
+  // A marcação 'ice' da Home é só gelo. O Lite também barra congelado, mas
+  // desde o CP-A nenhuma receita da Home tem congelado (ver "regras das 100").
   if (liteIceBlocked(restricted)) derived.add('ice');
 
   return HOME_RECIPE_CONTENT_VALUES.filter(content => derived.has(content));
@@ -158,8 +164,7 @@ describe('receitas da Home — marcação conferida pelas regras do backend', ()
 
 describe('receitas da Home — leitor de volume (CP-A)', () => {
   it('mede todos os ingredientes das 100 receitas, com o mesmo volume em en e pt-BR', () => {
-    // O limite de 400 ml NÃO é conferido aqui: a proposta de ajuste
-    // (docs/proposals/cp-a-receitas-home.md) ainda não foi aplicada.
+    // O limite de 400 ml é conferido no bloco "regras das 100 receitas".
     const ptBR = JSON.parse(readFileSync(path.join(MOBILE_SRC, 'locales/pt-BR.json'), 'utf8')) as Record<string, unknown>;
     const translatePt = (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], ptBR));
     const problems: string[] = [];
@@ -210,7 +215,8 @@ function nutritionTable(): Record<string, Nutrition> {
     plant: fromBackendTable('Plant protein powder', 0, ''),
     eggWhite: fromBackendTable('Egg white protein powder', 0, ''),
     greek: fromBackendTable('Nonfat Greek yogurt', 0, ''),
-    skim: fromBackendTable('Skim milk', 0, ''),
+    // CP-A: "Milk"/"Leite" sem tipo, referência única 2%.
+    milk: { protein: 3.3, carbs: 4.8, fat: 1.98, calories: 50, fiber: 0, source: 'USDA 01079 Milk, reduced fat, fluid, 2% milkfat' },
     almond: fromBackendTable('Unsweetened almond milk', 0, ''),
     oatMilk: fromBackendTable('Oat milk', 0, ''),
     strawberry: fromBackendTable('Strawberry', 2.0, 'USDA 09316'),
@@ -220,10 +226,10 @@ function nutritionTable(): Record<string, Nutrition> {
     spinach: fromBackendTable('Raw spinach', 2.2, 'USDA 11457'),
     oats: fromBackendTable('Rolled oats', 10.1, 'USDA 08120'),
     water: { protein: 0, carbs: 0, fat: 0, calories: 0, fiber: 0, source: '-' },
-    soy: { protein: 2.86, carbs: 1.74, fat: 1.61, calories: 33, fiber: 0.4, source: 'USDA 16139 Soymilk, unsweetened' },
+    soy: { protein: 2.86, carbs: 1.74, fat: 1.61, calories: 33, fiber: 0.4, source: 'USDA 16222 Soymilk, unsweetened' },
     raspberry: { protein: 1.2, carbs: 11.94, fat: 0.65, calories: 52, fiber: 6.5, source: 'USDA 09302 Raspberries, raw' },
     blackberry: { protein: 1.39, carbs: 9.61, fat: 0.49, calories: 43, fiber: 5.3, source: 'USDA 09042 Blackberries, raw' },
-    tofu: { protein: 6.9, carbs: 2.4, fat: 2.7, calories: 62, fiber: 0.1, source: 'USDA 16161 Tofu, silken, firm' },
+    tofu: { protein: 6.9, carbs: 2.4, fat: 2.7, calories: 62, fiber: 0.1, source: 'USDA 16162 Tofu, silken, firm' },
     chia: { protein: 16.54, carbs: 42.12, fat: 30.74, calories: 486, fiber: 34.4, source: 'USDA 12006 Chia seeds, dried' },
     flax: { protein: 18.29, carbs: 28.88, fat: 42.16, calories: 534, fiber: 27.3, source: 'USDA 12220 Flaxseed' },
     cocoa: { protein: 19.6, carbs: 57.9, fat: 13.7, calories: 228, fiber: 37, source: 'USDA 19165 Cocoa, dry powder, unsweetened' },
@@ -243,24 +249,24 @@ function nutritionTable(): Record<string, Nutrition> {
  * depois de batidos).
  */
 const WEIGHT_LOSS_INGREDIENTS: ReadonlyArray<ReadonlyArray<readonly [string, number]>> = [
-  [['whey', 30], ['raspberry', 125], ['skim', 200]],
+  [['whey', 30], ['raspberry', 125], ['milk', 200]],
   [['plant', 30], ['strawberry', 150], ['soy', 200]],
   [['greek', 200], ['blueberry', 100], ['chia', 12]],
   [['plant', 30], ['cocoa', 10], ['soy', 250]],
-  [['cottage', 150], ['peach', 150], ['skim', 100]],
+  [['cottage', 150], ['peach', 150], ['milk', 100]],
   [['plant', 30], ['kiwi', 140], ['water', 230]],
   [['whey', 30], ['pineapple', 150], ['water', 220]],
   [['greek', 150], ['strawberry', 150], ['oats', 20]],
   [['eggWhite', 30], ['raspberry', 125], ['oatMilk', 220]],
   [['whey', 30], ['cherry', 120], ['almond', 250]],
-  [['greek', 200], ['pumpkin', 100], ['skim', 100]],
+  [['greek', 200], ['pumpkin', 100], ['milk', 100]],
   [['tofu', 200], ['blueberry', 100], ['soy', 100]],
   [['plant', 30], ['blackberry', 120], ['oatMilk', 250]],
   [['whey', 30], ['pear', 150], ['almond', 220]],
   [['plant', 30], ['pumpkin', 120], ['almond', 250]],
   [['plant', 30], ['banana', 100], ['water', 250]],
   [['tofu', 180], ['pineapple', 150], ['spinach', 30]],
-  [['greek', 200], ['cherry', 100], ['skim', 100]],
+  [['greek', 200], ['cherry', 100], ['milk', 100]],
   [['cottage', 150], ['mango', 120], ['almond', 130]],
   [['greek', 170], ['peach', 150], ['flax', 10]],
 ];
@@ -331,8 +337,6 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
       assert.ok(!recipe.contains.includes('ice'), recipe.nameKey);
       assert.ok(!recipe.contains.includes('added_sugar'), recipe.nameKey);
       const restricted = toRestrictedRecipe(recipe);
-      // CP-B2: o Lite agora também barra congelado; as receitas da Home com
-      // fruta congelada ficam para o CP-A — aqui, só gelo e açúcar.
       assert.ok(validateRecipeRestrictions(restricted, ['no_added_sugar'], 'ProPlus').compliant, recipe.nameKey);
       assert.ok(!liteIceBlocked(restricted), recipe.nameKey);
     }
@@ -346,7 +350,7 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
 
     const bases = new Set(WEIGHT_LOSS_INGREDIENTS.map(ingredients => ingredients[ingredients.length - 1][0]));
     const proteins = new Set(WEIGHT_LOSS_INGREDIENTS.map(ingredients => ingredients[0][0]));
-    for (const base of ['water', 'soy', 'skim']) assert.ok(bases.has(base), `base ${base}`);
+    for (const base of ['water', 'soy', 'milk']) assert.ok(bases.has(base), `base ${base}`);
     for (const protein of ['whey', 'plant', 'greek', 'tofu']) assert.ok(proteins.has(protein), `proteína ${protein}`);
   });
 
@@ -357,6 +361,121 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
       const pt = recipe.nameKey.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], ptBR);
       assert.ok(!promise.test(translate(recipe.nameKey)), translate(recipe.nameKey));
       assert.ok(!promise.test(String(pt)), String(pt));
+    }
+  });
+});
+
+// ─── CP-A: regras das 100 receitas ────────────────────────────────────────────
+//
+// Travam o que a proposta aprovada (docs/proposals/cp-a-receitas-home.md)
+// aplicou, para que uma receita nova ou alterada não volte a quebrar as regras.
+
+const ptBRMessages = JSON.parse(readFileSync(path.join(MOBILE_SRC, 'locales/pt-BR.json'), 'utf8')) as Record<string, unknown>;
+
+function translatePt(key: string): string {
+  const value = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], ptBRMessages);
+  assert.equal(typeof value, 'string', `chave sem texto em pt-BR.json: ${key}`);
+  return value as string;
+}
+
+function allRecipes(): Array<{ goal: string; recipe: HomeRecipe }> {
+  return USER_GOAL_VALUES.flatMap(goal => DAILY_RECIPES[goal].map(recipe => ({ goal, recipe })));
+}
+
+/** Menor copo entre os modelos (hoje 400 ml, Lite e Pro+): a receita cabe em qualquer um. */
+const SMALLEST_CUP_ML = Math.min(...Object.values(BLENDER_LIMITS).map(limit => limit.maxVolumeMl));
+const CALORIE_TOLERANCE = 0.1;
+const MIN_RECIPES_PER_GOAL_AND_DIET = 2;
+
+/** Nome do ingrediente normalizado (sem acento, minúsculas, singular), para comparar conjuntos. */
+function ingredientIdentity(name: string): string {
+  return tokenizeSegments(name).map(tokens => tokens.join(' ')).join(' ');
+}
+
+describe('receitas da Home — regras das 100 receitas (CP-A)', () => {
+  it(`volume até ${SMALLEST_CUP_ML} ml no leitor do backend (textos em inglês), sem item sem medida`, () => {
+    assert.equal(SMALLEST_CUP_ML, 400);
+    const problems: string[] = [];
+    for (const { recipe } of allRecipes()) {
+      const { estimatedVolumeMl, unmeasured } = estimateRecipeVolumeMl(
+        recipe.ingredients.map(i => ({ name: translate(i.nameKey), amount: translate(i.amountKey) }))
+      );
+      if (estimatedVolumeMl > SMALLEST_CUP_ML) problems.push(`${recipe.nameKey}: ${estimatedVolumeMl} ml`);
+      if (unmeasured.length > 0) problems.push(`${recipe.nameKey} sem medida: ${unmeasured.join(', ')}`);
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it('nenhum ingrediente nem passo barrado no Lite pelo validador (congelado ou gelo)', () => {
+    const problems: string[] = [];
+    for (const { recipe } of allRecipes()) {
+      const result = validateRecipeRestrictions(toRestrictedRecipe(recipe), [], 'Lite');
+      if (!result.compliant) problems.push(`${recipe.nameKey}: ${result.violations.map(v => v.term).join(', ')}`);
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it('passos com texto neutro: nenhum "BLENDi" em en nem em pt-BR', () => {
+    const problems: string[] = [];
+    for (const { recipe } of allRecipes()) {
+      for (const step of recipe.steps) {
+        for (const text of [translate(step.textKey), translatePt(step.textKey)]) {
+          if (/blendi/i.test(text)) problems.push(`${step.textKey}: ${text}`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it(`kcal declarada a ±${CALORIE_TOLERANCE * 100}% da conta 4/4/9`, () => {
+    const problems: string[] = [];
+    for (const { recipe } of allRecipes()) {
+      const fromMacros = recipe.protein * 4 + recipe.carbs * 4 + recipe.fat * 9;
+      if (Math.abs(recipe.calories - fromMacros) > fromMacros * CALORIE_TOLERANCE) {
+        problems.push(`${recipe.nameKey}: ${recipe.calories} kcal × 4/4/9 ${fromMacros} kcal`);
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it('nenhum par de receitas com o mesmo conjunto de ingredientes (ignorando quantidades)', () => {
+    const seen = new Map<string, string>();
+    const duplicates: string[] = [];
+    for (const { recipe } of allRecipes()) {
+      const identity = recipe.ingredients.map(i => ingredientIdentity(translate(i.nameKey))).sort().join(' + ');
+      const other = seen.get(identity);
+      if (other) duplicates.push(`${other} = ${recipe.nameKey} (${identity})`);
+      else seen.set(identity, recipe.nameKey);
+    }
+    assert.deepEqual(duplicates, []);
+  });
+
+  it('mesma quantidade em en e pt-BR para cada ingrediente (mesmos números, medida equivalente)', () => {
+    const problems: string[] = [];
+    const numbers = (text: string) => text.match(/\d+(?:[.,/]\d+)?/g) ?? [];
+    for (const { recipe } of allRecipes()) {
+      for (const ingredient of recipe.ingredients) {
+        const enItem = { name: translate(ingredient.nameKey), amount: translate(ingredient.amountKey) };
+        const ptItem = { name: translatePt(ingredient.nameKey), amount: translatePt(ingredient.amountKey) };
+        const sameNumbers = JSON.stringify(numbers(enItem.amount)) === JSON.stringify(numbers(ptItem.amount));
+        const enMl = estimateIngredientVolumeMl(enItem);
+        const ptMl = estimateIngredientVolumeMl(ptItem);
+        if (!sameNumbers || enMl === null || ptMl === null || Math.abs(enMl - ptMl) > 0.01) {
+          problems.push(`${ingredient.amountKey}: "${enItem.amount}" (${enMl} ml) × "${ptItem.amount}" (${ptMl} ml)`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it(`cada goal tem pelo menos ${MIN_RECIPES_PER_GOAL_AND_DIET} receitas veganas e ${MIN_RECIPES_PER_GOAL_AND_DIET} sem laticínios`, () => {
+    const compatible = (recipe: HomeRecipe, diet: DietaryPreference) =>
+      !DIETARY_PREFERENCE_FORBIDDEN_CONTENTS[diet].some(content => recipe.contains.includes(content));
+    for (const goal of USER_GOAL_VALUES) {
+      for (const diet of ['vegan', 'dairy_free'] as const) {
+        const count = DAILY_RECIPES[goal].filter(recipe => compatible(recipe, diet)).length;
+        assert.ok(count >= MIN_RECIPES_PER_GOAL_AND_DIET, `${goal} × ${diet}: ${count}`);
+      }
     }
   });
 });

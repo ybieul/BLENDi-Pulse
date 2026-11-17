@@ -100,6 +100,16 @@ export const LIQUID_INGREDIENT_TERMS: readonly string[] = [
 
 export const POWDER_INGREDIENT_TERMS: readonly string[] = ['powder', 'po'];
 
+/**
+ * CP-A (ajuste 8): concentrado líquido ("tart cherry concentrate",
+ * "concentrado de cereja") conta pela medida, como líquido, e não como a
+ * fruta do nome. "2 tbsp" de concentrado de cereja = 29,6 ml, não os 19 ml
+ * da cereja em pedaços. Xarope ("syrup"/"xarope") já está nos termos de
+ * líquido acima. Exceção: "whey protein concentrate" é pó, não líquido.
+ */
+export const CONCENTRATE_INGREDIENT_TERMS: readonly string[] = ['concentrate', 'concentrado'];
+const CONCENTRATE_POWDER_EXCEPTION_TERMS: readonly string[] = ['protein', 'whey', 'casein', 'proteina', 'caseina'];
+
 interface CompiledWeight {
   entry: TypicalIngredientWeight;
   phrases: string[][];
@@ -114,9 +124,18 @@ const COMPILED_WEIGHTS: readonly CompiledWeight[] = TYPICAL_INGREDIENT_WEIGHTS.m
 
 const COMPILED_LIQUID_TERMS = LIQUID_INGREDIENT_TERMS.map(compilePhrase);
 const COMPILED_POWDER_TERMS = POWDER_INGREDIENT_TERMS.map(compilePhrase);
+const COMPILED_CONCENTRATE_TERMS = CONCENTRATE_INGREDIENT_TERMS.map(compilePhrase);
+const COMPILED_CONCENTRATE_EXCEPTION_TERMS = CONCENTRATE_POWDER_EXCEPTION_TERMS.map(compilePhrase);
 
 function hasAnyTerm(segments: readonly string[][], terms: readonly string[][]): boolean {
   return terms.some(term => findPhraseOccurrences(segments, term).length > 0);
+}
+
+/** Nome de líquido: termo de líquido ou concentrado (não proteico), sem "pó"/"powder". */
+function isLiquidName(segments: readonly string[][]): boolean {
+  if (hasAnyTerm(segments, COMPILED_POWDER_TERMS)) return false;
+  if (hasAnyTerm(segments, COMPILED_LIQUID_TERMS)) return true;
+  return hasAnyTerm(segments, COMPILED_CONCENTRATE_TERMS) && !hasAnyTerm(segments, COMPILED_CONCENTRATE_EXCEPTION_TERMS);
 }
 
 /**
@@ -127,7 +146,7 @@ export function findTypicalIngredientWeight(name: string): TypicalIngredientWeig
   const segments = tokenizeSegments(name);
   if (segments.length === 0) return null;
 
-  if (hasAnyTerm(segments, COMPILED_LIQUID_TERMS) && !hasAnyTerm(segments, COMPILED_POWDER_TERMS)) {
+  if (isLiquidName(segments)) {
     return null;
   }
 
@@ -324,7 +343,7 @@ export function findUnitIngredientWeight(amountRest: string, name = ''): UnitIng
   const segments = tokenizeSegments(`${amountRest} ${name}`);
   if (segments.length === 0) return null;
 
-  const isLiquid = hasAnyTerm(segments, COMPILED_LIQUID_TERMS) && !hasAnyTerm(segments, COMPILED_POWDER_TERMS);
+  const isLiquid = isLiquidName(segments);
 
   let best: CompiledUnitWeight | null = null;
   for (const compiled of COMPILED_UNIT_WEIGHTS) {

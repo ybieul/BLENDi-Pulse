@@ -27,6 +27,10 @@
 //   continua contando 0. É o mesmo leitor para a IA (Pulse AI e Pantry) e
 //   para medir as receitas da Home.
 //
+// - CP-A (ajustes 7 e 8): "fluid oz" é lido como onça fluida; concentrado
+//   líquido ("tart cherry concentrate") conta pela medida, como líquido, e não
+//   como a fruta do nome (ver CONCENTRATE_INGREDIENT_TERMS).
+//
 // Resultado: um LIMITE INFERIOR do volume real. Um total acima do limite do
 // copo é uma violação certa (sem falso positivo por item não medido); um
 // total abaixo pode esconder itens não medidos — risco aceito para não
@@ -44,7 +48,8 @@ const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number, HouseholdMeasure?]> = 
   // Ordem importa: frases mais longas primeiro.
   // CP-B2: o texto já chega sem acento (normalize), então "onça" vira
   // "onca" — antes a regex esperava "ç" e "onça fluida" nunca era lida.
-  [/^(fl\.?\s*oz|fluid\s+ounces?|oncas?\s+fluidas?)\b/, 29.5735],
+  // CP-A (ajuste 7): "fluid oz" também ("8 fluid oz" contava 0).
+  [/^(fl\.?\s*oz|fluid\s+(?:ounces?|oz)|oncas?\s+fluidas?)\b/, 29.5735],
   [/^(colher(es)?\s+de\s+sopa|tablespoons?|tbsps?|tbs|cs)\b/, 14.787, 'tbsp'],
   [/^(colher(es)?\s+de\s+cha|colher(es)?\s+de\s+cafe|teaspoons?|tsps?|cc)\b/, 4.929, 'tsp'],
   [/^(colher(es)?)\b/, 4.929, 'tsp'],

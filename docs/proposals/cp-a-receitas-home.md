@@ -1,6 +1,6 @@
 # CP-A — Proposta de ajuste das 100 receitas fixas da Home
 
-**Status:** proposta para revisão (Gabriel e Claude). **Nada foi aplicado**: `dailyRecipes.data.ts`, `en.json` e `pt-BR.json` não mudaram neste CP. A única mudança de código é o leitor de volume (Tarefa 1).
+**Status:** **aplicada** em 17/11/2026, com os ajustes da revisão (iogurte e cottage sem tipo, Recovery19 nova, Muscle01 com 35 g, nome pt-BR da WeightLoss16, "fluid oz" e concentrados no leitor). Relatório: [fixes/cp-a2-receitas-home-aplicadas.md](../fixes/cp-a2-receitas-home-aplicadas.md). O texto abaixo é a proposta como foi revisada; onde o relatório diverge (Muscle01, Recovery19, Recovery02), vale o relatório.
 
 Data: 17/11/2026. Base: análise de 16/11 (itens 1 a 9) e regras do Gabriel e do Jon (copo de 400 ml no Lite e Pro+ e 600 ml no Steel, nada congelado, texto neutro, leite sem tipo, Recovery com opções vegetais).
 

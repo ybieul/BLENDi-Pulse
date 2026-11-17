@@ -89,14 +89,11 @@ describe('receita do dia — nunca viola a dieta nem o modelo', () => {
 
   // CP-B2: o teto de proteína por modelo saiu (o único limite físico é o
   // volume). Antes, o Lite perdia as Muscle 01, 02, 09 e 18 (36-38 g).
-  it('Lite: a Home não esconde mais as receitas Muscle de 36-38 g de proteína; o pool é o do goal inteiro', () => {
+  // CP-A: com os macros somados ingrediente a ingrediente, só a Muscle02
+  // (36 g) passa do antigo teto de 35 g; 01, 09 e 18 ficaram com 35 g.
+  it('Lite: a Home não esconde a receita Muscle acima de 35 g de proteína; o pool é o do goal inteiro', () => {
     const highProtein = DAILY_RECIPES.Muscle.filter((recipe) => recipe.protein > 35).map((recipe) => recipe.nameKey);
-    expect(highProtein).toEqual([
-      'home.goalMuscleRecipe',
-      'home.dailyRecipeMuscle02Name',
-      'home.dailyRecipeMuscle09Name',
-      'home.dailyRecipeMuscle18Name',
-    ]);
+    expect(highProtein).toEqual(['home.dailyRecipeMuscle02Name']);
     for (const goal of USER_GOAL_VALUES) {
       // Hoje nenhuma receita tem gelo: o pool do Lite é o do goal inteiro, na mesma ordem.
       expect(getDailyRecipePool({ goal, dietaryPreferences: [], blendiModel: 'Lite' })?.recipes).toEqual(
@@ -124,14 +121,30 @@ describe('receita do dia — nunca viola a dieta nem o modelo', () => {
 });
 
 describe('receita do dia — fallback para os outros goals', () => {
-  it('Recovery não tem receita vegana: usa as veganas dos outros goals, na ordem dos goals', () => {
+  // CP-A: o Recovery ganhou 4 receitas veganas (07, 09, 14 e 16) e nenhuma
+  // combinação de dieta esvazia mais um goal com os dados reais. O fallback
+  // para os outros goals segue coberto com dados sintéticos
+  // (dailyRecipeSelection.synthetic.test.tsx).
+  it('Recovery + vegan usa as veganas do próprio goal, na ordem do goal', () => {
     const pool = getDailyRecipePool({ goal: 'Recovery', dietaryPreferences: ['vegan'], blendiModel: 'ProPlus' });
-    expect(pool?.source).toBe('otherGoals');
-    const expected = USER_GOAL_VALUES.filter((goal) => goal !== 'Recovery')
-      .flatMap((goal) => DAILY_RECIPES[goal])
-      .filter((recipe) => !violates(recipe, ['vegan'], 'ProPlus'));
-    expect(pool?.recipes).toEqual(expected);
-    expect(pool?.recipes.length).toBeGreaterThan(0);
+    expect(pool?.source).toBe('goal');
+    expect(pool?.recipes).toEqual(DAILY_RECIPES.Recovery.filter((recipe) => !violates(recipe, ['vegan'], 'ProPlus')));
+    expect(pool?.recipes.map((recipe) => recipe.nameKey)).toEqual([
+      'home.dailyRecipeRecovery07Name',
+      'home.dailyRecipeRecovery09Name',
+      'home.dailyRecipeRecovery14Name',
+      'home.dailyRecipeRecovery16Name',
+    ]);
+  });
+
+  it('com os dados reais, nenhum goal × combinação de dieta × modelo cai no fallback', () => {
+    for (const goal of USER_GOAL_VALUES) {
+      for (const diets of DIET_COMBINATIONS) {
+        for (const blendiModel of ['Lite', 'ProPlus'] as const) {
+          expect(getDailyRecipePool({ goal, dietaryPreferences: diets, blendiModel })?.source).toBe('goal');
+        }
+      }
+    }
   });
 });
 

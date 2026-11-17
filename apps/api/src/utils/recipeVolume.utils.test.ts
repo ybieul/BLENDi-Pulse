@@ -278,3 +278,38 @@ describe('CP-A — itens por unidade (tabela USDA, tamanho médio)', () => {
     assert.ok(Date.now() - started < 1000);
   });
 });
+
+describe('CP-A — "fluid oz" e concentrados líquidos (ajustes 7 e 8)', () => {
+  const fluidOz: Array<[string, number]> = [
+    ['8 fluid oz', 236.6], ['4 fluid oz', 118.3], ['1 fluid oz', 29.6],
+    ['8 fl oz', 236.6], ['8 fluid ounces', 236.6], ['1 fluid ounce', 29.6],
+  ];
+  for (const [amount, expected] of fluidOz) {
+    it(`"${amount}" ≈ ${expected} ml`, () => close(estimateAmountVolumeMl(amount), expected));
+  }
+
+  it('"fluid oz" no nome + quantidade da IA (o caso do lote da auditoria)', () => {
+    close(estimateIngredientVolumeMl({ name: 'Almond milk', amount: '8 fluid oz' }), 236.6);
+    close(estimateIngredientVolumeMl({ name: 'Coffee', amount: '4 fluid oz' }), 118.3);
+  });
+
+  it('concentrado de cereja conta a medida (líquido), não a cereja em pedaços', () => {
+    const cases: Array<[string, string, number]> = [
+      ['Unsweetened tart cherry concentrate', '2 tbsp', 29.6],
+      ['Concentrado de cereja ácida sem açúcar', '2 colher(es) de sopa', 29.6],
+      ['Tart cherry concentrate', '1/4 cup', 59.2],
+      ['Concentrado de suco de uva', '1 colher de sopa', 14.8],
+      ['Maple syrup', '1 tbsp', 14.8],
+      ['Xarope de agave', '1 colher de sopa', 14.8],
+    ];
+    for (const [name, amount, expected] of cases) close(estimateIngredientVolumeMl({ name, amount }), expected);
+    // Antes do ajuste 8, o nome casava com "cherry" (154 g/xícara): 2 tbsp = 19,3 ml.
+    assert.ok((estimateIngredientVolumeMl({ name: 'Cherries', amount: '2 tbsp' }) ?? 0) < 20);
+  });
+
+  it('"whey protein concentrate" continua sendo pó (scoop e xícara pelo peso típico)', () => {
+    close(estimateIngredientVolumeMl({ name: 'Whey protein concentrate', amount: '1 scoop' }), 30);
+    close(estimateIngredientVolumeMl({ name: 'Whey protein concentrate', amount: '1/3 cup' }), 30);
+    close(estimateIngredientVolumeMl({ name: 'Whey protein concentrado', amount: '1 dose' }), 30);
+  });
+});
