@@ -21,6 +21,7 @@ import {
 import {
   UserModel,
   type BlendiModel,
+  type BlendiOwnership,
   type DietaryPreference,
   type UserGoal,
   type UserLocale,
@@ -62,6 +63,7 @@ import {
   summarizeBlenderLimitViolation,
   validateBlenderLimits,
 } from '../utils/blenderGuardrail.utils';
+import { isGenericBlender } from '../utils/recipeText.utils';
 import {
   buildRecipeRestrictionRetryMessage,
   summarizeRestrictionViolations,
@@ -99,6 +101,8 @@ interface ConversationContext {
 interface PulseAiUserProfile {
   id: string;
   blendiModel: BlendiModel;
+  /** CP-B3: 'other'/'none' — limites do Lite, texto da receita sem BLENDi. */
+  blendiOwnership: BlendiOwnership;
   goal: UserGoal;
   weightGoal?: WeightGoal;
   dietaryPreferences: DietaryPreference[];
@@ -342,6 +346,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
   const user = await UserModel.findById(userId)
     .select({
       blendiModel: 1,
+      blendiOwnership: 1,
       goal: 1,
       weightGoal: 1,
       dietaryPreferences: 1,
@@ -365,6 +370,8 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
   return {
     id: String(user._id),
     blendiModel: user.blendiModel as BlendiModel,
+    // .lean() não aplica o default do schema — conta antiga sem o campo = BLENDi.
+    blendiOwnership: (user.blendiOwnership ?? 'blendi') as BlendiOwnership,
     goal: user.goal as UserGoal,
     weightGoal: user.weightGoal as WeightGoal | undefined,
     // .lean() não aplica o default do schema — conta antiga sem o campo = sem dieta.
@@ -466,7 +473,7 @@ async function ensureBlenderGuardrail(
   });
 
   try {
-    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation);
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext);
     const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
       ...prompt.messages,
       { role: 'assistant', content: JSON.stringify(recipe) },
@@ -568,7 +575,9 @@ async function ensureRecipeRestrictions(
   });
 
   try {
-    const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations);
+    const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations, {
+      genericBlender: prompt.textContext?.genericBlender,
+    });
     const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
       ...prompt.messages,
       { role: 'assistant', content: JSON.stringify(recipe) },
@@ -817,6 +826,8 @@ async function runPulseAiChat(params: {
   const cacheKey = generateCacheKey({
     userId: currentUser.id,
     model: currentUser.blendiModel,
+    // CP-B3: o texto da receita muda para quem não tem BLENDi.
+    genericBlender: isGenericBlender(currentUser.blendiOwnership),
     goal: currentUser.goal,
     language: effectiveLanguage,
     unitSystem: currentUser.unitSystem,
@@ -936,6 +947,7 @@ async function runPulseAiChat(params: {
 
   const prompt = buildPulseAiPrompt({
     blendiModel: currentUser.blendiModel,
+    blendiOwnership: currentUser.blendiOwnership,
     goal: currentUser.goal,
     weightGoal: currentUser.weightGoal,
     dietaryPreferences: currentUser.dietaryPreferences,
@@ -1106,6 +1118,7 @@ async function runPulseAiChat(params: {
       aiModel: aiResponse.model,
       rawMessage: normalizedMessage,
       dietaryFlags: currentUser.dietaryPreferences,
+      genericBlender: isGenericBlender(currentUser.blendiOwnership),
       response: {
         recipe,
         aiProvider: aiResponse.provider,

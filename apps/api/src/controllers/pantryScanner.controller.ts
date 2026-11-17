@@ -22,6 +22,7 @@ import { LOCKED_PREVIEW_TTL_MS_BY_KIND, LockedPreviewModel } from '../models/Loc
 import {
   UserModel,
   type BlendiModel,
+  type BlendiOwnership,
   type DietaryPreference,
   type UserGoal,
   type UserLocale,
@@ -90,6 +91,8 @@ const USABLE_CONFIDENCE_LEVELS = new Set<PantryIngredient['confidence']>(['high'
 interface PantryScannerUserProfile {
   id: string;
   blendiModel: BlendiModel;
+  /** CP-B3: 'other'/'none' — limites do Lite, texto da receita sem BLENDi. */
+  blendiOwnership: BlendiOwnership;
   goal: UserGoal;
   weightGoal?: WeightGoal;
   dietaryPreferences: DietaryPreference[];
@@ -483,7 +486,7 @@ async function ensurePantryRecipeBlenderLimits(
   });
 
   try {
-    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation);
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext);
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
       messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
@@ -596,7 +599,9 @@ async function ensurePantryRecipeRestrictions(
   });
 
   try {
-    const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations);
+    const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations, {
+      genericBlender: prompt.textContext?.genericBlender,
+    });
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
       messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
@@ -649,6 +654,7 @@ async function findPantryScannerUserProfile(
   const user = await UserModel.findById(userId)
     .select({
       blendiModel: 1,
+      blendiOwnership: 1,
       goal: 1,
       weightGoal: 1,
       dietaryPreferences: 1,
@@ -672,6 +678,8 @@ async function findPantryScannerUserProfile(
   return {
     id: String(user._id),
     blendiModel: user.blendiModel as BlendiModel,
+    // .lean() não aplica o default do schema — conta antiga sem o campo = BLENDi.
+    blendiOwnership: (user.blendiOwnership ?? 'blendi') as BlendiOwnership,
     goal: user.goal as UserGoal,
     weightGoal: user.weightGoal as WeightGoal | undefined,
     // .lean() não aplica o default do schema — conta antiga sem o campo = sem dieta.
@@ -952,6 +960,7 @@ async function generatePantryRecipes(
 ): Promise<PantryRecipeGeneration> {
   const prompt = buildPantryRecipePrompt({
     blendiModel: user.blendiModel,
+    blendiOwnership: user.blendiOwnership,
     goal: user.goal,
     weightGoal: user.weightGoal,
     dietaryPreferences: user.dietaryPreferences,

@@ -14,20 +14,34 @@
 // - O que não dá para medir (unidades: "1 banana", "1 scoop", "1 shot")
 //   entra como 0 e fica listado em `unmeasured`.
 //
+// - CP-B3: quantidade em xícara ou colher (de sopa, de chá) de um ingrediente
+//   da tabela de pesos típicos (ingredientWeights.utils.ts: folhas, frutas em
+//   pedaços, aveia, pós, sementes, pastas, iogurte) conta os gramas típicos
+//   (1 g = 1 ml), não a medida cheia: "1 cup spinach" = 30 ml, como "30 g de
+//   espinafre". Líquidos e o que não está na tabela contam a medida.
+//
 // Resultado: um LIMITE INFERIOR do volume real. Um total acima do limite do
 // copo é uma violação certa (sem falso positivo por item não medido); um
 // total abaixo pode esconder itens não medidos — risco aceito para não
 // bloquear receitas corretas por falta de unidade.
 
-const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number]> = [
+import { findTypicalIngredientWeight } from './ingredientWeights.utils';
+
+/** Medidas caseiras que podem usar o peso típico do ingrediente (CP-B3). */
+type HouseholdMeasure = 'cup' | 'tbsp' | 'tsp';
+
+/** Fração da xícara de cada medida caseira (colher de sopa = 1/16; de chá = 1/48). */
+const CUP_FRACTION: Record<HouseholdMeasure, number> = { cup: 1, tbsp: 1 / 16, tsp: 1 / 48 };
+
+const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number, HouseholdMeasure?]> = [
   // Ordem importa: frases mais longas primeiro.
   // CP-B2: o texto já chega sem acento (normalize), então "onça" vira
   // "onca" — antes a regex esperava "ç" e "onça fluida" nunca era lida.
   [/^(fl\.?\s*oz|fluid\s+ounces?|oncas?\s+fluidas?)\b/, 29.5735],
-  [/^(colher(es)?\s+de\s+sopa|tablespoons?|tbsps?|tbs|cs)\b/, 14.787],
-  [/^(colher(es)?\s+de\s+cha|colher(es)?\s+de\s+cafe|teaspoons?|tsps?|cc)\b/, 4.929],
-  [/^(colher(es)?)\b/, 4.929],
-  [/^(xicaras?|xic\.?|cups?)\b/, 236.6],
+  [/^(colher(es)?\s+de\s+sopa|tablespoons?|tbsps?|tbs|cs)\b/, 14.787, 'tbsp'],
+  [/^(colher(es)?\s+de\s+cha|colher(es)?\s+de\s+cafe|teaspoons?|tsps?|cc)\b/, 4.929, 'tsp'],
+  [/^(colher(es)?)\b/, 4.929, 'tsp'],
+  [/^(xicaras?|xic\.?|cups?)\b/, 236.6, 'cup'],
   [/^(mililitros?|millilit(er|re)s?|ml)\b/, 1],
   [/^(centilitros?|cl)\b/, 10],
   [/^(decilitros?|dl)\b/, 100],
@@ -77,8 +91,12 @@ function parseNumber(raw: string): number | null {
   return Number.isFinite(decimal) ? decimal : null;
 }
 
-/** Volume em ml de um trecho "<número> <unidade>", ou null se não der para medir. */
-function measure(text: string): number | null {
+/**
+ * Volume em ml de um trecho "<número> <unidade>", ou null se não der para
+ * medir. Com `gramsPerCup` (peso típico do ingrediente), xícara e colher
+ * contam os gramas (1 g = 1 ml) em vez da medida.
+ */
+function measure(text: string, gramsPerCup: number | null): number | null {
   const match = text.match(new RegExp(`${NUMBER_PATTERN.source}(?:\\s*[-–a]\\s*${NUMBER_PATTERN.source})?\\s*(.*)$`));
   if (!match) return null;
 
@@ -87,26 +105,38 @@ function measure(text: string): number | null {
 
   // "1/4 de xícara", "2 colheres de sopa": o "de" entre número e unidade.
   const rest = (match[3] ?? '').replace(/^de\s+/, '');
-  for (const [pattern, mlPerUnit] of UNIT_TO_ML) {
+  for (const [pattern, mlPerUnit, household] of UNIT_TO_ML) {
     if (pattern.test(rest)) {
-      return quantity * mlPerUnit;
+      return household && gramsPerCup !== null
+        ? quantity * gramsPerCup * CUP_FRACTION[household]
+        : quantity * mlPerUnit;
     }
   }
   return null;
 }
 
-/** Volume em ml de um `amount` da IA; null quando não é mensurável. */
-export function estimateAmountVolumeMl(amount: string): number | null {
+/**
+ * Volume em ml de um `amount` da IA; null quando não é mensurável. Sem o
+ * nome do ingrediente, xícara e colher contam a medida cheia.
+ */
+export function estimateAmountVolumeMl(amount: string, ingredientName?: string): number | null {
   const text = normalize(amount);
   if (!text) return null;
 
+  const gramsPerCup = ingredientName ? findTypicalIngredientWeight(ingredientName)?.gramsPerCup ?? null : null;
+
   // Medida entre parênteses prevalece ("1 scoop (30g)", "1 cup (240 ml)").
   for (const inner of text.match(/\(([^)]*)\)/g) ?? []) {
-    const value = measure(inner.slice(1, -1).trim());
+    const value = measure(inner.slice(1, -1).trim(), gramsPerCup);
     if (value !== null) return value;
   }
 
-  return measure(text.replace(/\([^)]*\)/g, ' ').trim());
+  return measure(text.replace(/\([^)]*\)/g, ' ').trim(), gramsPerCup);
+}
+
+/** CP-B3: volume em ml de um ingrediente (nome + quantidade); null quando não é mensurável. */
+export function estimateIngredientVolumeMl(ingredient: { name: string; amount: string }): number | null {
+  return estimateAmountVolumeMl(ingredient.amount, ingredient.name);
 }
 
 export interface RecipeVolumeEstimate {
@@ -116,14 +146,16 @@ export interface RecipeVolumeEstimate {
   unmeasured: string[];
 }
 
-export function estimateRecipeVolumeMl(ingredients: ReadonlyArray<{ amount: string }>): RecipeVolumeEstimate {
+export function estimateRecipeVolumeMl(
+  ingredients: ReadonlyArray<{ name: string; amount: string }>
+): RecipeVolumeEstimate {
   let estimatedVolumeMl = 0;
   const unmeasured: string[] = [];
 
-  for (const { amount } of ingredients) {
-    const value = estimateAmountVolumeMl(amount);
+  for (const ingredient of ingredients) {
+    const value = estimateIngredientVolumeMl(ingredient);
     if (value === null) {
-      unmeasured.push(amount);
+      unmeasured.push(ingredient.amount);
     } else {
       estimatedVolumeMl += value;
     }

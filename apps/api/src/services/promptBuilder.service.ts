@@ -1,5 +1,4 @@
 import {
-  ML_PER_US_FLUID_OUNCE,
   RECIPE_CAPACITY_NOTICE_MAX_LENGTH,
   RECIPE_MIN_SERVING_KCAL,
   RECIPE_MIN_SERVING_ML,
@@ -9,8 +8,17 @@ import {
 
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
+import {
+  GENERIC_BLENDER_NAME,
+  formatDecimal,
+  formatMaxVolume,
+  formatVolume,
+  isGenericBlender,
+  type RecipeTextContext,
+} from '../utils/recipeText.utils';
 import type {
   BlendiModel,
+  BlendiOwnership,
   DietaryPreference,
   UserGoal,
   UserLocale,
@@ -29,6 +37,11 @@ interface PulseAiModelContext {
 
 export interface PulseAiPromptUserContext {
   blendiModel: BlendiModel;
+  /**
+   * CP-B3: 'other' e 'none' ficam gravados com blendiModel 'Lite' (limites do
+   * Lite), mas o texto não cita BLENDi, modelo nem potência. Ausente = 'blendi'.
+   */
+  blendiOwnership?: BlendiOwnership;
   goal: UserGoal;
   /**
    * Objetivo de peso corporal (lose/maintain/gain) — opcional porque contas
@@ -112,17 +125,18 @@ function filterByDiet(
 // (a abreviação impressa nas embalagens e nos copos medidores).
 const IMPERIAL_FRACTIONS_RULE: Record<UserLocale, string> = {
   en: 'Write every imperial quantity with common kitchen fractions (1/4, 1/3, 1/2, 2/3, 3/4, 1 1/2), never with decimals: never write 0.33 cup, 0.2 oz, 0.5 cup or 0.5 banana; write 1/3 cup, 1/2 banana, or switch to a smaller measure such as 2 tbsp or 1 tsp for small amounts.',
-  'pt-BR': 'Write every imperial quantity with common kitchen fractions (1/4, 1/3, 1/2, 2/3, 3/4, 1 1/2), never with decimals: never write 0,33 xícara, 0.2 oz, 0,5 xícara or 0,5 banana; write 1/3 de xícara, 1/2 banana, or switch to a smaller measure such as 2 colheres de sopa or 1 colher de chá for small amounts.',
+  'pt-BR': 'Write every imperial quantity with common kitchen fractions (1/4, 1/3, 1/2, 2/3, 3/4, 1 1/2), never with decimals: never write 0,33 xícara, 0,2 oz, 0,5 xícara or 0,5 banana; write 1/3 de xícara, 1/2 banana, or switch to a smaller measure such as 2 colheres de sopa or 1 colher de chá for small amounts.',
 };
 
 // CP-B2 (lote 4 ao vivo): no imperial a IA media pó e sólidos em xícaras
-// ("1/3 de xícara de whey", "1/2 cup spinach"), e o backend conta a xícara
-// como volume (recipeVolume.utils.ts) — 9 de 12 novas tentativas por volume
-// eram de contas imperiais, e "70 g de proteína" saía com 37 g. A regra abaixo
-// alinha a conta da IA com a do backend e manda pesar pó e sólidos densos.
+// ("1/3 de xícara de whey", "1/2 cup spinach"), e o backend contava a xícara
+// cheia como volume — 9 de 12 novas tentativas por volume eram de contas
+// imperiais. CP-B3: o backend passou a contar folhas, frutas em pedaços,
+// aveia, pós, sementes, pastas e iogurte medidos em xícara ou colher pelo
+// peso típico (ingredientWeights.utils.ts); a regra abaixo diz o mesmo à IA.
 const IMPERIAL_VOLUME_RULE: Record<UserLocale, string> = {
-  en: 'For the cup volume, an ingredient measured in cups, tbsp or tsp counts with that measured volume (1 cup = 8 fl oz), even when it is a powder or a solid; an ingredient measured by weight counts 1 oz as 1 fl oz. So measure protein powder and other dense powders or solids by weight in oz (for example "3 oz whey protein" or "2 scoops (2 oz)"), not in cups.',
-  'pt-BR': 'For the cup volume, an ingredient measured in xícara or colher counts with that measured volume (1 xícara = 8 fl oz), even when it is a powder or a solid; an ingredient measured by weight counts 1 oz as 1 fl oz. So measure protein powder and other dense powders or solids by weight in oz (for example "3 oz de proteína whey"), not in xícaras.',
+  en: 'For the cup volume, leafy greens, fruit pieces, oats, powders (protein, cocoa, matcha), seeds, nut butters and yogurt measured in cups, tbsp or tsp count by their typical weight, not by the full measure: 1 cup of spinach counts about 1 oz and 1 cup of strawberries about 5 oz. Liquids and any other ingredient measured in cups, tbsp or tsp count with the full measured volume (1 cup = 8 fl oz). An ingredient measured by weight counts 1 oz as 1 fl oz. Measure protein powder by weight in oz (for example "3 oz whey protein" or "2 scoops (2 oz)").',
+  'pt-BR': 'For the cup volume, leafy greens, fruit pieces, oats, powders (protein, cocoa, matcha), seeds, nut butters and yogurt measured in xícara or colher count by their typical weight, not by the full measure: 1 xícara de espinafre counts about 1 oz and 1 xícara de morangos about 5 oz. Liquids and any other ingredient measured in xícara or colher count with the full measured volume (1 xícara = 8 fl oz). An ingredient measured by weight counts 1 oz as 1 fl oz. Measure protein powder by weight in oz (for example "3 oz de proteína whey").',
 };
 
 const UNIT_SYSTEM_CONTEXT: Record<
@@ -187,6 +201,11 @@ export interface PulseAiApiMessage {
 export interface BuildPulseAiPromptResult {
   systemPrompt: string;
   messages: PulseAiApiMessage[];
+  /**
+   * CP-B3: idioma, sistema de unidades e aparelho neutro, para as mensagens de
+   * nova tentativa seguirem o mesmo formato do prompt.
+   */
+  textContext?: RecipeTextContext;
 }
 
 const PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE =
@@ -348,45 +367,50 @@ function buildCalorieEquationCheckSection(): string {
   ].join('\n');
 }
 
-function formatVolume(ml: number, unitSystem: UserUnitSystem): string {
-  return unitSystem === 'imperial'
-    ? `${Math.round((ml / ML_PER_US_FLUID_OUNCE) * 10) / 10} fl oz`
-    : `${ml}ml`;
+// CP-B3: no imperial o exemplo usa fl oz (pt-BR com vírgula: o lote 4 trouxe
+// "comporta até 13.5 fl oz" numa conta pt-BR); sem BLENDi, o aparelho é
+// "seu liquidificador portátil".
+function capacityNoticeExample(context: RecipeTextContext): string {
+  // O exemplo é sempre o do copo de 400 ml (Lite), em ml ou em fl oz.
+  const cupLimit = context.unitSystem === 'imperial'
+    ? `${formatDecimal(BLENDER_LIMITS.Lite.maxVolumeOz, context.locale)} fl oz`
+    : '400 ml';
+  if (context.locale === 'pt-BR') {
+    const cup = context.genericBlender ? `o copo do ${GENERIC_BLENDER_NAME['pt-BR']}` : 'o copo do seu BLENDi Lite';
+    return `Você pediu 900 kcal, mas ${cup} comporta até ${cupLimit}; esta receita tem 610 kcal. Para chegar lá, faça dois blends.`;
+  }
+  const cup = context.genericBlender ? `the cup of ${GENERIC_BLENDER_NAME.en}` : 'your BLENDi Lite cup';
+  return `You asked for 900 kcal, but ${cup} holds up to ${cupLimit}; this recipe has 610 kcal. To get there, make two blends.`;
 }
 
-function formatMaxVolume(blendiModel: BlendiModel, unitSystem: UserUnitSystem): string {
-  const limits = BLENDER_LIMITS[blendiModel];
-  return unitSystem === 'imperial' ? `${limits.maxVolumeOz} fl oz` : `${limits.maxVolumeMl}ml`;
+/** Nome do aparelho no prompt: o modelo do BLENDi, ou neutro para quem não tem BLENDi. */
+function deviceName(blendiModel: BlendiModel, genericBlender: boolean): string {
+  return genericBlender ? "the user's portable blender" : `the ${MODEL_CONTEXT[blendiModel].displayName}`;
 }
-
-const CAPACITY_NOTICE_EXAMPLE: Record<UserLocale, string> = {
-  en: 'You asked for 900 kcal, but your BLENDi Lite cup holds up to 400 ml; this recipe has 610 kcal. To get there, make two blends.',
-  'pt-BR': 'Você pediu 900 kcal, mas o copo do seu BLENDi Lite comporta até 400 ml; esta receita tem 610 kcal. Para chegar lá, faça dois blends.',
-};
 
 // CP-B2: o copo é o orçamento de volume dado de antemão; as metas diárias são
 // contexto (antes "25% a 40% da proteína diária", e a IA mirava nas metas e
 // estourava o copo). Sem teto de macro: só o volume limita.
 function buildServingSizeSection(params: {
   blendiModel: BlendiModel;
-  unitSystem: UserUnitSystem;
-  responseLocale: UserLocale;
+  textContext: RecipeTextContext;
   responseLanguage: string;
   responseMode: PulseAiResponseMode;
 }): string {
-  const { blendiModel, unitSystem, responseLocale, responseLanguage, responseMode } = params;
-  const maxVolume = formatMaxVolume(blendiModel, unitSystem);
+  const { blendiModel, textContext, responseLanguage, responseMode } = params;
+  const { unitSystem, locale } = textContext;
+  const maxVolume = formatMaxVolume(blendiModel, unitSystem, locale);
 
   return [
     'Serving size (volume budget):',
-    `- Each recipe is ONE serving, made in a single blend, that must fit the cup of the ${MODEL_CONTEXT[blendiModel].displayName}: the combined volume of all ingredients must be at most ${maxVolume} (${unitSystem === 'imperial' ? 'see the unit rules above for how cups, spoons and oz count' : 'count each gram of a solid ingredient as 1ml'}). Plan the quantities inside this budget from the start.`,
+    `- Each recipe is ONE serving, made in a single blend, that must fit the cup of ${deviceName(blendiModel, textContext.genericBlender)}: the combined volume of all ingredients must be at most ${maxVolume} (${unitSystem === 'imperial' ? 'see the unit rules above for how cups, spoons and oz count' : 'count each gram of a solid ingredient as 1ml'}). Plan the quantities inside this budget from the start.`,
     "- The user's daily targets in the User context are for the whole day, across several meals. Use them and the goal as context for the kind of blend, never as the target of a single blend.",
-    `- When there is no request about size, amount or nutrient values, make a regular serving: at least ${formatVolume(RECIPE_MIN_SERVING_ML, unitSystem)} and at least ${RECIPE_MIN_SERVING_KCAL} kcal, within the cup budget. When the ingredients are low in calories, reach the minimum with larger quantities or a more caloric ingredient that is allowed, never with a smaller serving.`,
+    `- When there is no request about size, amount or nutrient values, make a regular serving: at least ${formatVolume(RECIPE_MIN_SERVING_ML, unitSystem, locale)} and at least ${RECIPE_MIN_SERVING_KCAL} kcal, within the cup budget. When the ingredients are low in calories, reach the minimum with larger quantities or a more caloric ingredient that is allowed, never with a smaller serving.`,
     ...(responseMode === 'single-recipe'
       ? [
           '- When the user asks for something light or small (a light snack, a small shake, low calorie), follow the request: the minimum above does not apply.',
           '- When the user asks for a specific amount of calories or of any macro (for example "400 kcal", "70 g of protein", "low carb, up to 15 g", "little fat"), deliver that value, with the macros calculated from the real ingredient quantities (see the macro rules below), as long as the recipe fits the cup. Protein, carbs, fat and calories have no limit other than the cup volume.',
-          `- If the request cannot fit the cup, build the closest recipe that fits and fill capacityNotice with one short sentence (at most ${RECIPE_CAPACITY_NOTICE_MAX_LENGTH} characters) in ${responseLanguage} saying what was asked, what this recipe delivers and that the cup volume is the reason. Example: "${CAPACITY_NOTICE_EXAMPLE[responseLocale]}"`,
+          `- If the request cannot fit the cup, build the closest recipe that fits and fill capacityNotice with one short sentence (at most ${RECIPE_CAPACITY_NOTICE_MAX_LENGTH} characters) in ${responseLanguage} saying what was asked, what this recipe delivers and that the cup volume is the reason. Example: "${capacityNoticeExample(textContext)}"`,
           '- When a request does not fit, the closest recipe uses nearly the whole cup (about 90% of the volume budget) with the densest suitable ingredients, so it gets as close as possible to the requested value.',
           '- Fill capacityNotice only when you actually had to reduce what the user asked for. Otherwise omit the field.',
         ]
@@ -509,13 +533,11 @@ function buildDietaryRestrictionsSection(
 // CP-B2: o volume é o único limite físico (a linha de proteína saiu).
 function buildBlenderGuardrailsSection(
   blendiModel: BlendiModel,
-  unitSystem: UserUnitSystem
+  textContext: RecipeTextContext
 ): string {
-  const modelContext = MODEL_CONTEXT[blendiModel];
-
   return [
-    `Physical blender guardrails (${modelContext.displayName}):`,
-    `- The cup volume is the only physical limit: the combined volume of all ingredients in the recipe must not exceed ${formatMaxVolume(blendiModel, unitSystem)}.`,
+    `Physical blender guardrails (${textContext.genericBlender ? 'portable blender' : MODEL_CONTEXT[blendiModel].displayName}):`,
+    `- The cup volume is the only physical limit: the combined volume of all ingredients in the recipe must not exceed ${formatMaxVolume(blendiModel, textContext.unitSystem, textContext.locale)}.`,
     // CP-1.1.9: a mesma conta que o backend faz para validar (recipeVolume.utils.ts).
     '- When adding up the volume, count each gram of a solid ingredient as 1ml.',
     ...(blendiModel === 'Lite' ? [`- ${LITE_NO_FROZEN_RULE}`] : []),
@@ -561,11 +583,18 @@ const PT_BR_INGREDIENT_NAME_EXAMPLES: readonly RestrictedIngredient[] = [
   { name: '"Espinafre"' },
 ];
 
+// CP-B3: pt-BR escreve decimal com vírgula (o lote 4 trouxe "13.5 fl oz"
+// numa conta pt-BR). Os campos numéricos do JSON continuam números.
+const PT_BR_DECIMAL_COMMA_RULE =
+  '- Write decimal numbers with a comma, as in Brazilian Portuguese, in every text of the recipe (amounts, blendInstruction, steps, tip and capacityNotice): for example "13,5 fl oz", or "1,5 xícara" only when there is no common fraction for the amount. The numeric JSON fields (macros, prepTimeSeconds, pulseCount) stay plain JSON numbers.';
+
 function buildLanguageSection(
-  responseLocale: UserLocale,
+  textContext: RecipeTextContext,
   responseLanguage: string,
   dietaryPreferences: DietaryPreference[]
 ): string {
+  const responseLocale = textContext.locale;
+
   return [
     'Language of the recipe:',
     `- Write every user-visible text entirely in ${responseLanguage}: the title, every ingredient name, every amount (including the unit words), the blendInstruction, every step, the tip and the capacityNotice. Never mix languages.`,
@@ -573,6 +602,13 @@ function buildLanguageSection(
     ...(responseLocale === 'pt-BR'
       ? [
           `- Translate every ingredient name into Brazilian Portuguese, for example ${filterByDiet(PT_BR_INGREDIENT_NAME_EXAMPLES, dietaryPreferences).join(', ')}.`,
+        ]
+      : []),
+    ...(responseLocale === 'pt-BR' ? [PT_BR_DECIMAL_COMMA_RULE] : []),
+    // CP-B3: quem não tem BLENDi (blendiOwnership 'other' ou 'none').
+    ...(textContext.genericBlender
+      ? [
+          `- Never mention a blender brand, model or motor power anywhere in the recipe. When a text needs to refer to the blender, call it "${GENERIC_BLENDER_NAME[responseLocale]}".`,
         ]
       : []),
     '- Proofread every text for spelling and grammar before responding.',
@@ -637,6 +673,7 @@ function buildVarietySection(
 
 function buildSystemPrompt({
   blendiModel,
+  blendiOwnership,
   goal,
   weightGoal,
   dietaryPreferences,
@@ -663,6 +700,7 @@ function buildSystemPrompt({
   // persisted profile locale as a backward-compatible fallback.
   const responseLocale: UserLocale = language ?? locale;
   const responseLanguage = LANGUAGE_CONTEXT[responseLocale];
+  const textContext = buildRecipeTextContext({ blendiOwnership, language, locale, unitSystem });
   const unitSystemContext = UNIT_SYSTEM_CONTEXT[unitSystem];
   const recentRecipesSection = buildRecentRecipesSection(
     normalizeRecentRecipeNames(recentBlendRecipeNames)
@@ -670,7 +708,9 @@ function buildSystemPrompt({
   const normalizedDietaryPreferences = normalizeDietaryPreferences(dietaryPreferences);
 
   const sections = [
-    'You are BLENDi Pulse AI, a nutritionist specialized in sports nutrition and performance with deep knowledge of BLENDi hardware.',
+    textContext.genericBlender
+      ? 'You are Pulse AI, a nutritionist specialized in sports nutrition and performance with deep knowledge of portable blenders.'
+      : 'You are BLENDi Pulse AI, a nutritionist specialized in sports nutrition and performance with deep knowledge of BLENDi hardware.',
     '',
     'Behavior requirements:',
     `- Always respond in ${responseLanguage}.`,
@@ -687,7 +727,10 @@ function buildSystemPrompt({
     ...additionalBehaviorRequirements,
     '',
     'User context:',
-    `- BLENDi model: ${modelContext.displayName} (${modelContext.wattage}W).`,
+    // CP-B3: sem BLENDi, nem marca, nem modelo, nem potência.
+    textContext.genericBlender
+      ? '- Blender: a portable blender (brand and model not specified).'
+      : `- BLENDi model: ${modelContext.displayName} (${modelContext.wattage}W).`,
     `- Hardware guidance: ${getHardwareGuidance(blendiModel, normalizedDietaryPreferences)}`,
     `- Goal: ${goal} (${GOAL_CONTEXT[goal]}).`,
     `- Unit system: ${unitSystemContext.label}.`,
@@ -714,9 +757,9 @@ function buildSystemPrompt({
 
   sections.push(
     '',
-    buildServingSizeSection({ blendiModel, unitSystem, responseLocale, responseLanguage, responseMode }),
+    buildServingSizeSection({ blendiModel, textContext, responseLanguage, responseMode }),
     '',
-    buildLanguageSection(responseLocale, responseLanguage, normalizedDietaryPreferences),
+    buildLanguageSection(textContext, responseLanguage, normalizedDietaryPreferences),
     '',
     buildStepsSection(blendiModel),
     '',
@@ -742,9 +785,23 @@ function buildSystemPrompt({
     sections.push('', dietaryRestrictionsSection);
   }
 
-  sections.push('', buildBlenderGuardrailsSection(blendiModel, unitSystem));
+  sections.push('', buildBlenderGuardrailsSection(blendiModel, textContext));
 
   return sections.join('\n');
+}
+
+/** CP-B3: contexto de texto da conta (o mesmo para o prompt e as novas tentativas). */
+export function buildRecipeTextContext(params: {
+  blendiOwnership?: BlendiOwnership;
+  language?: PulseAiChatInput['language'];
+  locale: UserLocale;
+  unitSystem: UserUnitSystem;
+}): RecipeTextContext {
+  return {
+    locale: params.language ?? params.locale,
+    unitSystem: params.unitSystem,
+    genericBlender: isGenericBlender(params.blendiOwnership),
+  };
 }
 
 export function buildPulseAiPrompt({
@@ -753,6 +810,7 @@ export function buildPulseAiPrompt({
 }: BuildPulseAiPromptInput): BuildPulseAiPromptResult {
   return {
     systemPrompt: buildSystemPrompt(userContext),
+    textContext: buildRecipeTextContext(userContext),
     messages: [
       {
         role: 'user',
@@ -770,6 +828,7 @@ export function buildPantryRecipePrompt({
     normalizeDietaryPreferences(userContext.dietaryPreferences).length > 0;
 
   return {
+    textContext: buildRecipeTextContext(userContext),
     systemPrompt: buildSystemPrompt({
       ...userContext,
       responseMode: 'recipe-array',

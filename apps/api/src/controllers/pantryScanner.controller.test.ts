@@ -374,3 +374,35 @@ describe('Pantry Scanner — água fora da foto e passos (CP-B2)', () => {
     assert.deepEqual(only.steps.map(step => step.pulseCount), [undefined, undefined, undefined]);
   });
 });
+
+describe('Pantry Scanner — conta sem BLENDi (CP-B3)', () => {
+  for (const ownership of ['other', 'none'] as const) {
+    it(`'${ownership}': prompt das receitas sem BLENDi, Lite nem potência, com o limite e as regras do Lite`, async () => {
+      fakeUser.dietaryPreferences = [];
+      fakeUser.blendiModel = 'Lite';
+      fakeUser.blendiOwnership = ownership;
+      fakeUser.locale = 'pt-BR';
+      initialRecipes = [recipe('Banana com Aveia', 'Aveia')];
+
+      const res = await analyze();
+
+      assert.equal(res.statusCode, 200);
+      const prompt = callAiMock.mock.calls[0].arguments[0].systemPrompt;
+      assert.doesNotMatch(prompt, /BLENDi|\bLite\b|\d+W\b/);
+      assert.ok(prompt.includes('must not exceed 400ml.'));
+      assert.ok(prompt.includes('Never use ice or any frozen ingredient'));
+      assert.ok(prompt.includes('call it "seu liquidificador portátil"'));
+    });
+  }
+
+  it("'blendi': prompt com o modelo, como antes", async () => {
+    fakeUser.dietaryPreferences = [];
+    fakeUser.blendiModel = 'Lite';
+    fakeUser.blendiOwnership = 'blendi';
+    initialRecipes = [recipe('Banana Oat', 'Oats')];
+
+    await analyze();
+
+    assert.ok(callAiMock.mock.calls[0].arguments[0].systemPrompt.includes('- BLENDi model: BLENDi Lite (70W).'));
+  });
+});

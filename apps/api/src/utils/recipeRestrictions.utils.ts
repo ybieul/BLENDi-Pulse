@@ -744,6 +744,43 @@ function endsWithPhrase(tokens: readonly string[], end: number, phrase: readonly
   return matchesAt(tokens, end - phrase.length, phrase);
 }
 
+/**
+ * CP-B3: tokens de uma frase com a MESMA normalização do validador (sem
+ * acento, minúsculas, compostos). Usado pela tabela de pesos típicos
+ * (ingredientWeights.utils.ts) para não ter uma segunda lógica de texto.
+ */
+export function compilePhrase(phrase: string): string[] {
+  return phraseTokens(phrase);
+}
+
+export interface PhraseOccurrence {
+  tokens: readonly string[];
+  start: number;
+  /** Índice logo depois do último token da frase. */
+  end: number;
+}
+
+/**
+ * CP-B3: onde a frase (já compilada) aparece nos segmentos de
+ * tokenizeSegments, com o casamento de singular/plural do validador
+ * ("morangos" casa com "morango", "berries" com "berry").
+ */
+export function findPhraseOccurrences(
+  segments: readonly (readonly string[])[],
+  phrase: readonly string[]
+): PhraseOccurrence[] {
+  if (phrase.length === 0) return [];
+  const occurrences: PhraseOccurrence[] = [];
+  for (const tokens of segments) {
+    for (let start = 0; start + phrase.length <= tokens.length; start += 1) {
+      if (matchesAt(tokens, start, phrase)) {
+        occurrences.push({ tokens, start, end: start + phrase.length });
+      }
+    }
+  }
+  return occurrences;
+}
+
 // ─── Regras compiladas ───────────────────────────────────────────────────────
 
 interface CompiledTerm {
@@ -1031,6 +1068,11 @@ const RESTRICTION_LABELS: Record<RecipeRestriction, string> = {
   lite_no_ice: 'no ice and no frozen ingredients (the BLENDi Lite cannot blend ice or anything frozen)',
 };
 
+// CP-B3: conta sem BLENDi (mesmas regras do Lite, texto sem marca nem modelo).
+const GENERIC_BLENDER_RESTRICTION_LABELS: Partial<Record<RecipeRestriction, string>> = {
+  lite_no_ice: 'no ice and no frozen ingredients (this blender cannot blend ice or anything frozen)',
+};
+
 function describeViolationLocation(
   recipe: RestrictedRecipe,
   violation: RecipeRestrictionViolation
@@ -1054,10 +1096,15 @@ function describeViolationLocation(
  */
 export function buildRecipeRestrictionRetryMessage(
   recipe: RestrictedRecipe,
-  violations: readonly RecipeRestrictionViolation[]
+  violations: readonly RecipeRestrictionViolation[],
+  options: { genericBlender?: boolean } = {}
 ): string {
+  const labelOf = (restriction: RecipeRestriction) => (
+    (options.genericBlender ? GENERIC_BLENDER_RESTRICTION_LABELS[restriction] : undefined)
+      ?? RESTRICTION_LABELS[restriction]
+  );
   const details = violations.map(violation => (
-    `${describeViolationLocation(recipe, violation)} uses "${violation.term}", which violates the ${RESTRICTION_LABELS[violation.restriction]} restriction`
+    `${describeViolationLocation(recipe, violation)} uses "${violation.term}", which violates the ${labelOf(violation.restriction)} restriction`
   ));
 
   const hints = [...new Set(violations.flatMap(violation => {

@@ -43,20 +43,20 @@ describe('estimateAmountVolumeMl — unidades', () => {
 describe('estimateRecipeVolumeMl — limite inferior', () => {
   it('soma o que dá para medir e lista o resto', () => {
     assert.deepEqual(
-      estimateRecipeVolumeMl([{ amount: '1 banana' }, { amount: '250 ml' }, { amount: '1 scoop (30g)' }]),
+      estimateRecipeVolumeMl([{ name: '', amount: '1 banana' }, { name: '', amount: '250 ml' }, { name: '', amount: '1 scoop (30g)' }]),
       { estimatedVolumeMl: 280, unmeasured: ['1 banana'] }
     );
   });
 
   it('entradas hostis não quebram nem inflam o total', () => {
     const hostile = [
-      { amount: '1e9 ml' }, // notação científica: lê só "1"... e não "e9 ml"
-      { amount: '-500 ml' },
-      { amount: '9'.repeat(5000) },
-      { amount: '((((((((((' },
-      { amount: '1/0 cup' },
-      { amount: 'NaN ml' },
-      { amount: '\u0000‮200 ml' },
+      { name: '', amount: '1e9 ml' }, // notação científica: lê só "1"... e não "e9 ml"
+      { name: '', amount: '-500 ml' },
+      { name: '', amount: '9'.repeat(5000) },
+      { name: '', amount: '((((((((((' },
+      { name: '', amount: '1/0 cup' },
+      { name: '', amount: 'NaN ml' },
+      { name: '', amount: '\u0000‮200 ml' },
     ];
     const started = Date.now();
     const { estimatedVolumeMl } = estimateRecipeVolumeMl(hostile);
@@ -157,7 +157,7 @@ describe('validateBlenderLimits — só o volume (CP-B2)', () => {
     assert.equal(result.withinLimits, false);
     if (result.withinLimits) return;
     assert.deepEqual(result.violation, {
-      volume: { estimatedVolumeMl: 710, maxVolumeMl: 400, maxVolumeOz: 13.5 },
+      volume: { model: 'Lite', estimatedVolumeMl: 710, maxVolumeMl: 400, maxVolumeOz: 13.5 },
     });
     const message = buildBlenderLimitRetryMessage(result.violation);
     assert.match(message, /about 710ml/);

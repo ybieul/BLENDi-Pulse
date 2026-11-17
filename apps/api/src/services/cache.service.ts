@@ -21,6 +21,12 @@ export interface CacheKeyInput {
   aiModel: string;
   rawMessage: string;
   dietaryFlags?: string[];
+  /**
+   * CP-B3: conta sem BLENDi ('other'/'none') recebe receita com texto neutro;
+   * a chave ganha o sufixo ':generic' para não reaproveitar a receita que cita
+   * o BLENDi (nem o contrário). Ausente/false = chave igual à de antes.
+   */
+  genericBlender?: boolean;
 }
 
 export interface SetInCacheInput extends CacheKeyInput {
@@ -51,7 +57,8 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 
 /**
  * Entrada: metadados determinísticos da query do usuário.
- * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:weightGoal:aiProvider:aiModel:messageHash:dietaryFlagsHash.
+ * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:weightGoal:aiProvider:aiModel:messageHash:dietaryFlagsHash,
+ * com ':generic' no fim para conta sem BLENDi (CP-B3).
  */
 export function generateCacheKey({
   userId,
@@ -64,6 +71,7 @@ export function generateCacheKey({
   aiModel,
   rawMessage,
   dietaryFlags = [],
+  genericBlender = false,
 }: CacheKeyInput): string {
   const messageHash = sha256(normalizeText(rawMessage));
   const dietaryFlagsHash = buildDietaryFlagsHash(dietaryFlags);
@@ -79,6 +87,7 @@ export function generateCacheKey({
     aiModel.trim(),
     messageHash,
     dietaryFlagsHash,
+    ...(genericBlender ? ['generic'] : []),
   ].join(':');
 }
 
@@ -128,6 +137,7 @@ export async function setInCache({
   aiModel,
   rawMessage,
   dietaryFlags = [],
+  genericBlender = false,
   response,
 }: SetInCacheInput): Promise<void> {
   const expectedCacheKey = generateCacheKey({
@@ -141,6 +151,7 @@ export async function setInCache({
     aiModel,
     rawMessage,
     dietaryFlags,
+    genericBlender,
   });
 
   if (cacheKey !== expectedCacheKey) {

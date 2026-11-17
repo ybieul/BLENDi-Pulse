@@ -45,9 +45,9 @@ function pantry(overrides: Partial<PulseAiPromptUserContext> = {}) {
 }
 
 const MODELS: ReadonlyArray<[BlendiModel, string, string, string]> = [
-  ['Lite', 'BLENDi Lite', '400ml', '13.5 fl oz'],
-  ['ProPlus', 'BLENDi Pro+', '400ml', '13.5 fl oz'],
-  ['Steel', 'BLENDi Steel', '600ml', '20.2 fl oz'],
+  ['Lite', 'BLENDi Lite', '400ml', '13.5 fl oz, about 1 2/3 cups'],
+  ['ProPlus', 'BLENDi Pro+', '400ml', '13.5 fl oz, about 1 2/3 cups'],
+  ['Steel', 'BLENDi Steel', '600ml', '20.2 fl oz, about 2 1/2 cups'],
 ];
 
 describe('CP-B2 prompt — volume como único limite físico', () => {
@@ -155,15 +155,22 @@ describe('CP-B2 prompt — idioma e unidades', () => {
 
   // Lote 4 ao vivo: no imperial a IA media pó/sólidos em xícaras e o backend
   // conta a xícara como volume (9 de 12 novas tentativas eram imperiais).
-  it('imperial: xícara/colher contam pelo volume medido; pó e sólidos densos pesados em oz', () => {
+  // CP-B3: folhas, frutas em pedaços, aveia, pós, sementes, pastas e iogurte
+  // em xícara/colher contam pelo peso típico (antes: "contam a medida cheia,
+  // mesmo pó ou sólido").
+  it('imperial: folhas e frutas em xícara contam pelo peso típico; líquidos pela medida; whey pesado em oz', () => {
     const en = pulseAi({ unitSystem: 'imperial' });
-    assert.ok(en.includes('an ingredient measured in cups, tbsp or tsp counts with that measured volume (1 cup = 8 fl oz), even when it is a powder or a solid'));
-    assert.ok(en.includes('measure protein powder and other dense powders or solids by weight in oz'));
+    assert.ok(en.includes('leafy greens, fruit pieces, oats, powders (protein, cocoa, matcha), seeds, nut butters and yogurt measured in cups, tbsp or tsp count by their typical weight, not by the full measure'));
+    assert.ok(en.includes('1 cup of spinach counts about 1 oz and 1 cup of strawberries about 5 oz'));
+    assert.ok(en.includes('Liquids and any other ingredient measured in cups, tbsp or tsp count with the full measured volume (1 cup = 8 fl oz)'));
+    assert.ok(en.includes('Measure protein powder by weight in oz'));
+    assert.ok(!en.includes('even when it is a powder or a solid'));
     assert.ok(en.includes('(see the unit rules above for how cups, spoons and oz count)'));
     const pt = pulseAi({ unitSystem: 'imperial', locale: 'pt-BR' });
-    assert.ok(pt.includes('an ingredient measured in xícara or colher counts with that measured volume (1 xícara = 8 fl oz)'));
+    assert.ok(pt.includes('measured in xícara or colher count by their typical weight'));
+    assert.ok(pt.includes('1 xícara de espinafre counts about 1 oz'));
     const metric = pulseAi();
-    assert.ok(!metric.includes('counts with that measured volume'));
+    assert.ok(!metric.includes('typical weight'));
     assert.ok(metric.includes('(count each gram of a solid ingredient as 1ml)'));
   });
 

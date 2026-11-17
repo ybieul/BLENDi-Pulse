@@ -22,6 +22,7 @@ function chain(resolvedValue: unknown) {
 interface FakeUser {
   _id: string;
   blendiModel: string;
+  blendiOwnership?: string;
   goal: string;
   dietaryPreferences: string[];
   locale: string;
@@ -105,14 +106,15 @@ mock.module('../services/aiProvider.service', {
 });
 
 let cachedValue: unknown = null;
+const generateCacheKeyMock = mock.fn(({ rawMessage }: { rawMessage: string; genericBlender?: boolean }) =>
+  ['u', 'm', 'g', 'l', 'us', 'wg', 'p', 'am', createHash('sha256').update(rawMessage).digest('hex'), 'd'].join(':'));
 const getFromCacheMock = mock.fn(async (_key: string) => cachedValue);
 const setInCacheMock = mock.fn(async (_input: unknown) => undefined);
 const deleteFromCacheMock = mock.fn(async (_key: string) => undefined);
 
 mock.module('../services/cache.service', {
   namedExports: {
-    generateCacheKey: ({ rawMessage }: { rawMessage: string }) =>
-      ['u', 'm', 'g', 'l', 'us', 'wg', 'p', 'am', createHash('sha256').update(rawMessage).digest('hex'), 'd'].join(':'),
+    generateCacheKey: generateCacheKeyMock,
     getFromCache: getFromCacheMock,
     setInCache: setInCacheMock,
     deleteFromCache: deleteFromCacheMock,
@@ -240,6 +242,7 @@ beforeEach(() => {
     setInCacheMock,
     deleteFromCacheMock,
     awardXPMock,
+    generateCacheKeyMock,
   ]) {
     fn.mock.resetCalls();
   }
@@ -440,5 +443,96 @@ describe('Pulse AI — passos, capacityNotice e água (CP-B2)', () => {
     assert.equal(cached.response.recipe.capacityNotice, 'You asked for 900 kcal; this recipe has 610 kcal.');
     const pushed = JSON.stringify(conversationUpdateOneMock.mock.calls[0].arguments[1]);
     assert.ok(pushed.includes('You asked for 900 kcal; this recipe has 610 kcal.'));
+  });
+});
+
+describe('Pulse AI — conta sem BLENDi e números no formato do idioma (CP-B3)', () => {
+  function systemPromptOfCall(index: number): string {
+    return callAiMock.mock.calls[index].arguments[0].systemPrompt;
+  }
+
+  for (const ownership of ['other', 'none'] as const) {
+    it(`'${ownership}': prompt sem BLENDi, Lite nem potência, com o limite do Lite; cache separado`, async () => {
+      fakeUser.blendiModel = 'Lite';
+      fakeUser.blendiOwnership = ownership;
+      aiResponses = [recipe({ ingredients: [{ name: 'Strawberries', amount: '150 g' }, { name: 'Oat milk', amount: '200 ml' }] })];
+
+      const res = await send(uniqueMessage('berry shake'));
+
+      assert.equal(res.statusCode, 200);
+      const prompt = systemPromptOfCall(0);
+      assert.doesNotMatch(prompt, /BLENDi|\bLite\b|\d+W\b/);
+      assert.ok(prompt.includes("must fit the cup of the user's portable blender"));
+      assert.ok(prompt.includes('must not exceed 400ml.'));
+      assert.ok(prompt.includes('Never use ice or any frozen ingredient'));
+      assert.ok(prompt.includes('call it "your portable blender"'));
+      assert.equal(generateCacheKeyMock.mock.calls[0].arguments[0].genericBlender, true);
+      assert.equal((setInCacheMock.mock.calls[0].arguments[0] as { genericBlender?: boolean }).genericBlender, true);
+    });
+  }
+
+  it("'blendi' (ou campo ausente): prompt com o modelo, cache sem o sufixo", async () => {
+    fakeUser.blendiModel = 'Lite';
+    delete fakeUser.blendiOwnership;
+    aiResponses = [recipe({ ingredients: [{ name: 'Strawberries', amount: '150 g' }, { name: 'Oat milk', amount: '200 ml' }] })];
+
+    await send(uniqueMessage('berry shake'));
+
+    assert.ok(systemPromptOfCall(0).includes('- BLENDi model: BLENDi Lite (70W).'));
+    assert.equal(generateCacheKeyMock.mock.calls[0].arguments[0].genericBlender, false);
+  });
+
+  it('nova tentativa por gelo para conta sem BLENDi não cita o BLENDi Lite', async () => {
+    fakeUser.blendiModel = 'Lite';
+    fakeUser.blendiOwnership = 'none';
+    aiResponses = [
+      withIngredient('Ice cubes'),
+      withIngredient('Chia seeds', { ingredients: [{ name: 'Strawberries', amount: '150 g' }, { name: 'Chia seeds', amount: '1 tbsp' }] }),
+    ];
+
+    const res = await send(uniqueMessage('cold shake'));
+
+    assert.equal(res.statusCode, 200);
+    const retry = lastUserMessageOfCall(1);
+    assert.match(retry, /this blender cannot blend ice or anything frozen/);
+    assert.doesNotMatch(retry, /BLENDi|Lite/);
+  });
+
+  it('nova tentativa por volume em pt-BR imperial: limite com vírgula e em xícaras', async () => {
+    fakeUser.blendiModel = 'Lite';
+    fakeUser.blendiOwnership = 'blendi';
+    fakeUser.locale = 'pt-BR';
+    fakeUser.unitSystem = 'imperial';
+    aiResponses = [
+      recipe({ ingredients: [{ name: 'Leite', amount: '2 xícaras' }] }),
+      recipe({ ingredients: [{ name: 'Leite', amount: '1 1/2 xícara' }] }),
+    ];
+
+    const res = await send(uniqueMessage('shake de leite'));
+
+    assert.equal(res.statusCode, 200);
+    const retry = lastUserMessageOfCall(1);
+    assert.match(retry, /at most 400ml \(13,5 fl oz, cerca de 1 2\/3 xícara\)/);
+    assert.doesNotMatch(retry, /13\.5/);
+  });
+
+  it('imperial: "1 cup spinach" não estoura mais o copo (conta ~30 ml, não 236,6 ml)', async () => {
+    fakeUser.blendiModel = 'Lite';
+    fakeUser.blendiOwnership = 'blendi';
+    fakeUser.unitSystem = 'imperial';
+    aiResponses = [
+      recipe({
+        ingredients: [
+          { name: 'Spinach', amount: '1 cup' },
+          { name: 'Strawberries', amount: '1/2 cup' },
+          { name: 'Oat milk', amount: '1 cup' },
+        ],
+      }),
+    ];
+
+    const res = await send(uniqueMessage('green smoothie'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1, 'sem nova tentativa por volume');
   });
 });
