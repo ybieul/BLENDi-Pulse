@@ -2,8 +2,9 @@
 // CP-1.1.9 — escolha da receita do dia da Home, filtrada por dieta e modelo.
 //
 // 1. Receitas do goal da pessoa compatíveis com a dieta (dietaryPreferences)
-//    e com o modelo (nada com gelo no Lite, pela marcação `contains`; e
-//    proteína dentro do limite do modelo, BLENDER_LIMITS — Lite: 35 g).
+//    e com o modelo (nada com gelo no Lite, pela marcação `contains`).
+//    CP-B2: o filtro por proteína (Lite até 35 g) saiu — o único limite
+//    físico do copo é o volume.
 // 2. Nenhuma compatível no goal: receitas compatíveis dos outros goals, na
 //    ordem de USER_GOAL_VALUES.
 // 3. Nenhuma em lugar nenhum: null — a Home troca o card por um atalho para

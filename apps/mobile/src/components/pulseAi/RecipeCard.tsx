@@ -46,6 +46,10 @@ const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
 const SUBSTITUTES_BACKGROUND = colors.overlay.warning[8];
 const SUBSTITUTES_BORDER = colors.overlay.warning[15];
+// CP-B2: alerta de pedido ajustado ao copo (capacityNotice) — mesmo âmbar de
+// aviso das substituições, um pouco mais forte para se destacar no topo.
+const CAPACITY_NOTICE_BACKGROUND = colors.overlay.warning[12];
+const CAPACITY_NOTICE_BORDER = colors.overlay.warning[42];
 const TIP_BACKGROUND = colors.overlay.info[8];
 const TIP_BORDER = colors.overlay.info[15];
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
@@ -147,6 +151,64 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
   );
 }
 
+/**
+ * CP-B2: o pedido da pessoa não coube no copo e a IA entregou a receita mais
+ * próxima. Alerta explícito no topo do card, lido de uma vez pelo leitor de
+ * tela (título + texto).
+ */
+export function RecipeCapacityNotice({ notice }: { notice: string }) {
+  const colors = useColors();
+  const { t } = useAppTranslation();
+  const title = t('pulseAi.capacityNoticeTitle');
+
+  const noticeStyles = StyleSheet.create({
+    box: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: CAPACITY_NOTICE_BORDER,
+      backgroundColor: CAPACITY_NOTICE_BACKGROUND,
+      padding: spacing.md,
+    },
+    textColumn: {
+      flex: 1,
+      gap: 2,
+    },
+    title: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+    body: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 19,
+    },
+  });
+
+  return (
+    <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel={`${title}. ${notice}`}
+      style={noticeStyles.box}
+      testID="recipe-capacity-notice"
+    >
+      <Ionicons name="warning-outline" size={18} color={colors.feedback.warning} />
+      <View style={noticeStyles.textColumn}>
+        <Text style={noticeStyles.title}>{title}</Text>
+        <Text style={noticeStyles.body}>{notice}</Text>
+      </View>
+    </View>
+  );
+}
+
 export function RecipeCard({
   recipe,
   isFavorited,
@@ -204,6 +266,7 @@ export function RecipeCard({
   const macroPills = useMacroPills(recipe.macros);
 
   const substitutesText = recipe.tip?.trim();
+  const capacityNotice = recipe.capacityNotice?.trim();
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
   const shoppingListIngredients = useMemo(
     () => recipe.ingredients.map((ingredient) => ({
@@ -391,6 +454,20 @@ export function RecipeCard({
       fontStyle: 'italic',
       lineHeight: 20,
     },
+    waterNoteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    waterNoteText: {
+      flex: 1,
+      color: colors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: 12,
+      fontWeight: fontWeights.regular,
+      lineHeight: 17,
+    },
     substitutesBox: {
       marginTop: spacing.lg,
       borderRadius: 10,
@@ -480,6 +557,8 @@ export function RecipeCard({
   return (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
+      {capacityNotice ? <RecipeCapacityNotice notice={capacityNotice} /> : null}
+
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>
           <View style={styles.badgePill}>
@@ -534,6 +613,14 @@ export function RecipeCard({
           </View>
         ))}
       </View>
+
+      {/* CP-B2 (Pantry): a receita usa água que não estava na foto. */}
+      {recipe.usesWaterNotInPhoto ? (
+        <View style={styles.waterNoteRow} testID="recipe-water-not-in-photo">
+          <Ionicons name="water-outline" size={14} color={colors.text.secondary} />
+          <Text style={styles.waterNoteText}>{t('pulseAi.waterNotInPhoto')}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.separator} />
 

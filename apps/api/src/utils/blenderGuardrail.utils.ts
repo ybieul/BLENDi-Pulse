@@ -1,61 +1,24 @@
 // apps/api/src/utils/blenderGuardrail.utils.ts
-// Camada 2 do refinamento de qualidade do Pulse AI: valida no backend se a
-// proteína da receita respeita o limite físico do blenderModel do usuário.
-// A instrução no prompt (promptBuilder.service.ts) nem sempre é suficiente —
-// sob pedido adversarial do usuário ("máximo de proteína possível"), o modelo
-// pode ignorá-la. Esta é a rede de segurança: sinaliza a violação para o
-// handler pedir um retry.
+// Limite físico do copo do BLENDi, validado no backend sobre a receita já
+// gerada (Pulse AI e Pantry Scanner). A instrução do prompt
+// (promptBuilder.service.ts) nem sempre basta; esta é a rede de segurança:
+// sinaliza a violação para o handler pedir uma nova tentativa.
 //
-// CP-1.1.9: o limite físico passou a BLOQUEAR. Se o retry ainda passar do
-// limite de proteína ou de volume, a receita não é entregue (Pulse AI: 422
+// CP-1.1.9: o limite físico passou a BLOQUEAR. Se a nova tentativa ainda
+// passar do volume, a receita não é entregue (Pulse AI: 422
 // pulseai/blender-limit-unmet; Pantry: a receita é descartada). O volume é
 // estimado a partir do texto de `amount` por recipeVolume.utils.ts (limite
 // inferior: o que não dá para medir conta como 0).
+//
+// CP-B2: o VOLUME é o único limite físico. A checagem de proteína por modelo
+// (maxProteinGrams), a nova tentativa por proteína e o campo de violação de
+// proteína saíram: o teto foi criado por nós e não refletia o hardware.
 
 import type { PulseAiRecipe } from '@blendi/shared';
 
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import type { BlendiModel } from '../models/User';
 import { estimateRecipeVolumeMl } from './recipeVolume.utils';
-
-export interface ProteinGuardrailDiscrepancy {
-  declaredProtein: number;
-  maxProteinGrams: number;
-}
-
-export type ProteinGuardrailResult =
-  | { withinGuardrail: true }
-  | { withinGuardrail: false; discrepancy: ProteinGuardrailDiscrepancy };
-
-export function validateProteinGuardrail(
-  recipe: Pick<PulseAiRecipe, 'macros'>,
-  blendiModel: BlendiModel
-): ProteinGuardrailResult {
-  const { maxProteinGrams } = BLENDER_LIMITS[blendiModel];
-
-  if (recipe.macros.protein <= maxProteinGrams) {
-    return { withinGuardrail: true };
-  }
-
-  return {
-    withinGuardrail: false,
-    discrepancy: {
-      declaredProtein: recipe.macros.protein,
-      maxProteinGrams,
-    },
-  };
-}
-
-export function buildProteinGuardrailRetryMessage(
-  discrepancy: ProteinGuardrailDiscrepancy
-): string {
-  return [
-    `Your previous response exceeded the physical protein guardrail for this blender: it has ${discrepancy.declaredProtein}g of protein, but the maximum allowed for this hardware is ${discrepancy.maxProteinGrams}g.`,
-    'Reduce or substitute ingredients so the total protein fits within that limit, then return the corrected JSON with recalculated macros.',
-  ].join(' ');
-}
-
-// ─── Limite físico completo: proteína + volume (CP-1.1.9) ────────────────────
 
 export interface VolumeGuardrailDiscrepancy {
   /** Limite inferior do volume, em ml (ver recipeVolume.utils.ts). */
@@ -65,8 +28,7 @@ export interface VolumeGuardrailDiscrepancy {
 }
 
 export interface BlenderLimitViolation {
-  protein?: ProteinGuardrailDiscrepancy;
-  volume?: VolumeGuardrailDiscrepancy;
+  volume: VolumeGuardrailDiscrepancy;
 }
 
 export type BlenderLimitResult =
@@ -74,45 +36,50 @@ export type BlenderLimitResult =
   | { withinLimits: false; violation: BlenderLimitViolation };
 
 export function validateBlenderLimits(
-  recipe: Pick<PulseAiRecipe, 'macros' | 'ingredients'>,
+  recipe: Pick<PulseAiRecipe, 'ingredients'>,
   blendiModel: BlendiModel
 ): BlenderLimitResult {
   const limits = BLENDER_LIMITS[blendiModel];
-  const violation: BlenderLimitViolation = {};
-
-  const protein = validateProteinGuardrail(recipe, blendiModel);
-  if (!protein.withinGuardrail) {
-    violation.protein = protein.discrepancy;
-  }
-
   const { estimatedVolumeMl } = estimateRecipeVolumeMl(recipe.ingredients);
-  if (estimatedVolumeMl > limits.maxVolumeMl) {
-    violation.volume = {
-      estimatedVolumeMl,
-      maxVolumeMl: limits.maxVolumeMl,
-      maxVolumeOz: limits.maxVolumeOz,
-    };
+
+  if (estimatedVolumeMl <= limits.maxVolumeMl) {
+    return { withinLimits: true };
   }
 
-  return violation.protein || violation.volume ? { withinLimits: false, violation } : { withinLimits: true };
+  return {
+    withinLimits: false,
+    violation: {
+      volume: {
+        estimatedVolumeMl,
+        maxVolumeMl: limits.maxVolumeMl,
+        maxVolumeOz: limits.maxVolumeOz,
+      },
+    },
+  };
 }
 
+/**
+ * Nova tentativa por volume (CP-B2): reduzir as quantidades mantendo a ideia
+ * da receita e o título (sem palavras de tamanho), e preencher o
+ * capacityNotice se o pedido da pessoa deixar de ser atendido.
+ */
 export function buildBlenderLimitRetryMessage(violation: BlenderLimitViolation): string {
+  const { volume } = violation;
+
   return [
-    ...(violation.protein ? [buildProteinGuardrailRetryMessage(violation.protein)] : []),
-    ...(violation.volume
-      ? [
-          `Your previous response exceeded the physical volume of this blender: its ingredients add up to about ${violation.volume.estimatedVolumeMl}ml (counting each gram of a solid ingredient as 1ml), but the maximum is ${violation.volume.maxVolumeMl}ml (${violation.volume.maxVolumeOz}oz).`,
-          'Reduce the quantities so the combined volume fits within that limit, then return the corrected JSON with recalculated macros.',
-        ]
-      : []),
+    `Your previous response exceeded the physical volume of this blender: its ingredients add up to about ${volume.estimatedVolumeMl}ml (counting each gram of a solid ingredient as 1ml), but the cup holds at most ${volume.maxVolumeMl}ml (${volume.maxVolumeOz}oz).`,
+    'Keep the same recipe idea and the same title (if you change the title, do not add any word about size, such as compact, mini, small, compacto or pequeno). Reduce the quantities so the combined volume fits within that limit, then return the corrected JSON with macros recalculated from the new quantities.',
+    // CP-B2 (lote 4 ao vivo): depois da nova tentativa a IA encolhia demais
+    // (~300 ml e 140-180 kcal; "900 kcal" virou 425 kcal).
+    `Aim for about 90% of the limit (around ${Math.round(volume.maxVolumeMl * 0.9)}ml), not far below it: keep a full serving. In imperial units, a powder or solid measured in cups or spoons counts with that measured volume, so measure protein powder and dense solids by weight in oz instead.`,
+    "If, after reducing, the recipe no longer delivers what the user explicitly asked for (for example a calorie or macro amount), fill the capacityNotice field with one short sentence, in the user's language, saying what was asked, what this recipe delivers and that the cup's volume is the reason. Otherwise omit capacityNotice.",
   ].join(' ');
 }
 
 /** Resumo para log: só números, sem texto da receita. */
 export function summarizeBlenderLimitViolation(violation: BlenderLimitViolation) {
   return {
-    ...(violation.protein && { protein: violation.protein.declaredProtein, maxProtein: violation.protein.maxProteinGrams }),
-    ...(violation.volume && { volumeMl: violation.volume.estimatedVolumeMl, maxVolumeMl: violation.volume.maxVolumeMl }),
+    volumeMl: violation.volume.estimatedVolumeMl,
+    maxVolumeMl: violation.volume.maxVolumeMl,
   };
 }

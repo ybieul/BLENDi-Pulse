@@ -1,3 +1,12 @@
+import type { UserLocale } from '../models/User';
+
+// CP-B2: os nomes detectados vão para a receita e para a tela — no idioma da
+// conta (antes sempre em inglês: "Whole Milk" numa conta pt-BR).
+const INGREDIENT_NAME_LANGUAGE: Record<UserLocale, string> = {
+  en: 'English',
+  'pt-BR': 'Brazilian Portuguese (for example "Leite integral", "Morango", "Aveia em flocos"), even when the package label is in another language',
+};
+
 const PANTRY_ANALYSIS_PROMPT_SECTIONS = [
   'You are a vision model analyzing a pantry, refrigerator, freezer, or kitchen image for BLENDi Pulse.',
   'Identify only ingredients that are relevant for blends and smoothies.',
@@ -30,7 +39,7 @@ const PANTRY_ANALYSIS_PROMPT_SECTIONS = [
   '- noFoodDetected: a boolean',
   '',
   'Each ingredient object must follow these rules:',
-  '- name: string in English',
+  '- name: string in {{NAME_LANGUAGE}}',
   '- estimatedQuantity: optional string with an estimated quantity only if visible in the image',
   '- confidence: one of high, medium, or low',
   '',
@@ -62,6 +71,9 @@ const PANTRY_ANALYSIS_PROMPT_SECTIONS = [
   '}',
 ];
 
-export function buildPantryAnalysisPrompt(): string {
-  return PANTRY_ANALYSIS_PROMPT_SECTIONS.join('\n');
+export function buildPantryAnalysisPrompt(locale: UserLocale = 'en'): string {
+  return PANTRY_ANALYSIS_PROMPT_SECTIONS.join('\n').replace(
+    '{{NAME_LANGUAGE}}',
+    INGREDIENT_NAME_LANGUAGE[locale]
+  );
 }

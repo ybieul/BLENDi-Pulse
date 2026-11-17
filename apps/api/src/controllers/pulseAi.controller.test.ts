@@ -310,13 +310,19 @@ describe('Pulse AI — validação de restrições', () => {
     assert.equal(usageRollbackCalls().length, 1);
   });
 
-  it('validação roda depois dos retries de proteína e de macros', async () => {
-    fakeUser.blendiModel = 'Lite'; // maxProteinGrams 35
+  // CP-B2: o primeiro retry agora é o de volume (o de proteína saiu).
+  it('validação roda depois dos retries de volume e de macros', async () => {
+    fakeUser.blendiModel = 'ProPlus'; // 400 ml
     fakeUser.dietaryPreferences = ['no_added_sugar'];
     aiResponses = [
-      // 1) proteína acima do limite, sem violação de dieta
-      recipe({ macros: { protein: 60, carbs: 20, fat: 5, calories: 365 } }),
-      // 2) retry de proteína: traz mel e macros inconsistentes
+      // 1) volume acima do limite, sem violação de dieta
+      recipe({
+        ingredients: [
+          { name: 'Frozen strawberries', amount: '150 g' },
+          { name: 'Oat milk', amount: '400 ml' },
+        ],
+      }),
+      // 2) retry de volume: traz mel e macros inconsistentes
       withIngredient('Honey', { macros: { protein: 30, carbs: 30, fat: 5, calories: 900 } }),
       // 3) retry de macros: macros ok, mas ainda com xarope
       withIngredient('Maple syrup', { macros: { protein: 30, carbs: 30, fat: 5, calories: 285 } }),
@@ -324,11 +330,11 @@ describe('Pulse AI — validação de restrições', () => {
       withIngredient('Cinnamon', { title: 'Clean', macros: { protein: 30, carbs: 30, fat: 5, calories: 285 } }),
     ];
 
-    const res = await send(uniqueMessage('max protein shake'));
+    const res = await send(uniqueMessage('big berry shake'));
 
     assert.equal(res.statusCode, 200);
     assert.equal(callAiMock.mock.callCount(), 4);
-    assert.match(lastUserMessageOfCall(1), /physical protein guardrail/);
+    assert.match(lastUserMessageOfCall(1), /physical volume of this blender/);
     assert.doesNotMatch(lastUserMessageOfCall(2), /mandatory restrictions/);
     assert.match(lastUserMessageOfCall(3), /"Maple syrup" uses "syrup", which violates the no added sugar restriction/);
     const data = res.body?.data as { recipe: { title: string; macrosValidated: boolean } };
@@ -393,5 +399,46 @@ describe('Pulse AI — validação de restrições', () => {
 
     assert.equal(res.statusCode, 200);
     assert.equal(callAiMock.mock.callCount(), 1);
+  });
+});
+
+// CP-B2: checagem objetiva dos passos (sem nova tentativa) e campos novos.
+describe('Pulse AI — passos, capacityNotice e água (CP-B2)', () => {
+  it('pulseCount sem gelo/congelado é removido; com congelado (Pro+) é mantido', async () => {
+    fakeUser.blendiModel = 'ProPlus';
+    fakeUser.dietaryPreferences = [];
+    aiResponses = [
+      recipe({
+        ingredients: [{ name: 'Strawberries', amount: '150 g' }, { name: 'Oat milk', amount: '240 ml' }],
+        steps: [{ text: 'Add the milk.' }, { text: 'Add the strawberries.', pulseCount: 5 }, { text: 'Blend.' }],
+      }),
+    ];
+    const fresh = await send(uniqueMessage('fresh smoothie'));
+    const freshSteps = (fresh.body?.data as { recipe: { steps: Array<{ pulseCount?: number }> } }).recipe.steps;
+    assert.deepEqual(freshSteps.map(step => step.pulseCount), [undefined, undefined, undefined]);
+    assert.equal(callAiMock.mock.callCount(), 1, 'sem nova tentativa');
+
+    aiResponses = [recipe({ steps: [{ text: 'Add the frozen strawberries.', pulseCount: 5 }, { text: 'Blend.' }, { text: 'Serve.' }] })];
+    const frozen = await send(uniqueMessage('frozen smoothie'));
+    const frozenSteps = (frozen.body?.data as { recipe: { steps: Array<{ pulseCount?: number }> } }).recipe.steps;
+    assert.equal(frozenSteps[0].pulseCount, 5);
+  });
+
+  it('capacityNotice da IA chega à resposta, ao cache e à conversa; usesWaterNotInPhoto da IA é descartado', async () => {
+    fakeUser.blendiModel = 'ProPlus';
+    fakeUser.dietaryPreferences = [];
+    aiResponses = [recipe({ capacityNotice: '  You asked for 900 kcal; this recipe has 610 kcal.  ', usesWaterNotInPhoto: true })];
+
+    const res = await send(uniqueMessage('900 kcal shake'));
+
+    assert.equal(res.statusCode, 200);
+    const delivered = (res.body?.data as { recipe: Record<string, unknown> }).recipe;
+    assert.equal(delivered.capacityNotice, 'You asked for 900 kcal; this recipe has 610 kcal.');
+    assert.ok(!('usesWaterNotInPhoto' in delivered));
+
+    const cached = setInCacheMock.mock.calls[0].arguments[0] as { response: { recipe: { capacityNotice?: string } } };
+    assert.equal(cached.response.recipe.capacityNotice, 'You asked for 900 kcal; this recipe has 610 kcal.');
+    const pushed = JSON.stringify(conversationUpdateOneMock.mock.calls[0].arguments[1]);
+    assert.ok(pushed.includes('You asked for 900 kcal; this recipe has 610 kcal.'));
   });
 });

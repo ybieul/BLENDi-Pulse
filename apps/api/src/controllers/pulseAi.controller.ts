@@ -48,6 +48,8 @@ import { runWithAiRequestBudget } from '../services/aiRequestBudget.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
+import { prepareAiRecipePayload } from '../utils/aiRecipePayload.utils';
+import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
@@ -78,7 +80,8 @@ const PREVIEW_LOCKED_CODE = 'pulseai/preview-locked';
 const LOCKED_PREVIEW_HISTORY_PLACEHOLDER =
   '[A recipe was generated here but is locked for this user. Its contents are not available.]';
 const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
-// CP-1.1.9: receita acima do limite físico do BLENDi (proteína ou volume) mesmo após o retry.
+// CP-1.1.9: receita acima do limite físico do BLENDi mesmo após o retry.
+// CP-B2: só o volume (o teto de proteína saiu).
 const BLENDER_LIMIT_UNMET_CODE = 'pulseai/blender-limit-unmet';
 const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
 // 6 exchanges = 6 user messages + 6 assistant messages, interleaved.
@@ -403,7 +406,7 @@ async function resetDailyAiUsageIfNeeded(user: PulseAiUserProfile): Promise<void
 function parsePulseAiRecipe(content: string): PulseAiRecipe | null {
   try {
     const rawPayload: unknown = JSON.parse(content);
-    const parsed = pulseAiRecipeSchema.safeParse(rawPayload);
+    const parsed = pulseAiRecipeSchema.safeParse(prepareAiRecipePayload(rawPayload));
 
     return parsed.success ? parsed.data : null;
   } catch {
@@ -442,7 +445,7 @@ type BlenderLimitEnforcement =
   | { ok: true; recipe: PulseAiRecipe }
   | { ok: false; failure: EnforcementFailure };
 
-// Limite físico do BLENDi (proteína e volume — blenderGuardrail.utils.ts).
+// Limite físico do BLENDi (CP-B2: só o volume — blenderGuardrail.utils.ts).
 // CP-1.1.9: um retry e, se continuar acima do limite (ou vier inválido), a
 // receita NÃO é entregue ('unmet') — antes ela seguia mesmo acima do limite.
 // Se o retry falhar no provedor, 'aiUnavailable' (a receita não foi julgada).
@@ -542,12 +545,12 @@ type RecipeRestrictionEnforcement =
   | { ok: false; failure: EnforcementFailure };
 
 // CP-1.1.1c: última conferência antes de entregar — roda depois do guardrail
-// de proteína e da consistência de macros, porque os retries delas podem
+// de volume e da consistência de macros, porque os retries delas podem
 // trazer de volta um ingrediente proibido. Diferente dessas duas, esta
 // BLOQUEIA: um retry e, se continuar violando (ou vier inválido), a receita
 // não é entregue ('unmet'). Se o retry falhar no provedor, 'aiUnavailable'
 // (CP-1.1.9: responde como IA indisponível, não como dieta). A receita refeita não passa de novo pelos retries de
-// proteína/macros (eles nunca bloqueiam); só o flag macrosValidated é
+// volume/macros; só o flag macrosValidated é
 // recalculado.
 async function ensureRecipeRestrictions(
   recipe: PulseAiRecipe,
@@ -845,7 +848,7 @@ async function runPulseAiChat(params: {
       : null;
 
     // CP-1.1.9: idem para o limite físico (receitas gravadas antes do bloqueio
-    // por proteína/volume, ou antes do ajuste dos limites de volume).
+    // por volume, ou antes do ajuste dos limites de volume).
     const cachedWithinBlenderLimits = parsedCachedResponse.success
       ? validateBlenderLimits(parsedCachedResponse.data.recipe, currentUser.blendiModel).withinLimits
       : false;
@@ -1063,6 +1066,10 @@ async function runPulseAiChat(params: {
       console.warn('[pulseAi.controller] blender limit exceeded after later retries');
       return sendBlenderLimitUnmet();
     }
+
+    // CP-B2: checagem objetiva dos passos, sem nova tentativa (pulseCount sem
+    // gelo/congelado sai; inverter o copo fora do Steel vai para o log).
+    recipe = applyRecipeStepCheck(recipe, currentUser.blendiModel, '[pulseAi.controller]');
 
     if (usageReservation.mode === 'preview') {
       // Prévia: não grava no cache por usuário (senão a receita completa ficaria

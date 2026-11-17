@@ -73,10 +73,11 @@ describe('estimateRecipeVolumeMl — limite inferior', () => {
 });
 
 describe('BLENDER_LIMITS — ml é a fonte da verdade, oz derivado para baixo', () => {
-  it('Lite e Pro+ 400 ml (13,5 oz); Steel 600 ml (20,2 oz); proteína inalterada', () => {
-    assert.deepEqual(BLENDER_LIMITS.Lite, { maxVolumeMl: 400, maxVolumeOz: 13.5, maxProteinGrams: 35 });
-    assert.deepEqual(BLENDER_LIMITS.ProPlus, { maxVolumeMl: 400, maxVolumeOz: 13.5, maxProteinGrams: 45 });
-    assert.deepEqual(BLENDER_LIMITS.Steel, { maxVolumeMl: 600, maxVolumeOz: 20.2, maxProteinGrams: 55 });
+  // CP-B2: o teto de proteína (maxProteinGrams) saiu; só o volume.
+  it('Lite e Pro+ 400 ml (13,5 oz); Steel 600 ml (20,2 oz); sem teto de proteína', () => {
+    assert.deepEqual(BLENDER_LIMITS.Lite, { maxVolumeMl: 400, maxVolumeOz: 13.5 });
+    assert.deepEqual(BLENDER_LIMITS.ProPlus, { maxVolumeMl: 400, maxVolumeOz: 13.5 });
+    assert.deepEqual(BLENDER_LIMITS.Steel, { maxVolumeMl: 600, maxVolumeOz: 20.2 });
   });
 
   it('o oz mostrado, convertido de volta, nunca passa do limite em ml', () => {
@@ -88,42 +89,87 @@ describe('BLENDER_LIMITS — ml é a fonte da verdade, oz derivado para baixo', 
   });
 });
 
-describe('validateBlenderLimits', () => {
-  const base = { macros: { protein: 30, carbs: 20, fat: 5, calories: 245 }, ingredients: [{ name: 'Milk', amount: '300 ml' }] };
+describe('estimateAmountVolumeMl — frações e unidades em pt-BR (CP-B2)', () => {
+  const cases: Array<[string, number]> = [
+    ['1/4 cup', 59.15],
+    ['1/3 cup', 78.87],
+    ['1/2 cup', 118.3],
+    ['2/3 cup', 157.73],
+    ['3/4 cup', 177.45],
+    ['1 1/2 cups', 354.9],
+    ['1/3 de xícara', 78.87],
+    ['1/4 de xícara', 59.15],
+    ['3/4 de xícara', 177.45],
+    ['1 1/2 xícara', 354.9],
+    ['½ xícara', 118.3],
+    ['1 colher de sopa', 14.79],
+    ['2 colheres de sopa', 29.57],
+    ['1/2 colher (sopa)', 7.39],
+    ['1 colher de chá', 4.93],
+    ['2 colheres (chá)', 9.86],
+    ['8 fl oz', 236.59],
+    ['8 onças fluidas', 236.59],
+    ['1 onça fluida', 29.57],
+    ['2 onças', 56.7],
+    ['2 oz', 56.7],
+    ['1 tbsp', 14.79],
+    ['1/2 tsp', 2.46],
+  ];
 
-  it('dentro dos dois limites', () => {
+  for (const [amount, expected] of cases) {
+    it(`"${amount}" ≈ ${expected} ml`, () => {
+      const value = estimateAmountVolumeMl(amount);
+      assert.ok(value !== null, `não leu "${amount}"`);
+      assert.ok(Math.abs(value - expected) < 0.05, `"${amount}" → ${value}`);
+    });
+  }
+});
+
+describe('validateBlenderLimits — só o volume (CP-B2)', () => {
+  const base = { ingredients: [{ name: 'Milk', amount: '300 ml' }] };
+
+  it('dentro do limite', () => {
     assert.deepEqual(validateBlenderLimits(base, 'Lite'), { withinLimits: true });
   });
 
   it('exatamente no limite passa; 1 acima não', () => {
-    assert.ok(validateBlenderLimits({ ...base, macros: { ...base.macros, protein: 35 } }, 'Lite').withinLimits);
-    assert.ok(!validateBlenderLimits({ ...base, macros: { ...base.macros, protein: 35.5 } }, 'Lite').withinLimits);
-    assert.ok(validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '400 ml' }] }, 'Lite').withinLimits);
-    assert.ok(!validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '401 ml' }] }, 'Lite').withinLimits);
-    assert.ok(validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '400 ml' }] }, 'ProPlus').withinLimits);
-    assert.ok(!validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '401 ml' }] }, 'ProPlus').withinLimits);
-    assert.ok(validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '600 ml' }] }, 'Steel').withinLimits);
-    assert.ok(!validateBlenderLimits({ ...base, ingredients: [{ name: 'Milk', amount: '601 ml' }] }, 'Steel').withinLimits);
+    assert.ok(validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '400 ml' }] }, 'Lite').withinLimits);
+    assert.ok(!validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '401 ml' }] }, 'Lite').withinLimits);
+    assert.ok(validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '400 ml' }] }, 'ProPlus').withinLimits);
+    assert.ok(!validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '401 ml' }] }, 'ProPlus').withinLimits);
+    assert.ok(validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '600 ml' }] }, 'Steel').withinLimits);
+    assert.ok(!validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '601 ml' }] }, 'Steel').withinLimits);
   });
 
-  it('acusa proteína e volume juntos, e a mensagem de retry cita os dois', () => {
-    const result = validateBlenderLimits(
-      { macros: { protein: 40, carbs: 20, fat: 5, calories: 285 }, ingredients: [{ name: 'Milk', amount: '3 cups' }] },
-      'Lite'
-    );
+  it('70 g de proteína com volume dentro do copo passa no Lite (3 scoops de whey + 300 ml de leite)', () => {
+    const recipe = {
+      macros: { protein: 70, carbs: 25, fat: 8, calories: 452 },
+      ingredients: [
+        { name: 'Whey protein isolate', amount: '90 g' },
+        { name: 'Milk', amount: '300 ml' },
+      ],
+    };
+    assert.deepEqual(validateBlenderLimits(recipe, 'Lite'), { withinLimits: true });
+  });
+
+  it('acima do volume: só o volume na violação, e a mensagem pede o mesmo título e o capacityNotice', () => {
+    const result = validateBlenderLimits({ ingredients: [{ name: 'Milk', amount: '3 cups' }] }, 'Lite');
     assert.equal(result.withinLimits, false);
     if (result.withinLimits) return;
     assert.deepEqual(result.violation, {
-      protein: { declaredProtein: 40, maxProteinGrams: 35 },
       volume: { estimatedVolumeMl: 710, maxVolumeMl: 400, maxVolumeOz: 13.5 },
     });
     const message = buildBlenderLimitRetryMessage(result.violation);
-    assert.match(message, /40g of protein/);
     assert.match(message, /about 710ml/);
+    assert.match(message, /same title/);
+    assert.match(message, /compact, mini, small, compacto or pequeno/);
+    assert.match(message, /capacityNotice/);
+    assert.doesNotMatch(message, /protein guardrail|g of protein|maximum allowed/i);
+    assert.match(message, /about 90% of the limit \(around 360ml\)/);
   });
 
   it('cada modelo usa o próprio limite', () => {
-    const recipe = { macros: { protein: 50, carbs: 20, fat: 5, calories: 325 }, ingredients: [{ name: 'Milk', amount: '600 ml' }] };
+    const recipe = { ingredients: [{ name: 'Milk', amount: '600 ml' }] };
     assert.ok(!validateBlenderLimits(recipe, 'Lite').withinLimits);
     assert.ok(!validateBlenderLimits(recipe, 'ProPlus').withinLimits);
     assert.ok(validateBlenderLimits(recipe, 'Steel').withinLimits);

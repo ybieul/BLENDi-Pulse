@@ -1503,6 +1503,8 @@
   },
 
   "pulseAi": {
+    "capacityNoticeTitle": "Adjusted to fit your cup",
+    "waterNotInPhoto": "Includes water, which wasn't in the photo.",
     "offlineMessage": "Connect to the internet to use Pulse AI",
     "takingLonger": "This is taking longer than usual...",
     "ingredients": "Ingredients",

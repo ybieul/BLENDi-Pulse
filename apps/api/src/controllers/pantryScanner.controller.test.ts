@@ -238,17 +238,19 @@ describe('Pantry Scanner — validação de restrições', () => {
     assert.equal(awardXPMock.mock.callCount(), 0);
   });
 
-  it('Lite: gelo descartado; ProPlus sem dieta: nenhuma mudança', async () => {
+  // CP-B2: o Lite também barra congelados (decisão do Jon) — a receita com
+  // banana congelada, antes entregue, agora passa pela nova tentativa.
+  it('Lite: gelo e congelado descartados/refeitos; ProPlus sem dieta: nenhuma mudança', async () => {
     fakeUser.blendiModel = 'Lite';
     fakeUser.dietaryPreferences = [];
     initialRecipes = [recipe('Icy', 'Ice cubes'), recipe('Frozen', 'Frozen banana')];
-    retryByTitle = { Icy: recipe('Icy v2', 'Crushed ice') };
+    retryByTitle = { Icy: recipe('Icy v2', 'Crushed ice'), Frozen: recipe('Fresh', 'Banana') };
 
     const liteRes = await analyze();
     assert.equal(liteRes.statusCode, 200);
     assert.deepEqual(
       (liteRes.body?.data as { recipes: Array<{ title: string }> }).recipes.map(r => r.title),
-      ['Frozen']
+      ['Fresh']
     );
 
     fakeUser.blendiModel = 'ProPlus';
@@ -330,5 +332,45 @@ describe('Pantry Scanner — IA sem receita (CP-1.1.1d)', () => {
     assert.equal(data.xpAwarded, 15);
     assert.equal(scanRollbackCalls().length, 0);
     assert.equal(awardXPMock.mock.callCount(), 1);
+  });
+});
+
+// CP-B2: água é o único extra fora da foto; o backend marca a receita que a
+// usa (a foto deste teste tem banana, pasta de amendoim e aveia, sem água), e
+// a checagem objetiva tira o pulseCount de passo sem gelo/congelado.
+describe('Pantry Scanner — água fora da foto e passos (CP-B2)', () => {
+  it('receita com água que não estava na foto vem com usesWaterNotInPhoto; a outra não', async () => {
+    fakeUser.dietaryPreferences = [];
+    initialRecipes = [
+      { ...recipe('Oat Water', 'Oats'), ingredients: [{ name: 'Oats', amount: '40 g' }, { name: 'Water', amount: '250 ml' }] },
+      { ...recipe('Banana Oat', 'Oats'), usesWaterNotInPhoto: true },
+    ];
+
+    const res = await analyze();
+
+    assert.equal(res.statusCode, 200);
+    const data = res.body?.data as { recipes: Array<{ title: string; usesWaterNotInPhoto?: boolean }> };
+    assert.deepEqual(
+      data.recipes.map(r => [r.title, r.usesWaterNotInPhoto]),
+      [['Oat Water', true], ['Banana Oat', undefined]]
+    );
+  });
+
+  it('pulseCount de passo sem gelo/congelado é removido; água de coco não marca', async () => {
+    fakeUser.dietaryPreferences = [];
+    initialRecipes = [
+      {
+        ...recipe('Coco Oat', 'Oats'),
+        ingredients: [{ name: 'Oats', amount: '40 g' }, { name: 'Coconut water', amount: '250 ml' }],
+        steps: [{ text: 'Add the oats.' }, { text: 'Add the coconut water.', pulseCount: 6 }, { text: 'Blend.' }],
+      },
+    ];
+
+    const res = await analyze();
+
+    assert.equal(res.statusCode, 200);
+    const [only] = (res.body?.data as { recipes: Array<{ usesWaterNotInPhoto?: boolean; steps: Array<{ pulseCount?: number }> }> }).recipes;
+    assert.equal(only.usesWaterNotInPhoto, undefined);
+    assert.deepEqual(only.steps.map(step => step.pulseCount), [undefined, undefined, undefined]);
   });
 });

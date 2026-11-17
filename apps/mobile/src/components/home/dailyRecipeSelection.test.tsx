@@ -6,7 +6,6 @@
 // dailyRecipeSelection.synthetic.test.tsx.)
 import { fireEvent, render } from '@testing-library/react-native';
 import {
-  BLENDER_LIMITS,
   DIETARY_PREFERENCE_VALUES,
   USER_GOAL_VALUES,
   getForbiddenHomeRecipeContents,
@@ -41,10 +40,7 @@ const DIET_COMBINATIONS: DietaryPreference[][] = DIETARY_PREFERENCE_VALUES.reduc
 
 function violates(recipe: DailyRecipe, diets: readonly DietaryPreference[], blendiModel: 'Lite' | 'ProPlus'): boolean {
   const forbidden = getForbiddenHomeRecipeContents(diets, blendiModel);
-  return (
-    recipe.contains.some((content) => forbidden.has(content)) ||
-    recipe.protein > BLENDER_LIMITS[blendiModel].maxProteinGrams
-  );
+  return recipe.contains.some((content) => forbidden.has(content));
 }
 
 function renderCard(props: { goal: UserGoal; dietaryPreferences: DietaryPreference[]; blendiModel?: 'Lite' | 'ProPlus' | 'Steel' }) {
@@ -91,23 +87,23 @@ describe('receita do dia — nunca viola a dieta nem o modelo', () => {
     }
   });
 
-  it('Lite: nenhuma receita acima de 35 g de proteína; só o Muscle perde receitas (01, 02, 09 e 18)', () => {
-    const lite = BLENDER_LIMITS.Lite.maxProteinGrams;
-    for (const goal of USER_GOAL_VALUES) {
-      const pool = getDailyRecipePool({ goal, dietaryPreferences: [], blendiModel: 'Lite' })?.recipes ?? [];
-      expect(pool.every((recipe) => recipe.protein <= lite)).toBe(true);
-      // Hoje nenhuma receita tem gelo: fora o limite de proteína, é o pool inteiro, na mesma ordem.
-      expect(pool).toEqual(DAILY_RECIPES[goal].filter((recipe) => recipe.protein <= lite));
-    }
-    const removed = DAILY_RECIPES.Muscle.filter((recipe) => recipe.protein > lite).map((recipe) => recipe.nameKey);
-    expect(removed).toEqual([
+  // CP-B2: o teto de proteína por modelo saiu (o único limite físico é o
+  // volume). Antes, o Lite perdia as Muscle 01, 02, 09 e 18 (36-38 g).
+  it('Lite: a Home não esconde mais as receitas Muscle de 36-38 g de proteína; o pool é o do goal inteiro', () => {
+    const highProtein = DAILY_RECIPES.Muscle.filter((recipe) => recipe.protein > 35).map((recipe) => recipe.nameKey);
+    expect(highProtein).toEqual([
       'home.goalMuscleRecipe',
       'home.dailyRecipeMuscle02Name',
       'home.dailyRecipeMuscle09Name',
       'home.dailyRecipeMuscle18Name',
     ]);
-    // Pro+ (45 g) e Steel (55 g) continuam com as 20.
-    for (const blendiModel of ['ProPlus', 'Steel'] as const) {
+    for (const goal of USER_GOAL_VALUES) {
+      // Hoje nenhuma receita tem gelo: o pool do Lite é o do goal inteiro, na mesma ordem.
+      expect(getDailyRecipePool({ goal, dietaryPreferences: [], blendiModel: 'Lite' })?.recipes).toEqual(
+        DAILY_RECIPES[goal]
+      );
+    }
+    for (const blendiModel of ['Lite', 'ProPlus', 'Steel'] as const) {
       expect(getDailyRecipePool({ goal: 'Muscle', dietaryPreferences: [], blendiModel })?.recipes).toHaveLength(20);
     }
   });

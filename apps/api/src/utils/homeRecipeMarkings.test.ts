@@ -18,7 +18,7 @@
 // carregado aqui por import dinâmico — fora do grafo do tsc do backend.
 //
 // Também confere as 20 receitas do WeightLoss: macros somados ingrediente a
-// ingrediente (tabela abaixo), volume e proteína dentro do Lite, 180-320 kcal,
+// ingrediente (tabela abaixo), volume dentro do Lite (CP-B2: sem teto de proteína), 180-320 kcal,
 // sem gelo nem açúcar adicionado, e a variedade mínima para o filtro.
 // Rodar com: pnpm --filter @blendi/api test
 import assert from 'node:assert/strict';
@@ -37,7 +37,7 @@ import {
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import type { DietaryPreference } from '../models/User';
-import { validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
+import { isIceTerm, validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
 
 const MOBILE_SRC = path.resolve(__dirname, '../../../mobile/src');
 
@@ -88,6 +88,10 @@ function violatedTerms(recipe: RestrictedRecipe, diets: DietaryPreference[], mod
   return result.compliant ? [] : result.violations.map(violation => violation.term);
 }
 
+function liteIceBlocked(recipe: RestrictedRecipe): boolean {
+  return violatedTerms(recipe, [], 'Lite').some(isIceTerm);
+}
+
 /** Marcação que as regras do backend dão para a receita. */
 function deriveContains(recipe: HomeRecipe): HomeRecipeContent[] {
   const restricted = toRestrictedRecipe(recipe);
@@ -99,7 +103,9 @@ function deriveContains(recipe: HomeRecipe): HomeRecipeContent[] {
   if (veganTerms.some(term => !dairyTerms.includes(term))) derived.add('animal');
   if (violatedTerms(restricted, ['nut_free'], 'ProPlus').length > 0) derived.add('nuts');
   if (violatedTerms(restricted, ['no_added_sugar'], 'ProPlus').length > 0) derived.add('added_sugar');
-  if (violatedTerms(restricted, [], 'Lite').length > 0) derived.add('ice');
+  // CP-B2: o Lite também barra congelados, mas a marcação 'ice' da Home é só
+  // gelo — as receitas da Home com congelado ficam para o CP-A.
+  if (liteIceBlocked(restricted)) derived.add('ice');
 
   return HOME_RECIPE_CONTENT_VALUES.filter(content => derived.has(content));
 }
@@ -140,7 +146,7 @@ describe('receitas da Home — marcação conferida pelas regras do backend', ()
           const blockedByBackend = !validateRecipeRestrictions(restricted, [diet], 'ProPlus').compliant;
           assert.equal(blockedByMarking, blockedByBackend, `${recipe.nameKey} × ${diet}`);
         }
-        const iceBlocked = !validateRecipeRestrictions(restricted, [], 'Lite').compliant;
+        const iceBlocked = liteIceBlocked(restricted);
         assert.equal(recipe.contains.includes('ice'), iceBlocked, `${recipe.nameKey} × Lite`);
       }
     }
@@ -262,7 +268,7 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
     }
   });
 
-  it('macros declarados = soma ingrediente a ingrediente; volume, proteína, kcal e fibra dentro dos limites', () => {
+  it('macros declarados = soma ingrediente a ingrediente; volume, kcal e fibra dentro dos limites', () => {
     assert.equal(WEIGHT_LOSS_INGREDIENTS.length, DAILY_RECIPES.WeightLoss.length);
     DAILY_RECIPES.WeightLoss.forEach((recipe, index) => {
       const sum = { protein: 0, carbs: 0, fat: 0, calories: 0, fiber: 0, volume: 0 };
@@ -283,7 +289,6 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
       assert.equal(recipe.calories, roundHalfUp(sum.calories), `${recipe.nameKey} kcal`);
 
       assert.ok(sum.volume <= lite.maxVolumeMl, `${recipe.nameKey} volume ${sum.volume}`);
-      assert.ok(recipe.protein <= lite.maxProteinGrams, `${recipe.nameKey} proteína ${recipe.protein}`);
       assert.ok(
         recipe.calories >= WEIGHT_LOSS_CALORIES.min && recipe.calories <= WEIGHT_LOSS_CALORIES.max,
         `${recipe.nameKey} kcal ${recipe.calories}`
@@ -301,7 +306,10 @@ describe('receitas da Home — as 20 do WeightLoss', () => {
       assert.ok(!recipe.contains.includes('ice'), recipe.nameKey);
       assert.ok(!recipe.contains.includes('added_sugar'), recipe.nameKey);
       const restricted = toRestrictedRecipe(recipe);
-      assert.ok(validateRecipeRestrictions(restricted, ['no_added_sugar'], 'Lite').compliant, recipe.nameKey);
+      // CP-B2: o Lite agora também barra congelado; as receitas da Home com
+      // fruta congelada ficam para o CP-A — aqui, só gelo e açúcar.
+      assert.ok(validateRecipeRestrictions(restricted, ['no_added_sugar'], 'ProPlus').compliant, recipe.nameKey);
+      assert.ok(!liteIceBlocked(restricted), recipe.nameKey);
     }
   });
 

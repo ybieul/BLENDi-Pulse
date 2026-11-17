@@ -1,4 +1,11 @@
-import type { PulseAiChatInput } from '@blendi/shared';
+import {
+  ML_PER_US_FLUID_OUNCE,
+  RECIPE_CAPACITY_NOTICE_MAX_LENGTH,
+  RECIPE_MIN_SERVING_KCAL,
+  RECIPE_MIN_SERVING_ML,
+  RECIPE_TITLE_SIZE_WORDS,
+  type PulseAiChatInput,
+} from '@blendi/shared';
 
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
@@ -97,25 +104,63 @@ function filterByDiet(
     .map(ingredient => ingredient.name);
 }
 
+// CP-B2: unidades por sistema E por idioma. Os exemplos usam aveia e água de
+// coco (compatíveis com todas as dietas) — antes o exemplo era "almond milk",
+// e leite de amêndoas virou a base de 22 de 29 receitas no lote 1.
+// Imperial: frações comuns, nunca decimais ("0.33 cup", "0.2 oz" no lote 1).
+// pt-BR imperial: nomes das medidas em português; fluid ounce fica "fl oz"
+// (a abreviação impressa nas embalagens e nos copos medidores).
+const IMPERIAL_FRACTIONS_RULE: Record<UserLocale, string> = {
+  en: 'Write every imperial quantity with common kitchen fractions (1/4, 1/3, 1/2, 2/3, 3/4, 1 1/2), never with decimals: never write 0.33 cup, 0.2 oz, 0.5 cup or 0.5 banana; write 1/3 cup, 1/2 banana, or switch to a smaller measure such as 2 tbsp or 1 tsp for small amounts.',
+  'pt-BR': 'Write every imperial quantity with common kitchen fractions (1/4, 1/3, 1/2, 2/3, 3/4, 1 1/2), never with decimals: never write 0,33 xícara, 0.2 oz, 0,5 xícara or 0,5 banana; write 1/3 de xícara, 1/2 banana, or switch to a smaller measure such as 2 colheres de sopa or 1 colher de chá for small amounts.',
+};
+
+// CP-B2 (lote 4 ao vivo): no imperial a IA media pó e sólidos em xícaras
+// ("1/3 de xícara de whey", "1/2 cup spinach"), e o backend conta a xícara
+// como volume (recipeVolume.utils.ts) — 9 de 12 novas tentativas por volume
+// eram de contas imperiais, e "70 g de proteína" saía com 37 g. A regra abaixo
+// alinha a conta da IA com a do backend e manda pesar pó e sólidos densos.
+const IMPERIAL_VOLUME_RULE: Record<UserLocale, string> = {
+  en: 'For the cup volume, an ingredient measured in cups, tbsp or tsp counts with that measured volume (1 cup = 8 fl oz), even when it is a powder or a solid; an ingredient measured by weight counts 1 oz as 1 fl oz. So measure protein powder and other dense powders or solids by weight in oz (for example "3 oz whey protein" or "2 scoops (2 oz)"), not in cups.',
+  'pt-BR': 'For the cup volume, an ingredient measured in xícara or colher counts with that measured volume (1 xícara = 8 fl oz), even when it is a powder or a solid; an ingredient measured by weight counts 1 oz as 1 fl oz. So measure protein powder and other dense powders or solids by weight in oz (for example "3 oz de proteína whey"), not in xícaras.',
+};
+
 const UNIT_SYSTEM_CONTEXT: Record<
   UserUnitSystem,
   {
     label: string;
-    instruction: string;
-    example: (liquid: string) => string;
+    instructions: Record<UserLocale, string[]>;
   }
 > = {
   metric: {
     label: 'Metric',
-    instruction:
-      'Express ingredient quantities using metric units such as grams, milliliters, and liters.',
-    example: (liquid: string) => `Use metric units: 90g oats, 240ml ${liquid}.`,
+    instructions: {
+      en: [
+        'Express ingredient quantities in metric units: grams (g) for solids and powders, milliliters (ml) for liquids.',
+        'Example of amounts: 40g rolled oats, 200ml coconut water.',
+      ],
+      'pt-BR': [
+        'Express ingredient quantities in metric units: grams (g) for solids and powders, milliliters (ml) for liquids.',
+        'Example of amounts in Brazilian Portuguese: 40 g de aveia em flocos, 200 ml de água de coco.',
+      ],
+    },
   },
   imperial: {
     label: 'Imperial',
-    instruction:
-      'Express ingredient quantities using American units such as cups, tablespoons, teaspoons, ounces for solids, and fluid ounces or cups for liquids.',
-    example: (liquid: string) => `Use imperial units: 1 cup oats, 1 cup ${liquid}.`,
+    instructions: {
+      en: [
+        'Express ingredient quantities in American measures: cup, tbsp and tsp for volume, fl oz for liquids, oz for solids.',
+        IMPERIAL_FRACTIONS_RULE.en,
+        IMPERIAL_VOLUME_RULE.en,
+        'Example of amounts: 1/3 cup rolled oats, 3/4 cup coconut water, 1/2 banana, 2 tbsp chia seeds.',
+      ],
+      'pt-BR': [
+        'Express ingredient quantities in American measures, writing the unit names in Brazilian Portuguese: xícara, colher de sopa and colher de chá for volume, "fl oz" for fluid ounces and "oz" for ounces. Never write cup, tablespoon, teaspoon or "fluid ounces" in English.',
+        IMPERIAL_FRACTIONS_RULE['pt-BR'],
+        IMPERIAL_VOLUME_RULE['pt-BR'],
+        'Example of amounts in Brazilian Portuguese: 1/3 de xícara de aveia em flocos, 3/4 de xícara de água de coco, 1/2 banana, 2 colheres de sopa de chia.',
+      ],
+    },
   },
 };
 
@@ -145,17 +190,17 @@ export interface BuildPulseAiPromptResult {
 }
 
 const PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE =
-  '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}';
+  '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}';
 
 const PANTRY_RECIPES_JSON_ARRAY_STRUCTURE =
-  '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}]';
+  '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}]';
 
 const MODEL_CONTEXT: Record<BlendiModel, PulseAiModelContext> = {
   Lite: {
     displayName: 'BLENDi Lite',
     wattage: 70,
     hardwareGuidance:
-      'Use softer fruit, liquids, yogurt, oats, and similar easy-to-blend ingredients. Avoid recommending ice, whole nuts, or dense raw fibrous ingredients unless they are softened first.',
+      'Use softer fruit, liquids, yogurt, oats, and similar easy-to-blend ingredients. Avoid recommending whole nuts, or dense raw fibrous ingredients unless they are softened first.',
   },
   ProPlus: {
     displayName: 'BLENDi Pro+',
@@ -216,8 +261,11 @@ function buildRecentRecipesSection(recipeNames: string[]): string {
     return '';
   }
 
+  // CP-B2: reforço — não repetir a receita nem a mesma combinação base +
+  // ingrediente principal (o lote 1 repetia "leite de amêndoas + proteína +
+  // banana").
   return [
-    'Avoid repeating these recent recipes:',
+    "The user's most recent blends (do not repeat any of them, and do not repeat the same liquid base with the same main ingredients):",
     ...recipeNames.map((recipeName, index) => `${index + 1}. ${recipeName}`),
   ].join('\n');
 }
@@ -245,6 +293,11 @@ function buildMacroCalculationSection(): string {
   ].join('\n');
 }
 
+// CP-B2 (decisão do Jon): o Lite não recebe gelo nem nada congelado, e o
+// congelado não pode ser sugerido como substituto do gelo.
+const LITE_NO_FROZEN_RULE =
+  'Never use ice or any frozen ingredient (frozen fruit, frozen açaí pulp or anything else taken from the freezer), and never suggest a frozen ingredient as a replacement for ice: use fresh or room-temperature ingredients and chilled liquids instead.';
+
 // Lite sugere iogurte e Steel cita nozes inteiras; ProPlus não cita ingrediente.
 function getHardwareGuidance(blendiModel: BlendiModel, dietaryPreferences: DietaryPreference[]): string {
   if (blendiModel === 'Lite') {
@@ -258,7 +311,7 @@ function getHardwareGuidance(blendiModel: BlendiModel, dietaryPreferences: Dieta
       dietaryPreferences
     );
 
-    return `Use ${easyToBlend.join(', ')}, and similar easy-to-blend ingredients. Avoid recommending ice, whole nuts, or dense raw fibrous ingredients unless they are softened first.`;
+    return `Use ${easyToBlend.join(', ')}, and similar easy-to-blend ingredients. Avoid recommending whole nuts, or dense raw fibrous ingredients unless they are softened first. ${LITE_NO_FROZEN_RULE}`;
   }
 
   if (blendiModel === 'Steel') {
@@ -295,18 +348,55 @@ function buildCalorieEquationCheckSection(): string {
   ].join('\n');
 }
 
-function buildRecipeScopeSection(): string {
+function formatVolume(ml: number, unitSystem: UserUnitSystem): string {
+  return unitSystem === 'imperial'
+    ? `${Math.round((ml / ML_PER_US_FLUID_OUNCE) * 10) / 10} fl oz`
+    : `${ml}ml`;
+}
+
+function formatMaxVolume(blendiModel: BlendiModel, unitSystem: UserUnitSystem): string {
+  const limits = BLENDER_LIMITS[blendiModel];
+  return unitSystem === 'imperial' ? `${limits.maxVolumeOz} fl oz` : `${limits.maxVolumeMl}ml`;
+}
+
+const CAPACITY_NOTICE_EXAMPLE: Record<UserLocale, string> = {
+  en: 'You asked for 900 kcal, but your BLENDi Lite cup holds up to 400 ml; this recipe has 610 kcal. To get there, make two blends.',
+  'pt-BR': 'Você pediu 900 kcal, mas o copo do seu BLENDi Lite comporta até 400 ml; esta receita tem 610 kcal. Para chegar lá, faça dois blends.',
+};
+
+// CP-B2: o copo é o orçamento de volume dado de antemão; as metas diárias são
+// contexto (antes "25% a 40% da proteína diária", e a IA mirava nas metas e
+// estourava o copo). Sem teto de macro: só o volume limita.
+function buildServingSizeSection(params: {
+  blendiModel: BlendiModel;
+  unitSystem: UserUnitSystem;
+  responseLocale: UserLocale;
+  responseLanguage: string;
+  responseMode: PulseAiResponseMode;
+}): string {
+  const { blendiModel, unitSystem, responseLocale, responseLanguage, responseMode } = params;
+  const maxVolume = formatMaxVolume(blendiModel, unitSystem);
+
   return [
-    'Recipe scope:',
-    '- This shake is one of multiple meals the user has in a day, not their entire daily nutrition by itself.',
-    "- Unless the user explicitly asks for their full daily target in a single shake, the recipe should provide between 25% and 40% of the user's daily protein target.",
-    "- Never default to putting the user's entire daily target into a single recipe.",
+    'Serving size (volume budget):',
+    `- Each recipe is ONE serving, made in a single blend, that must fit the cup of the ${MODEL_CONTEXT[blendiModel].displayName}: the combined volume of all ingredients must be at most ${maxVolume} (${unitSystem === 'imperial' ? 'see the unit rules above for how cups, spoons and oz count' : 'count each gram of a solid ingredient as 1ml'}). Plan the quantities inside this budget from the start.`,
+    "- The user's daily targets in the User context are for the whole day, across several meals. Use them and the goal as context for the kind of blend, never as the target of a single blend.",
+    `- When there is no request about size, amount or nutrient values, make a regular serving: at least ${formatVolume(RECIPE_MIN_SERVING_ML, unitSystem)} and at least ${RECIPE_MIN_SERVING_KCAL} kcal, within the cup budget. When the ingredients are low in calories, reach the minimum with larger quantities or a more caloric ingredient that is allowed, never with a smaller serving.`,
+    ...(responseMode === 'single-recipe'
+      ? [
+          '- When the user asks for something light or small (a light snack, a small shake, low calorie), follow the request: the minimum above does not apply.',
+          '- When the user asks for a specific amount of calories or of any macro (for example "400 kcal", "70 g of protein", "low carb, up to 15 g", "little fat"), deliver that value, with the macros calculated from the real ingredient quantities (see the macro rules below), as long as the recipe fits the cup. Protein, carbs, fat and calories have no limit other than the cup volume.',
+          `- If the request cannot fit the cup, build the closest recipe that fits and fill capacityNotice with one short sentence (at most ${RECIPE_CAPACITY_NOTICE_MAX_LENGTH} characters) in ${responseLanguage} saying what was asked, what this recipe delivers and that the cup volume is the reason. Example: "${CAPACITY_NOTICE_EXAMPLE[responseLocale]}"`,
+          '- When a request does not fit, the closest recipe uses nearly the whole cup (about 90% of the volume budget) with the densest suitable ingredients, so it gets as close as possible to the requested value.',
+          '- Fill capacityNotice only when you actually had to reduce what the user asked for. Otherwise omit the field.',
+        ]
+      : ['- Omit the capacityNotice field.']),
   ].join('\n');
 }
 
 // Preferência qualitativa de composição, não um guardrail físico — por isso
 // fica posicionada antes de buildBlenderGuardrailsSection, que continua sendo
-// a última seção e a autoridade final sobre volume/proteína. O texto do
+// a última seção e a autoridade final sobre o volume. O texto do
 // 'gain' abaixo referencia essa ordem explicitamente ("below").
 const WEIGHT_GOAL_GUIDANCE: Record<WeightGoal, string[]> = {
   lose: [
@@ -323,7 +413,7 @@ const WEIGHT_GOAL_GUIDANCE: Record<WeightGoal, string[]> = {
   gain: [
     'Weight goal guidance (gain):',
     '- Favor high-calorie-density ingredients ({{DENSE_INGREDIENTS}}) to increase the calorie density of the recipe without increasing its volume beyond what the blender can handle.',
-    "- The blender's physical volume and protein limits below still apply and take priority over this guidance.",
+    "- The cup's volume limit below still applies and takes priority over this guidance.",
   ],
 };
 
@@ -386,8 +476,8 @@ function normalizeDietaryPreferences(
 }
 
 // Fica logo antes de buildBlenderGuardrailsSection: a dieta decide QUAIS
-// ingredientes podem entrar; os guardrails físicos continuam decidindo
-// volume/proteína e seguem como a última seção do prompt.
+// ingredientes podem entrar; os guardrails físicos continuam decidindo o
+// volume e seguem como a última seção do prompt.
 function buildDietaryRestrictionsSection(
   dietaryPreferences: DietaryPreference[],
   responseMode: PulseAiResponseMode
@@ -416,21 +506,20 @@ function buildDietaryRestrictionsSection(
   ].join('\n');
 }
 
+// CP-B2: o volume é o único limite físico (a linha de proteína saiu).
 function buildBlenderGuardrailsSection(
   blendiModel: BlendiModel,
   unitSystem: UserUnitSystem
 ): string {
   const modelContext = MODEL_CONTEXT[blendiModel];
-  const limits = BLENDER_LIMITS[blendiModel];
-  const maxVolume =
-    unitSystem === 'imperial' ? `${limits.maxVolumeOz}oz` : `${limits.maxVolumeMl}ml`;
 
   return [
     `Physical blender guardrails (${modelContext.displayName}):`,
-    `- The combined volume of all ingredients in the recipe must not exceed ${maxVolume}.`,
+    `- The cup volume is the only physical limit: the combined volume of all ingredients in the recipe must not exceed ${formatMaxVolume(blendiModel, unitSystem)}.`,
     // CP-1.1.9: a mesma conta que o backend faz para validar (recipeVolume.utils.ts).
     '- When adding up the volume, count each gram of a solid ingredient as 1ml.',
-    `- Total protein in this recipe must not exceed ${limits.maxProteinGrams}g.`,
+    ...(blendiModel === 'Lite' ? [`- ${LITE_NO_FROZEN_RULE}`] : []),
+    ...(blendiModel === 'Steel' ? [] : [`- ${INVERT_CUP_FORBIDDEN_RULE}`]),
     "- Never suggest an ingredient combination that exceeds the physical capacity of the user's blender.",
   ].join('\n');
 }
@@ -453,6 +542,97 @@ function buildResponseFormatRequirements(
     '- Always return a valid JSON object and nothing else. Do not include markdown, code fences, explanations, or text before or after the JSON.',
     `- The JSON must follow this exact structure: ${PULSE_AI_SINGLE_RECIPE_JSON_STRUCTURE}.`,
   ];
+}
+
+// CP-B2: inverter o copo só no Steel.
+const INVERT_CUP_FORBIDDEN_RULE =
+  'Never tell the user to invert, flip or turn the cup upside down: this blender is not used that way.';
+
+const RECIPE_TITLE_SIZE_WORD_LIST = RECIPE_TITLE_SIZE_WORDS.join(', ');
+
+// CP-B2: idioma de tudo o que aparece na tela (o lote 1 trazia "Unsweetened
+// almond milk" e "fluid ounces" em receitas pt-BR).
+const PT_BR_INGREDIENT_NAME_EXAMPLES: readonly RestrictedIngredient[] = [
+  { name: '"Leite de amêndoas sem açúcar"', violates: ['nut_free'] },
+  { name: '"Morango"' },
+  { name: '"Aveia em flocos"' },
+  { name: '"Proteína whey isolada"', violates: DAIRY_FREE_VIOLATORS },
+  { name: '"Iogurte grego natural"', violates: DAIRY_FREE_VIOLATORS },
+  { name: '"Espinafre"' },
+];
+
+function buildLanguageSection(
+  responseLocale: UserLocale,
+  responseLanguage: string,
+  dietaryPreferences: DietaryPreference[]
+): string {
+  return [
+    'Language of the recipe:',
+    `- Write every user-visible text entirely in ${responseLanguage}: the title, every ingredient name, every amount (including the unit words), the blendInstruction, every step, the tip and the capacityNotice. Never mix languages.`,
+    '- The nutrition reference table and the examples in this prompt are written in English only as reference data: never copy their English names into the recipe.',
+    ...(responseLocale === 'pt-BR'
+      ? [
+          `- Translate every ingredient name into Brazilian Portuguese, for example ${filterByDiet(PT_BR_INGREDIENT_NAME_EXAMPLES, dietaryPreferences).join(', ')}.`,
+        ]
+      : []),
+    '- Proofread every text for spelling and grammar before responding.',
+    `- Name the recipe by its flavor or main ingredients. Never put a word about size or restriction in the title (for example: ${RECIPE_TITLE_SIZE_WORD_LIST}).`,
+  ].join('\n');
+}
+
+// CP-B2: passos coerentes com a receita.
+function buildStepsSection(blendiModel: BlendiModel): string {
+  return [
+    'Steps and blend instruction:',
+    '- Generate between 3 and 5 preparation steps in the steps field.',
+    '- The steps and the blendInstruction may only mention ingredients that are in the ingredients list of this recipe. Never mention ice, frozen fruit or any other ingredient that is not in the list.',
+    '- Include pulseCount (an integer number of pulses) only in a step that adds ice or a frozen ingredient that is in the ingredients list of this recipe; omit the pulseCount field from every other step. A recipe without ice or frozen ingredients has no pulseCount at all.',
+    '- Adapt the blendInstruction to the ingredients (order of adding, blending time, texture). Never mention the cup volume limit, the motor power or the wattage in the blendInstruction or in the steps.',
+    blendiModel === 'Steel'
+      ? '- You may tell the user to invert the cup when it helps the blend.'
+      : `- ${INVERT_CUP_FORBIDDEN_RULE}`,
+  ].join('\n');
+}
+
+const VARIETY_LIQUID_BASES: readonly RestrictedIngredient[] = [
+  { name: 'water' },
+  { name: 'milk', violates: DAIRY_FREE_VIOLATORS },
+  { name: 'oat milk' },
+  { name: 'soy milk' },
+  { name: 'almond milk', violates: ['nut_free'] },
+  { name: 'coconut water' },
+  { name: 'yogurt', violates: DAIRY_FREE_VIOLATORS },
+  { name: 'kefir', violates: DAIRY_FREE_VIOLATORS },
+];
+
+const VARIETY_PROTEIN_SOURCES: readonly RestrictedIngredient[] = [
+  { name: 'whey protein', violates: DAIRY_FREE_VIOLATORS },
+  { name: 'plant protein powder' },
+  { name: 'Greek yogurt', violates: DAIRY_FREE_VIOLATORS },
+  { name: 'milk', violates: DAIRY_FREE_VIOLATORS },
+  { name: 'tofu' },
+  { name: 'peanut butter', violates: ['nut_free'] },
+  { name: 'chia, hemp or pumpkin seeds' },
+  { name: 'oats' },
+];
+
+// CP-B2: no lote 1, leite de amêndoas em 22 de 29 receitas.
+function buildVarietySection(
+  dietaryPreferences: DietaryPreference[],
+  responseMode: PulseAiResponseMode
+): string {
+  // Com nut_free, o texto nem cita leite de amêndoas (achado PI-J1: nome no
+  // texto fixo do prompt vaza para a receita).
+  const almondMilkAllowed = isCompliant(['nut_free'], dietaryPreferences);
+
+  return [
+    'Variety:',
+    `- ${almondMilkAllowed ? 'Do not use almond milk as a default base. ' : ''}Choose the liquid base to suit the goal, the diet and the request, varying among options such as ${filterByDiet(VARIETY_LIQUID_BASES, dietaryPreferences).join(', ')}.`,
+    `- Vary the protein source as well (for example ${filterByDiet(VARIETY_PROTEIN_SOURCES, dietaryPreferences).join(', ')}), and avoid falling back on the same "protein powder + banana + oats" or "strawberry + spinach" combination.`,
+    ...(responseMode === 'single-recipe'
+      ? ['- Do not repeat a recipe you already suggested earlier in this conversation unless the user asks for it.']
+      : []),
+  ].join('\n');
 }
 
 function buildSystemPrompt({
@@ -496,13 +676,8 @@ function buildSystemPrompt({
     `- Always respond in ${responseLanguage}.`,
     ...buildResponseFormatRequirements(responseMode, recipeCount),
     '- All macro fields must be numeric values, not strings.',
-    '- Personalize the blendInstruction for the user hardware and ingredient difficulty.',
-    '- Generate between 3 and 5 preparation steps in the steps field, written in the same language as the rest of the response.',
-    '- Include pulseCount (an integer number of pulses) only in steps that involve adding ice or frozen fruit; omit the pulseCount field from every other step.',
-    '- Calibrate the recipe macros so the suggestion fits the user daily targets and goal context. Keep the serving practical instead of arbitrarily oversized.',
     '- Prioritize common, accessible, supermarket-friendly ingredients.',
-    `- ${unitSystemContext.instruction}`,
-    `- ${unitSystemContext.example(normalizedDietaryPreferences.length > 0 ? 'water' : 'almond milk')}`,
+    ...unitSystemContext.instructions[responseLocale].map(line => `- ${line}`),
     ...(responseMode === 'single-recipe'
       ? [
           "- If the user says they are missing an ingredient using phrases like 'sem', 'without', 'don't have', 'nao tenho', 'não tenho', or equivalent, you must include substitution suggestions inside the optional tip field and set hasSubstitutes to true.",
@@ -539,13 +714,19 @@ function buildSystemPrompt({
 
   sections.push(
     '',
+    buildServingSizeSection({ blendiModel, unitSystem, responseLocale, responseLanguage, responseMode }),
+    '',
+    buildLanguageSection(responseLocale, responseLanguage, normalizedDietaryPreferences),
+    '',
+    buildStepsSection(blendiModel),
+    '',
+    buildVarietySection(normalizedDietaryPreferences, responseMode),
+    '',
     buildMacroCalculationSection(),
     '',
     buildNutritionReferenceSection(normalizedDietaryPreferences),
     '',
-    buildCalorieEquationCheckSection(),
-    '',
-    buildRecipeScopeSection()
+    buildCalorieEquationCheckSection()
   );
 
   const weightGoalSection = buildWeightGoalSection(weightGoal, normalizedDietaryPreferences);
@@ -597,8 +778,16 @@ export function buildPantryRecipePrompt({
         // CP-B1: antes "exactly 2" — sem 2 possíveis, a IA devolvia array
         // vazio e a receita boa se perdia. Agora pede 2 e aceita 1.
         '- Generate 2 distinct blend or smoothie recipes. If the available ingredients only allow 1 valid recipe, generate 1.',
-        '- Use only the ingredients listed in the Available ingredients section.',
-        '- Do not invent, substitute, or recommend ingredients that are not listed as available.',
+        // CP-B2: as 2 receitas saíam quase iguais (só trocava uma fruta).
+        '- The 2 recipes must be clearly different from each other: change the liquid base, the flavor profile or the texture. Swapping only one fruit for another does not make a different recipe. For example, one recipe with water or milk as the base and the other with yogurt as the base, or one fruity and the other with cocoa, peanut butter or greens.',
+        '- Use only the ingredients listed in the Available ingredients section, plus plain water.',
+        // CP-B2 (decisão do Gabriel): água é sempre permitida, mesmo fora da
+        // foto, e é o ÚNICO extra — sem líquido na foto, as receitas saíam
+        // grossas demais (iogurte + fruta + aveia seca).
+        '- Plain water is always available, even when it is not in the list: use it as the liquid base when the listed ingredients have no liquid or the recipe would be too thick to blend. Water is the only ingredient allowed outside the list.',
+        '- Do not invent, substitute, or recommend any other ingredient that is not listed as available.',
+        '- When a recipe uses water, the tip may suggest replacing it with milk or a plant-based beverage "if you have some" (only a compliant one when there are dietary restrictions).',
+        '- The names in the Available ingredients section may be in any language: write the recipe ingredient names in the response language.',
         '- Set hasSubstitutes to false for every recipe.',
         // Pentest CP-1.1.1a (Pantry): a lista inclui itens que a dieta proíbe
         // e a única saída era "lista vazia" — o modelo ora esvaziava a lista
@@ -620,7 +809,7 @@ export function buildPantryRecipePrompt({
       {
         role: 'user',
         content:
-          'Generate 2 distinct blend recipes (or 1 if the available ingredients only allow 1) using only the available ingredients list. Do not use ingredients outside the list.',
+          'Generate 2 clearly different blend recipes (or 1 if the available ingredients only allow 1) using only the available ingredients list plus plain water. Do not use any other ingredient outside the list.',
       },
     ],
   };

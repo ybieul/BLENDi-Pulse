@@ -150,3 +150,30 @@ describe('instância compartilhada do axios', () => {
     }
   });
 });
+
+// CP-B2 (achado baixo do CP-B1): tempo esgotado no Pulse AI vira a mensagem
+// de timeout, como no Pantry — antes caía no erro genérico de servidor.
+describe('tempo esgotado no app (CP-B2)', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports -- mesmo motivo do hoisting acima */
+  const { AxiosError } = require('axios') as typeof import('axios');
+  /* eslint-enable @typescript-eslint/no-require-imports */
+
+  it('Pulse AI: ECONNABORTED → errors.network.timeout', async () => {
+    mockPost.mockRejectedValueOnce(new AxiosError('timeout of 75000ms exceeded', 'ECONNABORTED'));
+
+    await expect(pulseAi.sendMessage('shake')).rejects.toMatchObject({
+      name: 'PulseAiServiceError',
+      translationKey: 'errors.network.timeout',
+    });
+  });
+
+  it('Pulse AI: erro com código da API continua mapeado como antes', async () => {
+    const error = new AxiosError('limit', 'ERR_BAD_REQUEST');
+    error.response = { data: { success: false, code: 'pulseai/blender-limit-unmet' } } as never;
+    mockPost.mockRejectedValueOnce(error);
+
+    await expect(pulseAi.sendMessage('shake')).rejects.toMatchObject({
+      translationKey: 'errors.pulseai_blender_limit_unmet',
+    });
+  });
+});

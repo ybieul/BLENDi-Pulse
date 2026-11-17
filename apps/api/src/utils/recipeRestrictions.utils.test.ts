@@ -346,13 +346,19 @@ describe('validateRecipeRestrictions — gelo no Lite', () => {
     ['Pedras de gelo', true],
     ['Água com gelo', true],
     ['Gelo de café', true],
-    // Não é gelo
+    // CP-B2 (decisão do Jon): nada congelado no Lite.
+    ['Frozen banana', true],
+    ['Frozen mixed berries', true],
+    ['Frozen yogurt', true],
+    ['Banana congelada', true],
+    ['Morangos congelados', true],
+    ['Frutas vermelhas congeladas', true],
+    ['Polpa de açaí congelada', true],
+    ['Manga congelada em cubos', true],
+    // Não é gelo nem congelado
     ['Vanilla ice cream', false],
     ['Sorvete de creme', false],
-    ['Frozen banana', false],
-    ['Frozen mixed berries', false],
-    ['Banana congelada', false],
-    ['Morangos congelados', false],
+    ['Banana descongelada', false],
     ['Iced coffee', false],
     ['Iced green tea', false],
     ['Café gelado', false],
@@ -373,47 +379,76 @@ describe('validateRecipeRestrictions — gelo no Lite', () => {
   }
 
   for (const model of ['ProPlus', 'Steel'] as const) {
-    it(`${model} permite gelo`, () => {
+    it(`${model} permite gelo e congelados`, () => {
       assert.deepEqual(check('Ice cubes', [], model), { compliant: true });
       assert.deepEqual(check('Gelo picado', [], model), { compliant: true });
+      assert.deepEqual(check('Frozen banana', [], model), { compliant: true });
+      assert.deepEqual(check('Morangos congelados', [], model), { compliant: true });
+      assert.deepEqual(check('Congele a banana antes de bater.', [], model), { compliant: true });
     });
   }
 
-  it('Lite: negação nos passos ("no ice needed", "sem gelo") não é violação', () => {
+  it('Lite: negação nos passos ("no ice needed", "sem gelo", "sem fruta congelada") não é violação', () => {
     const recipe: RestrictedRecipe = {
-      ingredients: [{ name: 'Frozen banana', amount: '1' }],
+      ingredients: [{ name: 'Banana', amount: '1' }],
       blendInstruction: 'Blend for 40 seconds. No ice needed.',
       steps: [
-        { text: 'Add the frozen banana — no ice needed.' },
-        { text: 'Bata sem gelo, a banana congelada já gela.' },
+        { text: 'Add the banana — no ice needed.' },
+        { text: 'Bata sem gelo.' },
         { text: 'Gelo não é necessário.' },
         { text: 'Ice is not needed here.' },
+        { text: 'Do not use frozen fruit.' },
+        { text: 'Não use frutas congeladas.' },
+        { text: 'Bata sem fruta congelada.' },
+        { text: 'Use the banana without frozen pieces.' },
       ],
     };
     assert.deepEqual(validateRecipeRestrictions(recipe, [], 'Lite'), { compliant: true });
   });
 
-  it('Lite: explicação da troca na blendInstruction não é violação', () => {
+  it('Lite: passos com ingrediente congelado ou que mandam congelar são barrados (en e pt-BR)', () => {
+    const instructions = [
+      'Adicione a banana congelada e bata.',
+      'Coloque os morangos congelados no copo.',
+      'Congele a banana na véspera.',
+      'Add the frozen mango and blend.',
+      'Freeze the banana the night before.',
+    ];
+    for (const text of instructions) {
+      const recipe: RestrictedRecipe = {
+        ingredients: [{ name: 'Banana', amount: '1' }],
+        blendInstruction: 'Blend for 40 seconds.',
+        steps: [{ text }],
+      };
+      const result = validateRecipeRestrictions(recipe, [], 'Lite');
+      assert.equal(result.compliant, false, text);
+    }
+  });
+
+  it('Lite: explicação da troca na blendInstruction não é violação (negação por frase)', () => {
     const explanations = [
-      'Substituímos o gelo por banana congelada para proteger o motor de 70W.',
-      'Como o BLENDi Lite não tritura gelo, use morangos congelados.',
-      'Em vez do gelo, use fruta congelada.',
-      'Evite gelo: o motor de 70W não foi feito para isso.',
-      'We replaced the ice with frozen banana to protect the 70W motor.',
-      'The BLENDi Lite cannot crush ice, so frozen fruit keeps it cold.',
-      'Avoid ice; use frozen strawberries instead of ice.',
-      'Swap the ice for frozen mango.',
+      'Substituímos o gelo por leite bem gelado.',
+      'Como o BLENDi Lite não tritura gelo nem congelados, use fruta fresca.',
+      'Em vez do gelo, use leite bem gelado.',
+      'Evite gelo e fruta congelada: o copo não foi feito para isso.',
+      'We replaced the ice with chilled milk.',
+      'The BLENDi Lite cannot crush ice, so chilled milk keeps it cold.',
+      'Avoid ice and frozen fruit; use fresh strawberries instead.',
+      'Swap the ice for chilled coconut water.',
     ];
     for (const blendInstruction of explanations) {
       const recipe: RestrictedRecipe = {
-        ingredients: [{ name: 'Frozen banana', amount: '1' }],
+        ingredients: [{ name: 'Banana', amount: '1' }],
         blendInstruction,
       };
       assert.deepEqual(validateRecipeRestrictions(recipe, [], 'Lite'), { compliant: true }, blendInstruction);
     }
   });
 
-  it('Lite: texto real do teste ao vivo (explicação na blendInstruction) não é violação', () => {
+  // CP-B2: até o CP-B1 este texto passava ("fruta congelada continua
+  // permitida"). Agora a frase depois da vírgula manda usar fruta congelada,
+  // sem negação no mesmo segmento: violação.
+  it('Lite: texto real do teste ao vivo que sugere frutas congeladas na blendInstruction é violação', () => {
     const recipe: RestrictedRecipe = {
       ingredients: [
         { name: 'Morango', amount: '150 g' },
@@ -422,7 +457,13 @@ describe('validateRecipeRestrictions — gelo no Lite', () => {
       blendInstruction:
         'Como o seu BLENDi Lite tem potência de 70W e não deve ser usado com gelo, esta receita utiliza frutas congeladas para garantir a cremosidade e o efeito gelado sem sobrecarregar o motor.',
     };
-    assert.deepEqual(validateRecipeRestrictions(recipe, [], 'Lite'), { compliant: true });
+    const result = validateRecipeRestrictions(recipe, [], 'Lite');
+    assert.equal(result.compliant, false);
+    if (result.compliant) return;
+    assert.deepEqual(
+      result.violations.map(violation => [violation.term, violation.field]),
+      [['congelada', 'blendInstruction']]
+    );
   });
 
   it('Lite: passos que mandam usar gelo continuam barrados (passos são estritos)', () => {

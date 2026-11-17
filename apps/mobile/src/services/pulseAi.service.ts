@@ -121,9 +121,15 @@ function mapPulseAiErrorTranslationKey(code?: string | null): TranslationKey {
 function toPulseAiServiceError(error: unknown): PulseAiServiceError {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const apiCode = error.response?.data?.code;
+    // CP-B2: tempo esgotado no app vira a mensagem de timeout (como no Pantry),
+    // não o erro genérico de servidor.
+    const translationKey = error.code === 'ECONNABORTED'
+      ? 'errors.network.timeout'
+      : mapPulseAiErrorTranslationKey(apiCode);
+
     return new PulseAiServiceError(
       error.response?.data?.message ?? error.message,
-      mapPulseAiErrorTranslationKey(apiCode),
+      translationKey,
       apiCode,
     );
   }

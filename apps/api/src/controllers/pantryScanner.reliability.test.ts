@@ -74,7 +74,7 @@ const callAiMock = mock.fn(async ({ messages }: CallAiInput) => {
   remainingBudgetSeen.push(getAiRequestRemainingMs());
   const last = messages[messages.length - 1].content;
 
-  if (last.includes('physical protein guardrail') || last.includes('physical volume')) {
+  if (last.includes('physical volume')) {
     const previous = JSON.parse(messages[messages.length - 2].content) as { title: string };
     return answer(limitRetryByTitle[previous.title] ?? new Error(`no limit retry for ${previous.title}`));
   }
@@ -148,9 +148,16 @@ function recipe(title: string, ingredientName = 'Oats') {
   };
 }
 
-// Lite: 35 g de proteína. 40*4 + 20*4 + 5*9 = 285 kcal (macros consistentes).
+// Lite: 400 ml. CP-B2: acima do VOLUME (antes era acima da proteína, que
+// deixou de ser limite).
 function heavy(title: string) {
-  return { ...recipe(title), macros: { protein: 40, carbs: 20, fat: 5, calories: 285 } };
+  return {
+    ...recipe(title),
+    ingredients: [
+      { name: 'Banana', amount: '1' },
+      { name: 'Oat milk', amount: '500 ml' },
+    ],
+  };
 }
 
 const JPEG_BASE64 = `/9j/${'A'.repeat(200)}`;

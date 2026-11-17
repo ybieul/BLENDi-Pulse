@@ -9,7 +9,7 @@
 // IA (validateRecipeRestrictions, apps/api/src/utils/recipeRestrictions.utils.ts):
 // apps/api/src/utils/homeRecipeMarkings.test.ts.
 
-import { BLENDER_LIMITS, type BlenderModel } from '../blenderLimits';
+import type { BlenderModel } from '../blenderLimits';
 import type { DietaryPreference } from '../schemas/user';
 
 export const HOME_RECIPE_CONTENT_VALUES = ['dairy', 'animal', 'nuts', 'added_sugar', 'ice'] as const;
@@ -64,22 +64,15 @@ export function isHomeRecipeCompatible(
   return !contains.some(content => forbidden.has(content));
 }
 
-/** Proteína da receita dentro do limite físico do modelo (BLENDER_LIMITS). */
-export function fitsBlenderProteinLimit(protein: number, blendiModel: HomeRecipeBlendiModel): boolean {
-  return protein <= BLENDER_LIMITS[blendiModel].maxProteinGrams;
-}
-
 /**
- * Receita da Home liberada para esta pessoa: nada que a dieta proíba, nada
- * com gelo no Lite e proteína dentro do limite do modelo (Lite: 35 g).
+ * Receita da Home liberada para esta pessoa: nada que a dieta proíba e nada
+ * com gelo no Lite. CP-B2: o filtro por proteína (Lite até 35 g) saiu junto
+ * com o teto de proteína por modelo — o único limite físico é o volume.
  */
 export function isHomeRecipeAllowed(
-  recipe: { contains: readonly HomeRecipeContent[]; protein: number },
+  recipe: { contains: readonly HomeRecipeContent[] },
   dietaryPreferences: readonly DietaryPreference[],
   blendiModel: HomeRecipeBlendiModel
 ): boolean {
-  return (
-    isHomeRecipeCompatible(recipe.contains, dietaryPreferences, blendiModel) &&
-    fitsBlenderProteinLimit(recipe.protein, blendiModel)
-  );
+  return isHomeRecipeCompatible(recipe.contains, dietaryPreferences, blendiModel);
 }

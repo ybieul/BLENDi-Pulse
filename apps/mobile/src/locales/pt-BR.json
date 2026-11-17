@@ -1503,6 +1503,8 @@
   },
 
   "pulseAi": {
+    "capacityNoticeTitle": "Ajustada para caber no copo",
+    "waterNotInPhoto": "Inclui água, que não aparecia na foto.",
     "offlineMessage": "Conecte-se à internet para usar o Pulse AI",
     "takingLonger": "Isso está demorando mais que o habitual...",
     "ingredients": "Ingredientes",

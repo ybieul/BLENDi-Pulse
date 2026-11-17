@@ -42,6 +42,9 @@ import {
   type BuildPulseAiPromptResult,
 } from '../services/promptBuilder.service';
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
+import { prepareAiRecipePayload } from '../utils/aiRecipePayload.utils';
+import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
+import { markWaterNotInPhoto } from '../utils/recipeWater.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import {
   buildBlenderLimitRetryMessage,
@@ -343,7 +346,7 @@ function parsePantryRecipes(content: string): PantryRecipesParseResult {
   let firstIssuePath: string | undefined;
 
   list.forEach((item, index) => {
-    const parsed = pulseAiRecipeSchema.safeParse(item);
+    const parsed = pulseAiRecipeSchema.safeParse(prepareAiRecipePayload(item));
 
     if (parsed.success) {
       recipes.push(parsed.data);
@@ -416,7 +419,7 @@ function parsePantryRecipe(content: string): PantryRecipeParseResult {
     };
   }
 
-  const parsed = pulseAiRecipeSchema.safeParse(list[0]);
+  const parsed = pulseAiRecipeSchema.safeParse(prepareAiRecipePayload(list[0]));
 
   return parsed.success
     ? { status: 'ok', recipe: parsed.data }
@@ -457,7 +460,7 @@ type PantryRecipeEnforcement =
   | { recipe: PulseAiRecipe; failure?: undefined }
   | { recipe: null; failure: PantryEnforcementFailure };
 
-// Limite físico do BLENDi (proteína e volume — blenderGuardrail.utils.ts),
+// Limite físico do BLENDi (CP-B2: só o volume — blenderGuardrail.utils.ts),
 // mesma rede de segurança das receitas do chat do Pulse AI
 // (pulseAi.controller.ts, ensureBlenderGuardrail), por receita: um único
 // retry (callAi direto, maxTokens 2000). CP-1.1.9: se continuar acima do
@@ -573,7 +576,7 @@ async function ensurePantryRecipeMacroConsistency(
 
 // CP-1.1.1c: validação determinística da dieta e do gelo no Lite
 // (recipeRestrictions.utils.ts), por receita, como ÚLTIMA conferência — depois
-// do guardrail de proteína e da consistência de macros, cujos retries podem
+// do guardrail de volume e da consistência de macros, cujos retries podem
 // trazer de volta um ingrediente proibido. Um retry só desta receita, no mesmo
 // padrão de ensurePantryRecipeBlenderLimits; se continuar violando (ou o
 // retry falhar), a receita é descartada (null).
@@ -933,7 +936,7 @@ interface PantryGeneratedRecipes {
   generatedCount: number;
   /** Descartadas por dieta/gelo no Lite (CP-1.1.9: para escolher o código de erro). */
   restrictionDiscards: number;
-  /** Descartadas por limite físico (proteína ou volume). */
+  /** Descartadas por limite físico (volume). */
   blenderLimitDiscards: number;
   /** Perdidas porque a nova tentativa falhou no provedor de IA (não julgadas). */
   aiUnavailableDiscards: number;
@@ -1019,7 +1022,9 @@ async function generatePantryRecipes(
           return { recipe: null, discardedBy: 'blenderLimit' };
         }
 
-        return { recipe: restrictedRecipe };
+        // CP-B2: checagem objetiva dos passos e a marcação de água fora da foto.
+        const stepChecked = applyRecipeStepCheck(restrictedRecipe, user.blendiModel, '[pantryScanner]');
+        return { recipe: markWaterNotInPhoto(stepChecked, ingredients) };
       })
     );
 
@@ -1113,7 +1118,6 @@ async function analyzePantryWithinBudget(
     const imageSizeKb = calculateImageSizeKb(imageBase64);
 
     console.info('[pantryScanner] analyze request', {
-      userId,
       mimeType,
       imageSizeKb,
     });
@@ -1147,7 +1151,7 @@ async function analyzePantryWithinBudget(
       const visionResponse = await callVisionAi({
         imageBase64,
         mimeType,
-        prompt: buildPantryAnalysisPrompt(),
+        prompt: buildPantryAnalysisPrompt(currentUser.locale),
       });
 
       visionResponseContent = visionResponse.content;

@@ -21,7 +21,9 @@
 
 const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number]> = [
   // Ordem importa: frases mais longas primeiro.
-  [/^(fl\.?\s*oz|fluid\s+ounces?|onças?\s+fluidas?)\b/, 29.5735],
+  // CP-B2: o texto já chega sem acento (normalize), então "onça" vira
+  // "onca" — antes a regex esperava "ç" e "onça fluida" nunca era lida.
+  [/^(fl\.?\s*oz|fluid\s+ounces?|oncas?\s+fluidas?)\b/, 29.5735],
   [/^(colher(es)?\s+de\s+sopa|tablespoons?|tbsps?|tbs|cs)\b/, 14.787],
   [/^(colher(es)?\s+de\s+cha|colher(es)?\s+de\s+cafe|teaspoons?|tsps?|cc)\b/, 4.929],
   [/^(colher(es)?)\b/, 4.929],
@@ -33,7 +35,7 @@ const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number]> = [
   [/^(miligramas?|milligrams?|mg)\b/, 0.001],
   [/^(quilogramas?|quilos?|kilograms?|kgs?)\b/, 1000],
   [/^(gramas?|grams?|gr|g)\b/, 1],
-  [/^(onças?|ounces?|oz)\b/, 28.35],
+  [/^(oncas?|ounces?|oz)\b/, 28.35],
   [/^(libras?|pounds?|lbs?)\b/, 453.6],
 ];
 
@@ -46,7 +48,15 @@ const UNICODE_FRACTIONS: Record<string, number> = {
 const NUMBER_PATTERN = /(\d+\s+\d+\/\d+|\d+\/\d+|\d*[¼½¾⅓⅔⅛]|\d+(?:[.,]\d+)?)/;
 
 function normalize(text: string): string {
-  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    // "1 colher (sopa)" = "1 colher de sopa": o tipo da colher entre
+    // parênteses não é uma medida e não pode ser descartado (CP-B2).
+    .replace(/\b(colher(?:es)?)\s*\((sopa|cha|cafe)\)/g, '$1 de $2');
 }
 
 function parseNumber(raw: string): number | null {
@@ -75,7 +85,8 @@ function measure(text: string): number | null {
   const quantity = parseNumber(match[1]);
   if (quantity === null || quantity < 0) return null;
 
-  const rest = match[3] ?? '';
+  // "1/4 de xícara", "2 colheres de sopa": o "de" entre número e unidade.
+  const rest = (match[3] ?? '').replace(/^de\s+/, '');
   for (const [pattern, mlPerUnit] of UNIT_TO_ML) {
     if (pattern.test(rest)) {
       return quantity * mlPerUnit;

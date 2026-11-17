@@ -1,4 +1,5 @@
-// CP-1.1.9 — limite físico do BLENDi (proteína e volume) no Pantry Scanner:
+// CP-1.1.9 — limite físico do BLENDi no Pantry Scanner (CP-B2: só o volume;
+// o teto de proteína saiu):
 // por receita, um retry e, se continuar acima do limite, a receita é
 // descartada. Todas descartadas só pelo limite → 422 scanner/blender-limit-unmet
 // (scan devolvido, sem XP); se alguma caiu pela dieta, o código continua o da
@@ -67,8 +68,8 @@ const callAiMock = mock.fn(async ({ messages }: CallAiInput) => {
     throw generationError;
   }
 
-  // CP-1.1.9: retry do limite físico (proteína/volume), escolhido pelo título.
-  if (last.includes('physical protein guardrail') || last.includes('physical volume')) {
+  // CP-1.1.9: retry do limite físico (CP-B2: só volume), escolhido pelo título.
+  if (last.includes('physical volume')) {
     const previous = JSON.parse(messages[messages.length - 2].content) as { title: string };
     const answer = limitRetryByTitle[previous.title];
     if (answer instanceof Error) throw answer;
@@ -211,9 +212,27 @@ beforeEach(() => {
 });
 
 
-// 40*4 + 20*4 + 5*9 = 285 kcal (consistente)
+// CP-B2: "heavy" passou a ser acima do VOLUME (500 ml de leite de aveia);
+// antes era acima da proteína (40 g no Lite), que não é mais limite.
 function heavy(title: string) {
-  return { ...recipe(title, 'Oats'), macros: { protein: 40, carbs: 20, fat: 5, calories: 285 } };
+  return {
+    ...recipe(title, 'Oats'),
+    ingredients: [
+      { name: 'Oats', amount: '40 g' },
+      { name: 'Oat milk', amount: '500 ml' },
+    ],
+  };
+}
+// 70*4 + 25*4 + 8*9 = 452 kcal (consistente); 90 g + 300 ml = 390 ml.
+function highProtein(title: string) {
+  return {
+    ...recipe(title, 'Whey protein isolate'),
+    ingredients: [
+      { name: 'Whey protein isolate', amount: '90 g' },
+      { name: 'Milk', amount: '300 ml' },
+    ],
+    macros: { protein: 70, carbs: 25, fat: 8, calories: 452 },
+  };
 }
 function bulky(title: string) {
   return {
@@ -228,11 +247,22 @@ function bulky(title: string) {
 
 describe('Pantry Scanner — limite físico do BLENDi (CP-1.1.9)', () => {
   beforeEach(() => {
-    fakeUser.blendiModel = 'Lite'; // 35 g, 400 ml (13,5 oz)
+    fakeUser.blendiModel = 'Lite'; // 400 ml (13,5 oz)
     fakeUser.dietaryPreferences = [];
   });
 
-  it('uma acima da proteína, retry resolve: as duas entregues', async () => {
+  it('70 g de proteína dentro do volume: entregue no Lite, sem nova tentativa', async () => {
+    initialRecipes = [recipe('Oat Banana', 'Oats'), highProtein('Whey Max')];
+
+    const res = await analyze();
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    const data = res.body?.data as { recipes: Array<{ title: string }> };
+    assert.deepEqual(data.recipes.map(r => r.title), ['Oat Banana', 'Whey Max']);
+  });
+
+  it('uma acima do volume, retry resolve: as duas entregues', async () => {
     initialRecipes = [recipe('Oat Banana', 'Oats'), heavy('Heavy')];
     limitRetryByTitle = { Heavy: recipe('Heavy fixed', 'Oats') };
 

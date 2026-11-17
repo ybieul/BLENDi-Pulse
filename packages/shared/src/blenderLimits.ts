@@ -15,13 +15,18 @@
 // Histórico: até o CP-1.1.9 os ml e os fl oz eram números soltos que não
 // batiam (400 ml × 17,5 oz; 600 ml × 21 oz). Uma versão intermediária do
 // CP-1.1.9 derivou os ml dos fl oz (518/621 ml) — corrigida pelo Jon.
+//
+// CP-B2: o VOLUME é o único limite físico. O teto de proteína por modelo
+// (maxProteinGrams 35/45/55 g) saiu: foi criado por nós e não refletia o
+// hardware (3 scoops de whey ≈ 70 g de proteína em ~90 g de pó + 300 ml de
+// leite ≈ 390 ml cabem no Lite). Macros e calorias seguem o pedido da
+// pessoa, desde que caibam no copo.
 
 export type BlenderModel = 'Lite' | 'ProPlus' | 'Steel';
 
 export interface BlenderLimit {
   maxVolumeMl: number;
   maxVolumeOz: number;
-  maxProteinGrams: number;
 }
 
 /** 1 fl oz americano em ml. */
@@ -29,17 +34,16 @@ export const ML_PER_US_FLUID_OUNCE = 29.5735;
 
 const TENTHS = 10;
 
-function blenderLimit(maxVolumeMl: number, maxProteinGrams: number): BlenderLimit {
+function blenderLimit(maxVolumeMl: number): BlenderLimit {
   return {
     maxVolumeMl,
     // Arredondado para baixo: maxVolumeOz × ML_PER_US_FLUID_OUNCE ≤ maxVolumeMl.
     maxVolumeOz: Math.floor((maxVolumeMl / ML_PER_US_FLUID_OUNCE) * TENTHS) / TENTHS,
-    maxProteinGrams,
   };
 }
 
 export const BLENDER_LIMITS: Readonly<Record<BlenderModel, BlenderLimit>> = {
-  Lite: blenderLimit(400, 35), // 13,5 oz
-  ProPlus: blenderLimit(400, 45), // 13,5 oz
-  Steel: blenderLimit(600, 55), // 20,2 oz
+  Lite: blenderLimit(400), // 13,5 oz
+  ProPlus: blenderLimit(400), // 13,5 oz
+  Steel: blenderLimit(600), // 20,2 oz
 };

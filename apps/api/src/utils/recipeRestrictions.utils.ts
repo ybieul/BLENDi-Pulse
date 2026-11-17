@@ -67,7 +67,10 @@ import type { BlendiModel, DietaryPreference } from '../models/User';
 
 // ─── Tipos públicos ──────────────────────────────────────────────────────────
 
-/** Restrição de hardware: o BLENDi Lite não pode receber gelo. */
+/**
+ * Restrição de hardware: o BLENDi Lite não pode receber gelo nem nada
+ * congelado (CP-B2, decisão do Jon). O id 'lite_no_ice' ficou o mesmo.
+ */
 export const LITE_NO_ICE_RESTRICTION = 'lite_no_ice' as const;
 
 export type RecipeRestriction = DietaryPreference | typeof LITE_NO_ICE_RESTRICTION;
@@ -110,6 +113,12 @@ interface RestrictedTerm {
    * ("nut-free granola", "granola sem castanhas").
    */
   allowedWith?: { before?: readonly string[]; after?: readonly string[] };
+  /**
+   * Quantos tokens podem ficar entre a negação e o termo (padrão 0). CP-B2:
+   * adjetivo depois do nome em pt — "sem fruta congelada", "não use banana
+   * congelada" negam "congelada".
+   */
+  negationLookback?: number;
 }
 
 interface RestrictionRules {
@@ -448,12 +457,37 @@ const NO_ADDED_SUGAR_RULES: RestrictionRules = {
   ],
 };
 
+/** Termos de gelo (en e pt-BR). Ver LITE_ICE_RULES. */
+export const LITE_ICE_TERMS = { en: ['ice'], pt: ['gelo'] } as const;
+
 /**
- * Gelo no BLENDi Lite (inclui contas "Other or older model" e "No BLENDi
- * yet", que gravam blendiModel "Lite"). Só gelo: fruta congelada continua
- * permitida.
+ * Termos de ingrediente congelado (CP-B2). "congelados/congeladas" e
+ * "frozen fruits" caem pelo singular; "congele"/"congelar"/"freeze" pegam a
+ * instrução de congelar um ingrediente antes de bater. "descongelado",
+ * "congelador" e "freezer" são outros tokens e não casam.
+ */
+export const LITE_FROZEN_TERMS = {
+  en: ['frozen', 'freeze'],
+  pt: ['congelado', 'congelada', 'congele', 'congelar'],
+} as const;
+
+/** Negação a até 1 token de distância (o nome entre a negação e o adjetivo). */
+const FROZEN_NEGATION_LOOKBACK = 1;
+
+function frozenTerms(phrases: readonly string[]): RestrictedTerm[] {
+  return phrases.map(phrase => ({ phrase, negationLookback: FROZEN_NEGATION_LOOKBACK }));
+}
+
+/**
+ * Gelo e congelados no BLENDi Lite (inclui contas "Other or older model" e
+ * "No BLENDi yet", que gravam blendiModel "Lite").
  *
- * Decisões:
+ * Histórico: até o CP-B1 era "só gelo: fruta congelada continua permitida".
+ * CP-B2: o Jon confirmou que o Lite NÃO pode receber nada congelado (fruta
+ * congelada, iogurte congelado...) — os termos de congelado entraram aqui,
+ * com a mesma nova tentativa e o mesmo bloqueio do gelo.
+ *
+ * Decisões (mantidas):
  * - "ice cream" vira um token só ("icecream") antes da busca: sorvete não é
  *   gelo (para dairy_free/vegan continua sendo laticínio).
  * - "iced coffee", "iced tea", "café gelado", "água gelada": NÃO são gelo —
@@ -463,10 +497,13 @@ const NO_ADDED_SUGAR_RULES: RestrictionRules = {
  *   "serve over ice": SÃO gelo — cubos congelados vão para o copo ou para o
  *   jarro, e o brief proíbe sugerir gelo ao Lite.
  * - "sem gelo", "without ice", "no ice needed": negação, não é violação.
+ * - "sem fruta congelada", "without frozen fruit": negação (congelado aceita
+ *   1 token entre a negação e o termo).
+ * - A blendInstruction continua com negação por frase (regra 7).
  */
 const LITE_ICE_RULES: RestrictionRules = {
-  en: terms(['ice']),
-  pt: terms(['gelo']),
+  en: [...terms(LITE_ICE_TERMS.en), ...frozenTerms(LITE_FROZEN_TERMS.en)],
+  pt: [...terms(LITE_ICE_TERMS.pt), ...frozenTerms(LITE_FROZEN_TERMS.pt)],
   exceptions: ['ice cold'],
 };
 
@@ -710,6 +747,7 @@ function endsWithPhrase(tokens: readonly string[], end: number, phrase: readonly
 // ─── Regras compiladas ───────────────────────────────────────────────────────
 
 interface CompiledTerm {
+  negationLookback: number;
   canonical: string;
   tokens: string[];
   isEnglish: boolean;
@@ -731,6 +769,7 @@ function compileRules(rules: RestrictionRules): CompiledRules {
     isEnglish,
     ...(term.neutralizedBy ? { neutralizedBy: term.neutralizedBy } : {}),
     qualifierLookback: term.qualifierLookback ?? 1,
+    negationLookback: term.negationLookback ?? 0,
     allowedBefore: (term.allowedWith?.before ?? []).map(phraseTokens),
     allowedAfter: (term.allowedWith?.after ?? []).map(phraseTokens),
   });
@@ -780,7 +819,16 @@ function isNegated(tokens: readonly string[], start: number, end: number, term: 
     ? [...COMPILED_NEGATION_PREFIXES, ...COMPILED_EN_ONLY_NEGATION_PREFIXES]
     : COMPILED_NEGATION_PREFIXES;
 
-  const prefixEnds = NEGATION_ARTICLES.has(tokens[start - 1] ?? '') ? [start, start - 1] : [start];
+  // Onde a negação pode terminar: colada ao termo ou, com negationLookback,
+  // até N tokens antes (sem atravessar conjunção). Um artigo entre a
+  // negação e o termo/nome é aceito ("sem o gelo", "sem a fruta congelada").
+  const prefixEnds: number[] = [];
+  for (let gap = 0; gap <= term.negationLookback; gap += 1) {
+    const end = start - gap;
+    if (gap > 0 && QUALIFIER_STOP_TOKENS.has(tokens[end] ?? '')) break;
+    prefixEnds.push(end);
+    if (NEGATION_ARTICLES.has(tokens[end - 1] ?? '')) prefixEnds.push(end - 1);
+  }
 
   if (prefixEnds.some(prefixEnd => prefixes.some(prefix => endsWithPhrase(tokens, prefixEnd, prefix)))) {
     return true;
@@ -953,6 +1001,21 @@ export function validateRecipeRestrictions(
   return violations.length === 0 ? { compliant: true } : { compliant: false, violations };
 }
 
+/**
+ * CP-B2: o texto cita gelo ou ingrediente congelado (mesmas regras do Lite:
+ * negação, "ice cream", "iced coffee"...). Usado pela checagem objetiva dos
+ * passos (recipeSteps.utils.ts) para saber se a receita tem o que pede
+ * pulseCount.
+ */
+export function mentionsIceOrFrozen(text: string): boolean {
+  return findViolatingTerm(text, COMPILED_RULES.lite_no_ice, { sentenceNegation: false }) !== null;
+}
+
+/** CP-B2: o termo canônico de uma violação lite_no_ice é de gelo (não de congelado). */
+export function isIceTerm(term: string): boolean {
+  return (LITE_ICE_TERMS.en as readonly string[]).includes(term) || (LITE_ICE_TERMS.pt as readonly string[]).includes(term);
+}
+
 /** Versão para log: só restrição, termo e campo — sem texto da receita nem usuário. */
 export function summarizeRestrictionViolations(
   violations: readonly RecipeRestrictionViolation[]
@@ -965,7 +1028,7 @@ const RESTRICTION_LABELS: Record<RecipeRestriction, string> = {
   vegan: 'vegan',
   dairy_free: 'dairy-free',
   no_added_sugar: 'no added sugar',
-  lite_no_ice: 'no ice (the BLENDi Lite cannot blend ice)',
+  lite_no_ice: 'no ice and no frozen ingredients (the BLENDi Lite cannot blend ice or anything frozen)',
 };
 
 function describeViolationLocation(

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { RECIPE_CAPACITY_NOTICE_MAX_LENGTH } from '../recipeContent';
+
 const PULSE_AI_MESSAGE_MAX = 500;
 
 export const pulseAiChatSchema = z.object({
@@ -30,6 +32,17 @@ export interface PulseAiRecipe {
   tip?: string;
   hasSubstitutes: boolean;
   macrosValidated?: boolean;
+  /**
+   * CP-B2: preenchido pela IA só quando o pedido da pessoa não coube no copo
+   * e foi ajustado — frase curta, no idioma da pessoa, com o que foi pedido,
+   * o que foi possível e por quê. O app mostra como alerta no topo do card.
+   */
+  capacityNotice?: string;
+  /**
+   * CP-B2 (só Pantry Scanner): a receita usa água que não estava entre os
+   * ingredientes detectados na foto. Marcado pelo backend, nunca pela IA.
+   */
+  usesWaterNotInPhoto?: boolean;
   steps?: Array<{
     text: string;
     pulseCount?: number;
@@ -78,6 +91,19 @@ const pulseAiMacrosSchema = z.object({
   }),
 });
 
+// Saneado como os outros textos da receita (trim) e com tamanho máximo.
+// Texto vazio conta como ausente: a IA às vezes devolve "" quando não houve
+// ajuste, e isso não pode invalidar a receita inteira.
+const capacityNoticeSchema = z.preprocess(
+  value => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z
+    .string({ invalid_type_error: 'errors.validation.invalid_option' })
+    .trim()
+    .min(1, 'errors.validation.required')
+    .max(RECIPE_CAPACITY_NOTICE_MAX_LENGTH, 'errors.validation.too_long')
+    .optional()
+) as z.ZodType<string | undefined>;
+
 export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
   title: z
     .string({ required_error: 'errors.validation.required' })
@@ -110,6 +136,10 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
   macrosValidated: z
     .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
     .default(true),
+  capacityNotice: capacityNoticeSchema,
+  usesWaterNotInPhoto: z
+    .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
+    .optional(),
   steps: z.array(pulseAiStepSchema).optional(),
 });
 // ─── Prévia bloqueada (CP-1.1.4a — "Wow Moment Paywall") ─────────────────────

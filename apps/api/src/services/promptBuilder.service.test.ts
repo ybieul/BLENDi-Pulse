@@ -169,10 +169,12 @@ describe('promptBuilder — ingredientes sugeridos em texto fixo × dieta', () =
     );
   });
 
-  it('sem dieta o texto é o de sempre: tabela completa, "almond milk", yogurt, nozes e leite integral', () => {
+  // CP-B2: o exemplo de unidades deixou de citar "almond milk" (virou base
+  // padrão em 22 de 29 receitas do lote 1): agora aveia + água de coco.
+  it('sem dieta: tabela completa, exemplo de unidades sem almond milk, yogurt, nozes e leite integral', () => {
     for (const prompt of Object.values(buildBothPaths())) {
       assert.equal(tableNames(prompt).length, NUTRITION_REFERENCE_TABLE.length);
-      assert.ok(prompt.includes('Use metric units: 90g oats, 240ml almond milk.'));
+      assert.ok(prompt.includes('- Example of amounts: 40g rolled oats, 200ml coconut water.'));
       assert.ok(prompt.includes('(peanut butter, oats, banana, whole milk, nuts)'));
       assert.ok(prompt.includes('Use softer fruit, liquids, yogurt, oats, and similar easy-to-blend ingredients.'));
     }
@@ -192,10 +194,10 @@ describe('promptBuilder — ingredientes sugeridos em texto fixo × dieta', () =
     });
   }
 
-  it('com qualquer dieta o exemplo de unidades deixa de citar almond milk (metric e imperial)', () => {
+  it('com qualquer dieta (ou sem) o exemplo de unidades não cita almond milk; nut_free não cita amêndoas em lugar nenhum fora da regra', () => {
     const metric = buildBothPaths(['nut_free']).pulseAi;
-    assert.ok(metric.includes('Use metric units: 90g oats, 240ml water.'));
-    assert.ok(!lineStarting(metric, '- Use metric units').includes('almond'));
+    assert.ok(metric.includes('- Example of amounts: 40g rolled oats, 200ml coconut water.'));
+    assert.ok(!lineStarting(metric, '- Example of amounts').includes('almond'));
 
     const imperial = buildPulseAiPrompt({
       ...BASE_CONTEXT,
@@ -203,7 +205,13 @@ describe('promptBuilder — ingredientes sugeridos em texto fixo × dieta', () =
       dietaryPreferences: ['vegan'],
       message: 'x',
     }).systemPrompt;
-    assert.ok(imperial.includes('Use imperial units: 1 cup oats, 1 cup water.'));
+    assert.ok(imperial.includes('- Example of amounts: 1/3 cup rolled oats, 3/4 cup coconut water, 1/2 banana, 2 tbsp chia seeds.'));
+
+    // Variedade e exemplos de nome em pt-BR também filtram pela dieta.
+    const ptNutFree = buildPulseAiPrompt({ ...BASE_CONTEXT, locale: 'pt-BR', dietaryPreferences: ['nut_free'], message: 'x' }).systemPrompt;
+    assert.ok(!lineStarting(ptNutFree, '- Translate every ingredient name').includes('amêndoas'));
+    assert.ok(!lineStarting(ptNutFree, '- Choose the liquid base').includes('almond'));
+    assert.ok(!ptNutFree.includes('Do not use almond milk as a default base'));
   });
 
   it('weight goal "gain": a lista de ingredientes densos é filtrada pela dieta', () => {
