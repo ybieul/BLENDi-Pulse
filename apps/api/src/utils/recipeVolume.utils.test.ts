@@ -7,7 +7,8 @@ import { describe, it } from 'node:test';
 import { BLENDER_LIMITS, ML_PER_US_FLUID_OUNCE } from '@blendi/shared';
 
 import { buildBlenderLimitRetryMessage, validateBlenderLimits } from './blenderGuardrail.utils';
-import { estimateAmountVolumeMl, estimateRecipeVolumeMl } from './recipeVolume.utils';
+import { UNIT_WEIGHTS, findUnitIngredientWeight } from './ingredientWeights.utils';
+import { estimateAmountVolumeMl, estimateIngredientVolumeMl, estimateRecipeVolumeMl } from './recipeVolume.utils';
 
 function close(actual: number | null, expected: number) {
   assert.ok(actual !== null && Math.abs(actual - expected) < 0.5, `${actual} ≈ ${expected}`);
@@ -27,8 +28,10 @@ describe('estimateAmountVolumeMl — unidades', () => {
     it(`"${amount}" ≈ ${expected} ml`, () => close(estimateAmountVolumeMl(amount), expected));
   }
 
-  it('unidades sem medida devolvem null', () => {
-    for (const amount of ['1 scoop', '1 medium', '2 kiwis', '1 large banana', '1 green apple', '1 shot', 'a pinch', '', 'to taste']) {
+  it('unidades sem medida e sem item da tabela por unidade devolvem null', () => {
+    // CP-A: "2 kiwis", "1 large banana" e "1 green apple" passaram a contar
+    // (ver o bloco "itens por unidade" abaixo).
+    for (const amount of ['1 scoop', '1 medium', '1 shot', '1 dose', 'a pinch', '', 'to taste']) {
       assert.equal(estimateAmountVolumeMl(amount), null, amount);
     }
   });
@@ -43,8 +46,8 @@ describe('estimateAmountVolumeMl — unidades', () => {
 describe('estimateRecipeVolumeMl — limite inferior', () => {
   it('soma o que dá para medir e lista o resto', () => {
     assert.deepEqual(
-      estimateRecipeVolumeMl([{ name: '', amount: '1 banana' }, { name: '', amount: '250 ml' }, { name: '', amount: '1 scoop (30g)' }]),
-      { estimatedVolumeMl: 280, unmeasured: ['1 banana'] }
+      estimateRecipeVolumeMl([{ name: '', amount: '1 lime' }, { name: '', amount: '250 ml' }, { name: '', amount: '1 scoop (30g)' }]),
+      { estimatedVolumeMl: 280, unmeasured: ['1 lime'] }
     );
   });
 
@@ -173,5 +176,105 @@ describe('validateBlenderLimits — só o volume (CP-B2)', () => {
     assert.ok(!validateBlenderLimits(recipe, 'Lite').withinLimits);
     assert.ok(!validateBlenderLimits(recipe, 'ProPlus').withinLimits);
     assert.ok(validateBlenderLimits(recipe, 'Steel').withinLimits);
+  });
+});
+
+describe('CP-A — itens por unidade (tabela USDA, tamanho médio)', () => {
+  const amountOnly: Array<[string, number]> = [
+    ['1 medium banana', 118], ['1 banana', 118], ['2 bananas', 236], ['1/2 banana', 59], ['½ banana', 59],
+    ['1 1/2 bananas', 177], ['1 large banana', 118], ['2 ripe bananas', 236],
+    ['1 kiwi', 69], ['2 kiwis', 138], ['1 orange', 131], ['1 laranja', 131],
+    ['1 maçã média', 182], ['1 green apple', 182], ['1 pera', 178], ['1 medium pear', 178], ['1 pêssego', 150],
+    ['1 cenoura média', 61], ['1 medium carrot', 61], ['2 tâmaras', 48], ['3 dates', 72],
+    ['1/4 de abacate', 50.25], ['1/4 avocado', 50.25],
+    ['1 talo de aipo', 40], ['1 stalk celery', 40], ['1 celery stalk', 40],
+    ['1 punhado de espinafre', 30], ['1 punhado de couve', 30], ['1 handful spinach', 30], ['1 handful of kale', 30],
+    ['1 dose de espresso', 30], ['1 espresso shot', 30], ['2 shots of espresso', 60],
+  ];
+  for (const [amount, expected] of amountOnly) {
+    it(`"${amount}" ≈ ${expected} ml`, () => close(estimateAmountVolumeMl(amount), expected));
+  }
+
+  // Nome e quantidade separados, como nas receitas da Home e da IA.
+  const withName: Array<[string, string, number]> = [
+    ['Banana', '1 unidade média', 118],
+    ['Banana', '1 medium', 118],
+    ['Frozen banana', '1', 118],
+    ['Banana madura', '1 1/2', 177],
+    ['Tâmaras', '2', 48],
+    ['Dates', '2', 48],
+    ['Kiwi', '2', 138],
+    ['Kiwis', '3 units', 207],
+    ['Green apple', '1 medium', 182],
+    ['Maçã verde', '1 unidade média', 182],
+    ['Avocado', '1/4 fruit', 50.25],
+    ['Abacate', '1/4 fruta', 50.25],
+    ['Celery', '1 stalk', 40],
+    ['Aipo', '1 talo', 40],
+    ['Spinach', '1 handful', 30],
+    ['Couve', '1 punhado', 30],
+    ['Whey protein', '1 scoop', 30],
+    ['Whey protein', '1 dose', 30],
+    ['Chocolate whey protein', '1 scoop', 30],
+    ['Plant protein powder', '1 scoop', 30],
+    ['Proteína vegetal em pó', '1 dose', 30],
+    ['Espresso shot', '1', 30],
+    ['Dose de espresso', '1', 30],
+  ];
+  for (const [name, amount, expected] of withName) {
+    it(`"${amount}" de "${name}" ≈ ${expected} ml`, () => close(estimateIngredientVolumeMl({ name, amount }), expected));
+  }
+
+  it('medida de peso ou volume continua valendo antes da unidade ("1 medium (140g)", "100 g de banana")', () => {
+    close(estimateIngredientVolumeMl({ name: 'Kiwi', amount: '2 medium (140g)' }), 140);
+    close(estimateIngredientVolumeMl({ name: 'Banana', amount: '100 g' }), 100);
+    close(estimateIngredientVolumeMl({ name: 'Banana', amount: '1 cup' }), 150);
+  });
+
+  it('sem casar com a tabela, continua contando 0 (null)', () => {
+    const cases: Array<[string, string]> = [
+      ['Lime', '1'], ['Strawberries', '6 units'], ['Ice cubes', '4'], ['Ginger', '1 piece'],
+      ['', '1 scoop'], ['Cacao powder', '1 scoop'], ['Spinach', '1'], ['Espinafre', '4 folhas'],
+      ['Celery', '1'], ['Banana', '2 slices'], ['Banana', '1 lata'], ['Banana milk', '1'],
+      ['Leite de banana', '1 unidade'], ['Couve-flor', '1 punhado'], ['Coffee', '1 cup (240 ml) brewed'],
+    ];
+    for (const [name, amount] of cases) {
+      const value = estimateIngredientVolumeMl({ name, amount });
+      if (name === 'Coffee') {
+        assert.equal(value, 240, 'medida entre parênteses');
+        continue;
+      }
+      assert.equal(value, null, `"${amount}" de "${name}" → ${value}`);
+    }
+  });
+
+  it('a unidade exigida decide: "1 dose" de proteína é o scoop; "1 dose de pó de maca" não é maçã', () => {
+    assert.equal(findUnitIngredientWeight('dose', 'Proteína de banana')?.id, 'protein_powder');
+    assert.equal(findUnitIngredientWeight('dose de po de maca', ''), null);
+    assert.equal(findUnitIngredientWeight('', 'Maçã')?.id, 'apple');
+  });
+
+  it('um peso por constante, todos positivos', () => {
+    for (const [key, value] of Object.entries(UNIT_WEIGHTS)) {
+      assert.ok(Number.isFinite(value) && value > 0, key);
+    }
+  });
+
+  it('estimateRecipeVolumeMl soma as unidades e só lista o que não casou', () => {
+    assert.deepEqual(
+      estimateRecipeVolumeMl([
+        { name: 'Whey protein', amount: '1 scoop' },
+        { name: 'Banana', amount: '1 medium' },
+        { name: 'Almond milk', amount: '250ml' },
+        { name: 'Lime', amount: '1' },
+      ]),
+      { estimatedVolumeMl: 398, unmeasured: ['1'] }
+    );
+  });
+
+  it('entrada longa com muitas palavras termina rápido', () => {
+    const started = Date.now();
+    estimateIngredientVolumeMl({ name: 'banana '.repeat(5000), amount: `1 ${'medium '.repeat(5000)}` });
+    assert.ok(Date.now() - started < 1000);
   });
 });

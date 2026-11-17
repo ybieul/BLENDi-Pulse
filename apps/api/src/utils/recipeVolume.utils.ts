@@ -11,8 +11,7 @@
 // - Quando o texto traz uma medida entre parênteses ("1 scoop (30g)"), ela
 //   prevalece — é a mais precisa.
 // - Faixa ("2-3 tbsp") usa o menor valor.
-// - O que não dá para medir (unidades: "1 banana", "1 scoop", "1 shot")
-//   entra como 0 e fica listado em `unmeasured`.
+// - O que não dá para medir entra como 0 e fica listado em `unmeasured`.
 //
 // - CP-B3: quantidade em xícara ou colher (de sopa, de chá) de um ingrediente
 //   da tabela de pesos típicos (ingredientWeights.utils.ts: folhas, frutas em
@@ -20,12 +19,20 @@
 //   (1 g = 1 ml), não a medida cheia: "1 cup spinach" = 30 ml, como "30 g de
 //   espinafre". Líquidos e o que não está na tabela contam a medida.
 //
+// - CP-A: quantidade só com número, sem medida ("1 banana", "2 tâmaras",
+//   "1 unidade média" de banana, "1/4 de abacate", "1 talo de aipo", "1
+//   punhado de espinafre", "1 scoop" de proteína, "1 dose de espresso"),
+//   conta o peso típico de 1 unidade da tabela por unidade
+//   (ingredientWeights.utils.ts, USDA, tamanho médio). Sem casar com a tabela,
+//   continua contando 0. É o mesmo leitor para a IA (Pulse AI e Pantry) e
+//   para medir as receitas da Home.
+//
 // Resultado: um LIMITE INFERIOR do volume real. Um total acima do limite do
 // copo é uma violação certa (sem falso positivo por item não medido); um
 // total abaixo pode esconder itens não medidos — risco aceito para não
 // bloquear receitas corretas por falta de unidade.
 
-import { findTypicalIngredientWeight } from './ingredientWeights.utils';
+import { findTypicalIngredientWeight, findUnitIngredientWeight } from './ingredientWeights.utils';
 
 /** Medidas caseiras que podem usar o peso típico do ingrediente (CP-B3). */
 type HouseholdMeasure = 'cup' | 'tbsp' | 'tsp';
@@ -94,9 +101,11 @@ function parseNumber(raw: string): number | null {
 /**
  * Volume em ml de um trecho "<número> <unidade>", ou null se não der para
  * medir. Com `gramsPerCup` (peso típico do ingrediente), xícara e colher
- * contam os gramas (1 g = 1 ml) em vez da medida.
+ * contam os gramas (1 g = 1 ml) em vez da medida. Sem unidade de medida, o
+ * número conta unidades do item da tabela por unidade (CP-A), achado no resto
+ * do texto e no nome do ingrediente.
  */
-function measure(text: string, gramsPerCup: number | null): number | null {
+function measure(text: string, gramsPerCup: number | null, ingredientName: string): number | null {
   const match = text.match(new RegExp(`${NUMBER_PATTERN.source}(?:\\s*[-–a]\\s*${NUMBER_PATTERN.source})?\\s*(.*)$`));
   if (!match) return null;
 
@@ -112,12 +121,15 @@ function measure(text: string, gramsPerCup: number | null): number | null {
         : quantity * mlPerUnit;
     }
   }
-  return null;
+
+  const unitWeight = findUnitIngredientWeight(rest, ingredientName);
+  return unitWeight ? quantity * unitWeight.gramsPerUnit : null;
 }
 
 /**
  * Volume em ml de um `amount` da IA; null quando não é mensurável. Sem o
- * nome do ingrediente, xícara e colher contam a medida cheia.
+ * nome do ingrediente, xícara e colher contam a medida cheia, e a contagem
+ * por unidade só usa o que estiver no próprio `amount` ("2 kiwis").
  */
 export function estimateAmountVolumeMl(amount: string, ingredientName?: string): number | null {
   const text = normalize(amount);
@@ -127,11 +139,11 @@ export function estimateAmountVolumeMl(amount: string, ingredientName?: string):
 
   // Medida entre parênteses prevalece ("1 scoop (30g)", "1 cup (240 ml)").
   for (const inner of text.match(/\(([^)]*)\)/g) ?? []) {
-    const value = measure(inner.slice(1, -1).trim(), gramsPerCup);
+    const value = measure(inner.slice(1, -1).trim(), gramsPerCup, ingredientName ?? '');
     if (value !== null) return value;
   }
 
-  return measure(text.replace(/\([^)]*\)/g, ' ').trim(), gramsPerCup);
+  return measure(text.replace(/\([^)]*\)/g, ' ').trim(), gramsPerCup, ingredientName ?? '');
 }
 
 /** CP-B3: volume em ml de um ingrediente (nome + quantidade); null quando não é mensurável. */

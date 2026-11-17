@@ -38,6 +38,7 @@ import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import type { DietaryPreference } from '../models/User';
 import { isIceTerm, validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
+import { estimateRecipeVolumeMl } from './recipeVolume.utils';
 
 const MOBILE_SRC = path.resolve(__dirname, '../../../mobile/src');
 
@@ -150,6 +151,30 @@ describe('receitas da Home — marcação conferida pelas regras do backend', ()
         assert.equal(recipe.contains.includes('ice'), iceBlocked, `${recipe.nameKey} × Lite`);
       }
     }
+  });
+});
+
+// ─── CP-A: o mesmo leitor de volume da IA mede as receitas da Home ───────────
+
+describe('receitas da Home — leitor de volume (CP-A)', () => {
+  it('mede todos os ingredientes das 100 receitas, com o mesmo volume em en e pt-BR', () => {
+    // O limite de 400 ml NÃO é conferido aqui: a proposta de ajuste
+    // (docs/proposals/cp-a-receitas-home.md) ainda não foi aplicada.
+    const ptBR = JSON.parse(readFileSync(path.join(MOBILE_SRC, 'locales/pt-BR.json'), 'utf8')) as Record<string, unknown>;
+    const translatePt = (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], ptBR));
+    const problems: string[] = [];
+    for (const goal of USER_GOAL_VALUES) {
+      for (const recipe of DAILY_RECIPES[goal]) {
+        const en = estimateRecipeVolumeMl(recipe.ingredients.map(i => ({ name: translate(i.nameKey), amount: translate(i.amountKey) })));
+        const pt = estimateRecipeVolumeMl(recipe.ingredients.map(i => ({ name: translatePt(i.nameKey), amount: translatePt(i.amountKey) })));
+        if (en.unmeasured.length > 0) problems.push(`${recipe.nameKey} en sem medida: ${en.unmeasured.join(', ')}`);
+        if (pt.unmeasured.length > 0) problems.push(`${recipe.nameKey} pt-BR sem medida: ${pt.unmeasured.join(', ')}`);
+        if (en.estimatedVolumeMl !== pt.estimatedVolumeMl) {
+          problems.push(`${recipe.nameKey}: en ${en.estimatedVolumeMl} ml × pt-BR ${pt.estimatedVolumeMl} ml`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
   });
 });
 

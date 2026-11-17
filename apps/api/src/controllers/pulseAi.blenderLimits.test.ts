@@ -358,14 +358,26 @@ describe('Pulse AI — limite físico do BLENDi bloqueia (CP-1.1.9; CP-B2: só v
     assert.equal(res.body?.code, 'pulseai/ai-unavailable');
   });
 
-  it('itens sem medida não contam: "1 banana" + 380 ml fica dentro (sem retry)', async () => {
+  it('item sem medida fora da tabela por unidade não conta: "1 lime" + 380 ml fica dentro (sem retry)', async () => {
+    aiResponses = [
+      recipe({ ingredients: [{ name: 'Lime', amount: '1' }, { name: 'Oat milk', amount: '380 ml' }] }),
+    ];
+    const res = await send(uniqueMessage('lime shake'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+  });
+
+  it('CP-A: "1 large" banana conta 118 ml — com 380 ml passa do Lite (498 ml) e pede nova tentativa', async () => {
     aiResponses = [
       recipe({ ingredients: [{ name: 'Banana', amount: '1 large' }, { name: 'Oat milk', amount: '380 ml' }] }),
+      recipe({ ingredients: [{ name: 'Banana', amount: '1 large' }, { name: 'Oat milk', amount: '250 ml' }] }),
     ];
     const res = await send(uniqueMessage('banana shake'));
 
     assert.equal(res.statusCode, 200);
-    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.match(lastUserMessageOfCall(1), /about 498ml/);
   });
 
   it('retry de restrição que volta acima do volume: barrado na conferência final', async () => {
