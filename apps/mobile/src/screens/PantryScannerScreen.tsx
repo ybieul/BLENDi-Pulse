@@ -39,6 +39,7 @@ import {
 } from '@blendi/shared';
 
 import { useAuthStore } from '../store/auth.store';
+import { resolveBlenderTextKey } from '../utils/blenderText.utils';
 import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
@@ -140,6 +141,11 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const { favorites } = useFavorites();
   const isPro = useAuthStore((state) => state.user?.isPro ?? false);
   const userId = useAuthStore((state) => state.user?.id);
+  const blendiOwnership = useAuthStore((state) => state.user?.blendiOwnership);
+  // CP-B4: quem não tem BLENDi lê os textos neutros (blenderText.utils). O ref
+  // deixa os handlers de erro lerem o valor atual sem entrar nas dependências.
+  const blendiOwnershipRef = useRef(blendiOwnership);
+  blendiOwnershipRef.current = blendiOwnership;
   const isFreeTier = !isPro;
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -303,7 +309,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         if (cancelled) return;
         const message =
           err instanceof PantryScannerServiceError
-            ? t(err.translationKey)
+            ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
             : t('errors.network_internal_server_error');
 
         if (
@@ -373,7 +379,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           if (userId) {
             clearLastPantryPreview(userId);
           }
-          showToast(t(err.translationKey));
+          showToast(t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current)));
         }
       })
       .finally(() => {
@@ -422,7 +428,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
       showToast(
         err instanceof PantryScannerServiceError
-          ? t(err.translationKey)
+          ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
           : t('errors.network_internal_server_error'),
       );
     } finally {

@@ -138,3 +138,28 @@ describe('EditSettingSheet — outros tipos não mudam', () => {
     expect(onConfirm).toHaveBeenCalledWith(80);
   });
 });
+
+describe('EditSettingSheet — título do modelo (CP-B4)', () => {
+  it.each([['blendi'], [undefined]] as const)('posse %s: título atual', (blendiOwnership) => {
+    const { getByText, queryByText } = render(
+      <EditSettingSheet type="model" currentValue="Lite" blendiOwnership={blendiOwnership} onConfirm={onConfirm} onClose={onClose} />
+    );
+    expect(getByText('me.edit.modelTitle')).toBeTruthy();
+    expect(queryByText('me.edit.modelTitleGeneric')).toBeNull();
+  });
+
+  it.each([['other'], ['none']] as const)('posse %s: título neutro', (blendiOwnership) => {
+    const { getByText, queryByText } = render(
+      <EditSettingSheet type="model" currentValue={blendiOwnership} blendiOwnership={blendiOwnership} onConfirm={onConfirm} onClose={onClose} />
+    );
+    expect(getByText('me.edit.modelTitleGeneric')).toBeTruthy();
+    expect(queryByText('me.edit.modelTitle')).toBeNull();
+  });
+
+  it('outros tipos não mudam com a posse', () => {
+    const { getByText } = render(
+      <EditSettingSheet type="goal" currentValue="Muscle" blendiOwnership="none" onConfirm={onConfirm} onClose={onClose} />
+    );
+    expect(getByText('me.edit.goalTitle')).toBeTruthy();
+  });
+});

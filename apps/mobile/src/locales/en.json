@@ -1352,6 +1352,7 @@
     "howWasIt": "How was it?",
     "skip": "Skip",
     "cleanReminder": "Time to clean your BLENDi",
+    "cleanReminderGeneric": "Time to clean your portable blender",
     "markCleaned": "Done ✓",
     "savedLocally": "Blend saved locally — will sync when connected",
     "syncFailed": "Couldn't sync blend after 3 attempts",
@@ -1491,6 +1492,7 @@
   "profile": {
     "fields": {
       "model": "My BLENDi",
+      "modelGeneric": "My blender",
       "goal": "Goal",
       "fat_target": "Fat target"
     },
@@ -1535,6 +1537,7 @@
       "muscle": {
         "welcomeTitle": "What should we blend for muscle today?",
         "welcomeSubtitle": "Ask for protein-forward recipes tuned for strength, recovery, and your BLENDi model.",
+        "welcomeSubtitleGeneric": "Ask for protein-forward recipes tuned for strength, recovery, and your portable blender.",
         "suggestion1": "Build me a post-workout blend with 35g of protein.",
         "suggestion2": "I want a lean-bulk smoothie with oats and peanut butter.",
         "suggestion3": "Create a high-protein breakfast shake without banana.",
@@ -1545,6 +1548,7 @@
       "wellness": {
         "welcomeTitle": "What should we blend for balance today?",
         "welcomeSubtitle": "Ask for everyday recipes focused on balance, easy ingredients, and your BLENDi model.",
+        "welcomeSubtitleGeneric": "Ask for everyday recipes focused on balance, easy ingredients, and your portable blender.",
         "suggestion1": "Make me a balanced smoothie for a busy morning.",
         "suggestion2": "Suggest a low-sugar blend with accessible ingredients.",
         "suggestion3": "Create a creamy everyday wellness shake without yogurt.",
@@ -1555,6 +1559,7 @@
       "energy": {
         "welcomeTitle": "What should we blend for energy today?",
         "welcomeSubtitle": "Ask for performance-focused recipes made for stamina, focus, and your BLENDi model.",
+        "welcomeSubtitleGeneric": "Ask for performance-focused recipes made for stamina, focus, and your portable blender.",
         "suggestion1": "I need a fast pre-workout blend for steady energy.",
         "suggestion2": "Suggest a smoothie for focus and afternoon energy.",
         "suggestion3": "Make me an energizing oat blend without coffee.",
@@ -1565,6 +1570,7 @@
       "weightLoss": {
         "welcomeTitle": "What filling blend should we make today?",
         "welcomeSubtitle": "Ask for high-protein, fiber-rich recipes that fit your calorie target and your BLENDi model.",
+        "welcomeSubtitleGeneric": "Ask for high-protein, fiber-rich recipes that fit your calorie target and your portable blender.",
         "suggestion1": "Make me a filling breakfast shake under 300 kcal with 25g of protein.",
         "suggestion2": "I want a high-fiber berry smoothie with no added sugar.",
         "suggestion3": "Create a high-protein afternoon snack blend without banana.",
@@ -1575,6 +1581,7 @@
       "recovery": {
         "welcomeTitle": "What should we blend for recovery today?",
         "welcomeSubtitle": "Ask for soothing recipes built for repair, digestion, and your BLENDi model.",
+        "welcomeSubtitleGeneric": "Ask for soothing recipes built for repair, digestion, and your portable blender.",
         "suggestion1": "Create a recovery smoothie for sore legs after training.",
         "suggestion2": "I need an easy-to-digest anti-inflammatory blend.",
         "suggestion3": "Suggest a calming recovery shake without dairy.",
@@ -1713,6 +1720,7 @@
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
     "pulseai_dietary_restriction_unmet": "We couldn't put together a recipe that fits your diet and your BLENDi this time. Try asking a different way.",
+    "pulseai_dietary_restriction_unmet_generic": "We couldn't put together a recipe that fits your diet and your portable blender this time. Try asking a different way.",
     "pulseai_preview_expired": "This recipe preview has expired.",
     "pulseai_preview_locked": "Unlock this recipe with Pulse Pro.",
     "macros_inconsistent": "Nutrition values estimated — actual macros may vary.",
@@ -1723,8 +1731,11 @@
     "scanner_vision_unavailable": "Pantry Scanner is temporarily unavailable. Please try again shortly.",
     "scanner_image_processing_failed": "We couldn't prepare this image for analysis. Try another photo.",
     "scanner_dietary_restriction_unmet": "We couldn't put together a recipe that fits your diet and your BLENDi with these ingredients. This scan didn't count toward your limit — try another photo.",
-    "pulseai_blender_limit_unmet": "That recipe didn't fit your BLENDi (too much protein or volume for its cup). Try asking for a smaller serving.",
+    "scanner_dietary_restriction_unmet_generic": "We couldn't put together a recipe that fits your diet and your portable blender with these ingredients. This scan didn't count toward your limit — try another photo.",
+    "pulseai_blender_limit_unmet": "That recipe didn't fit your BLENDi's cup (more volume than it holds). Try asking for a smaller serving.",
+    "pulseai_blender_limit_unmet_generic": "That recipe didn't fit your portable blender's cup (more volume than it holds). Try asking for a smaller serving.",
     "scanner_blender_limit_unmet": "We couldn't fit a recipe from these ingredients into your BLENDi's cup. This scan didn't count toward your limit — try another photo.",
+    "scanner_blender_limit_unmet_generic": "We couldn't fit a recipe from these ingredients into your portable blender's cup. This scan didn't count toward your limit — try another photo.",
     "scanner_preview_expired": "These recipes have expired. Scan again to get new ones.",
     "scanner_preview_locked": "Unlock these recipes with Pulse Pro.",
     "favorites_invalid_data": "This recipe couldn't be saved. Please review the data and try again.",
@@ -1867,6 +1878,7 @@
     },
     "edit": {
       "modelTitle": "Your BLENDi Model",
+      "modelTitleGeneric": "Your Blender",
       "goalTitle": "Your Goal",
       "fatTitle": "Daily Fat Target",
       "unitSystemTitle": "Units",

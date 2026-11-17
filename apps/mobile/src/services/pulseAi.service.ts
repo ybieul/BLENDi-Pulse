@@ -23,7 +23,7 @@ const PULSE_AI_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.1c: a receita violou a dieta (ou trouxe gelo para o Lite) mesmo
   // após o retry e foi barrada no backend.
   'pulseai/dietary-restriction-unmet': 'errors.pulseai_dietary_restriction_unmet',
-  // CP-1.1.9: a receita passou do limite do BLENDi (proteína ou volume) mesmo
+  // CP-1.1.9: a receita passou do limite de volume do copo (CP-B2: só volume) mesmo
   // após o retry e foi barrada no backend.
   'pulseai/blender-limit-unmet': 'errors.pulseai_blender_limit_unmet',
   // CP-1.1.4a: desbloqueio de prévia — expirada/inexistente e ainda não Pro.

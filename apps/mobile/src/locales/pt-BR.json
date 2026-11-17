@@ -1352,6 +1352,7 @@
     "howWasIt": "Como ficou?",
     "skip": "Pular",
     "cleanReminder": "Hora de limpar seu BLENDi",
+    "cleanReminderGeneric": "Hora de limpar seu liquidificador portátil",
     "markCleaned": "Limpo ✓",
     "savedLocally": "Blend salvo localmente — será sincronizado com conexão",
     "syncFailed": "Não foi possível sincronizar blend após 3 tentativas",
@@ -1491,6 +1492,7 @@
   "profile": {
     "fields": {
       "model": "Meu BLENDi",
+      "modelGeneric": "Meu liquidificador",
       "goal": "Objetivo",
       "fat_target": "Meta de gordura"
     },
@@ -1535,6 +1537,7 @@
       "muscle": {
         "welcomeTitle": "O que vamos bater para músculo hoje?",
         "welcomeSubtitle": "Peça receitas ricas em proteína para força, recuperação e ajustadas ao seu modelo BLENDi.",
+        "welcomeSubtitleGeneric": "Peça receitas ricas em proteína para força, recuperação e ajustadas ao seu liquidificador portátil.",
         "suggestion1": "Monte um blend pós-treino com 35g de proteína.",
         "suggestion2": "Quero um smoothie para ganho de massa com aveia e pasta de amendoim.",
         "suggestion3": "Crie um shake de café da manhã rico em proteína sem banana.",
@@ -1545,6 +1548,7 @@
       "wellness": {
         "welcomeTitle": "O que vamos bater para bem-estar hoje?",
         "welcomeSubtitle": "Peça receitas do dia a dia com equilíbrio, ingredientes acessíveis e adaptadas ao seu modelo BLENDi.",
+        "welcomeSubtitleGeneric": "Peça receitas do dia a dia com equilíbrio, ingredientes acessíveis e adaptadas ao seu liquidificador portátil.",
         "suggestion1": "Faça um smoothie equilibrado para uma manhã corrida.",
         "suggestion2": "Sugira um blend com pouco açúcar e ingredientes acessíveis.",
         "suggestion3": "Crie um shake cremoso de bem-estar sem iogurte.",
@@ -1555,6 +1559,7 @@
       "energy": {
         "welcomeTitle": "O que vamos bater para energia hoje?",
         "welcomeSubtitle": "Peça receitas focadas em performance, foco e constância, sempre ajustadas ao seu modelo BLENDi.",
+        "welcomeSubtitleGeneric": "Peça receitas focadas em performance, foco e constância, sempre ajustadas ao seu liquidificador portátil.",
         "suggestion1": "Preciso de um blend pré-treino rápido para energia constante.",
         "suggestion2": "Sugira um smoothie para foco e energia à tarde.",
         "suggestion3": "Faça um blend energético com aveia sem café.",
@@ -1565,6 +1570,7 @@
       "weightLoss": {
         "welcomeTitle": "Que blend que sacia vamos fazer hoje?",
         "welcomeSubtitle": "Peça receitas ricas em proteína e fibra que cabem na sua meta de calorias e no seu modelo BLENDi.",
+        "welcomeSubtitleGeneric": "Peça receitas ricas em proteína e fibra que cabem na sua meta de calorias e no seu liquidificador portátil.",
         "suggestion1": "Monte um shake de café da manhã que sacie, com menos de 300 kcal e 25g de proteína.",
         "suggestion2": "Quero um smoothie de frutas vermelhas rico em fibra e sem açúcar adicionado.",
         "suggestion3": "Crie um blend de lanche da tarde rico em proteína e sem banana.",
@@ -1575,6 +1581,7 @@
       "recovery": {
         "welcomeTitle": "O que vamos bater para recuperação hoje?",
         "welcomeSubtitle": "Peça receitas reconfortantes para reparo, digestão leve e ajustadas ao seu modelo BLENDi.",
+        "welcomeSubtitleGeneric": "Peça receitas reconfortantes para reparo, digestão leve e ajustadas ao seu liquidificador portátil.",
         "suggestion1": "Crie um smoothie de recuperação para pernas doloridas após o treino.",
         "suggestion2": "Preciso de um blend anti-inflamatório fácil de digerir.",
         "suggestion3": "Sugira um shake calmante de recuperação sem laticínios.",
@@ -1713,6 +1720,7 @@
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
     "pulseai_dietary_restriction_unmet": "Não conseguimos montar uma receita que respeite a sua dieta e o seu BLENDi desta vez. Tente pedir de outro jeito.",
+    "pulseai_dietary_restriction_unmet_generic": "Não conseguimos montar uma receita que respeite a sua dieta e o seu liquidificador portátil desta vez. Tente pedir de outro jeito.",
     "pulseai_preview_expired": "A prévia desta receita expirou.",
     "pulseai_preview_locked": "Desbloqueie esta receita com o Pulse Pro.",
     "macros_inconsistent": "Valores nutricionais estimados — macros reais podem variar.",
@@ -1723,8 +1731,11 @@
     "scanner_vision_unavailable": "O Pantry Scanner está indisponível no momento. Tente novamente em instantes.",
     "scanner_image_processing_failed": "Não foi possível preparar esta imagem para análise. Tente outra foto.",
     "scanner_dietary_restriction_unmet": "Não conseguimos montar uma receita que respeite a sua dieta e o seu BLENDi com esses ingredientes. Este scan não contou no seu limite — tente outra foto.",
-    "pulseai_blender_limit_unmet": "Essa receita não coube no seu BLENDi (proteína ou volume acima do que o copo comporta). Tente pedir uma porção menor.",
+    "scanner_dietary_restriction_unmet_generic": "Não conseguimos montar uma receita que respeite a sua dieta e o seu liquidificador portátil com esses ingredientes. Este scan não contou no seu limite — tente outra foto.",
+    "pulseai_blender_limit_unmet": "Essa receita não coube no copo do seu BLENDi (volume acima do que ele comporta). Tente pedir uma porção menor.",
+    "pulseai_blender_limit_unmet_generic": "Essa receita não coube no copo do seu liquidificador portátil (volume acima do que ele comporta). Tente pedir uma porção menor.",
     "scanner_blender_limit_unmet": "Não conseguimos montar uma receita com esses ingredientes que caiba no copo do seu BLENDi. Este scan não contou no seu limite — tente outra foto.",
+    "scanner_blender_limit_unmet_generic": "Não conseguimos montar uma receita com esses ingredientes que caiba no copo do seu liquidificador portátil. Este scan não contou no seu limite — tente outra foto.",
     "scanner_preview_expired": "Estas receitas expiraram. Escaneie de novo para ver novas.",
     "scanner_preview_locked": "Desbloqueie estas receitas com o Pulse Pro.",
     "favorites_invalid_data": "Não foi possível salvar esta receita. Revise os dados e tente novamente.",
@@ -1867,6 +1878,7 @@
     },
     "edit": {
       "modelTitle": "Seu Modelo BLENDi",
+      "modelTitleGeneric": "Seu Liquidificador",
       "goalTitle": "Seu Objetivo",
       "fatTitle": "Meta de Gordura Diária",
       "unitSystemTitle": "Unidades",

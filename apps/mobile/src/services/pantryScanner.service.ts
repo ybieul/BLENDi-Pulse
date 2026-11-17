@@ -36,7 +36,7 @@ const PANTRY_SCANNER_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.1c: todas as receitas violaram a dieta (ou trouxeram gelo para o
   // Lite) mesmo após o retry; o backend devolveu o scan.
   'scanner/dietary-restriction-unmet': 'errors.scanner_dietary_restriction_unmet',
-  // CP-1.1.9: todas as receitas passaram do limite do BLENDi (proteína ou volume).
+  // CP-1.1.9: todas as receitas passaram do limite de volume do copo (CP-B2: só volume).
   'scanner/blender-limit-unmet': 'errors.scanner_blender_limit_unmet',
   // CP-1.1.4b: desbloqueio da prévia — expirada/inexistente e ainda não Pro.
   'scanner/preview-not-found': 'errors.scanner_preview_expired',

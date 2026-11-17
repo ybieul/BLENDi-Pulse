@@ -410,6 +410,10 @@ function buildServingSizeSection(params: {
       ? [
           '- When the user asks for something light or small (a light snack, a small shake, low calorie), follow the request: the minimum above does not apply.',
           '- When the user asks for a specific amount of calories or of any macro (for example "400 kcal", "70 g of protein", "low carb, up to 15 g", "little fat"), deliver that value, with the macros calculated from the real ingredient quantities (see the macro rules below), as long as the recipe fits the cup. Protein, carbs, fat and calories have no limit other than the cup volume.',
+          // CP-B4: pó de proteína ocupa pouco volume; folhas e fruta, muito.
+          '- For a high protein request, get the protein from protein powder (it takes little room in the cup) before bulky foods, respecting the dietary restrictions and the goal.',
+          // CP-B4 (lote 7 ao vivo): "70 g of protein" virou 70 g de whey (~60 g de proteína).
+          '- A requested amount of a macro is the grams of that macro in the macros field, not the weight of an ingredient: protein powder is not 100% protein, so 70 g of protein needs more than 70 g of protein powder.',
           `- If the request cannot fit the cup, build the closest recipe that fits and fill capacityNotice with one short sentence (at most ${RECIPE_CAPACITY_NOTICE_MAX_LENGTH} characters) in ${responseLanguage} saying what was asked, what this recipe delivers and that the cup volume is the reason. Example: "${capacityNoticeExample(textContext)}"`,
           '- When a request does not fit, the closest recipe uses nearly the whole cup (about 90% of the volume budget) with the densest suitable ingredients, so it gets as close as possible to the requested value.',
           '- Fill capacityNotice only when you actually had to reduce what the user asked for. Otherwise omit the field.',

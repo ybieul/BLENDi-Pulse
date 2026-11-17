@@ -62,6 +62,18 @@ export function validateBlenderLimits(
 }
 
 /**
+ * CP-B4: o que reduzir primeiro na nova tentativa por volume. Pó de proteína,
+ * cacau e outros pós entram no copo pelo peso (ingredientWeights.utils.ts) e
+ * quase não somam volume; cortá-los não resolve o volume e derruba o valor
+ * pedido. Exportada para os testes.
+ */
+export const BLENDER_LIMIT_RETRY_REDUCTION_RULES: readonly string[] = [
+  'Reduce first the liquid, then fruit, leafy greens and other bulky ingredients.',
+  'Protein powder, cocoa powder and other powders take very little room in the cup: do not reduce them to fix the volume.',
+  'If the user asked for a specific amount of calories or of a macro (for example 70 g protein or 600 kcal), the corrected recipe must keep that amount whenever it fits the cup.',
+];
+
+/**
  * Nova tentativa por volume (CP-B2): reduzir as quantidades mantendo a ideia
  * da receita e o título (sem palavras de tamanho), e preencher o
  * capacityNotice se o pedido da pessoa deixar de ser atendido.
@@ -70,6 +82,10 @@ export function validateBlenderLimits(
  * com vírgula) e, no imperial, também em xícaras; a regra do peso típico é a
  * mesma do prompt. Sem contexto, o texto em inglês de antes do CP-B3 (com a
  * regra do peso atualizada).
+ *
+ * CP-B4: a ordem de redução (líquido e itens volumosos antes dos pós) e a
+ * regra de manter o valor pedido quando cabe; o capacityNotice só quando o
+ * valor de fato deixa de ser atendido.
  */
 export function buildBlenderLimitRetryMessage(
   violation: BlenderLimitViolation,
@@ -88,8 +104,13 @@ export function buildBlenderLimitRetryMessage(
     // (~300 ml e 140-180 kcal; "900 kcal" virou 425 kcal).
     `Aim for about 90% of the limit (around ${Math.round(volume.maxVolumeMl * 0.9)}ml), not far below it: keep a full serving.`,
     // CP-B3: a mesma conta do backend (ingredientWeights.utils.ts).
-    'Leafy greens, fruit pieces, oats, powders, seeds, nut butters and yogurt measured in cups or spoons count by their typical weight; liquids and any other ingredient measured in cups or spoons count with the full measured volume, so measure protein powder by weight.',
-    "If, after reducing, the recipe no longer delivers what the user explicitly asked for (for example a calorie or macro amount), fill the capacityNotice field with one short sentence, in the user's language, saying what was asked, what this recipe delivers and that the cup's volume is the reason. Otherwise omit capacityNotice.",
+    'Leafy greens, fruit pieces, oats, powders, seeds, nut butters and yogurt measured in cups or spoons count by their typical weight; liquids and any other ingredient measured in cups or spoons count with the full measured volume.',
+    // CP-B4 (lote 6 ao vivo): "70 g de proteína" virou 59 g porque a IA
+    // cortou tudo por igual, inclusive o whey, que quase não ocupa volume.
+    ...BLENDER_LIMIT_RETRY_REDUCTION_RULES,
+    "Only if, after reducing, the recipe still cannot deliver what the user explicitly asked for, fill the capacityNotice field with one short sentence, in the user's language, saying what was asked, what this recipe delivers and that the cup's volume is the reason. If the requested value is delivered, omit capacityNotice.",
+    // CP-B4 (lote 7 ao vivo): 60 g pedidos, 60,1 g entregues e mesmo assim com aviso.
+    'Before returning, compare the corrected macros with the requested value: if they reach it, do not fill capacityNotice, because the notice would tell the user something false.',
   ].join(' ');
 }
 

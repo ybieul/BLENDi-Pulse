@@ -111,6 +111,7 @@ import { getSupplementHistory, type SupplementHistoryData } from "../services/su
 import { generateAndShare } from "../utils/shareCard.utils";
 import { showToast } from "../utils/toast.utils";
 import { getAxiosErrorTranslationKey } from "../utils/error.utils";
+import { resolveBlenderTextKey } from "../utils/blenderText.utils";
 import axios from "axios";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1849,7 +1850,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             </Text>
 
             <SettingRow
-              label={t("profile.fields.model")}
+              label={t(resolveBlenderTextKey("profile.fields.model", displayOwnership))}
               value={modelDisplayName}
               onPress={() => { setEditingType("model"); }}
             />
@@ -2115,6 +2116,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
           type={editingType}
           currentValue={getCurrentEditValue(editingType)}
           currentOtherBlenderModel={editingType === "model" ? displayOtherBlenderModel : null}
+          blendiOwnership={displayOwnership}
           onConfirm={(val, details) => {
             void handleConfirmEdit(val, details);
           }}

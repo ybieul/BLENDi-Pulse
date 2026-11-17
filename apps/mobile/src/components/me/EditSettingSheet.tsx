@@ -21,6 +21,7 @@ import {
   fontWeights,
   OTHER_BLENDER_MODEL_MAX_LENGTH,
   spacing,
+  type BlendiOwnership,
   type Colors,
 } from '@blendi/shared';
 
@@ -31,6 +32,7 @@ import { AuthInput } from '../ui/AuthInput';
 import { SelectionCard } from '../ui/SelectionCard';
 import type { TranslationKey } from '../../locales/i18n';
 import { BLENDER_OPTIONS } from '../../utils/blenderOwnership.utils';
+import { resolveBlenderTextKey } from '../../utils/blenderText.utils';
 
 const SHEET_RADIUS = 24;
 const SUBTITLE_OPACITY = 0.7;
@@ -62,6 +64,8 @@ interface EditSettingSheetProps {
   currentValue: EditSettingValue;
   /** Só para 'model': marca/modelo já salvo, para pré-preencher o campo de "outro modelo". */
   currentOtherBlenderModel?: string | null;
+  /** CP-B4: 'other' e 'none' leem o título neutro (blenderText.utils). */
+  blendiOwnership?: BlendiOwnership;
   onConfirm: (nextValue: EditSettingValue, details?: EditSettingDetails) => void;
   onClose: () => void;
 }
@@ -183,10 +187,12 @@ export function EditSettingSheet({
   type,
   currentValue,
   currentOtherBlenderModel,
+  blendiOwnership,
   onConfirm,
   onClose,
 }: EditSettingSheetProps) {
   const { t } = useAppTranslation();
+  const titleKey = resolveBlenderTextKey(TITLE_KEYS[type], blendiOwnership);
   const colors = useColors();
   const { height } = useWindowDimensions();
 
@@ -387,7 +393,7 @@ export function EditSettingSheet({
       <AuthInput
         keyboardType="numeric"
         onChangeText={setSelectedValue}
-        placeholder={t(TITLE_KEYS[type])}
+        placeholder={t(titleKey)}
         value={selectedValue}
       />
     );
@@ -479,7 +485,7 @@ export function EditSettingSheet({
           >
             <View style={styles.handle} />
 
-            <Text style={styles.title}>{t(TITLE_KEYS[type])}</Text>
+            <Text style={styles.title}>{t(titleKey)}</Text>
             <Text style={styles.subtitle}>{t('me.edit.confirm')}</Text>
 
             <ScrollView

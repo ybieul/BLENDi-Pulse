@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { BlendiOwnership } from '@blendi/shared';
 
 import {
   borderRadius,
@@ -20,6 +21,7 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { markCleaned } from '../../services/user.service';
 import { useAuthStore } from '../../store/auth.store';
+import { resolveBlenderTextKey } from '../../utils/blenderText.utils';
 
 const REMINDER_BACKGROUND = colors.overlay.warning[12];
 const REMINDER_BORDER = colors.overlay.warning[25];
@@ -29,6 +31,7 @@ const REMINDER_STALE_DAYS = 7;
 interface CleaningReminderStoreSnapshot {
   user?: {
     lastCleanedAt?: unknown;
+    blendiOwnership?: BlendiOwnership;
   } | null;
   updateUserProfile: (updates: { lastCleanedAt?: string | null }) => void;
 }
@@ -207,7 +210,7 @@ export function CleaningReminder({ visible }: CleaningReminderProps) {
       <Ionicons color={colors.feedback.warning} name="sparkles-outline" size={20} />
 
       <View style={styles.textContainer}>
-        <Text style={styles.message}>{t('blend.cleanReminder')}</Text>
+        <Text style={styles.message}>{t(resolveBlenderTextKey('blend.cleanReminder', authState.user?.blendiOwnership))}</Text>
 
         <Pressable accessibilityRole="button" onPress={() => { void handleMarkCleaned(); }}>
           <Text style={styles.action}>{t('blend.markCleaned')}</Text>

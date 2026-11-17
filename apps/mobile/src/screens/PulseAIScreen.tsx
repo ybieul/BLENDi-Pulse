@@ -43,6 +43,7 @@ import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 import { useAuthStore } from '../store/auth.store';
+import { resolveBlenderTextKey } from '../utils/blenderText.utils';
 import { useNetworkStore } from '../store/network.store';
 import { usePulseAIStore } from '../store/pulseAi.store';
 import { AuroraBackground } from '../components/ui/AuroraBackground';
@@ -276,6 +277,11 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   const authUser = useAuthStore((state) => state.user);
   const userGoal = authUser?.goal ?? 'Wellness';
   const isPro = authUser?.isPro ?? false;
+  const blendiOwnership = authUser?.blendiOwnership;
+  // CP-B4: quem não tem BLENDi lê os textos neutros (blenderText.utils). O ref
+  // deixa os handlers de erro lerem o valor atual sem entrar nas dependências.
+  const blendiOwnershipRef = useRef(blendiOwnership);
+  blendiOwnershipRef.current = blendiOwnership;
   const isConnected = useNetworkStore((state) => state.isConnected);
   const goalKey = GOAL_I18N_KEYS[userGoal];
 
@@ -315,7 +321,9 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   }, [favoritesCount, badgeScale]);
 
   const welcomeTitle = t(`pulseAi.goals.${goalKey}.welcomeTitle`);
-  const welcomeSubtitle = t(`pulseAi.goals.${goalKey}.welcomeSubtitle`);
+  const welcomeSubtitle = t(
+    resolveBlenderTextKey(`pulseAi.goals.${goalKey}.welcomeSubtitle`, blendiOwnership),
+  );
   const suggestions = GOAL_SUGGESTION_FIELDS.map((field) =>
     t(`pulseAi.goals.${goalKey}.${field}`),
   ) as [string, string, string];
@@ -531,7 +539,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           const limitReachedMessage: ChatMessageItem = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: t(err.translationKey),
+            content: t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current)),
             timestamp: new Date(),
             isError: true,
           };
@@ -549,7 +557,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
 
           const errorText =
             err instanceof PulseAiServiceError
-              ? t(err.translationKey)
+              ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
               : t('errors.network_internal_server_error');
 
           const errorMessage: ChatMessageItem = {
@@ -604,7 +612,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
                 : item,
             ),
           );
-          showToast(t(err.translationKey));
+          showToast(t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current)));
         }
         // 403 (backend ainda não vê o Pro) ou falha de rede: o card continua
         // bloqueado e a próxima mudança tenta de novo.
