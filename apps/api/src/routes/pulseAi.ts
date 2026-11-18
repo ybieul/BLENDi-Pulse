@@ -1,6 +1,12 @@
 import { Router, type IRouter } from 'express';
 
-import { chat, getUsage, invalidateCache, unlockPreview } from '../controllers/pulseAi.controller';
+import {
+  chat,
+  confirmAlcoholAge,
+  getUsage,
+  invalidateCache,
+  unlockPreview,
+} from '../controllers/pulseAi.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const pulseAiRouter: IRouter = Router();
@@ -31,3 +37,10 @@ pulseAiRouter.delete('/cache', authenticate, invalidateCache);
  * AI tem limitador próprio).
  */
 pulseAiRouter.get('/previews/:id', authenticate, unlockPreview);
+
+/**
+ * POST /pulse-ai/age-confirmation  🔒 autenticado
+ * CP-B5: grava uma vez a resposta "Tenho 21 anos ou mais" (body { isAdult })
+ * de quem não tem data de nascimento real. Nunca sobrescreve. Não gasta uso.
+ */
+pulseAiRouter.post('/age-confirmation', authenticate, confirmAlcoholAge);

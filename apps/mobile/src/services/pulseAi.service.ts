@@ -2,6 +2,7 @@ import axios from 'axios';
 import {
   AI_CLIENT_TIMEOUT_MS,
   calculateLevel,
+  type PulseAiAgeConfirmationInput,
   type PulseAiChatInput,
   type PulseAiRecipe,
   type PulseAiRecipePreview,
@@ -29,7 +30,13 @@ const PULSE_AI_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.4a: desbloqueio de prévia — expirada/inexistente e ainda não Pro.
   'pulseai/preview-not-found': 'errors.pulseai_preview_expired',
   'pulseai/preview-locked': 'errors.pulseai_preview_locked',
+  // CP-B5: o pedido tem bebida alcoólica e a conta não tem idade conhecida.
+  // A tela mostra a confirmação única em vez desta mensagem.
+  'pulseai/age-confirmation-required': 'errors.pulseai_age_confirmation_required',
 } as const satisfies Record<string, TranslationKey>;
+
+/** CP-B5: código do backend que pede a confirmação única de idade. */
+export const AGE_CONFIRMATION_REQUIRED_CODE = 'pulseai/age-confirmation-required';
 
 interface ApiErrorResponse {
   success: false;
@@ -45,6 +52,11 @@ interface PulseAiChatResponse {
 interface PulseAiUnlockPreviewResponse {
   success: true;
   data: PulseAiUnlockedPreview;
+}
+
+interface PulseAiAgeConfirmationResponse {
+  success: true;
+  data: { alcoholAgeConfirmed: boolean };
 }
 
 interface PulseAiUsageResponse {
@@ -195,6 +207,22 @@ export async function unlockPreview(previewId: string): Promise<PulseAiUnlockedP
       `/pulse-ai/previews/${encodeURIComponent(previewId)}`,
     );
     return response.data.data;
+  } catch (error) {
+    throw toPulseAiServiceError(error);
+  }
+}
+
+/**
+ * CP-B5: grava a resposta única "Tenho 21 anos ou mais" / "Não". O backend
+ * nunca sobrescreve uma resposta já gravada e devolve a que ficou valendo.
+ * Não gasta mensagem do Pulse AI; o app reenvia o pedido depois.
+ */
+export async function confirmAlcoholAge(isAdult: boolean): Promise<boolean> {
+  const payload: PulseAiAgeConfirmationInput = { isAdult };
+
+  try {
+    const response = await api.post<PulseAiAgeConfirmationResponse>('/pulse-ai/age-confirmation', payload);
+    return response.data.data.alcoholAgeConfirmed;
   } catch (error) {
     throw toPulseAiServiceError(error);
   }

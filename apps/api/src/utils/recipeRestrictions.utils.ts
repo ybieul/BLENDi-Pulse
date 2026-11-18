@@ -60,8 +60,22 @@
 // Na dúvida, nut_free erra para o lado de bloquear (alergia). Nas demais
 // restrições o objetivo é equilíbrio: um falso positivo custa um retry da
 // IA ou um erro para o usuário.
+//
+// CP-B5 — pedido explícito (só Pulse AI, decisão do Gabriel): a pessoa pode
+// furar a própria dieta pedindo um ingrediente na mensagem ATUAL. O backend
+// não confia na IA para isso: roda estas MESMAS regras sobre o texto da
+// mensagem atual (com a mesma normalização e negação: "sem whey" não libera)
+// e só libera, em cada restrição de dieta, os termos que aparecem nela. Na
+// receita, uma ocorrência proibida passa quando é um desses termos ou está
+// colada a um deles no mesmo trecho ("Whey protein powder": "protein
+// powder" encosta em "whey"). Gelo/congelado no Lite e álcool nunca são
+// liberados por pedido. Mensagens anteriores e o histórico não entram.
+//
+// CP-B5 — álcool: 'no_alcohol' só fica ativa quando o controller pede
+// (Pulse AI); o Pantry Scanner não muda. Ela também olha a tip (com negação
+// por frase, como a blendInstruction): o app não sugere álcool nem na dica.
 
-import type { PulseAiRecipe } from '@blendi/shared';
+import { RECIPE_MAX_ALCOHOL_GRAMS, type PulseAiRecipe } from '@blendi/shared';
 
 import type { BlendiModel, DietaryPreference } from '../models/User';
 
@@ -73,9 +87,19 @@ import type { BlendiModel, DietaryPreference } from '../models/User';
  */
 export const LITE_NO_ICE_RESTRICTION = 'lite_no_ice' as const;
 
-export type RecipeRestriction = DietaryPreference | typeof LITE_NO_ICE_RESTRICTION;
+/** CP-B5: receita sem álcool (menor de 21, idade não confirmada ou álcool não pedido). */
+export const NO_ALCOHOL_RESTRICTION = 'no_alcohol' as const;
 
-export type RecipeRestrictionField = 'ingredient' | 'step' | 'blendInstruction';
+/** CP-B5: álcool pedido por quem tem 21+, mas acima do teto ou sem alcoholGrams. */
+export const ALCOHOL_LIMIT_RESTRICTION = 'alcohol_limit' as const;
+
+export type RecipeRestriction =
+  | DietaryPreference
+  | typeof LITE_NO_ICE_RESTRICTION
+  | typeof NO_ALCOHOL_RESTRICTION
+  | typeof ALCOHOL_LIMIT_RESTRICTION;
+
+export type RecipeRestrictionField = 'ingredient' | 'step' | 'blendInstruction' | 'tip' | 'alcoholGrams';
 
 export interface RecipeRestrictionViolation {
   restriction: RecipeRestriction;
@@ -87,10 +111,35 @@ export interface RecipeRestrictionViolation {
 }
 
 export type RecipeRestrictionResult =
-  | { compliant: true }
+  | {
+      compliant: true;
+      /**
+       * CP-B5: índices dos ingredientes que só passaram porque a mensagem
+       * atual pediu (fora da dieta). Ausente quando nenhum.
+       */
+      dietOverrideIngredientIndexes?: number[];
+    }
   | { compliant: false; violations: RecipeRestrictionViolation[] };
 
-export type RestrictedRecipe = Pick<PulseAiRecipe, 'ingredients' | 'blendInstruction' | 'steps'>;
+export type RestrictedRecipe = Pick<PulseAiRecipe, 'ingredients' | 'blendInstruction' | 'steps'> &
+  Partial<Pick<PulseAiRecipe, 'tip' | 'alcoholGrams'>>;
+
+/** CP-B5: política de álcool desta receita (só Pulse AI passa). */
+export type RecipeAlcoholPolicy = 'forbidden' | 'allowed';
+
+export interface RecipeRestrictionOptions {
+  /**
+   * Texto da mensagem ATUAL da pessoa. Libera, nas restrições de dieta, só
+   * os termos proibidos que ela pede explicitamente. Nunca o histórico.
+   */
+  explicitRequest?: string;
+  /**
+   * 'forbidden': nenhum ingrediente alcoólico (nem alcoholGrams > 0).
+   * 'allowed': 21+ que pediu: álcool permitido, com alcoholGrams preenchido
+   * e até RECIPE_MAX_ALCOHOL_GRAMS. Ausente: sem checagem de álcool (Pantry).
+   */
+  alcohol?: RecipeAlcoholPolicy;
+}
 
 // ─── Estrutura das listas ────────────────────────────────────────────────────
 
@@ -507,12 +556,122 @@ const LITE_ICE_RULES: RestrictionRules = {
   exceptions: ['ice cold'],
 };
 
+// "sem álcool", "non-alcoholic", "virgin": a versão sem álcool não é violação.
+const NON_ALCOHOLIC_BEFORE = ['non alcoholic', 'nonalcoholic', 'alcohol free', 'virgin', 'zero alcohol'] as const;
+const NON_ALCOHOLIC_AFTER = [
+  'sem alcool',
+  'zero alcool',
+  'nao alcoolico',
+  'nao alcoolica',
+  'zero',
+  '0',
+  'alcohol free',
+  'non alcoholic',
+] as const;
+
+function alcoholTerms(phrases: readonly string[]): RestrictedTerm[] {
+  return phrases.map(phrase => ({
+    phrase,
+    allowedWith: { before: NON_ALCOHOLIC_BEFORE, after: NON_ALCOHOLIC_AFTER },
+  }));
+}
+
+/**
+ * CP-B5 — bebida alcoólica na receita (rede de segurança do backend; o
+ * PEDIDO de álcool é detectado pela IA, não por lista). Destilados, vinhos,
+ * cervejas e licores comuns em drinks, en e pt-BR. Aroma/extrato/essência
+ * de rum é exceção (sabor, sem álcool relevante); "vinagre de vinho"/"wine
+ * vinegar" também. Gengibre ("ginger" ≠ "gin") e "vinagre" são outros
+ * tokens e não casam. "sake" fica só em pt ("saquê"): em inglês, "for the
+ * sake of" daria falso positivo.
+ */
+const ALCOHOL_RULES: RestrictionRules = {
+  en: alcoholTerms([
+    'alcohol',
+    'alcoholic',
+    'rum',
+    'vodka',
+    'gin',
+    'tequila',
+    'mezcal',
+    'whisky',
+    'whiskey',
+    'bourbon',
+    'scotch',
+    'brandy',
+    'cognac',
+    'cachaca',
+    'pisco',
+    'soju',
+    'liqueur',
+    'schnapps',
+    'absinthe',
+    'amaretto',
+    'kahlua',
+    'baileys',
+    'cointreau',
+    'triple sec',
+    'curacao',
+    'vermouth',
+    'aperol',
+    'campari',
+    'wine',
+    'champagne',
+    'prosecco',
+    'beer',
+    'lager',
+    'stout',
+    'hard cider',
+    'hard seltzer',
+    'liquor',
+  ]),
+  pt: alcoholTerms([
+    'alcool',
+    'alcoolico',
+    'alcoolica',
+    'cachaca',
+    'pinga',
+    'aguardente',
+    'conhaque',
+    'licor',
+    'vinho',
+    'espumante',
+    'champanhe',
+    'cerveja',
+    'chope',
+    'chopp',
+    'sidra',
+    'saque',
+    'vermute',
+    'destilado',
+    'absinto',
+  ]),
+  exceptions: [
+    'rum extract',
+    'rum flavoring',
+    'rum flavor',
+    'extrato de rum',
+    'essencia de rum',
+    'aroma de rum',
+    'wine vinegar',
+    'vinagre de vinho',
+    'alcohol free',
+    'sem alcool',
+    'zero alcool',
+    'non alcoholic',
+    'nonalcoholic',
+  ],
+};
+
 const RULES_BY_RESTRICTION: Record<RecipeRestriction, RestrictionRules> = {
   dairy_free: DAIRY_RULES,
   nut_free: NUT_RULES,
   vegan: VEGAN_RULES,
   no_added_sugar: NO_ADDED_SUGAR_RULES,
   lite_no_ice: LITE_ICE_RULES,
+  no_alcohol: ALCOHOL_RULES,
+  // Mesmos termos: com álcool permitido, serve para saber se a receita tem álcool.
+  alcohol_limit: ALCOHOL_RULES,
 };
 
 // Ordem fixa: nut_free primeiro (alergia), igual ao prompt.
@@ -522,7 +681,17 @@ const RESTRICTION_ORDER: readonly RecipeRestriction[] = [
   'dairy_free',
   'no_added_sugar',
   LITE_NO_ICE_RESTRICTION,
+  NO_ALCOHOL_RESTRICTION,
+  ALCOHOL_LIMIT_RESTRICTION,
 ];
+
+/** CP-B5: restrições que o pedido explícito da mensagem atual pode furar (só a dieta). */
+const OVERRIDABLE_RESTRICTIONS: ReadonlySet<RecipeRestriction> = new Set<RecipeRestriction>([
+  'nut_free',
+  'vegan',
+  'dairy_free',
+  'no_added_sugar',
+]);
 
 // ─── Negação (regra 6) ───────────────────────────────────────────────────────
 
@@ -586,6 +755,13 @@ const NEGATION_PREFIXES: readonly string[] = [
   'nao e indicado para',
   'nao recomendamos',
   'nao recomenda',
+  // CP-B5: negação típica da mensagem da pessoa ("não quero whey") — o
+  // pedido explícito passa pelas mesmas regras e não pode liberar o que ela
+  // recusou.
+  'nao quero',
+  'nao gosto de',
+  'nao pode ter',
+  'nada de',
   // en
   'without',
   'without adding',
@@ -623,6 +799,10 @@ const NEGATION_PREFIXES: readonly string[] = [
   'doesn t handle',
   'not designed for',
   'not built for',
+  'don t want',
+  'dont want',
+  'do not want',
+  'no more',
 ];
 
 // Artigos que podem ficar entre a negação e o termo ("sem o gelo",
@@ -827,6 +1007,8 @@ const COMPILED_RULES: Record<RecipeRestriction, CompiledRules> = {
   vegan: compileRules(RULES_BY_RESTRICTION.vegan),
   no_added_sugar: compileRules(RULES_BY_RESTRICTION.no_added_sugar),
   lite_no_ice: compileRules(RULES_BY_RESTRICTION.lite_no_ice),
+  no_alcohol: compileRules(RULES_BY_RESTRICTION.no_alcohol),
+  alcohol_limit: compileRules(RULES_BY_RESTRICTION.alcohol_limit),
 };
 
 const COMPILED_NEGATION_PREFIXES = NEGATION_PREFIXES.map(phraseTokens);
@@ -942,11 +1124,21 @@ function hasSentenceNegationBefore(tokens: readonly string[], start: number): bo
   return tokens.slice(0, start).some(token => SENTENCE_NEGATION_CUES.has(token));
 }
 
-function findViolatingTerm(
+interface ViolatingOccurrence {
+  canonical: string;
+  segment: readonly string[];
+  start: number;
+  end: number;
+}
+
+/** Todas as ocorrências proibidas do texto, na ordem de busca (termos mais longos primeiro). */
+function findViolatingOccurrences(
   text: string,
   rules: CompiledRules,
   { sentenceNegation }: { sentenceNegation: boolean }
-): string | null {
+): ViolatingOccurrence[] {
+  const occurrences: ViolatingOccurrence[] = [];
+
   for (const tokens of tokenizeSegments(text)) {
     const masked = maskExceptions(tokens, rules.exceptions);
 
@@ -960,12 +1152,66 @@ function findViolatingTerm(
         if (sentenceNegation && hasSentenceNegationBefore(tokens, start)) continue;
         if (isNeutralized(tokens, start, end, term)) continue;
 
-        return term.canonical;
+        occurrences.push({ canonical: term.canonical, segment: tokens, start, end });
       }
     }
   }
 
-  return null;
+  return occurrences;
+}
+
+/** Primeiro termo proibido encontrado no texto, ou null. */
+function findViolatingTerm(
+  text: string,
+  rules: CompiledRules,
+  options: { sentenceNegation: boolean }
+): string | null {
+  return findViolatingOccurrences(text, rules, options)[0]?.canonical ?? null;
+}
+
+// ─── Pedido explícito (CP-B5) ────────────────────────────────────────────────
+
+/** Até quantos tokens de distância uma ocorrência "encosta" num termo pedido. */
+const EXPLICIT_REQUEST_ADJACENCY_GAP = 1;
+
+/**
+ * Termos proibidos de cada restrição de dieta que a mensagem atual pede
+ * explicitamente (mesma normalização e negação do validador).
+ */
+function explicitlyRequestedTerms(
+  explicitRequest: string | undefined,
+  restriction: RecipeRestriction
+): ReadonlySet<string> {
+  if (!explicitRequest?.trim() || !OVERRIDABLE_RESTRICTIONS.has(restriction)) {
+    return new Set();
+  }
+
+  return new Set(
+    findViolatingOccurrences(explicitRequest, COMPILED_RULES[restriction], { sentenceNegation: false })
+      .map(occurrence => occurrence.canonical)
+  );
+}
+
+/**
+ * A ocorrência é o ingrediente pedido: é um termo pedido, ou encosta (até
+ * 1 token, sem atravessar conjunção) num termo pedido do mesmo trecho.
+ */
+function isCoveredByRequest(
+  occurrence: ViolatingOccurrence,
+  requested: readonly ViolatingOccurrence[]
+): boolean {
+  return requested.some(other => {
+    if (other.segment !== occurrence.segment) return false;
+    if (other.start < occurrence.end && occurrence.start < other.end) return true;
+
+    const [left, right] = other.start < occurrence.start ? [other, occurrence] : [occurrence, other];
+    const between = occurrence.segment.slice(left.end, right.start);
+
+    return (
+      between.length <= EXPLICIT_REQUEST_ADJACENCY_GAP &&
+      !between.some(token => QUALIFIER_STOP_TOKENS.has(token))
+    );
+  });
 }
 
 // ─── API pública ─────────────────────────────────────────────────────────────
@@ -973,7 +1219,8 @@ function findViolatingTerm(
 /** Restrições que valem para este usuário, em ordem fixa (nut_free primeiro). */
 export function getActiveRecipeRestrictions(
   dietaryPreferences: readonly DietaryPreference[],
-  blendiModel: BlendiModel
+  blendiModel: BlendiModel,
+  alcohol?: RecipeAlcoholPolicy
 ): RecipeRestriction[] {
   const active = new Set<RecipeRestriction>(dietaryPreferences);
 
@@ -981,20 +1228,37 @@ export function getActiveRecipeRestrictions(
     active.add(LITE_NO_ICE_RESTRICTION);
   }
 
+  if (alcohol === 'forbidden') {
+    active.add(NO_ALCOHOL_RESTRICTION);
+  } else if (alcohol === 'allowed') {
+    active.add(ALCOHOL_LIMIT_RESTRICTION);
+  }
+
   return RESTRICTION_ORDER.filter(restriction => active.has(restriction));
+}
+
+function positiveAlcoholGrams(recipe: RestrictedRecipe): number {
+  const grams = recipe.alcoholGrams;
+  return typeof grams === 'number' && Number.isFinite(grams) && grams > 0 ? grams : 0;
 }
 
 /**
  * Função pura: confere ingredientes, passos e blendInstruction contra a dieta
- * e o modelo do BLENDi. Nunca olha tip nem title.
- * Usuário sem dieta e fora do Lite: sempre conforme, sem nenhuma busca.
+ * e o modelo do BLENDi. Nunca olha o title; a tip só para o álcool (CP-B5).
+ * Usuário sem dieta, fora do Lite e sem política de álcool: sempre conforme,
+ * sem nenhuma busca.
+ *
+ * CP-B5: `options.explicitRequest` (texto da mensagem atual) libera, só nas
+ * restrições de dieta, os ingredientes pedidos nela; `options.alcohol` liga
+ * a checagem de álcool (Pulse AI).
  */
 export function validateRecipeRestrictions(
   recipe: RestrictedRecipe,
   dietaryPreferences: readonly DietaryPreference[],
-  blendiModel: BlendiModel
+  blendiModel: BlendiModel,
+  options: RecipeRestrictionOptions = {}
 ): RecipeRestrictionResult {
-  const restrictions = getActiveRecipeRestrictions(dietaryPreferences, blendiModel);
+  const restrictions = getActiveRecipeRestrictions(dietaryPreferences, blendiModel, options.alcohol);
 
   if (restrictions.length === 0) {
     return { compliant: true };
@@ -1015,27 +1279,88 @@ export function validateRecipeRestrictions(
   ];
 
   const violations: RecipeRestrictionViolation[] = [];
+  const overriddenIngredients = new Set<number>();
 
   for (const restriction of restrictions) {
     const rules = COMPILED_RULES[restriction];
 
-    for (const { field, index, text } of fields) {
-      const term = findViolatingTerm(text, rules, {
-        sentenceNegation: field === 'blendInstruction',
-      });
+    if (restriction === ALCOHOL_LIMIT_RESTRICTION) {
+      violations.push(...findAlcoholLimitViolations(recipe, fields, rules));
+      continue;
+    }
 
-      if (term) {
+    const requestedTerms = explicitlyRequestedTerms(options.explicitRequest, restriction);
+    const restrictionFields = restriction === NO_ALCOHOL_RESTRICTION && recipe.tip?.trim()
+      ? [...fields, { field: 'tip' as const, text: recipe.tip }]
+      : fields;
+
+    for (const { field, index, text } of restrictionFields) {
+      const occurrences = findViolatingOccurrences(text, rules, {
+        sentenceNegation: field === 'blendInstruction' || field === 'tip',
+      });
+      const requested = occurrences.filter(occurrence => requestedTerms.has(occurrence.canonical));
+      const blocking = occurrences.find(occurrence => !isCoveredByRequest(occurrence, requested));
+
+      if (blocking) {
         violations.push({
           restriction,
-          term,
+          term: blocking.canonical,
           field,
           ...(index !== undefined ? { index } : {}),
         });
+      } else if (occurrences.length > 0 && field === 'ingredient' && index !== undefined) {
+        overriddenIngredients.add(index);
       }
+    }
+
+    // Álcool: o número declarado também conta, mesmo sem nome alcoólico.
+    if (restriction === NO_ALCOHOL_RESTRICTION && positiveAlcoholGrams(recipe) > 0) {
+      violations.push({ restriction, term: 'alcoholGrams', field: 'alcoholGrams' });
     }
   }
 
-  return violations.length === 0 ? { compliant: true } : { compliant: false, violations };
+  if (violations.length > 0) {
+    return { compliant: false, violations };
+  }
+
+  return overriddenIngredients.size > 0
+    ? { compliant: true, dietOverrideIngredientIndexes: [...overriddenIngredients].sort((a, b) => a - b) }
+    : { compliant: true };
+}
+
+/**
+ * 21+ que pediu: a receita com álcool precisa declarar alcoholGrams (entra
+ * nas calorias) e ficar no teto de uma dose normal de drink.
+ */
+function findAlcoholLimitViolations(
+  recipe: RestrictedRecipe,
+  fields: ReadonlyArray<{ field: RecipeRestrictionField; index?: number; text: string }>,
+  rules: CompiledRules
+): RecipeRestrictionViolation[] {
+  const grams = positiveAlcoholGrams(recipe);
+
+  if (grams > RECIPE_MAX_ALCOHOL_GRAMS) {
+    return [{ restriction: ALCOHOL_LIMIT_RESTRICTION, term: 'alcoholGrams', field: 'alcoholGrams' }];
+  }
+
+  const alcoholicIngredient = fields.find(({ field, text }) => (
+    field === 'ingredient' && findViolatingTerm(text, rules, { sentenceNegation: false }) !== null
+  ));
+
+  if (alcoholicIngredient && grams === 0) {
+    return [{
+      restriction: ALCOHOL_LIMIT_RESTRICTION,
+      term: 'alcoholGrams',
+      field: 'alcoholGrams',
+    }];
+  }
+
+  return [];
+}
+
+/** CP-B5: o texto cita bebida alcoólica (mesmas regras da checagem de álcool). */
+export function mentionsAlcohol(text: string): boolean {
+  return findViolatingTerm(text, COMPILED_RULES.no_alcohol, { sentenceNegation: false }) !== null;
 }
 
 /**
@@ -1066,6 +1391,8 @@ const RESTRICTION_LABELS: Record<RecipeRestriction, string> = {
   dairy_free: 'dairy-free',
   no_added_sugar: 'no added sugar',
   lite_no_ice: 'no ice and no frozen ingredients (the BLENDi Lite cannot blend ice or anything frozen)',
+  no_alcohol: 'no alcohol (make the alcohol-free version of the drink, keep the same flavor, set alcoholGrams to 0 and never mention alcohol in the tip)',
+  alcohol_limit: `alcohol only at a regular single-drink amount, at most ${RECIPE_MAX_ALCOHOL_GRAMS} g of pure alcohol, with the grams of pure alcohol filled in the alcoholGrams field and counted at 7 kcal per gram in the calories`,
 };
 
 // CP-B3: conta sem BLENDi (mesmas regras do Lite, texto sem marca nem modelo).
@@ -1084,6 +1411,14 @@ function describeViolationLocation(
 
   if (violation.field === 'step' && violation.index !== undefined) {
     return `step ${violation.index + 1}`;
+  }
+
+  if (violation.field === 'tip') {
+    return 'the tip';
+  }
+
+  if (violation.field === 'alcoholGrams') {
+    return 'the alcoholGrams field';
   }
 
   return 'the blend instruction';

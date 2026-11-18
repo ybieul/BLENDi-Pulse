@@ -1935,7 +1935,7 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 When the user has at least one of `dairy_free`, `vegan`, `nut_free` or `no_added_sugar`, the system prompt gets a **"Dietary restrictions (mandatory)"** block (English, like the rest of the prompt) placed after the weight-goal guidance and before the physical blender guardrails, which stay last. An account with no preference (or an old account without the field) gets a byte-identical prompt to before. The block:
 
 - treats every restriction as a hard requirement and states that it takes priority over any ingredient mentioned elsewhere in the prompt;
-- states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`);
+- states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`). **Changed on purpose in CP-B5 for this endpoint:** an ingredient outside the diet that the *current* message names explicitly is included (see *Explicit request, diet override and alcohol* below); a generic order to ignore the rules, medical-clearance claims and text imitating a system message still have no effect. The Pantry Scanner keeps the old text;
 - lists per-diet rules: `nut_free` (no peanuts or tree nuts nor derivatives; listed first because it is usually an allergy), `vegan` (no animal-origin ingredient; protein powder must be plant-based), `dairy_free`, `no_added_sugar` (natural fruit sugar is allowed).
 
 With a diet active, the fixed parts of the prompt also stop *suggesting* ingredients that violate it: the nutrition reference table omits them (a new table entry must be classified in `NUTRITION_ENTRY_RESTRICTIONS`, enforced by a test), the unit example uses `water` instead of `almond milk`, the `gain` guidance and the Lite/Steel hardware hints drop the conflicting examples. This was needed because the pentest showed the explicit priority clause alone still let `Unsweetened almond milk` through for `nut_free` users (2 of 12 generations) — the prompt itself was offering it.
@@ -1947,6 +1947,25 @@ The diet is enforced **by the prompt only**: there is no ingredient validation o
 **Recipe content (CP-B2).** `capacityNotice` (optional string, trimmed, at most `RECIPE_CAPACITY_NOTICE_MAX_LENGTH` = 240 characters; longer AI text is cut at a word with "…") is filled by the AI only when the user's request did not fit the cup and was adjusted; the app shows it as an alert at the top of the card. It travels through cache, conversation and preview unlock; the locked preview (macros only) never carries it, and favorites keep their usual fields. The prompt gives the cup as a volume budget up front, treats daily targets as context (not the target of one blend), asks for at least 250 ml and 180 kcal (`RECIPE_MIN_SERVING_ML` / `RECIPE_MIN_SERVING_KCAL`) when nothing about size is asked, honours explicit calorie/macro requests, forbids size words in the title (`RECIPE_TITLE_SIZE_WORDS`), requires every visible text in the account language (pt-BR imperial: xícara, colher de sopa/chá, `fl oz`, `oz`; imperial quantities as fractions, never decimals), allows inverting the cup only on the Steel, forbids ice and any frozen ingredient on the Lite and asks for varied bases and protein sources.
 
 **Recipe text (CP-B3).** Imperial prompts show the cup limit also in cups, rounded down to a common fraction (Lite and Pro+ "13.5 fl oz, about 1 2/3 cups"; Steel "20.2 fl oz, about 2 1/2 cups"), with the rule that greens, fruit pieces, oats, powders, seeds, nut butters and yogurt in cups count by weight. pt-BR prompts write decimals with a comma ("13,5 fl oz") and ask the AI to do the same in every recipe text (the numeric JSON fields stay numbers). Accounts with `blendiOwnership` `other` or `none` keep the Lite limits and rules (400 ml, no ice, nothing frozen) but get a neutral prompt: no "BLENDi", model or wattage, the device is "your portable blender" / "seu liquidificador portátil", and the AI is told not to name a brand or model. The volume and ice retry messages follow the same locale and neutral text. The Pulse AI cache key gets a `:generic` suffix for those accounts (unchanged for `blendi`), so a recipe written for one is never served to the other.
+
+#### Explicit request, diet override and alcohol (CP-B5)
+
+**Priority order** (single-recipe prompt only, in a new section right after the user context, before the recent blends and the variety rules): 1) the physical limits (cup volume; Lite/no BLENDi: no ice, nothing frozen); 2) what the **current** message explicitly asks for — ingredients, exact amounts ("2 bananas"), flavors (become a real ingredient: vanilla → vanilla extract) and calorie/macro values; 3) the profile diet, only for what was not asked for; 4) goal, targets, variety and history. The variety rules and the recent-blends list now say they apply only to what was not asked for. Earlier messages of the conversation and the blend history are never a request: they never lift the diet nor allow alcohol. What does not fit the cup still becomes the closest recipe with `capacityNotice` (unchanged).
+
+**Diet override (backend-checked).** `validateRecipeRestrictions` (`utils/recipeRestrictions.utils.ts`) receives the current message as `explicitRequest` and runs the *same* restriction rules over it (same normalization, singular/plural and negation — "sem whey", "não quero whey", "I don't want whey" do not count). Only the forbidden terms found there are released, per diet restriction, and only for the occurrence that is that term or touches it in the same phrase ("Whey protein powder"; "Iogurte grego com whey" still blocks the yogurt). Everything else keeps the old retry-then-`422`. Lite ice/frozen and alcohol are never released by a request. Released ingredients are returned as `recipe.dietOverrideIngredients` (names from the recipe, set by the backend only; an AI-sent value is dropped) and the app shows "Includes X, outside your diet, as you asked". The AI is not trusted for this: it has no field to claim an override.
+
+**Alcohol.** The prompt allows alcohol only when the backend marks the user as 21+ (`alcoholOfAge`) **and** the current message explicitly asks for it; the AI never adds it on its own, uses neutral language, a regular single-drink amount (≤ 60 ml of a spirit) and fills `alcoholGrams` (grams of pure alcohol, counted at 7 kcal/g in the macro check — `ALCOHOL_KCAL_PER_GRAM`). The AI returns `alcoholRequested: boolean` (read by the backend from the first valid answer, never sent to the app); there is no keyword list for the *request*. Age: a real `birthDate` (`hasRealBodyProfile: true`, UTC age like the user schema) decides; otherwise the one-time answer `alcoholAgeConfirmed` (see `POST /pulse-ai/age-confirmation`); otherwise unknown. Every account is created with a 30-year placeholder `birthDate`, which is never treated as real.
+
+| Age | Message asks for alcohol | Result |
+|---|---|---|
+| 21+ | yes | recipe with alcohol; `alcohol_limit` check: `alcoholGrams` required and ≤ `RECIPE_MAX_ALCOHOL_GRAMS` (28 g), else retry → `422` |
+| 21+ | no | `no_alcohol` check: any alcoholic ingredient/step/instruction/tip or `alcoholGrams > 0` → retry → `422 pulseai/dietary-restriction-unmet` |
+| under 21 or answered "No" | yes | alcohol-free version, `recipe.alcoholFreeVersion: true` (backend-set) and a short card notice; same `no_alcohol` check |
+| unknown | yes | `428 pulseai/age-confirmation-required`; usage/preview returned, nothing cached, no conversation turn, no XP |
+
+The `no_alcohol` check is a deterministic backend safety net (spirits, wine, beer, liqueurs, en and pt-BR; "rum extract", "cerveja sem álcool", "vinagre de vinho" pass). It only runs on this endpoint; the Pantry Scanner is unchanged.
+
+**Cache key.** Gets a last segment `:alcohol21` (21+) or `:noalcohol` (`alcoholTier` in `generateCacheKey`), because the prompt text differs. Since this endpoint always sends it, entries written before CP-B5 (older prompt) are no longer read and expire by TTL.
 
 #### AI time budget (CP-B1)
 
@@ -1994,9 +2013,31 @@ The preview counter is reset together with `dailyAiUsage` (same `aiUsageResetDat
 | `404` | Authenticated user record not found |
 | `422` | `pulseai/dietary-restriction-unmet`: the recipe still violated the user's diet (or brought ice or, since CP-B2, a frozen ingredient for the Lite) after the retry |
 | `422` | `pulseai/blender-limit-unmet`: the recipe was still above the blender's volume limit after the retry (CP-B2: protein is no longer a limit), or went above it after the later retries (CP-1.1.9) |
+| `428` | `pulseai/age-confirmation-required` (CP-B5): the message asks for an alcoholic drink and the account has no real birth date nor a stored answer. Nothing is spent; the app asks once (`POST /pulse-ai/age-confirmation`) and sends the message again |
 | `429` | Daily Pulse AI limit reached for a non-Pro user, and the daily locked preview was already used |
 | `500` | AI provider returned invalid JSON after retry, or another unexpected server error occurred |
 | `503` | `pulseai/ai-unavailable`: the AI provider is temporarily unavailable — on the main generation (after the Gemini overload retries of step 8), on the invalid-JSON retry, on a blocking retry (blender limits or diet, see step 9b), or because the 55 s request budget ran out (CP-B1) |
+
+### POST /pulse-ai/age-confirmation
+
+CP-B5. Stores, **once**, the answer to "I'm 21 or older" for an account without a real birth date. Never overwrites a stored answer (the update filter requires `alcoholAgeConfirmed` to be missing), so a "No" cannot be flipped by calling again. Does not use Pulse AI quota.
+
+**JWT required:** Yes
+
+**Request body** (`pulseAiAgeConfirmationSchema`, strict)
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `isAdult` | boolean | Yes | `true` = 21 or older, `false` = no |
+
+**Success response** — `200 OK`, `{ "success": true, "data": { "alcoholAgeConfirmed": true } }` with the value that is stored (the earlier one, if any). Writes `alcoholAgeConfirmed` and `alcoholAgeConfirmedAt` on the user.
+
+| Status | Meaning |
+|---|---|
+| `200` | Answer stored, or the earlier answer returned |
+| `400` | `pulseai/invalid-age-confirmation`: missing/non-boolean `isAdult` or extra fields |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
 
 ### GET /pulse-ai/previews/:id
 

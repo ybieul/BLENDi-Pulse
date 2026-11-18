@@ -3,6 +3,9 @@ import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
   AI_REQUEST_BUDGET_MS,
+  ALCOHOL_MIN_AGE_YEARS,
+  RECIPE_DIET_OVERRIDE_MAX_ITEMS,
+  pulseAiAgeConfirmationSchema,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
   toPulseAiRecipePreview,
@@ -41,6 +44,7 @@ import {
 import {
   deleteFromCache,
   generateCacheKey,
+  type AlcoholCacheTier,
   getFromCache,
   invalidateUserCache,
   setInCache,
@@ -49,7 +53,8 @@ import { runWithAiRequestBudget } from '../services/aiRequestBudget.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
-import { prepareAiRecipePayload } from '../utils/aiRecipePayload.utils';
+import { parseAiJson, prepareAiRecipePayload, readAlcoholRequested } from '../utils/aiRecipePayload.utils';
+import { calculateAge } from '../utils/macroCalculation.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
@@ -68,6 +73,8 @@ import {
   buildRecipeRestrictionRetryMessage,
   summarizeRestrictionViolations,
   validateRecipeRestrictions,
+  type RecipeAlcoholPolicy,
+  type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
 
 const DAILY_FREE_LIMIT = 3;
@@ -85,6 +92,10 @@ const DIETARY_RESTRICTION_UNMET_CODE = 'pulseai/dietary-restriction-unmet';
 // CP-1.1.9: receita acima do limite físico do BLENDi mesmo após o retry.
 // CP-B2: só o volume (o teto de proteína saiu).
 const BLENDER_LIMIT_UNMET_CODE = 'pulseai/blender-limit-unmet';
+// CP-B5: a mensagem pediu bebida alcoólica e a conta não tem data de
+// nascimento real nem resposta gravada. Nada é entregue, o uso volta, e o app
+// pergunta uma vez ("Tenho 21 anos ou mais") e reenvia.
+const AGE_CONFIRMATION_REQUIRED_CODE = 'pulseai/age-confirmation-required';
 const CONVERSATION_CONTEXT_WINDOW_MS = 24 * 60 * 60 * 1000;
 // 6 exchanges = 6 user messages + 6 assistant messages, interleaved.
 const CONVERSATION_HISTORY_MESSAGE_LIMIT = 12;
@@ -115,7 +126,11 @@ interface PulseAiUserProfile {
   dailyAiUsage: number;
   aiUsageResetDate: Date;
   isPro: boolean;
+  /** CP-B5: 21+ (data de nascimento real ou confirmação), menor, ou sem resposta. */
+  alcoholAge: AlcoholAgeStatus;
 }
+
+type AlcoholAgeStatus = 'of-age' | 'under-age' | 'unknown';
 
 interface PulseAiCachedResponse {
   recipe: PulseAiRecipe;
@@ -126,6 +141,8 @@ interface PulseAiCachedResponse {
 interface GeneratedPulseAiRecipe {
   recipe: PulseAiRecipe | null;
   aiResponse: AiProviderResponse;
+  /** CP-B5: a IA marcou que a mensagem atual pede bebida alcoólica. */
+  alcoholRequested: boolean;
 }
 
 const pulseAiCachedResponseSchema: z.ZodType<PulseAiCachedResponse> = z.object({
@@ -342,9 +359,31 @@ async function rollbackPulseAiAccessReservation(
   await rollbackPulseAiUsageReservation(user);
 }
 
+/**
+ * CP-B5: idade para álcool. A data de nascimento só conta quando é real
+ * (hasRealBodyProfile): toda conta nasce com o placeholder de 30 anos
+ * (accountDefaults.utils.ts) e, sem esse cuidado, quem nunca informou a data
+ * passaria como 21+. Sem data real, vale a resposta única gravada.
+ */
+export function resolveAlcoholAge(
+  user: { birthDate?: Date | null; hasRealBodyProfile?: boolean | null; alcoholAgeConfirmed?: boolean | null },
+  now: Date = new Date()
+): AlcoholAgeStatus {
+  if (user.hasRealBodyProfile === true && user.birthDate instanceof Date && !Number.isNaN(user.birthDate.getTime())) {
+    return calculateAge(user.birthDate, now) >= ALCOHOL_MIN_AGE_YEARS ? 'of-age' : 'under-age';
+  }
+
+  if (user.alcoholAgeConfirmed === true) return 'of-age';
+  if (user.alcoholAgeConfirmed === false) return 'under-age';
+  return 'unknown';
+}
+
 async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfile | null> {
   const user = await UserModel.findById(userId)
     .select({
+      birthDate: 1,
+      hasRealBodyProfile: 1,
+      alcoholAgeConfirmed: 1,
       blendiModel: 1,
       blendiOwnership: 1,
       goal: 1,
@@ -385,6 +424,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     dailyAiUsage: user.dailyAiUsage ?? 0,
     aiUsageResetDate: user.aiUsageResetDate ?? new Date(),
     isPro: user.isPro ?? false,
+    alcoholAge: resolveAlcoholAge(user),
   };
 }
 
@@ -410,14 +450,17 @@ async function resetDailyAiUsageIfNeeded(user: PulseAiUserProfile): Promise<void
   ).exec();
 }
 
-function parsePulseAiRecipe(content: string): PulseAiRecipe | null {
+function parsePulseAiRecipe(content: string): { recipe: PulseAiRecipe | null; alcoholRequested: boolean } {
   try {
-    const rawPayload: unknown = JSON.parse(content);
+    const rawPayload = parseAiJson(content);
     const parsed = pulseAiRecipeSchema.safeParse(prepareAiRecipePayload(rawPayload));
 
-    return parsed.success ? parsed.data : null;
+    return {
+      recipe: parsed.success ? parsed.data : null,
+      alcoholRequested: parsed.success && readAlcoholRequested(rawPayload),
+    };
   } catch {
-    return null;
+    return { recipe: null, alcoholRequested: false };
   }
 }
 
@@ -435,7 +478,7 @@ async function generatePulseAiRecipe(
   });
 
   return {
-    recipe: parsePulseAiRecipe(aiResponse.content),
+    ...parsePulseAiRecipe(aiResponse.content),
     aiResponse,
   };
 }
@@ -473,7 +516,10 @@ async function ensureBlenderGuardrail(
   });
 
   try {
-    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext);
+    // CP-B5: no chat, o que a mensagem atual pediu fica na quantidade pedida.
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext, {
+      keepExplicitRequest: true,
+    });
     const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
       ...prompt.messages,
       { role: 'assistant', content: JSON.stringify(recipe) },
@@ -548,7 +594,7 @@ async function ensureMacroConsistency(
 }
 
 type RecipeRestrictionEnforcement =
-  | { ok: true; recipe: PulseAiRecipe }
+  | { ok: true; recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[] }
   | { ok: false; failure: EnforcementFailure };
 
 // CP-1.1.1c: última conferência antes de entregar — roda depois do guardrail
@@ -559,15 +605,18 @@ type RecipeRestrictionEnforcement =
 // (CP-1.1.9: responde como IA indisponível, não como dieta). A receita refeita não passa de novo pelos retries de
 // volume/macros; só o flag macrosValidated é
 // recalculado.
+// CP-B5: `options` traz o texto da mensagem ATUAL (libera só o ingrediente
+// fora da dieta pedido nela) e a política de álcool desta receita.
 async function ensureRecipeRestrictions(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
-  user: Pick<PulseAiUserProfile, 'dietaryPreferences' | 'blendiModel'>
+  user: Pick<PulseAiUserProfile, 'dietaryPreferences' | 'blendiModel'>,
+  options: RecipeRestrictionOptions
 ): Promise<RecipeRestrictionEnforcement> {
-  const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel);
+  const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel, options);
 
   if (initialCheck.compliant) {
-    return { ok: true, recipe };
+    return { ok: true, recipe, dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [] };
   }
 
   console.info('[pulseAi.controller] recipe restriction violated, retrying', {
@@ -592,7 +641,8 @@ async function ensureRecipeRestrictions(
     const retriedCheck = validateRecipeRestrictions(
       retried.recipe,
       user.dietaryPreferences,
-      user.blendiModel
+      user.blendiModel,
+      options
     );
 
     if (!retriedCheck.compliant) {
@@ -608,6 +658,7 @@ async function ensureRecipeRestrictions(
         ...retried.recipe,
         macrosValidated: validateMacroConsistency(retried.recipe).macrosValidated,
       },
+      dietOverrideIngredientIndexes: retriedCheck.dietOverrideIngredientIndexes ?? [],
     };
   } catch (error) {
     console.error('[pulseAi.controller] recipe restriction retry failed', {
@@ -617,6 +668,39 @@ async function ensureRecipeRestrictions(
 
     return { ok: false, failure: 'aiUnavailable' };
   }
+}
+
+/**
+ * CP-B5: marcações do backend para o card — ingredientes fora da dieta que a
+ * mensagem atual pediu (pelos índices que o validador liberou) e "versão sem
+ * álcool". Sempre recalculadas: nada disso vem da IA.
+ */
+function withRequestNotices(
+  recipe: PulseAiRecipe,
+  dietOverrideIngredientIndexes: readonly number[],
+  alcoholFreeVersion: boolean
+): PulseAiRecipe {
+  const { dietOverrideIngredients: _previousOverride, alcoholFreeVersion: _previousAlcoholFree, ...rest } = recipe;
+  void _previousOverride;
+  void _previousAlcoholFree;
+
+  const overrideNames = [
+    ...new Set(
+      dietOverrideIngredientIndexes
+        .map(index => recipe.ingredients[index]?.name.trim())
+        .filter((name): name is string => Boolean(name))
+    ),
+  ].slice(0, RECIPE_DIET_OVERRIDE_MAX_ITEMS);
+
+  return {
+    ...rest,
+    ...(overrideNames.length > 0 ? { dietOverrideIngredients: overrideNames } : {}),
+    ...(alcoholFreeVersion ? { alcoholFreeVersion: true } : {}),
+  };
+}
+
+function alcoholCacheTier(user: Pick<PulseAiUserProfile, 'alcoholAge'>): AlcoholCacheTier {
+  return user.alcoholAge === 'of-age' ? 'of-age' : 'not-of-age';
 }
 
 function serializeConversationMessage(message: IConversationMessage): PulseAiApiMessage {
@@ -836,6 +920,8 @@ async function runPulseAiChat(params: {
     aiModel: env.AI_MODEL,
     rawMessage: normalizedMessage,
     dietaryFlags: currentUser.dietaryPreferences,
+    // CP-B5: o prompt muda para quem tem 21+ confirmado.
+    alcoholTier: alcoholCacheTier(currentUser),
   });
 
   const cacheKeyParts = cacheKey.split(':');
@@ -850,11 +936,18 @@ async function runPulseAiChat(params: {
     // CP-1.1.1c: receita do cache também passa pela validação de restrições
     // (pode ter sido gravada antes desta checagem existir). Se violar, a
     // entrada é removida e o fluxo segue como cache inexistente.
+    // CP-B5: a chave tem o hash da mesma mensagem, então o pedido explícito
+    // é o mesmo; com 21+ o álcool da receita gravada passou pela checagem
+    // quando foi pedido (teto e alcoholGrams continuam conferidos).
     const cachedRestrictionCheck = parsedCachedResponse.success
       ? validateRecipeRestrictions(
           parsedCachedResponse.data.recipe,
           currentUser.dietaryPreferences,
-          currentUser.blendiModel
+          currentUser.blendiModel,
+          {
+            explicitRequest: message,
+            alcohol: currentUser.alcoholAge === 'of-age' ? 'allowed' : 'forbidden',
+          }
         )
       : null;
 
@@ -886,6 +979,11 @@ async function runPulseAiChat(params: {
     }
 
     if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant && cachedWithinBlenderLimits) {
+      const cachedRecipe = withRequestNotices(
+        parsedCachedResponse.data.recipe,
+        cachedRestrictionCheck.dietOverrideIngredientIndexes ?? [],
+        parsedCachedResponse.data.recipe.alcoholFreeVersion === true
+      );
       const usageReservation = await reservePulseAiAccess(currentUser);
 
       if (!usageReservation.ok) {
@@ -899,7 +997,7 @@ async function runPulseAiChat(params: {
             conversationId: conversationContext.conversationId,
             userMessage: message,
             userSentAt: requestReceivedAt,
-            recipe: parsedCachedResponse.data.recipe,
+            recipe: cachedRecipe,
           });
         } catch (error) {
           await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -913,7 +1011,7 @@ async function runPulseAiChat(params: {
           userId: currentUser.id,
           userMessage: message,
           userSentAt: requestReceivedAt,
-          recipe: parsedCachedResponse.data.recipe,
+          recipe: cachedRecipe,
         });
       } catch (error) {
         await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -924,7 +1022,7 @@ async function runPulseAiChat(params: {
       triggerPulseAiMissionProgress(currentUser.id, currentUser.timezone);
 
       return successOutcome({
-        recipe: parsedCachedResponse.data.recipe,
+        recipe: cachedRecipe,
         fromCache: true,
         usageRemaining: usageReservation.usageRemaining,
         aiProvider: parsedCachedResponse.data.aiProvider,
@@ -933,7 +1031,7 @@ async function runPulseAiChat(params: {
         leveledUp: xpResult.leveledUp,
         newLevel: xpResult.newLevel,
         conversationId: String(conversationContext.conversationId),
-        macrosValidated: parsedCachedResponse.data.recipe.macrosValidated ?? true,
+        macrosValidated: cachedRecipe.macrosValidated ?? true,
       });
     }
   }
@@ -961,6 +1059,7 @@ async function runPulseAiChat(params: {
       log.recipeName ? [log.recipeName] : []
     )),
     message,
+    alcoholOfAge: currentUser.alcoholAge === 'of-age',
   });
 
   if (conversationContext.historyMessages.length > 0) {
@@ -977,12 +1076,16 @@ async function runPulseAiChat(params: {
 
   let recipe: PulseAiRecipe | null = null;
   let aiResponse: AiProviderResponse | null = null;
+  // CP-B5: lido da primeira receita válida (é sobre a mensagem, não sobre a
+  // receita); as novas tentativas não mudam esse valor.
+  let alcoholRequested = false;
 
   try {
     try {
       const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
       recipe = generatedRecipe.recipe;
       aiResponse = generatedRecipe.aiResponse;
+      alcoholRequested = generatedRecipe.alcoholRequested;
     } catch (error) {
       if (shouldRollbackUsage) {
         await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -1007,6 +1110,7 @@ async function runPulseAiChat(params: {
         ]);
         recipe = regeneratedRecipe.recipe;
         aiResponse = regeneratedRecipe.aiResponse;
+        alcoholRequested = regeneratedRecipe.alcoholRequested;
       } catch (error) {
         if (shouldRollbackUsage) {
           await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -1048,6 +1152,22 @@ async function runPulseAiChat(params: {
     const sendBlenderLimitUnmet = () =>
       sendEnforcementFailure('unmet', BLENDER_LIMIT_UNMET_CODE, 'Pulse AI could not generate a recipe within the blender limits.');
 
+    // CP-B5: pedido de álcool sem idade conhecida. Nada é entregue nem
+    // gravado e o uso volta (o reenvio depois da confirmação gasta um só).
+    if (alcoholRequested && currentUser.alcoholAge === 'unknown') {
+      if (shouldRollbackUsage) {
+        await rollbackPulseAiAccessReservation(currentUser, usageReservation);
+        shouldRollbackUsage = false;
+      }
+
+      console.info('[pulseAi.controller] alcohol requested without a known age, asking for confirmation');
+      return errorOutcome(428, AGE_CONFIRMATION_REQUIRED_CODE, 'Age confirmation is required for this request.');
+    }
+
+    const alcoholPolicy: RecipeAlcoholPolicy =
+      alcoholRequested && currentUser.alcoholAge === 'of-age' ? 'allowed' : 'forbidden';
+    const alcoholFreeVersion = alcoholRequested && currentUser.alcoholAge === 'under-age';
+
     const blenderLimitEnforcement = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
 
     if (!blenderLimitEnforcement.ok) {
@@ -1060,7 +1180,10 @@ async function runPulseAiChat(params: {
 
     recipe = await ensureMacroConsistency(blenderLimitEnforcement.recipe, prompt);
 
-    const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser);
+    const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser, {
+      explicitRequest: message,
+      alcohol: alcoholPolicy,
+    });
 
     if (!restrictionEnforcement.ok) {
       return sendEnforcementFailure(
@@ -1070,7 +1193,11 @@ async function runPulseAiChat(params: {
       );
     }
 
-    recipe = restrictionEnforcement.recipe;
+    recipe = withRequestNotices(
+      restrictionEnforcement.recipe,
+      restrictionEnforcement.dietOverrideIngredientIndexes,
+      alcoholFreeVersion
+    );
 
     // Conferência final do limite físico (CP-1.1.9): os retries de macros e de
     // restrições refazem a receita e podem passar do limite de novo.
@@ -1119,6 +1246,7 @@ async function runPulseAiChat(params: {
       rawMessage: normalizedMessage,
       dietaryFlags: currentUser.dietaryPreferences,
       genericBlender: isGenericBlender(currentUser.blendiOwnership),
+      alcoholTier: alcoholCacheTier(currentUser),
       response: {
         recipe,
         aiProvider: aiResponse.provider,
@@ -1283,6 +1411,60 @@ export async function invalidateCache(
     next(error);
   }
 }
+// ─── Confirmação de idade para álcool (CP-B5) ────────────────────────────────
+
+/**
+ * POST /pulse-ai/age-confirmation — grava UMA vez a resposta à pergunta
+ * "Tenho 21 anos ou mais". Não sobrescreve uma resposta já gravada (o filtro
+ * do update exige o campo ausente): quem disse "Não" não vira 21+ tocando de
+ * novo. Responde com o valor que ficou gravado. Não gasta uso do Pulse AI.
+ */
+export async function confirmAlcoholAge(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const parsed = pulseAiAgeConfirmationSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: 'pulseai/invalid-age-confirmation',
+        message: 'Invalid age confirmation.',
+        errors: formatZodErrors(parsed.error),
+      });
+      return;
+    }
+
+    await UserModel.updateOne(
+      { _id: userId, alcoholAgeConfirmed: { $exists: false } },
+      { $set: { alcoholAgeConfirmed: parsed.data.isAdult, alcoholAgeConfirmedAt: new Date() } }
+    ).exec();
+
+    const user = await UserModel.findById(userId).select({ alcoholAgeConfirmed: 1 }).lean().exec();
+
+    if (!user) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { alcoholAgeConfirmed: user.alcoholAgeConfirmed === true },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // ─── Desbloqueio de prévia (CP-1.1.4a) ───────────────────────────────────────
 
 const lockedPreviewContextSchema = z.object({

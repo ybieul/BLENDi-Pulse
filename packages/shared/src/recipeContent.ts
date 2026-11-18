@@ -43,3 +43,22 @@ export const RECIPE_TITLE_SIZE_WORDS = [
   'reduzido',
   'reduzida',
 ] as const;
+
+// ─── CP-B5: pedido explícito, dieta furada e álcool ─────────────────────────
+
+/** Calorias por grama de álcool puro (etanol), somadas à conferência de macros. */
+export const ALCOHOL_KCAL_PER_GRAM = 7;
+
+/**
+ * Teto de álcool puro numa receita (g): duas doses-padrão americanas (14 g
+ * cada), o equivalente a duas doses de destilado num drink. Acima disso a
+ * receita é refeita (diretriz 1.4.3 da App Store: nada de incentivar consumo
+ * excessivo).
+ */
+export const RECIPE_MAX_ALCOHOL_GRAMS = 28;
+
+/** Idade mínima para receber receita com álcool (EUA). */
+export const ALCOHOL_MIN_AGE_YEARS = 21;
+
+/** Máximo de ingredientes listados no aviso de "fora da sua dieta". */
+export const RECIPE_DIET_OVERRIDE_MAX_ITEMS = 5;

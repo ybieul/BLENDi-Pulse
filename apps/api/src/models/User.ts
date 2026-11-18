@@ -232,6 +232,16 @@ export interface IUser {
    */
   hasRealBodyProfile: boolean;
   /**
+   * CP-B5: resposta única à pergunta "Tenho 21 anos ou mais", feita só a
+   * quem não tem data de nascimento real (hasRealBodyProfile false: o
+   * birthDate é o placeholder de 30 anos da criação de conta). true = 21+,
+   * false = não. Gravada uma vez (POST /pulse-ai/age-confirmation) e nunca
+   * sobrescrita. Com data de nascimento real, a idade calculada prevalece.
+   */
+  alcoholAgeConfirmed?: boolean;
+  /** CP-B5: quando a resposta acima foi gravada. */
+  alcoholAgeConfirmedAt?: Date;
+  /**
    * Quantos scans do Pantry Scanner já foram consumidos no mês corrente.
    * Usado pelo rate limiting atômico do free tier e do Pro.
    */
@@ -758,6 +768,15 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
     hasRealBodyProfile: {
       type: Boolean,
       default: false,
+    },
+    // CP-B5: sem default — ausente = ainda não perguntado.
+    alcoholAgeConfirmed: {
+      type: Boolean,
+      required: false,
+    },
+    alcoholAgeConfirmedAt: {
+      type: Date,
+      required: false,
     },
     scanCount: {
       type: Number,

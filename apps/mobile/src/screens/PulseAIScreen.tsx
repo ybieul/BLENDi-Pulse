@@ -51,11 +51,13 @@ import { ChatMessage } from '../components/pulseAi/ChatMessage';
 import { ChatInput, type ChatInputHandle } from '../components/pulseAi/ChatInput';
 import { ChatMessageSkeleton } from '../components/pulseAi/ChatMessageSkeleton';
 import { UsageIndicator } from '../components/pulseAi/UsageIndicator';
+import { HowToUseSheet } from '../components/pulseAi/HowToUseSheet';
+import { AgeConfirmationSheet } from '../components/pulseAi/AgeConfirmationSheet';
 import { images } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
 import * as conversationService from '../services/conversation.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
-import { PulseAiServiceError } from '../services/pulseAi.service';
+import { AGE_CONFIRMATION_REQUIRED_CODE, PulseAiServiceError } from '../services/pulseAi.service';
 import { trackEvent } from '../services/analytics.service';
 import { showToast } from '../utils/toast.events';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
@@ -295,6 +297,11 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   // Rastreado para uso futuro (ex.: ações que dependem da conversa ativa) — ainda não lido nesta tela.
   void activeConversationId;
   const [isViewingHistory, setIsViewingHistory] = useState(false);
+  // CP-B5: "Como usar" e a confirmação única de idade (guarda a mensagem
+  // que o backend devolveu com pulseai/age-confirmation-required, para
+  // reenviar depois da resposta sem repetir o balão do usuário).
+  const [isHowToUseVisible, setIsHowToUseVisible] = useState(false);
+  const [pendingAgeMessage, setPendingAgeMessage] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList<ChatMessageItem>>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -474,19 +481,11 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   }, []);
 
   // ── Envio de mensagem ─────────────────────────────────────────────────────
-  const handleSend = useCallback(
-    async (messageText: string) => {
-      const trimmed = messageText.trim();
-      if (!trimmed) return;
-
-      const userMessage: ChatMessageItem = {
-        id: Date.now().toString(),
-        role: 'user',
-        content: trimmed,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, userMessage].slice(-MAX_MESSAGES));
+  // Pede a receita para uma mensagem que JÁ está no chat. CP-B5: separado do
+  // handleSend para o reenvio depois da confirmação de idade não duplicar o
+  // balão do usuário.
+  const requestRecipe = useCallback(
+    async (trimmed: string, options: { afterAgeConfirmation?: boolean } = {}) => {
       setIsLoading(true);
 
       try {
@@ -525,6 +524,18 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile });
         void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.conversations });
       } catch (err) {
+        // CP-B5: pedido com bebida alcoólica sem idade conhecida. O backend
+        // não gastou a mensagem; a folha pergunta uma vez e o app reenvia.
+        // Depois de responder, o código não pode voltar (cai no erro abaixo).
+        if (
+          err instanceof PulseAiServiceError &&
+          err.apiCode === AGE_CONFIRMATION_REQUIRED_CODE &&
+          !options.afterAgeConfirmation
+        ) {
+          setPendingAgeMessage(trimmed);
+          return;
+        }
+
         const is429 =
           err instanceof PulseAiServiceError &&
           err.apiCode === 'pulseai/daily-limit-reached';
@@ -576,6 +587,78 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     },
     [queryClient, t],
   );
+
+  const handleSend = useCallback(
+    async (messageText: string) => {
+      const trimmed = messageText.trim();
+      if (!trimmed) return;
+
+      const userMessage: ChatMessageItem = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: trimmed,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, userMessage].slice(-MAX_MESSAGES));
+      await requestRecipe(trimmed);
+    },
+    [requestRecipe],
+  );
+
+  // ── CP-B5: confirmação única de idade → grava e reenvia o mesmo pedido ────
+  const handleAgeAnswer = useCallback(
+    async (isAdult: boolean) => {
+      const pendingMessage = pendingAgeMessage;
+      setPendingAgeMessage(null);
+
+      if (!pendingMessage) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        await pulseAiService.confirmAlcoholAge(isAdult);
+      } catch (err) {
+        const errorMessage: ChatMessageItem = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content:
+            err instanceof PulseAiServiceError
+              ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
+              : t('errors.network_internal_server_error'),
+          timestamp: new Date(),
+          isError: true,
+        };
+
+        setMessages((prev) => [...prev, errorMessage].slice(-MAX_MESSAGES));
+        setIsLoading(false);
+        return;
+      }
+
+      await requestRecipe(pendingMessage, { afterAgeConfirmation: true });
+    },
+    [pendingAgeMessage, requestRecipe, t],
+  );
+
+  const handleAgeDismiss = useCallback(() => {
+    setPendingAgeMessage(null);
+  }, []);
+
+  // ── CP-B5: "Como usar" — exemplo preenche o campo, não envia ─────────────
+  const handleHowToUsePress = useCallback(() => {
+    setIsHowToUseVisible(true);
+  }, []);
+
+  const handleHowToUseClose = useCallback(() => {
+    setIsHowToUseVisible(false);
+  }, []);
+
+  const handleHowToUseExample = useCallback((text: string) => {
+    setIsHowToUseVisible(false);
+    chatInputRef.current?.setText(text);
+  }, []);
 
   // ── Prévia bloqueada: toque abre os planos; virou Pro → desbloqueia ──────
   const handleLockedPreviewPress = useCallback(() => {
@@ -793,13 +876,25 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       fontSize: BADGE_FONT_SIZE_OVERFLOW,
       lineHeight: BADGE_FONT_SIZE_OVERFLOW + 2,
     },
-    headerTitle: {
+    headerTitleRow: {
       flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 2,
+    },
+    headerTitle: {
       color: colors.text.primary,
       fontFamily: fonts.body,
       fontSize: fontSizes.sm,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    howToUseButton: {
+      width: 32,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     // FlatList
@@ -917,7 +1012,20 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           </Pressable>
         </View>
 
-        <Text style={styles.headerTitle}>{t('navigation.pulseAI')}</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>{t('navigation.pulseAI')}</Text>
+          {/* CP-B5: "Como usar" — discreto, ao lado do título. */}
+          <Pressable
+            style={styles.howToUseButton}
+            onPress={handleHowToUsePress}
+            accessibilityRole="button"
+            accessibilityLabel={t('pulseAi.howToUse.a11yLabel')}
+            hitSlop={6}
+            testID="pulse-ai-how-to-use-button"
+          >
+            <Ionicons name="help-circle-outline" size={18} color={colors.text.secondary} />
+          </Pressable>
+        </View>
 
         <View style={[styles.headerSide, styles.headerRightActions]}>
           <View style={styles.headerActionWithBadge}>
@@ -1006,6 +1114,20 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         onSend={handleSend}
         isLoading={isLoading}
         usageRemaining={usageRemaining}
+      />
+
+      <HowToUseSheet
+        visible={isHowToUseVisible}
+        onClose={handleHowToUseClose}
+        onExamplePress={handleHowToUseExample}
+      />
+
+      <AgeConfirmationSheet
+        visible={pendingAgeMessage !== null}
+        onAnswer={(isAdult) => {
+          void handleAgeAnswer(isAdult);
+        }}
+        onDismiss={handleAgeDismiss}
       />
     </View>
   );

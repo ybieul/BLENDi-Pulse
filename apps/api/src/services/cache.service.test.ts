@@ -43,3 +43,21 @@ describe('generateCacheKey — dieta', () => {
     );
   });
 });
+
+// CP-B5: o prompt muda para quem tem 21+ confirmado (álcool só se pedido).
+describe('generateCacheKey — nível de idade para álcool', () => {
+  it('21+ e não-21+ geram chaves diferentes para a mesma mensagem', () => {
+    const ofAge = generateCacheKey({ ...BASE_INPUT, alcoholTier: 'of-age' });
+    const notOfAge = generateCacheKey({ ...BASE_INPUT, alcoholTier: 'not-of-age' });
+
+    assert.notEqual(ofAge, notOfAge);
+    assert.ok(ofAge.endsWith(':alcohol21'));
+    assert.ok(notOfAge.endsWith(':noalcohol'));
+    // O hash da mensagem continua na posição 8 (o controller confere).
+    assert.equal(ofAge.split(':')[8], notOfAge.split(':')[8]);
+  });
+
+  it('com o nível, a chave nunca coincide com a de antes do CP-B5 (entradas antigas deixam de ser lidas)', () => {
+    assert.notEqual(generateCacheKey({ ...BASE_INPUT, alcoholTier: 'not-of-age' }), generateCacheKey(BASE_INPUT));
+  });
+});

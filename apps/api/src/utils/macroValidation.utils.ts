@@ -4,7 +4,7 @@
 // macros (protein x4 + carbs x4 + fat x9). Nunca bloqueia o usuário — apenas
 // sinaliza a inconsistência para o handler decidir se vale um retry.
 
-import type { PulseAiRecipe } from '@blendi/shared';
+import { ALCOHOL_KCAL_PER_GRAM, type PulseAiRecipe } from '@blendi/shared';
 
 // Tolerância deliberadamente mais folgada que a checagem de 10% pedida ao
 // modelo no prompt (ver promptBuilder.service.ts) — esta é a rede de
@@ -31,11 +31,19 @@ function getCalorieDifferencePercent(declaredCalories: number, derivedCalories: 
   return (Math.abs(declaredCalories - derivedCalories) / referenceCalories) * 100;
 }
 
+// CP-B5: o álcool (7 kcal/g) não é proteína, carboidrato nem gordura. Sem o
+// campo alcoholGrams, a conta é a mesma de antes.
+function alcoholGramsOf(recipe: Pick<PulseAiRecipe, 'alcoholGrams'>): number {
+  const grams = recipe.alcoholGrams;
+  return typeof grams === 'number' && Number.isFinite(grams) && grams > 0 ? grams : 0;
+}
+
 export function validateMacroConsistency(
-  recipe: Pick<PulseAiRecipe, 'macros'>
+  recipe: Pick<PulseAiRecipe, 'macros' | 'alcoholGrams'>
 ): MacroConsistencyResult {
   const { protein, carbs, fat, calories } = recipe.macros;
-  const derivedCalories = protein * 4 + carbs * 4 + fat * 9;
+  const derivedCalories =
+    protein * 4 + carbs * 4 + fat * 9 + alcoholGramsOf(recipe) * ALCOHOL_KCAL_PER_GRAM;
   const differencePercent = getCalorieDifferencePercent(calories, derivedCalories);
 
   if (differencePercent <= MACRO_CALORIE_TOLERANCE_PERCENT) {
@@ -53,14 +61,16 @@ export function validateMacroConsistency(
 }
 
 export function buildMacroInconsistencyRetryMessage(
-  recipe: Pick<PulseAiRecipe, 'macros'>,
+  recipe: Pick<PulseAiRecipe, 'macros' | 'alcoholGrams'>,
   discrepancy: MacroConsistencyDiscrepancy
 ): string {
   const { protein, carbs, fat } = recipe.macros;
+  const alcoholGrams = alcoholGramsOf(recipe);
+  const alcoholTerm = alcoholGrams > 0 ? ` + alcohol (${alcoholGrams}g x ${ALCOHOL_KCAL_PER_GRAM})` : '';
 
   return [
     'Your previous response had inconsistent macros.',
-    `You declared ${discrepancy.declaredCalories} kcal, but protein (${protein}g x 4) + carbs (${carbs}g x 4) + fat (${fat}g x 9) = ${discrepancy.derivedCalories} kcal, a ${discrepancy.differencePercent}% difference.`,
+    `You declared ${discrepancy.declaredCalories} kcal, but protein (${protein}g x 4) + carbs (${carbs}g x 4) + fat (${fat}g x 9)${alcoholTerm} = ${discrepancy.derivedCalories} kcal, a ${discrepancy.differencePercent}% difference.`,
     'Recalculate the macros and total calories using the exact ingredient quantities you listed, then return the corrected JSON.',
   ].join(' ');
 }

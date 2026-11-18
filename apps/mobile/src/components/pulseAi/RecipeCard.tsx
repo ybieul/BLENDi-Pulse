@@ -44,12 +44,18 @@ const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
 const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
 const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
+// CP-B5: álcool junto dos macros só quando > 0 (cor neutra, sem destaque).
+const ALCOHOL_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const SUBSTITUTES_BACKGROUND = colors.overlay.warning[8];
 const SUBSTITUTES_BORDER = colors.overlay.warning[15];
 // CP-B2: alerta de pedido ajustado ao copo (capacityNotice) — mesmo âmbar de
 // aviso das substituições, um pouco mais forte para se destacar no topo.
 const CAPACITY_NOTICE_BACKGROUND = colors.overlay.warning[12];
 const CAPACITY_NOTICE_BORDER = colors.overlay.warning[42];
+// CP-B5: avisos de pedido (fora da dieta, versão sem álcool) — azul
+// informativo, mais discreto que o âmbar do capacityNotice.
+const REQUEST_NOTICE_BACKGROUND = colors.overlay.info[8];
+const REQUEST_NOTICE_BORDER = colors.overlay.info[15];
 const TIP_BACKGROUND = colors.overlay.info[8];
 const TIP_BORDER = colors.overlay.info[15];
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
@@ -58,7 +64,7 @@ const UNIT_OPACITY = 0.7;
 const HEART_SCALE_DEFAULT = 1;
 const HEART_SCALE_ACTIVE = 1.3;
 
-type MacroTone = 'protein' | 'carbs' | 'fat' | 'calories';
+type MacroTone = 'protein' | 'carbs' | 'fat' | 'calories' | 'alcohol';
 
 interface MacroPillData {
   tone: MacroTone;
@@ -75,7 +81,7 @@ export interface RecipeCardProps {
   isFromCache?: boolean;
 }
 
-function useMacroPills(macros: PulseAiRecipe['macros']): MacroPillData[] {
+function useMacroPills(macros: PulseAiRecipe['macros'], alcoholGrams?: number): MacroPillData[] {
   const { t } = useAppTranslation();
 
   return useMemo<MacroPillData[]>(() => [
@@ -103,7 +109,15 @@ function useMacroPills(macros: PulseAiRecipe['macros']): MacroPillData[] {
       value: macros.calories,
       unit: t('common.units.kilocalories'),
     },
-  ], [macros, t]);
+    ...(typeof alcoholGrams === 'number' && alcoholGrams > 0
+      ? [{
+          tone: 'alcohol' as const,
+          icon: 'beaker-outline' as const,
+          value: alcoholGrams,
+          unit: t('pulseAi.alcoholUnit'),
+        }]
+      : []),
+  ], [alcoholGrams, macros, t]);
 }
 
 function MacroPill({ icon, value, unit, tone }: MacroPillData) {
@@ -116,7 +130,9 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
         ? CARBS_PILL_BACKGROUND
         : tone === 'fat'
           ? FAT_PILL_BACKGROUND
-          : CALORIES_PILL_BACKGROUND;
+          : tone === 'alcohol'
+            ? ALCOHOL_PILL_BACKGROUND
+            : CALORIES_PILL_BACKGROUND;
 
   const pillStyles = StyleSheet.create({
     macroPill: {
@@ -143,7 +159,7 @@ function MacroPill({ icon, value, unit, tone }: MacroPillData) {
   });
 
   return (
-    <View style={[pillStyles.macroPill, { backgroundColor }]}>
+    <View style={[pillStyles.macroPill, { backgroundColor }]} testID={`macro-pill-${tone}`}>
       <Ionicons name={icon} size={10} color={colors.text.primary} />
       <Text style={pillStyles.macroValue}>{formatDecimal(value)}</Text>
       <Text style={pillStyles.macroUnit}>{unit}</Text>
@@ -209,6 +225,50 @@ export function RecipeCapacityNotice({ notice }: { notice: string }) {
   );
 }
 
+/**
+ * CP-B5: aviso curto marcado pelo backend — ingrediente fora da dieta que a
+ * pessoa pediu, ou versão sem álcool. Lido de uma vez pelo leitor de tela.
+ */
+export function RecipeRequestNotice({ text, testID }: { text: string; testID: string }) {
+  const colors = useColors();
+
+  const noticeStyles = StyleSheet.create({
+    box: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: REQUEST_NOTICE_BORDER,
+      backgroundColor: REQUEST_NOTICE_BACKGROUND,
+      padding: spacing.md,
+    },
+    body: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.regular,
+      lineHeight: 19,
+    },
+  });
+
+  return (
+    <View accessible accessibilityLabel={text} style={noticeStyles.box} testID={testID}>
+      <Ionicons name="information-circle-outline" size={18} color={colors.feedback.info} />
+      <Text style={noticeStyles.body}>{text}</Text>
+    </View>
+  );
+}
+
+/** "Proteína whey isolada" → "proteína whey isolada" no meio da frase; siglas ficam. */
+function toMidSentence(name: string): string {
+  const trimmed = name.trim();
+  const [first, second] = [trimmed.charAt(0), trimmed.charAt(1)];
+  return second && second === second.toLowerCase() ? `${first.toLowerCase()}${trimmed.slice(1)}` : trimmed;
+}
+
 export function RecipeCard({
   recipe,
   isFavorited,
@@ -263,10 +323,13 @@ export function RecipeCard({
     };
   }, [pendingShareFormat]);
 
-  const macroPills = useMacroPills(recipe.macros);
+  const macroPills = useMacroPills(recipe.macros, recipe.alcoholGrams);
 
   const substitutesText = recipe.tip?.trim();
   const capacityNotice = recipe.capacityNotice?.trim();
+  const dietOverrideItems = (recipe.dietOverrideIngredients ?? [])
+    .map(toMidSentence)
+    .filter(Boolean);
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
   const shoppingListIngredients = useMemo(
     () => recipe.ingredients.map((ingredient) => ({
@@ -558,6 +621,17 @@ export function RecipeCard({
     <View style={styles.cardContainer}>
       <View style={styles.card}>
       {capacityNotice ? <RecipeCapacityNotice notice={capacityNotice} /> : null}
+
+      {dietOverrideItems.length > 0 ? (
+        <RecipeRequestNotice
+          testID="recipe-diet-override-notice"
+          text={t('pulseAi.dietOverrideNotice', { items: dietOverrideItems.join(', ') })}
+        />
+      ) : null}
+
+      {recipe.alcoholFreeVersion ? (
+        <RecipeRequestNotice testID="recipe-alcohol-free-notice" text={t('pulseAi.alcoholFreeNotice')} />
+      ) : null}
 
       <View style={styles.headerRow}>
         <View style={styles.badgeRow}>

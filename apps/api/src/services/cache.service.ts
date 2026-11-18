@@ -27,7 +27,17 @@ export interface CacheKeyInput {
    * o BLENDi (nem o contrário). Ausente/false = chave igual à de antes.
    */
   genericBlender?: boolean;
+  /**
+   * CP-B5: o texto do prompt muda para quem tem 21+ confirmado (álcool só
+   * se pedido) e para quem não tem. A chave ganha ':alcohol21' ou
+   * ':noalcohol' no fim. Como o chat sempre passa este campo, as entradas
+   * gravadas antes do CP-B5 (prompt sem a regra de pedido explícito) deixam
+   * de ser lidas e expiram pelo TTL. Ausente = chave igual à de antes.
+   */
+  alcoholTier?: AlcoholCacheTier;
 }
+
+export type AlcoholCacheTier = 'of-age' | 'not-of-age';
 
 export interface SetInCacheInput extends CacheKeyInput {
   cacheKey: string;
@@ -58,7 +68,8 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 /**
  * Entrada: metadados determinísticos da query do usuário.
  * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:weightGoal:aiProvider:aiModel:messageHash:dietaryFlagsHash,
- * com ':generic' no fim para conta sem BLENDi (CP-B3).
+ * com ':generic' no fim para conta sem BLENDi (CP-B3) e ':alcohol21'/':noalcohol'
+ * por último (CP-B5).
  */
 export function generateCacheKey({
   userId,
@@ -72,6 +83,7 @@ export function generateCacheKey({
   rawMessage,
   dietaryFlags = [],
   genericBlender = false,
+  alcoholTier,
 }: CacheKeyInput): string {
   const messageHash = sha256(normalizeText(rawMessage));
   const dietaryFlagsHash = buildDietaryFlagsHash(dietaryFlags);
@@ -88,6 +100,7 @@ export function generateCacheKey({
     messageHash,
     dietaryFlagsHash,
     ...(genericBlender ? ['generic'] : []),
+    ...(alcoholTier ? [alcoholTier === 'of-age' ? 'alcohol21' : 'noalcohol'] : []),
   ].join(':');
 }
 
@@ -138,6 +151,7 @@ export async function setInCache({
   rawMessage,
   dietaryFlags = [],
   genericBlender = false,
+  alcoholTier,
   response,
 }: SetInCacheInput): Promise<void> {
   const expectedCacheKey = generateCacheKey({
@@ -152,6 +166,7 @@ export async function setInCache({
     rawMessage,
     dietaryFlags,
     genericBlender,
+    alcoholTier,
   });
 
   if (cacheKey !== expectedCacheKey) {

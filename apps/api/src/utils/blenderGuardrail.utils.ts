@@ -87,9 +87,18 @@ export const BLENDER_LIMIT_RETRY_REDUCTION_RULES: readonly string[] = [
  * regra de manter o valor pedido quando cabe; o capacityNotice só quando o
  * valor de fato deixa de ser atendido.
  */
+/**
+ * CP-B5 (lote 9 ao vivo, só Pulse AI): "2 bananas e 1 colher de pasta de
+ * amendoim" virou 1 banana na nova tentativa, sem aviso. O item pedido na
+ * mensagem atual fica; os outros encolhem antes.
+ */
+export const BLENDER_LIMIT_RETRY_KEEP_REQUEST_RULE =
+  'Keep every ingredient the user\'s current message explicitly asked for, in the requested amount (for example "2 bananas" stays 2 bananas): reduce the other ingredients first. Only if the recipe still does not fit, reduce a requested item as little as possible and say so in capacityNotice.';
+
 export function buildBlenderLimitRetryMessage(
   violation: BlenderLimitViolation,
-  textContext?: RecipeTextContext
+  textContext?: RecipeTextContext,
+  options: { keepExplicitRequest?: boolean } = {}
 ): string {
   const { volume } = violation;
   const locale = textContext?.locale ?? 'en';
@@ -108,6 +117,7 @@ export function buildBlenderLimitRetryMessage(
     // CP-B4 (lote 6 ao vivo): "70 g de proteína" virou 59 g porque a IA
     // cortou tudo por igual, inclusive o whey, que quase não ocupa volume.
     ...BLENDER_LIMIT_RETRY_REDUCTION_RULES,
+    ...(options.keepExplicitRequest ? [BLENDER_LIMIT_RETRY_KEEP_REQUEST_RULE] : []),
     "Only if, after reducing, the recipe still cannot deliver what the user explicitly asked for, fill the capacityNotice field with one short sentence, in the user's language, saying what was asked, what this recipe delivers and that the cup's volume is the reason. If the requested value is delivered, omit capacityNotice.",
     // CP-B4 (lote 7 ao vivo): 60 g pedidos, 60,1 g entregues e mesmo assim com aviso.
     'Before returning, compare the corrected macros with the requested value: if they reach it, do not fill capacityNotice, because the notice would tell the user something false.',

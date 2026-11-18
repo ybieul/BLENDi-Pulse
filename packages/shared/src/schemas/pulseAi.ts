@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { RECIPE_CAPACITY_NOTICE_MAX_LENGTH } from '../recipeContent';
+import {
+  RECIPE_CAPACITY_NOTICE_MAX_LENGTH,
+  RECIPE_DIET_OVERRIDE_MAX_ITEMS,
+} from '../recipeContent';
 
 const PULSE_AI_MESSAGE_MAX = 500;
 
@@ -14,6 +17,22 @@ export const pulseAiChatSchema = z.object({
 });
 
 export type PulseAiChatInput = z.infer<typeof pulseAiChatSchema>;
+
+/**
+ * CP-B5: resposta única à pergunta "Tenho 21 anos ou mais" (só para quem não
+ * tem data de nascimento real no perfil). Gravada uma vez; o app reenvia o
+ * pedido depois.
+ */
+export const pulseAiAgeConfirmationSchema = z
+  .object({
+    isAdult: z.boolean({
+      required_error: 'errors.validation.required',
+      invalid_type_error: 'errors.validation.invalid_option',
+    }),
+  })
+  .strict();
+
+export type PulseAiAgeConfirmationInput = z.infer<typeof pulseAiAgeConfirmationSchema>;
 
 export interface PulseAiRecipe {
   title: string;
@@ -43,6 +62,24 @@ export interface PulseAiRecipe {
    * ingredientes detectados na foto. Marcado pelo backend, nunca pela IA.
    */
   usesWaterNotInPhoto?: boolean;
+  /**
+   * CP-B5: gramas de álcool puro (etanol) da receita, preenchido pela IA só
+   * quando há bebida alcoólica. Entra na conferência de calorias (7 kcal/g).
+   */
+  alcoholGrams?: number;
+  /**
+   * CP-B5 (só Pulse AI): ingredientes fora da dieta do perfil que a pessoa
+   * pediu explicitamente na mensagem atual. Marcado pelo backend (o que vier
+   * da IA é descartado). O app mostra "Inclui X, fora da sua dieta, como
+   * você pediu".
+   */
+  dietOverrideIngredients?: string[];
+  /**
+   * CP-B5 (só Pulse AI): a mensagem pediu bebida alcoólica e a receita saiu
+   * na versão sem álcool (menor de 21 ou idade não confirmada). Marcado pelo
+   * backend, nunca pela IA.
+   */
+  alcoholFreeVersion?: boolean;
   steps?: Array<{
     text: string;
     pulseCount?: number;
@@ -138,6 +175,17 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
     .default(true),
   capacityNotice: capacityNoticeSchema,
   usesWaterNotInPhoto: z
+    .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
+    .optional(),
+  alcoholGrams: z
+    .number({ invalid_type_error: 'errors.validation.number_range' })
+    .min(0, 'errors.validation.number_range')
+    .optional(),
+  dietOverrideIngredients: z
+    .array(z.string().trim().min(1, 'errors.validation.required'))
+    .max(RECIPE_DIET_OVERRIDE_MAX_ITEMS, 'errors.validation.too_long')
+    .optional(),
+  alcoholFreeVersion: z
     .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
     .optional(),
   steps: z.array(pulseAiStepSchema).optional(),

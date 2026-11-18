@@ -217,7 +217,14 @@ describe('CP-B3 — prompt: limite em xícaras e regra do peso no imperial', () 
 describe('CP-B3 — prompt: números com vírgula em pt-BR', () => {
   it('pt-BR imperial: nenhum decimal com ponto no prompt; regra da vírgula presente', () => {
     for (const prompt of [pulseAi({ unitSystem: 'imperial', locale: 'pt-BR' }), pantry({ unitSystem: 'imperial', locale: 'pt-BR' })]) {
-      assert.doesNotMatch(prompt.replace(/Nutrition reference table[\s\S]*?\n\n/, ''), /\d\.\d/);
+      // CP-B5: a linha do ponto decimal no JSON fala do número do JSON (não
+      // dos textos) e por isso usa ponto de propósito.
+      assert.doesNotMatch(
+        prompt
+          .replace(/Nutrition reference table[\s\S]*?\n\n/, '')
+          .replace(/- Every number in the JSON uses a dot[^\n]*\n/, ''),
+        /\d\.\d/
+      );
       assert.ok(prompt.includes('at least 8,5 fl oz'));
       assert.ok(prompt.includes('Write decimal numbers with a comma, as in Brazilian Portuguese'));
       assert.ok(prompt.includes('The numeric JSON fields (macros, prepTimeSeconds, pulseCount) stay plain JSON numbers.'));

@@ -240,7 +240,8 @@ describe('CP-B2 prompt — variedade', () => {
       recentBlendRecipeNames: ['Morning Oat Shake', 'Berry Whey'],
       message: 'x',
     }).systemPrompt;
-    assert.ok(prompt.includes("The user's most recent blends (do not repeat any of them, and do not repeat the same liquid base with the same main ingredients):"));
+    // CP-B5: no chat o histórico vale só para o que não foi pedido.
+    assert.ok(prompt.includes("The user's most recent blends (history only, never a request. Do not repeat any of them, and do not repeat the same liquid base with the same main ingredients, but only for what the current message did not ask for: an ingredient, base or flavor the user asks for is always used, even when it is in this list):"));
     assert.ok(prompt.includes('1. Morning Oat Shake'));
     assert.ok(prompt.includes('Do not repeat a recipe you already suggested earlier in this conversation'));
   });

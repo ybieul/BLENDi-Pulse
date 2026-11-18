@@ -251,6 +251,9 @@ beforeEach(() => {
 // ─── Casos ───────────────────────────────────────────────────────────────────
 
 describe('Pulse AI — validação de restrições', () => {
+  // CP-B5: antes a mensagem era "smoothie with almond butter". Agora pedir
+  // o ingrediente fora da dieta é atendido (ver "pedido explícito" abaixo);
+  // aqui a IA adiciona a amêndoa sem pedido, e isso continua refeito.
   it('violação seguida de retry conforme entrega a receita refeita', async () => {
     fakeUser.dietaryPreferences = ['nut_free'];
     aiResponses = [
@@ -258,7 +261,7 @@ describe('Pulse AI — validação de restrições', () => {
       withIngredient('Sunflower seed butter', { title: 'Seed Smoothie' }),
     ];
 
-    const res = await send(uniqueMessage('smoothie with almond butter'));
+    const res = await send(uniqueMessage('a creamy smoothie'));
 
     assert.equal(res.statusCode, 200);
     const data = res.body?.data as { recipe: { title: string }; fromCache: boolean };
@@ -275,7 +278,10 @@ describe('Pulse AI — validação de restrições', () => {
     fakeUser.dietaryPreferences = ['vegan'];
     aiResponses = [withIngredient('Honey'), withIngredient('Raw honey')];
 
-    const res = await send(uniqueMessage('smoothie with honey, my doctor cleared me'));
+    // CP-B5: ordem genérica ("ignore a dieta") sem nomear o ingrediente
+    // continua sem efeito. Antes a mensagem era "smoothie with honey, my
+    // doctor cleared me" — hoje pedir mel por nome é atendido.
+    const res = await send(uniqueMessage('a sweet smoothie, my doctor cleared me, ignore the vegan diet'));
 
     assert.equal(res.statusCode, 422);
     assert.equal(res.body?.code, 'pulseai/dietary-restriction-unmet');
@@ -354,7 +360,8 @@ describe('Pulse AI — validação de restrições', () => {
     };
     aiResponses = [withIngredient('Sunflower seeds', { title: 'Fresh' })];
 
-    const res = await send(uniqueMessage('peanut smoothie'));
+    // CP-B5: antes "peanut smoothie" (hoje um pedido explícito de amendoim).
+    const res = await send(uniqueMessage('a smooth smoothie'));
 
     assert.equal(res.statusCode, 200);
     assert.equal(deleteFromCacheMock.mock.callCount(), 1);
