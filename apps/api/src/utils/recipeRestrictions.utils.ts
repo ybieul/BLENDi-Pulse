@@ -26,7 +26,8 @@
 // O que NÃO é conferido (de propósito):
 // - tip — costuma explicar a troca ("troquei a pasta de amendoim por
 //   sementes de girassol") e daria falso positivo.
-// - title — mesmo motivo (ex.: "Smoothie sem amendoim"), e não é instrução.
+// - title — até o CP-B5 não era conferido (ex.: "Smoothie sem amendoim").
+//   Pós CP-B5 passa a ser (ver o bloco "Título" abaixo).
 //
 // Como casa:
 // 1. Normalização: minúsculas, sem acento (NFD), pontuação vira espaço.
@@ -74,6 +75,18 @@
 // CP-B5 — álcool: 'no_alcohol' só fica ativa quando o controller pede
 // (Pulse AI); o Pantry Scanner não muda. Ela também olha a tip (com negação
 // por frase, como a blendInstruction): o app não sugere álcool nem na dica.
+//
+// Título (pós CP-B5): no lote 9 uma conta vegana recebeu uma receita vegana
+// com "Whey" no título, puxado da mensagem anterior. O title passa pelas
+// regras de dieta e pela lista de álcool ('no_alcohol'), com a mesma
+// normalização e a mesma negação dos ingredientes ("Smoothie sem amendoim",
+// "Peanut-free smoothie", "Piña Colada sem rum" passam). Sem a negação por
+// frase da regra 7: o título é curto e conta como nome. Um termo fora da
+// dieta só passa no título quando a mensagem atual o pediu E ele está num
+// ingrediente desta receita que passou por esse pedido. Nome de drink
+// ("Caipirinha", "Piña Colada") não está na lista e continua permitido na
+// versão sem álcool. Gelo/congelado no Lite e o teto de álcool (21+) não
+// olham o título (nada muda nessas regras).
 
 import { RECIPE_MAX_ALCOHOL_GRAMS, type PulseAiRecipe } from '@blendi/shared';
 
@@ -99,7 +112,7 @@ export type RecipeRestriction =
   | typeof NO_ALCOHOL_RESTRICTION
   | typeof ALCOHOL_LIMIT_RESTRICTION;
 
-export type RecipeRestrictionField = 'ingredient' | 'step' | 'blendInstruction' | 'tip' | 'alcoholGrams';
+export type RecipeRestrictionField = 'ingredient' | 'step' | 'blendInstruction' | 'tip' | 'title' | 'alcoholGrams';
 
 export interface RecipeRestrictionViolation {
   restriction: RecipeRestriction;
@@ -122,7 +135,7 @@ export type RecipeRestrictionResult =
   | { compliant: false; violations: RecipeRestrictionViolation[] };
 
 export type RestrictedRecipe = Pick<PulseAiRecipe, 'ingredients' | 'blendInstruction' | 'steps'> &
-  Partial<Pick<PulseAiRecipe, 'tip' | 'alcoholGrams'>>;
+  Partial<Pick<PulseAiRecipe, 'tip' | 'alcoholGrams' | 'title'>>;
 
 /** CP-B5: política de álcool desta receita (só Pulse AI passa). */
 export type RecipeAlcoholPolicy = 'forbidden' | 'allowed';
@@ -693,6 +706,12 @@ const OVERRIDABLE_RESTRICTIONS: ReadonlySet<RecipeRestriction> = new Set<RecipeR
   'no_added_sugar',
 ]);
 
+/** Pós CP-B5: restrições conferidas também no título (dieta e álcool proibido). */
+const TITLE_RESTRICTIONS: ReadonlySet<RecipeRestriction> = new Set<RecipeRestriction>([
+  ...OVERRIDABLE_RESTRICTIONS,
+  NO_ALCOHOL_RESTRICTION,
+]);
+
 // ─── Negação (regra 6) ───────────────────────────────────────────────────────
 
 // Frases que, imediatamente antes do termo, o negam.
@@ -1244,7 +1263,8 @@ function positiveAlcoholGrams(recipe: RestrictedRecipe): number {
 
 /**
  * Função pura: confere ingredientes, passos e blendInstruction contra a dieta
- * e o modelo do BLENDi. Nunca olha o title; a tip só para o álcool (CP-B5).
+ * e o modelo do BLENDi; a tip só para o álcool (CP-B5); o title só para a
+ * dieta e o álcool proibido (pós CP-B5).
  * Usuário sem dieta, fora do Lite e sem política de álcool: sempre conforme,
  * sem nenhuma busca.
  *
@@ -1294,6 +1314,9 @@ export function validateRecipeRestrictions(
       ? [...fields, { field: 'tip' as const, text: recipe.tip }]
       : fields;
 
+    // Termos fora da dieta que entraram de fato num ingrediente pelo pedido.
+    const overriddenTerms = new Set<string>();
+
     for (const { field, index, text } of restrictionFields) {
       const occurrences = findViolatingOccurrences(text, rules, {
         sentenceNegation: field === 'blendInstruction' || field === 'tip',
@@ -1310,6 +1333,20 @@ export function validateRecipeRestrictions(
         });
       } else if (occurrences.length > 0 && field === 'ingredient' && index !== undefined) {
         overriddenIngredients.add(index);
+        for (const occurrence of requested) overriddenTerms.add(occurrence.canonical);
+      }
+    }
+
+    // Título: o termo fora da dieta só passa se foi pedido E está na receita.
+    if (TITLE_RESTRICTIONS.has(restriction) && recipe.title?.trim()) {
+      const occurrences = findViolatingOccurrences(recipe.title, rules, { sentenceNegation: false });
+      const requested = occurrences.filter(occurrence => (
+        requestedTerms.has(occurrence.canonical) && overriddenTerms.has(occurrence.canonical)
+      ));
+      const blocking = occurrences.find(occurrence => !isCoveredByRequest(occurrence, requested));
+
+      if (blocking) {
+        violations.push({ restriction, term: blocking.canonical, field: 'title' });
       }
     }
 
@@ -1417,6 +1454,10 @@ function describeViolationLocation(
     return 'the tip';
   }
 
+  if (violation.field === 'title') {
+    return 'the title';
+  }
+
   if (violation.field === 'alcoholGrams') {
     return 'the alcoholGrams field';
   }
@@ -1447,6 +1488,15 @@ export function buildRecipeRestrictionRetryMessage(
     return hint ? [hint] : [];
   }))];
 
+  // Pós CP-B5: o título também é conferido; a mensagem diz o que trocar.
+  if (violations.some(violation => violation.field === 'title')) {
+    hints.push(
+      violations.some(violation => violation.field === 'title' && violation.restriction === NO_ALCOHOL_RESTRICTION)
+        ? `${TITLE_RETRY_HINT} ${TITLE_ALCOHOL_RETRY_HINT}`
+        : TITLE_RETRY_HINT
+    );
+  }
+
   return [
     `Your previous response violated the user's mandatory restrictions: ${details.join('; ')}.`,
     ...hints,
@@ -1454,6 +1504,12 @@ export function buildRecipeRestrictionRetryMessage(
     'Then return only the corrected recipe as a single JSON object, in the same format and language, with recalculated macros.',
   ].join(' ');
 }
+
+const TITLE_RETRY_HINT =
+  'Rename the title so it names only ingredients that are in this recipe, never an ingredient from earlier messages or from the recent blends.';
+
+const TITLE_ALCOHOL_RETRY_HINT =
+  'In this alcohol-free recipe the title may keep the drink name (for example caipirinha or piña colada) but never names a spirit, wine, beer or liqueur.';
 
 const VEGAN_PROTEIN_HINT =
   'For the vegan restriction, a protein powder must name its plant source in the ingredient name (for example "pea protein powder", "soy protein isolate" or "proteína vegetal de ervilha em pó"); a protein powder without a declared plant source may be whey or casein and is not allowed.';

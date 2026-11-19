@@ -1306,7 +1306,7 @@
         "name": "Active Moms"
       },
       "beach_cocktails": {
-        "name": "Beach & Cocktails"
+        "name": "Beach & Refreshers"
       },
       "travel": {
         "name": "Travel"
@@ -1315,7 +1315,7 @@
     "protocolPrompts": {
       "gym_protein": "Create a BLENDi Pulse gym protein protocol with one pre-workout option and one post-workout option focused on strength and recovery.",
       "active_moms": "Create a BLENDi Pulse protocol for active moms with fast, balanced blends for energy, satiety, and busy mornings.",
-      "beach_cocktails": "Create a BLENDi Pulse beach cocktail protocol with tropical mocktail-style blends focused on hydration and fresh flavors.",
+      "beach_cocktails": "Create a BLENDi Pulse beach protocol with tropical blends for hot days, focused on hydration and fresh flavors.",
       "travel": "Create a BLENDi Pulse travel protocol with portable blends that are quick to prepare and easy to repeat on the go."
     }
   },

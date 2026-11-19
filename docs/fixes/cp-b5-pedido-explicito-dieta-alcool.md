@@ -90,6 +90,8 @@
 
 **Home:** nada de álcool. As receitas do dia não mudaram. O protocolo rápido "Praia & Drinks" é tratado nos achados.
 
+> **Atualização (CP-B5.1):** o protocolo virou "Praia e Refrescos" / "Beach & Refreshers", sem drinks no texto; o título passou a ser conferido com a dieta e o álcool; o lote 10 mediu `alcoholRequested` (achados 1, 2 e 4 abaixo). Ver [cp-b5-1-praia-refrescos-titulo-lote10.md](cp-b5-1-praia-refrescos-titulo-lote10.md).
+
 ## Tarefa 4: calorias do álcool
 
 - `alcoholGrams` é um campo opcional no schema compartilhado (número ≥ 0). O parser converte "16" em 16 e descarta valor inválido, em vez de invalidar a receita.

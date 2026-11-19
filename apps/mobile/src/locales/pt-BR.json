@@ -1306,7 +1306,7 @@
         "name": "Mães Ativas"
       },
       "beach_cocktails": {
-        "name": "Praia & Drinks"
+        "name": "Praia e Refrescos"
       },
       "travel": {
         "name": "Viagem"
@@ -1315,7 +1315,7 @@
     "protocolPrompts": {
       "gym_protein": "Crie um protocolo BLENDi Pulse para academia com uma opção pré-treino e uma pós-treino focadas em força e recuperação.",
       "active_moms": "Crie um protocolo BLENDi Pulse para mães ativas com blends rápidos e equilibrados para energia, saciedade e manhãs corridas.",
-      "beach_cocktails": "Crie um protocolo BLENDi Pulse de praia e drinks com blends tropicais estilo mocktail focados em hidratação e sabores frescos.",
+      "beach_cocktails": "Crie um protocolo BLENDi Pulse de praia com blends tropicais para dias de calor, focados em hidratação e sabores frescos.",
       "travel": "Crie um protocolo BLENDi Pulse para viagens com blends portáteis, rápidos de preparar e fáceis de repetir no dia a dia."
     }
   },

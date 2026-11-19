@@ -628,3 +628,82 @@ describe('CP-B5 — nova tentativa por volume mantém o que foi pedido (lote 9)'
     assert.match(lastUserMessageOfCall(1), /Keep every ingredient the user's current message explicitly asked for, in the requested amount/);
   });
 });
+
+// ─── Pós CP-B5: título conferido ─────────────────────────────────────────────
+
+describe('pós CP-B5 — título conferido com a dieta e o álcool', () => {
+  const VEGAN_INGREDIENTS = ['Proteína de ervilha', 'Aveia em flocos', 'Banana'];
+
+  it('vegana sem pedido: receita vegana com "Whey" no título → nova tentativa pelo mesmo caminho', async () => {
+    fakeUser.dietaryPreferences = ['vegan'];
+    aiResponses = [
+      withIngredients(VEGAN_INGREDIENTS, { title: 'Shake de Banana com Aveia e Whey' }),
+      withIngredients(VEGAN_INGREDIENTS, { title: 'Shake de Banana com Aveia' }),
+    ];
+
+    const res = await send(uniqueMessage('shake com banana'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.match(lastUserMessageOfCall(1), /the title uses "whey", which violates the vegan restriction/);
+    assert.match(lastUserMessageOfCall(1), /Rename the title/);
+    const data = res.body?.data as RecipeBody;
+    assert.equal(data.recipe.title, 'Shake de Banana com Aveia');
+    assert.equal(data.recipe.dietOverrideIngredients, undefined);
+  });
+
+  it('vegana que pediu whey: título com whey passa de primeira, com o aviso', async () => {
+    fakeUser.dietaryPreferences = ['vegan'];
+    aiResponses = [withIngredients(['Whey protein', 'Morango', 'Leite de aveia'], { title: 'Shake de Morango com Whey' })];
+
+    const res = await send(uniqueMessage('hoje quero com whey'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.deepEqual((res.body?.data as RecipeBody).recipe.dietOverrideIngredients, ['Whey protein']);
+  });
+
+  it('título que continua violando depois da nova tentativa → o mesmo 422 de hoje, uso devolvido', async () => {
+    fakeUser.dietaryPreferences = ['vegan'];
+    aiResponses = [
+      withIngredients(VEGAN_INGREDIENTS, { title: 'Shake com Whey' }),
+      withIngredients(VEGAN_INGREDIENTS, { title: 'Shake com Whey' }),
+    ];
+
+    const res = await send(uniqueMessage('shake com banana'));
+
+    assert.equal(res.statusCode, 422);
+    assert.equal(res.body?.code, 'pulseai/dietary-restriction-unmet');
+    assert.equal(usageRollbackCalls().length, 1);
+    assert.equal(setInCacheMock.mock.callCount(), 0);
+  });
+
+  it('menor de 21: "Caipirinha de Morango" passa; "…com Cachaça" na versão sem álcool é refeita', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    aiResponses = [virginCaipirinha({ title: 'Caipirinha de Morango' })];
+    const named = await send(uniqueMessage('caipirinha de morango'));
+    assert.equal(named.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.equal((named.body?.data as RecipeBody).recipe.alcoholFreeVersion, true);
+
+    callAiMock.mock.resetCalls();
+    aiResponses = [
+      virginCaipirinha({ title: 'Caipirinha de Morango com Cachaça' }),
+      virginCaipirinha({ title: 'Caipirinha de Morango' }),
+    ];
+    const fixed = await send(uniqueMessage('caipirinha de morango'));
+    assert.equal(fixed.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.match(lastUserMessageOfCall(1), /the title uses "cachaca", which violates the no alcohol/);
+    assert.equal((fixed.body?.data as RecipeBody).recipe.title, 'Caipirinha de Morango');
+  });
+
+  it('21+ que pediu: título com o destilado passa', async () => {
+    aiResponses = [caipirinha({ title: 'Caipirinha de Morango com Cachaça' })];
+
+    const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+  });
+});

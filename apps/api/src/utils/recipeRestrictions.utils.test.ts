@@ -548,15 +548,27 @@ describe('validateRecipeRestrictions — onde confere', () => {
     });
   });
 
-  it('ignora tip e title', () => {
+  // Pós CP-B5: o title passou a ser conferido na dieta (com a mesma negação);
+  // a tip continua ignorada na dieta e o gelo no Lite não olha o título.
+  it('ignora a tip; no title confere a dieta com negação, e não o gelo', () => {
     const recipe = {
       title: 'Peanut butter-free honey ice smoothie',
       tip: 'Troquei a pasta de amendoim e o leite por sementes de girassol; sem mel e sem gelo.',
       ingredients: [{ name: 'Sunflower seeds', amount: '20 g' }],
       blendInstruction: 'Blend for 40 seconds.',
     };
+    const restrictions = ['nut_free', 'vegan', 'dairy_free', 'no_added_sugar'] as const;
+    // "butter-free" nega só "butter": "peanut" e "honey" ficam no título.
+    assert.deepEqual(validateRecipeRestrictions(recipe, restrictions, 'Lite'), {
+      compliant: false,
+      violations: [
+        { restriction: 'nut_free', term: 'peanut', field: 'title' },
+        { restriction: 'vegan', term: 'honey', field: 'title' },
+        { restriction: 'no_added_sugar', term: 'honey', field: 'title' },
+      ],
+    });
     assert.deepEqual(
-      validateRecipeRestrictions(recipe, ['nut_free', 'vegan', 'dairy_free', 'no_added_sugar'], 'Lite'),
+      validateRecipeRestrictions({ ...recipe, title: 'Peanut-free, honey-free ice smoothie' }, restrictions, 'Lite'),
       { compliant: true }
     );
   });

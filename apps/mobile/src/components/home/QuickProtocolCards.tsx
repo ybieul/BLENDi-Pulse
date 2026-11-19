@@ -22,7 +22,7 @@ const CARD_HEIGHT = 80;
 const CARD_RADIUS = 14;
 const CARD_GAP = 12;
 
-type ProtocolIconName = 'barbell-outline' | 'heart-outline' | 'wine-outline' | 'airplane-outline';
+type ProtocolIconName = 'barbell-outline' | 'heart-outline' | 'sunny-outline' | 'airplane-outline';
 
 export interface QuickProtocol {
   id: 'gym-protein' | 'active-moms' | 'cocktail-beach' | 'travel';
@@ -59,7 +59,7 @@ export function QuickProtocolCards({ onProtocolSelect }: QuickProtocolCardsProps
     {
       id: 'cocktail-beach',
       title: t('home.protocols.beach_cocktails.name'),
-      icon: 'wine-outline',
+      icon: 'sunny-outline',
       prompt: t('home.protocolPrompts.beach_cocktails'),
     },
     {

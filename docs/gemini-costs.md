@@ -20,6 +20,7 @@ Why this model (see `apps/api/.env.example` for the project's own notes on this)
 - `gemini-3.5-flash` (without `-lite`) has "thinking" enabled by default, which regularly blows past this app's 30s/45s request timeouts in real calls.
 - `gemini-3.5-flash-lite` does not use thinking by default, responds in 1-3s, is multimodal (handles the Pantry Scanner's image input as well as Pulse AI's text), and works on the free tier — it is the model actually validated and configured in this codebase for both `AI_MODEL` and `VISION_MODEL`.
 - `pro`-tier models (e.g. `gemini-3.1-pro-preview`) return `429` (quota `0`) on the free tier — not usable here regardless of cost.
+- **Free-tier quota (measured 2026-11-18, CP-B5.1, batch 10):** `gemini-3.5-flash-lite` on the free tier allows **15 requests per minute** and **500 requests per day** (`generate_content_free_tier_requests`). Above that Gemini returns `429`, which the provider does not retry (only `500`/`503` are retried; `429` only goes to `AI_FALLBACK_MODEL` when set), so the user gets `503 pulseai/ai-unavailable` / `scanner/vision-unavailable` with the usage returned. A single Pulse AI recipe can take 2–3 calls (volume, macro or diet retries), so the free tier holds roughly 170–250 recipes per day for the whole app. In batch 10, 81 of 240 requests hit the per-minute limit and the daily limit stopped the second phase; the "Gemini overloaded" 503s of batch 9 were probably the same quota. **Production must run on a paid-tier key.**
 
 Pricing source used for this document:
 

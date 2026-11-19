@@ -322,6 +322,9 @@ function buildExplicitRequestSection(): string {
     '- A named drink or dish is a request for its defining ingredients, also in an alcohol-free version: for example a piña colada has pineapple and coconut, a caipirinha has lime, a mojito has lime and mint. Never replace a defining ingredient with another fruit.',
     '- Never drop, shrink or swap a requested item because of variety, the goal, the daily targets, the recent blends or taste. Those rules only shape what the user did not ask for.',
     '- Only the current message counts as an explicit request. Earlier messages of this conversation and the recent blends list are context, never a request: they never add an ingredient, never lift a dietary restriction and never allow alcohol.',
+    // Pós CP-B5 (lote 9): receita vegana com "Whey" no título, puxado da
+    // mensagem anterior. O backend também confere o título.
+    '- The title names only ingredients that are in the ingredients list of this recipe; it never names an ingredient from earlier messages or from the recent blends.',
     '- The physical limits are never lifted by a request. When something requested does not fit the cup, follow the serving size rules below (the closest recipe that fits, with capacityNotice); ice and frozen ingredients follow the hardware rules below.',
   ].join('\n');
 }
@@ -329,12 +332,14 @@ function buildExplicitRequestSection(): string {
 function buildAlcoholSection(alcoholOfAge: boolean): string {
   // Lote 9 (CP-B5): "piña colada without ice" para 21+ saiu "Virgin Piña
   // Colada" com alcoholRequested false (a IA leu o pedido como smoothie); o
-  // protocolo "Praia & Drinks" da Home pede blends estilo mocktail e não pode
-  // contar. Uma definição só, usada pelas duas versões da seção.
+  // protocolo de praia da Home (hoje "Praia e Refrescos", sem drinks no
+  // texto) não pode contar. Uma definição só, usada pelas duas versões da seção.
+  // Lote 10: "virgin piña colada" saía true só na versão sem álcool (menor
+  // e "Não"), e "piña colada sem gelo" às vezes false em pt-BR.
   const whatCounts =
-    '- What counts as asking for alcohol: the current message names a spirit, wine, beer or liqueur, or a cocktail that normally contains alcohol (for example a caipirinha, a piña colada, a mojito, a margarita or a daiquiri), even without naming the spirit and even with other changes such as "without ice", "strawberry" or "light", which change only those details. It never counts when the message asks for something alcohol-free, virgin, zero-alcohol, a mocktail, a mocktail-style blend or a protocol of blends, even if it also says drinks or cocktails (for example "a beach protocol with mocktail-style drinks" is not a request for alcohol). Earlier messages and the recent blends never count.';
+    '- What counts as asking for alcohol: the current message names a spirit, wine, beer or liqueur, or a cocktail that normally contains alcohol (for example a caipirinha, a piña colada, a mojito, a margarita or a daiquiri), even without naming the spirit and even with other changes such as "without ice", "strawberry" or "light": "without" removes only the item it names, so a piña colada without ice still counts. It never counts when the message asks for something alcohol-free, virgin, zero-alcohol, a mocktail, a mocktail-style blend or a protocol of blends, even if it also says drinks or cocktails (for example "a beach protocol with mocktail-style drinks" is not a request for alcohol). Earlier messages and the recent blends never count.';
   const flagMeaning =
-    '- alcoholRequested describes the current message, not your recipe: set it to true when the message counts as asking for alcohol, also when the recipe you return has no alcohol; otherwise set it to false.';
+    '- alcoholRequested describes the current message, not your recipe: set it to true when the message counts as asking for alcohol, also when the recipe you return has no alcohol; otherwise set it to false. A message that itself asks for the alcohol-free version of a drink (for example a virgin piña colada) is not asking for alcohol: set alcoholRequested to false, whoever the user is.';
 
   if (!alcoholOfAge) {
     return [
