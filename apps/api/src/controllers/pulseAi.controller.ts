@@ -53,6 +53,12 @@ import { runWithAiRequestBudget } from '../services/aiRequestBudget.service';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP, type AwardXPResult } from '../services/xp.service';
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
+import {
+  buildDrinkIngredientsRetryMessage,
+  detectAlcoholRequest,
+  findMissingDrinkIngredients,
+  type AlcoholRequestDecision,
+} from '../utils/alcoholRequest.utils';
 import { parseAiJson, prepareAiRecipePayload, readAlcoholRequested } from '../utils/aiRecipePayload.utils';
 import { calculateAge } from '../utils/macroCalculation.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
@@ -671,6 +677,73 @@ async function ensureRecipeRestrictions(
 }
 
 /**
+ * CP-B5.2: drink clássico pedido pelo nome sem o ingrediente que o define
+ * (caipirinha sem limão; tabela em alcoholRequest.utils.ts). Uma nova
+ * tentativa pelo mesmo caminho das outras (mensagem dizendo o que faltou),
+ * com e sem álcool. NUNCA bloqueia: se persistir, se a resposta vier
+ * inválida ou se o provedor falhar, a receita segue (as conferências de
+ * volume, macros, dieta e álcool vêm depois, como sempre).
+ */
+async function ensureDrinkDefiningIngredients(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  message: string
+): Promise<PulseAiRecipe> {
+  const missing = findMissingDrinkIngredients(message, recipe.ingredients.map(ingredient => ingredient.name));
+
+  if (missing.length === 0) {
+    return recipe;
+  }
+
+  const summarize = (items: typeof missing) => items.map(item => ({ drink: item.drink, missing: item.missing }));
+
+  console.info('[pulseAi.controller] drink defining ingredient missing, retrying', {
+    missing: summarize(missing),
+  });
+
+  try {
+    const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+      ...prompt.messages,
+      { role: 'assistant', content: JSON.stringify(recipe) },
+      { role: 'user', content: buildDrinkIngredientsRetryMessage(missing) },
+    ]);
+
+    if (!retried.recipe) {
+      console.warn('[pulseAi.controller] drink defining ingredient retry returned an invalid recipe, delivering the first one');
+      return recipe;
+    }
+
+    const stillMissing = findMissingDrinkIngredients(
+      message,
+      retried.recipe.ingredients.map(ingredient => ingredient.name)
+    );
+
+    if (stillMissing.length > 0) {
+      console.warn('[pulseAi.controller] drink defining ingredient still missing after retry, delivering', {
+        missing: summarize(stillMissing),
+      });
+    }
+
+    return retried.recipe;
+  } catch (error) {
+    console.error('[pulseAi.controller] drink defining ingredient retry failed, delivering the first one', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
+
+    return recipe;
+  }
+}
+
+/**
+ * CP-B5.2: decisão final sobre o pedido de álcool. O código decide os casos
+ * óbvios ('yes'/'no') e, nesses, o campo da IA é ignorado; só no 'ai' (nome
+ * de drink sozinho) vale o alcoholRequested da IA.
+ */
+export function resolveAlcoholRequested(decision: AlcoholRequestDecision, aiAlcoholRequested: boolean): boolean {
+  return decision === 'ai' ? aiAlcoholRequested : decision === 'yes';
+}
+
+/**
  * CP-B5: marcações do backend para o card — ingredientes fora da dieta que a
  * mensagem atual pediu (pelos índices que o validador liberou) e "versão sem
  * álcool". Sempre recalculadas: nada disso vem da IA.
@@ -903,6 +976,18 @@ async function runPulseAiChat(params: {
     return errorOutcome(404, 'resource/not-found', 'User not found.');
   }
 
+  // CP-B5.2: detecção mista, só sobre a mensagem atual. Quando o código
+  // decide 'yes' e a idade é desconhecida, a pergunta de idade sai ANTES do
+  // cache e da IA: nenhuma chamada, nenhum uso reservado.
+  const alcoholDecision = detectAlcoholRequest(message);
+
+  if (alcoholDecision === 'yes' && currentUser.alcoholAge === 'unknown') {
+    console.info('[pulseAi.controller] alcohol requested without a known age, asking for confirmation', {
+      decidedBy: 'code',
+    });
+    return errorOutcome(428, AGE_CONFIRMATION_REQUIRED_CODE, 'Age confirmation is required for this request.');
+  }
+
   const effectiveLanguage = requestedLanguage ?? currentUser.locale;
   const requestReceivedAt = new Date();
   const conversationContext = await resolveConversationContext(currentUser.id);
@@ -946,7 +1031,8 @@ async function runPulseAiChat(params: {
           currentUser.blendiModel,
           {
             explicitRequest: message,
-            alcohol: currentUser.alcoholAge === 'of-age' ? 'allowed' : 'forbidden',
+            // CP-B5.2: 'no' decidido pelo código vale também para a receita do cache.
+            alcohol: currentUser.alcoholAge === 'of-age' && alcoholDecision !== 'no' ? 'allowed' : 'forbidden',
           }
         )
       : null;
@@ -982,7 +1068,10 @@ async function runPulseAiChat(params: {
       const cachedRecipe = withRequestNotices(
         parsedCachedResponse.data.recipe,
         cachedRestrictionCheck.dietOverrideIngredientIndexes ?? [],
-        parsedCachedResponse.data.recipe.alcoholFreeVersion === true
+        // CP-B5.2: com a decisão do código, o aviso de "sem álcool" sai dela.
+        alcoholDecision === 'ai'
+          ? parsedCachedResponse.data.recipe.alcoholFreeVersion === true
+          : alcoholDecision === 'yes' && currentUser.alcoholAge === 'under-age'
       );
       const usageReservation = await reservePulseAiAccess(currentUser);
 
@@ -1060,6 +1149,7 @@ async function runPulseAiChat(params: {
     )),
     message,
     alcoholOfAge: currentUser.alcoholAge === 'of-age',
+    alcoholRequestDecision: alcoholDecision,
   });
 
   if (conversationContext.historyMessages.length > 0) {
@@ -1077,15 +1167,16 @@ async function runPulseAiChat(params: {
   let recipe: PulseAiRecipe | null = null;
   let aiResponse: AiProviderResponse | null = null;
   // CP-B5: lido da primeira receita válida (é sobre a mensagem, não sobre a
-  // receita); as novas tentativas não mudam esse valor.
-  let alcoholRequested = false;
+  // receita); as novas tentativas não mudam esse valor. CP-B5.2: só vale
+  // quando o código devolveu 'ai' (resolveAlcoholRequested).
+  let aiAlcoholRequested = false;
 
   try {
     try {
       const generatedRecipe = await generatePulseAiRecipe(prompt.systemPrompt, prompt.messages);
       recipe = generatedRecipe.recipe;
       aiResponse = generatedRecipe.aiResponse;
-      alcoholRequested = generatedRecipe.alcoholRequested;
+      aiAlcoholRequested = generatedRecipe.alcoholRequested;
     } catch (error) {
       if (shouldRollbackUsage) {
         await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -1110,7 +1201,7 @@ async function runPulseAiChat(params: {
         ]);
         recipe = regeneratedRecipe.recipe;
         aiResponse = regeneratedRecipe.aiResponse;
-        alcoholRequested = regeneratedRecipe.alcoholRequested;
+        aiAlcoholRequested = regeneratedRecipe.alcoholRequested;
       } catch (error) {
         if (shouldRollbackUsage) {
           await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -1152,8 +1243,19 @@ async function runPulseAiChat(params: {
     const sendBlenderLimitUnmet = () =>
       sendEnforcementFailure('unmet', BLENDER_LIMIT_UNMET_CODE, 'Pulse AI could not generate a recipe within the blender limits.');
 
+    const alcoholRequested = resolveAlcoholRequested(alcoholDecision, aiAlcoholRequested);
+
+    // CP-B5.2: só enums e booleanos (sem texto da mensagem nem da receita).
+    console.info('[pulseAi.controller] alcohol request resolved', {
+      decision: alcoholDecision,
+      aiFlag: aiAlcoholRequested,
+      alcoholRequested,
+      alcoholAge: currentUser.alcoholAge,
+    });
+
     // CP-B5: pedido de álcool sem idade conhecida. Nada é entregue nem
     // gravado e o uso volta (o reenvio depois da confirmação gasta um só).
+    // CP-B5.2: aqui só chega o caso 'ai' (o 'yes' perguntou antes da IA).
     if (alcoholRequested && currentUser.alcoholAge === 'unknown') {
       if (shouldRollbackUsage) {
         await rollbackPulseAiAccessReservation(currentUser, usageReservation);
@@ -1167,6 +1269,9 @@ async function runPulseAiChat(params: {
     const alcoholPolicy: RecipeAlcoholPolicy =
       alcoholRequested && currentUser.alcoholAge === 'of-age' ? 'allowed' : 'forbidden';
     const alcoholFreeVersion = alcoholRequested && currentUser.alcoholAge === 'under-age';
+
+    // CP-B5.2: drink pelo nome traz os ingredientes que o definem (nunca bloqueia).
+    recipe = await ensureDrinkDefiningIngredients(recipe, prompt, message);
 
     const blenderLimitEnforcement = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
 

@@ -16,6 +16,10 @@ import {
   isGenericBlender,
   type RecipeTextContext,
 } from '../utils/recipeText.utils';
+import {
+  describeDrinkDefiningIngredients,
+  type AlcoholRequestDecision,
+} from '../utils/alcoholRequest.utils';
 import type {
   BlendiModel,
   BlendiOwnership,
@@ -187,6 +191,12 @@ export interface BuildPulseAiPromptInput extends PulseAiPromptUserContext {
    * atual pedir. Ausente/false = nunca álcool.
    */
   alcoholOfAge?: boolean;
+  /**
+   * CP-B5.2: decisão do código sobre o pedido de álcool da mensagem atual
+   * (detectAlcoholRequest). 'yes'/'no' viram uma linha no prompt (a IA não
+   * decide de novo); 'ai' ou ausente: o prompt fica como antes.
+   */
+  alcoholRequestDecision?: AlcoholRequestDecision;
 }
 
 export interface PantryAvailableIngredient {
@@ -320,6 +330,9 @@ function buildExplicitRequestSection(): string {
     // de pasta de amendoim" virou "15 g".
     '- When the user gives an amount in their own unit (for example "2 bananas" or "1 tbsp of peanut butter"), write the amount field in that unit; you may add the weight in parentheses, for example "2 (240 g)" or "1 tbsp (16 g)".',
     '- A named drink or dish is a request for its defining ingredients, also in an alcohol-free version: for example a piña colada has pineapple and coconut, a caipirinha has lime, a mojito has lime and mint. Never replace a defining ingredient with another fruit.',
+    // CP-B5.2 (lote 10): caipirinha sem limão em pt-BR para 21+. A mesma
+    // tabela é conferida pelo backend (nova tentativa).
+    describeDrinkDefiningIngredients(),
     '- Never drop, shrink or swap a requested item because of variety, the goal, the daily targets, the recent blends or taste. Those rules only shape what the user did not ask for.',
     '- Only the current message counts as an explicit request. Earlier messages of this conversation and the recent blends list are context, never a request: they never add an ingredient, never lift a dietary restriction and never allow alcohol.',
     // Pós CP-B5 (lote 9): receita vegana com "Whey" no título, puxado da
@@ -329,7 +342,17 @@ function buildExplicitRequestSection(): string {
   ].join('\n');
 }
 
-function buildAlcoholSection(alcoholOfAge: boolean): string {
+// CP-B5.2: quando o código já decidiu (detectAlcoholRequest), o prompt diz o
+// resultado e a IA só preenche o campo com ele. O backend ignora o campo da
+// IA nesses casos; a linha existe para a receita sair certa na 1ª tentativa.
+const ALCOHOL_DECISION_LINES: Record<Exclude<AlcoholRequestDecision, 'ai'>, string> = {
+  yes: '- The app has already checked the current message: it asks for alcohol. Set alcoholRequested to true.',
+  no: '- The app has already checked the current message: it does not ask for alcohol (or it asks for the alcohol-free version). Set alcoholRequested to false and use no alcoholic ingredient.',
+};
+
+function buildAlcoholSection(alcoholOfAge: boolean, decision?: AlcoholRequestDecision): string {
+  const decisionLines = decision && decision !== 'ai' ? [ALCOHOL_DECISION_LINES[decision]] : [];
+
   // Lote 9 (CP-B5): "piña colada without ice" para 21+ saiu "Virgin Piña
   // Colada" com alcoholRequested false (a IA leu o pedido como smoothie); o
   // protocolo de praia da Home (hoje "Praia e Refrescos", sem drinks no
@@ -348,6 +371,7 @@ function buildAlcoholSection(alcoholOfAge: boolean): string {
       '- Never use alcohol in this recipe: no spirit, wine, beer, liqueur or any other alcoholic ingredient, and never mention or suggest alcohol in any text, including the tip. Omit the alcoholGrams field.',
       '- When the message counts as asking for alcohol, make the alcohol-free version of the same drink: replace only the alcohol and keep every other defining ingredient and the flavor (for example a caipirinha keeps the lime, a piña colada keeps the pineapple and the coconut). Do not explain why: the app shows the user a short notice.',
       flagMeaning,
+      ...decisionLines,
     ].join('\n');
   }
 
@@ -356,9 +380,12 @@ function buildAlcoholSection(alcoholOfAge: boolean): string {
     whatCounts,
     '- Never add alcohol on your own: use no alcoholic ingredient unless the current message counts as asking for alcohol. The goal, the daily targets, earlier messages and the recent blends never justify alcohol, and no text, including the tip, ever suggests adding alcohol.',
     '- The user is of legal drinking age. When the message counts as asking for alcohol, include the drink\'s usual alcoholic ingredient (for example rum in a piña colada, cachaça in a caipirinha) at a regular single-drink amount (at most 60 ml of a spirit, or the equivalent in wine or beer), never more, even if the user asks for more. Never turn it into an alcohol-free version on your own: the user chose this drink.',
+    // CP-B5.2 (lote 10): 21+ recebeu "Piña Colada Zero Álcool" sem pedir.
+    '- When the message counts as asking for alcohol, the recipe always has the alcoholic ingredient: never return an alcohol-free, "zero", "0%" or "virgin" version and never use those words in the title. Only the current message itself can ask for the alcohol-free version.',
     '- Use neutral language about alcohol: no encouragement, no praise of drinking, no suggestion to drink more or to have another one.',
     '- When the recipe has alcohol, fill alcoholGrams with the grams of pure alcohol (for example, 50 ml of a 40% spirit has about 16 g of pure alcohol) and count 7 kcal per gram of alcohol in the calories. Without alcohol, omit alcoholGrams.',
     flagMeaning,
+    ...decisionLines,
   ].join('\n');
 }
 
@@ -788,9 +815,11 @@ function buildSystemPrompt({
   additionalBehaviorRequirements = [],
   additionalContextSections = [],
   alcoholOfAge = false,
+  alcoholRequestDecision,
 }: PulseAiPromptUserContext & {
   language?: PulseAiChatInput['language'];
   alcoholOfAge?: boolean;
+  alcoholRequestDecision?: AlcoholRequestDecision;
   responseMode?: PulseAiResponseMode;
   recipeCount?: number;
   additionalBehaviorRequirements?: string[];
@@ -851,7 +880,7 @@ function buildSystemPrompt({
 
   // CP-B5: antes do histórico e da variedade (só chat).
   if (responseMode === 'single-recipe') {
-    sections.push('', buildExplicitRequestSection(), '', buildAlcoholSection(alcoholOfAge));
+    sections.push('', buildExplicitRequestSection(), '', buildAlcoholSection(alcoholOfAge, alcoholRequestDecision));
   }
 
   if (recentRecipesSection) {

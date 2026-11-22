@@ -1150,13 +1150,23 @@ interface ViolatingOccurrence {
   end: number;
 }
 
-/** Todas as ocorrências proibidas do texto, na ordem de busca (termos mais longos primeiro). */
-function findViolatingOccurrences(
+interface ScannedOccurrence extends ViolatingOccurrence {
+  /** Negada por prefixo/sufixo (regra 6) ou por frase (regra 7, quando ligada). */
+  negated: boolean;
+}
+
+/**
+ * Todas as ocorrências do texto que não são exceção nem neutralizadas, com a
+ * marca de negação. Base de findViolatingOccurrences (que só fica com as não
+ * negadas) e da detecção do pedido de álcool (CP-B5.2, que precisa saber o que
+ * foi negado: "sem cachaça").
+ */
+function scanOccurrences(
   text: string,
   rules: CompiledRules,
   { sentenceNegation }: { sentenceNegation: boolean }
-): ViolatingOccurrence[] {
-  const occurrences: ViolatingOccurrence[] = [];
+): ScannedOccurrence[] {
+  const occurrences: ScannedOccurrence[] = [];
 
   for (const tokens of tokenizeSegments(text)) {
     const masked = maskExceptions(tokens, rules.exceptions);
@@ -1167,16 +1177,79 @@ function findViolatingOccurrences(
 
         if (!matchesAt(tokens, start, term.tokens)) continue;
         if (masked.slice(start, end).some(Boolean)) continue;
-        if (isNegated(tokens, start, end, term)) continue;
-        if (sentenceNegation && hasSentenceNegationBefore(tokens, start)) continue;
-        if (isNeutralized(tokens, start, end, term)) continue;
 
-        occurrences.push({ canonical: term.canonical, segment: tokens, start, end });
+        const negated =
+          isNegated(tokens, start, end, term) ||
+          (sentenceNegation && hasSentenceNegationBefore(tokens, start));
+
+        if (!negated && isNeutralized(tokens, start, end, term)) continue;
+
+        occurrences.push({ canonical: term.canonical, segment: tokens, start, end, negated });
       }
     }
   }
 
   return occurrences;
+}
+
+/** Todas as ocorrências proibidas do texto, na ordem de busca (termos mais longos primeiro). */
+function findViolatingOccurrences(
+  text: string,
+  rules: CompiledRules,
+  options: { sentenceNegation: boolean }
+): ViolatingOccurrence[] {
+  return scanOccurrences(text, rules, options)
+    .filter(occurrence => !occurrence.negated)
+    .map(({ canonical, segment, start, end }) => ({ canonical, segment, start, end }));
+}
+
+// ─── Listas de termos para outros módulos (CP-B5.2) ──────────────────────────
+
+/** Lista de termos compilada com a normalização e a negação deste validador. */
+export interface CompiledTermList {
+  readonly rules: CompiledRules;
+}
+
+/**
+ * CP-B5.2: compila uma lista de termos (en, pt, exceções) com as MESMAS regras
+ * deste validador (acentos, singular/plural, compostos, exceções mascaradas,
+ * negação da regra 6). Usado pela detecção do pedido de álcool e pela tabela
+ * de ingredientes dos drinks, sem uma segunda lógica de texto.
+ */
+export function compileTermList(list: {
+  en: readonly string[];
+  pt: readonly string[];
+  exceptions?: readonly string[];
+}): CompiledTermList {
+  return {
+    rules: compileRules({
+      en: terms(list.en),
+      pt: terms(list.pt),
+      exceptions: list.exceptions ?? [],
+    }),
+  };
+}
+
+export interface TermMention {
+  /** Termo canônico da lista. */
+  term: string;
+  /** Negado no texto ("sem cachaça", "without rum", "não quero limão"). */
+  negated: boolean;
+}
+
+/** CP-B5.2: termos da lista citados no texto, negados ou não (sem negação por frase). */
+export function findTermMentions(text: string, list: CompiledTermList): TermMention[] {
+  return scanOccurrences(text, list.rules, { sentenceNegation: false })
+    .map(({ canonical, negated }) => ({ term: canonical, negated }));
+}
+
+/**
+ * CP-B5.2: bebidas alcoólicas citadas no texto, com a lista, as exceções
+ * ("essência de rum", "cerveja sem álcool", "vinagre de vinho") e a negação
+ * da checagem de álcool da receita.
+ */
+export function findAlcoholMentions(text: string): TermMention[] {
+  return findTermMentions(text, { rules: COMPILED_RULES.no_alcohol });
 }
 
 /** Primeiro termo proibido encontrado no texto, ou null. */

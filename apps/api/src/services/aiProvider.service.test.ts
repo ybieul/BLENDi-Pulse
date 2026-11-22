@@ -305,3 +305,58 @@ describe('aiProvider — orçamento de tempo (CP-B1)', () => {
     assert.equal(callsByModel['backup-model'], undefined);
   });
 });
+
+// CP-B5.2: o 429 de cota do Gemini continua virando "IA indisponível" para o
+// app, mas o log ganha um código interno próprio (ai/quota-exceeded).
+describe('aiProvider — código interno da falha (CP-B5.2)', () => {
+  function failureLogs(text: string) {
+    return logLines.filter(line => line.text === text).map(line => line.payload as Record<string, unknown>);
+  }
+
+  it('429 (cota): mesmo erro para quem chama, log com ai/quota-exceeded e sem conteúdo', async () => {
+    outcomesByModel = { 'primary-model': [429] };
+
+    const error = await provider.callAi(REQUEST).then(
+      () => assert.fail('deveria falhar'),
+      (caught: unknown) => caught
+    );
+
+    assert.ok(error instanceof provider.AiProviderRequestError);
+    assert.equal((error as InstanceType<typeof provider.AiProviderRequestError>).code, 'ai/quota-exceeded');
+    const [log] = failureLogs('[aiProvider] request failed');
+    assert.equal(log.code, 'ai/quota-exceeded');
+    const serialized = JSON.stringify(logLines);
+    assert.ok(!serialized.includes('SECRET SYSTEM PROMPT'));
+    assert.ok(!serialized.includes('SECRET USER MESSAGE'));
+  });
+
+  it('503 esgotado e 400: ai/unavailable', async () => {
+    outcomesByModel = { 'primary-model': [503, 503, 503] };
+    await assert.rejects(provider.callAi(REQUEST), (error: unknown) => (
+      error instanceof provider.AiProviderRequestError && error.code === 'ai/unavailable'
+    ));
+
+    logLines = [];
+    outcomesByModel = { 'primary-model': [400] };
+    await assert.rejects(provider.callAi(REQUEST), provider.AiProviderRequestError);
+    assert.equal(failureLogs('[aiProvider] request failed')[0].code, 'ai/unavailable');
+  });
+
+  it('visão (Pantry): 429 também sai com ai/quota-exceeded no log', async () => {
+    outcomesByModel = { 'vision-model': [429] };
+
+    await assert.rejects(
+      provider.callVisionAi({ imageBase64: 'aGVsbG8=', mimeType: 'image/jpeg', prompt: 'SECRET SYSTEM PROMPT' }),
+      (error: unknown) => error instanceof provider.AiProviderRequestError && error.code === 'ai/quota-exceeded'
+    );
+    assert.equal(failureLogs('[aiProvider] vision request failed')[0].code, 'ai/quota-exceeded');
+    assert.ok(!JSON.stringify(logLines).includes('SECRET SYSTEM PROMPT'));
+  });
+
+  it('classifyAiFailure: só o status 429 é cota (OpenAI/Anthropic também expõem status)', () => {
+    assert.equal(provider.classifyAiFailure({ status: 429 }), 'ai/quota-exceeded');
+    assert.equal(provider.classifyAiFailure({ status: 503 }), 'ai/unavailable');
+    assert.equal(provider.classifyAiFailure(new Error('timeout')), 'ai/unavailable');
+    assert.equal(provider.classifyAiFailure(undefined), 'ai/unavailable');
+  });
+});

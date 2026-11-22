@@ -72,11 +72,37 @@ export interface VisionProviderResponse {
 
 type VisionProviderResult = Omit<VisionProviderResponse, 'processingTimeMs'>;
 
+/**
+ * CP-B5.2: código interno da falha do provedor, só para o log. A resposta ao
+ * app continua a mesma (503 de IA indisponível) nos dois casos; o código
+ * separa cota (429: no plano gratuito do Gemini, 15 pedidos/min e 500/dia)
+ * de sobrecarga, rede ou timeout.
+ */
+export type AiFailureCode = 'ai/quota-exceeded' | 'ai/unavailable';
+
+export const AI_QUOTA_EXCEEDED_CODE: AiFailureCode = 'ai/quota-exceeded';
+export const AI_UNAVAILABLE_CODE: AiFailureCode = 'ai/unavailable';
+
 export class AiProviderRequestError extends Error {
-  constructor(message = 'AI provider request failed.') {
+  readonly code: AiFailureCode;
+
+  constructor(message = 'AI provider request failed.', code: AiFailureCode = AI_UNAVAILABLE_CODE) {
     super(message);
     this.name = 'AiProviderRequestError';
+    this.code = code;
   }
+}
+
+/**
+ * 429 do provedor (Gemini: GoogleGenerativeAIFetchError.status; OpenAI e
+ * Anthropic: error.status) é cota/limite de taxa. Lê só o status numérico.
+ */
+export function classifyAiFailure(error: unknown): AiFailureCode {
+  const status = typeof error === 'object' && error !== null
+    ? (error as { status?: unknown }).status
+    : undefined;
+
+  return status === 429 ? AI_QUOTA_EXCEEDED_CODE : AI_UNAVAILABLE_CODE;
 }
 
 function getMaxTokens(maxTokens?: number, defaultMaxTokens = DEFAULT_MAX_TOKENS): number {
@@ -571,16 +597,19 @@ export async function callVisionAi(
       processingTimeMs,
     };
   } catch (error) {
+    const code = classifyAiFailure(error);
+
     console.error('[aiProvider] vision request failed', {
       provider,
       model,
+      code,
       imageSizeKb,
       processingTimeMs: Date.now() - startedAt,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    throw new AiProviderRequestError();
+    throw new AiProviderRequestError(undefined, code);
   }
 }
 
@@ -605,14 +634,17 @@ export async function callAi(request: AiProviderRequest): Promise<AiProviderResp
         throw new Error(`[aiProvider] Unsupported provider: ${provider}`);
     }
   } catch (error) {
+    const code = classifyAiFailure(error);
+
     console.error('[aiProvider] request failed', {
       provider,
       model,
+      code,
       processingTimeMs: Date.now() - startedAt,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    throw new AiProviderRequestError();
+    throw new AiProviderRequestError(undefined, code);
   }
 }

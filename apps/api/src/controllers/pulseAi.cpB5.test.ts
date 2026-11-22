@@ -187,13 +187,15 @@ function withIngredients(names: string[], overrides: Record<string, unknown> = {
   return recipe({ ingredients: names.map(name => ({ name, amount: '30 g' })), ...overrides });
 }
 
-// 50 ml de cachaça (~16 g de álcool) + morango + água: 1*4 + 20*4 + 0 + 16*7 = 196.
+// 50 ml de cachaça (~16 g de álcool) + morango + limão + água: 1*4 + 20*4 + 0 + 16*7 = 196.
+// CP-B5.2: com limão (ingrediente que define a caipirinha; sem ele o backend refaz).
 function caipirinha(overrides: Record<string, unknown> = {}) {
   return recipe({
     title: 'Caipirinha de morango',
     ingredients: [
       { name: 'Cachaça', amount: '50 ml' },
       { name: 'Morango', amount: '100 g' },
+      { name: 'Limão', amount: '1/2' },
       { name: 'Água', amount: '100 ml' },
     ],
     macros: { protein: 1, carbs: 20, fat: 0, calories: 196 },
@@ -702,6 +704,215 @@ describe('pós CP-B5 — título conferido com a dieta e o álcool', () => {
     aiResponses = [caipirinha({ title: 'Caipirinha de Morango com Cachaça' })];
 
     const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+  });
+});
+
+// ─── CP-B5.2: detecção mista e ingredientes do drink ─────────────────────────
+
+describe('CP-B5.2 — detecção mista: o código decide os casos óbvios', () => {
+  // Piña colada com rum, abacaxi e coco: 1*4 + 20*4 + 10*9 + 16*7 = 286.
+  function colada(overrides: Record<string, unknown> = {}) {
+    return recipe({
+      title: 'Piña Colada',
+      ingredients: [
+        { name: 'Abacaxi', amount: '150 g' },
+        { name: 'Leite de coco', amount: '100 ml' },
+        { name: 'Rum branco', amount: '50 ml' },
+      ],
+      macros: { protein: 1, carbs: 20, fat: 10, calories: 286 },
+      alcoholGrams: 16,
+      ...overrides,
+    });
+  }
+
+  function virginColada(overrides: Record<string, unknown> = {}) {
+    return recipe({
+      title: 'Piña Colada sem álcool',
+      ingredients: [
+        { name: 'Abacaxi', amount: '150 g' },
+        { name: 'Leite de coco', amount: '100 ml' },
+      ],
+      macros: { protein: 1, carbs: 20, fat: 10, calories: 174 },
+      ...overrides,
+    });
+  }
+
+  it('"no" ignora a flag true da IA: menor pede "piña colada sem álcool" → sem aviso indevido', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    aiResponses = [virginColada({ alcoholRequested: true })];
+
+    const res = await send(uniqueMessage('piña colada sem álcool'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholFreeVersion, undefined);
+    assert.ok(systemPromptOfCall(0).includes('The app has already checked the current message: it does not ask for alcohol'));
+  });
+
+  it('"no" ignora a flag true da IA: sem data pede "virgin piña colada" → nenhuma pergunta de idade', async () => {
+    fakeUser.hasRealBodyProfile = false;
+    aiResponses = [virginColada({ alcoholRequested: true })];
+
+    const res = await send(uniqueMessage('virgin piña colada'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholFreeVersion, undefined);
+  });
+
+  it('"no" para 21+: a flag true da IA não libera álcool; receita com rum é refeita', async () => {
+    aiResponses = [colada({ alcoholRequested: true }), virginColada()];
+
+    const res = await send(uniqueMessage('piña colada sem álcool'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.match(lastUserMessageOfCall(1), /violates the no alcohol/);
+  });
+
+  it('"yes" ignora a flag false da IA: 21+ pede "shake com rum" → álcool permitido', async () => {
+    aiResponses = [withIngredients(['Rum branco', 'Banana'], {
+      alcoholRequested: false,
+      alcoholGrams: 16,
+      macros: { protein: 1, carbs: 20, fat: 0, calories: 196 },
+    })];
+
+    const res = await send(uniqueMessage('shake com rum'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholGrams, 16);
+    assert.ok(systemPromptOfCall(0).includes('The app has already checked the current message: it asks for alcohol.'));
+  });
+
+  it('"yes" ignora a flag false da IA: menor pede "rum shake" → versão sem álcool COM aviso', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    aiResponses = [withIngredients(['Banana', 'Leite de aveia'], { alcoholRequested: false })];
+
+    const res = await send(uniqueMessage('rum shake'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholFreeVersion, true);
+  });
+
+  it('"yes" + idade desconhecida → 428 ANTES da IA: nenhuma chamada, nenhum uso, nada gravado', async () => {
+    fakeUser.hasRealBodyProfile = false;
+    cachedValue = { recipe: recipe(), aiProvider: 'google', aiModel: 'gemini-test' };
+
+    const res = await send(uniqueMessage('mistura com vodka e alguma fruta'));
+
+    assert.equal(res.statusCode, 428);
+    assert.equal(res.body?.code, 'pulseai/age-confirmation-required');
+    assert.equal(callAiMock.mock.callCount(), 0);
+    assert.equal(getFromCacheMock.mock.callCount(), 0);
+    assert.equal(usageReservations().length, 0);
+    assert.equal(usageRollbackCalls().length, 0);
+    assert.equal(setInCacheMock.mock.callCount(), 0);
+    assert.equal(conversationUpdateOneMock.mock.callCount(), 0);
+    assert.equal(awardXPMock.mock.callCount(), 0);
+  });
+
+  it('"ai" segue a flag da IA: drink pelo nome, sem data → 428 depois da chamada (fluxo de antes)', async () => {
+    fakeUser.hasRealBodyProfile = false;
+    aiResponses = [virginColada({ alcoholRequested: true })];
+
+    const res = await send(uniqueMessage('piña colada sem gelo'));
+
+    assert.equal(res.statusCode, 428);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.equal(usageRollbackCalls().length, 1);
+    assert.ok(!systemPromptOfCall(0).includes('The app has already checked the current message'));
+  });
+
+  it('"ai" segue a flag da IA: false para 21+ → álcool proibido (receita com rum é refeita)', async () => {
+    aiResponses = [colada({ alcoholRequested: false }), virginColada()];
+
+    const res = await send(uniqueMessage('piña colada sem gelo'));
+
+    assert.equal(res.statusCode, 200);
+    assert.match(lastUserMessageOfCall(1), /violates the no alcohol/);
+  });
+
+  it('cache: "no" decidido pelo código confere a receita gravada com álcool proibido, mesmo para 21+', async () => {
+    cachedValue = { recipe: colada(), aiProvider: 'google', aiModel: 'gemini-test' };
+    aiResponses = [virginColada()];
+
+    const res = await send(uniqueMessage('piña colada sem álcool'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(deleteFromCacheMock.mock.callCount(), 1);
+    assert.equal((res.body?.data as { fromCache: boolean }).fromCache, false);
+  });
+});
+
+describe('CP-B5.2 — ingredientes que definem o drink', () => {
+  const NO_LIME = () => caipirinha({
+    ingredients: [
+      { name: 'Cachaça', amount: '50 ml' },
+      { name: 'Morango', amount: '100 g' },
+      { name: 'Açúcar', amount: '10 g' },
+    ],
+  });
+
+  it('caipirinha sem limão → nova tentativa dizendo o que faltou; a refeita é entregue', async () => {
+    aiResponses = [NO_LIME(), caipirinha()];
+
+    const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.match(lastUserMessageOfCall(1), /missing ingredients that define the drink the user asked for: a caipirinha needs lime/);
+    assert.ok((res.body?.data as RecipeBody).recipe.ingredients.some(ingredient => ingredient.name === 'Limão'));
+  });
+
+  it('versão sem álcool também: menor, caipirinha sem limão → refeita', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    aiResponses = [
+      virginCaipirinha({ ingredients: [{ name: 'Morango', amount: '150 g' }, { name: 'Água com gás', amount: '150 ml' }] }),
+      virginCaipirinha(),
+    ];
+
+    const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholFreeVersion, true);
+  });
+
+  it('"caipirinha sem limão" pedido → não refaz', async () => {
+    aiResponses = [NO_LIME()];
+
+    const res = await send(uniqueMessage('caipirinha sem limão'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+  });
+
+  it('persistente → entrega a receita (não bloqueia), uso gasto normalmente', async () => {
+    aiResponses = [NO_LIME(), NO_LIME()];
+
+    const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 2);
+    assert.equal(usageRollbackCalls().length, 0);
+    assert.equal(setInCacheMock.mock.callCount(), 1);
+  });
+
+  it('falha do provedor na nova tentativa → entrega a primeira (não vira 503)', async () => {
+    aiResponses = [NO_LIME(), new FakeAiProviderRequestError('quota')];
+
+    const res = await send(uniqueMessage('caipirinha de morango'));
+
+    assert.equal(res.statusCode, 200);
+    assert.ok(!(res.body?.data as RecipeBody).recipe.ingredients.some(ingredient => ingredient.name === 'Limão'));
+  });
+
+  it('drink sem pedido de drink na mensagem: nada é cobrado', async () => {
+    aiResponses = [recipe()];
+
+    const res = await send(uniqueMessage('um shake de morango'));
 
     assert.equal(res.statusCode, 200);
     assert.equal(callAiMock.mock.callCount(), 1);
