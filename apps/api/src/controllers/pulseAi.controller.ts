@@ -687,9 +687,14 @@ async function ensureRecipeRestrictions(
 async function ensureDrinkDefiningIngredients(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
-  message: string
+  message: string,
+  language: UserLocale
 ): Promise<PulseAiRecipe> {
-  const missing = findMissingDrinkIngredients(message, recipe.ingredients.map(ingredient => ingredient.name));
+  const missing = findMissingDrinkIngredients(
+    message,
+    recipe.ingredients.map(ingredient => ingredient.name),
+    language
+  );
 
   if (missing.length === 0) {
     return recipe;
@@ -715,7 +720,8 @@ async function ensureDrinkDefiningIngredients(
 
     const stillMissing = findMissingDrinkIngredients(
       message,
-      retried.recipe.ingredients.map(ingredient => ingredient.name)
+      retried.recipe.ingredients.map(ingredient => ingredient.name),
+      language
     );
 
     if (stillMissing.length > 0) {
@@ -979,7 +985,10 @@ async function runPulseAiChat(params: {
   // CP-B5.2: detecção mista, só sobre a mensagem atual. Quando o código
   // decide 'yes' e a idade é desconhecida, a pergunta de idade sai ANTES do
   // cache e da IA: nenhuma chamada, nenhum uso reservado.
-  const alcoholDecision = detectAlcoholRequest(message);
+  // CP-B5.3: o idioma do pedido só muda o "drink" (ambíguo em pt-BR; em
+  // inglês é verbo e "protein drink").
+  const effectiveLanguage = requestedLanguage ?? currentUser.locale;
+  const alcoholDecision = detectAlcoholRequest(message, effectiveLanguage);
 
   if (alcoholDecision === 'yes' && currentUser.alcoholAge === 'unknown') {
     console.info('[pulseAi.controller] alcohol requested without a known age, asking for confirmation', {
@@ -988,7 +997,6 @@ async function runPulseAiChat(params: {
     return errorOutcome(428, AGE_CONFIRMATION_REQUIRED_CODE, 'Age confirmation is required for this request.');
   }
 
-  const effectiveLanguage = requestedLanguage ?? currentUser.locale;
   const requestReceivedAt = new Date();
   const conversationContext = await resolveConversationContext(currentUser.id);
 
@@ -1271,7 +1279,7 @@ async function runPulseAiChat(params: {
     const alcoholFreeVersion = alcoholRequested && currentUser.alcoholAge === 'under-age';
 
     // CP-B5.2: drink pelo nome traz os ingredientes que o definem (nunca bloqueia).
-    recipe = await ensureDrinkDefiningIngredients(recipe, prompt, message);
+    recipe = await ensureDrinkDefiningIngredients(recipe, prompt, message, effectiveLanguage);
 
     const blenderLimitEnforcement = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
 

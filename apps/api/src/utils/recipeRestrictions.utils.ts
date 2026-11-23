@@ -596,7 +596,8 @@ function alcoholTerms(phrases: readonly string[]): RestrictedTerm[] {
  * de rum é exceção (sabor, sem álcool relevante); "vinagre de vinho"/"wine
  * vinegar" também. Gengibre ("ginger" ≠ "gin") e "vinagre" são outros
  * tokens e não casam. "sake" fica só em pt ("saquê"): em inglês, "for the
- * sake of" daria falso positivo.
+ * sake of" daria falso positivo. CP-B5.3a: "ginger beer", "root beer",
+ * "birch beer" e "cerveja de gengibre" são refrigerantes (exceção).
  */
 const ALCOHOL_RULES: RestrictionRules = {
   en: alcoholTerms([
@@ -668,6 +669,12 @@ const ALCOHOL_RULES: RestrictionRules = {
     'aroma de rum',
     'wine vinegar',
     'vinagre de vinho',
+    // CP-B5.3a: refrigerantes com "beer" no nome (o gengibre do moscow mule
+    // vem da ginger beer). "cerveja de gengibre" é a tradução literal.
+    'ginger beer',
+    'root beer',
+    'birch beer',
+    'cerveja de gengibre',
     'alcohol free',
     'sem alcool',
     'zero alcool',

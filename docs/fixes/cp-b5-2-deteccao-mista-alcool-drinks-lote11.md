@@ -249,6 +249,8 @@ Os 5 erros de marcação são todos no caso `ai` (só o nome do drink), todos em
 - **Nenhum é de segurança:** o erro é sempre para o lado sem álcool.
 - O código acertou 100% do que decidiu. O que ficou abaixo é o mesmo ponto fraco do lote 10: a IA lendo "piña colada sem gelo" (e agora "mojito") em pt-BR como smoothie.
 
+> **Atualização (CP-B5.3, 23/11):** o Gabriel escolheu a opção 1, ampliada para os coquetéis clássicos que sempre levam álcool. "drink" (pt-BR) e "batida" passaram a ir para a IA, e a troca de destilado foi confirmada como `yes`. Ver [cp-b5-3-coqueteis-decididos-pelo-codigo-lote12.md](cp-b5-3-coqueteis-decididos-pelo-codigo-lote12.md).
+
 **Opções (decisão do Gabriel; nada implementado):**
 1. **Drinks da tabela de ingredientes viram `yes` pelo código** (caipirinha, caipiroska, piña colada, mojito, margarita, daiquiri). São coquetéis que, pela definição que já está no prompt, sempre contam como pedido de álcool. A IA continuaria decidindo só os ambíguos (sangria, mimosa, martini, "cocktail"…).
    - Neste lote, os 5 erros viram acerto, e os 6 grupos ficariam em 100% nos pedidos medidos.

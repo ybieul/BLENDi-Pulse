@@ -10,6 +10,13 @@
 // drink. Isso substitui, de propósito, a regra "sem lista de palavras para
 // detectar o pedido" dos CPs anteriores.
 //
+// CP-B5.3 (lote 11: os 5 erros foram a IA marcando false em "piña colada sem
+// gelo" e "mojito"): coquetel que sempre leva álcool é decidido pelo código
+// ('yes'); a IA decide só nomes ambíguos ("batida", "ponche", "eggnog",
+// "drink" em pt-BR) e nomes de coquetel que também são palavra comum sem
+// contexto de bebida ("mimosa", "manhattan"). Drinks famosos sem álcool
+// ("shirley temple") nunca são 'yes' por si.
+//
 // Nenhuma lógica de texto nova: tudo passa pela normalização e pela negação
 // do validador (recipeRestrictions.utils.ts — acentos, singular/plural,
 // compostos, exceções, "sem"/"without"/"não quero"...). A lista de bebidas
@@ -23,11 +30,12 @@ import {
   findTermMentions,
   type CompiledTermList,
 } from './recipeRestrictions.utils';
+import type { UserLocale } from '../models/User';
 
 /**
  * 'yes': a mensagem pede álcool (o código decidiu).
  * 'no': a mensagem não pede álcool, ou pede a versão sem álcool (o código decidiu).
- * 'ai': só o nome de um drink que normalmente leva álcool — vale o
+ * 'ai': só um nome ambíguo de drink (pode ou não levar álcool) — vale o
  * alcoholRequested da IA.
  */
 export type AlcoholRequestDecision = 'yes' | 'no' | 'ai';
@@ -105,7 +113,12 @@ const GENERIC_ALCOHOL_TERMS: ReadonlySet<string> = new Set([
   'destilado',
 ]);
 
-/** Ingredientes que definem um drink, com sinônimos en e pt-BR. */
+/**
+ * Ingredientes que definem um drink, com sinônimos en e pt-BR. Só
+ * ingredientes simples e inequívocos de liquidificador. "lime" (caipirinha,
+ * mojito...) aceita "lemon" desde o CP-B5.2; "lemon" (tom collins, lemon
+ * drop) aceita "lime" — em pt os dois são "limão".
+ */
 export const DRINK_DEFINING_INGREDIENTS = {
   lime: { label: 'lime', en: ['lime', 'lime juice', 'lemon'], pt: ['limao', 'lima', 'suco de limao'] },
   pineapple: { label: 'pineapple', en: ['pineapple'], pt: ['abacaxi', 'ananas'] },
@@ -115,67 +128,174 @@ export const DRINK_DEFINING_INGREDIENTS = {
     pt: ['coco', 'leite de coco', 'creme de coco'],
   },
   mint: { label: 'mint', en: ['mint'], pt: ['hortela', 'menta'] },
+  lemon: { label: 'lemon', en: ['lemon', 'lemon juice', 'lime'], pt: ['limao', 'limao siciliano', 'lima', 'suco de limao'] },
+  // "ginger beer"/"ginger ale" contêm "ginger" e contam.
+  ginger: { label: 'ginger', en: ['ginger'], pt: ['gengibre'] },
+  cranberry: { label: 'cranberry', en: ['cranberry'], pt: ['oxicoco'] },
+  grapefruit: { label: 'grapefruit', en: ['grapefruit'], pt: ['toranja'] },
+  tomato: { label: 'tomato', en: ['tomato'], pt: ['tomate'] },
+  // "coffee liqueur"/"licor de café" contêm "coffee"/"café" e contam.
+  coffee: { label: 'coffee', en: ['coffee', 'espresso', 'cold brew'], pt: ['cafe', 'expresso'] },
+  milk: { label: 'milk or cream', en: ['milk', 'cream', 'half and half'], pt: ['leite', 'creme', 'creme de leite', 'nata'] },
+  orange: { label: 'orange', en: ['orange'], pt: ['laranja'] },
+  peach: { label: 'peach', en: ['peach'], pt: ['pessego'] },
 } as const;
 
 export type DrinkDefiningIngredient = keyof typeof DRINK_DEFINING_INGREDIENTS;
 
-interface ClassicDrink {
+interface AlcoholicCocktail {
   /** Nome usado nos logs e no prompt. */
   label: string;
-  /** Nomes normalizados (sem acento), iguais em en e pt-BR. */
+  /** Nomes normalizados (sem acento), iguais em en e pt-BR. Citados → 'yes'. */
   names: readonly string[];
-  /** Ingredientes que a receita precisa trazer (Tarefa 2). Vazio: só detecção. */
+  /**
+   * Nomes que também são palavra comum, lugar, nome de pessoa ou outra
+   * comida ("manhattan", "painkiller", "old fashioned oats"). Só contam como
+   * o coquetel colados a "drink"/"drinque"/"cocktail"/"coquetel" (antes ou
+   * depois, com ou sem "de") ou depois de "frozen" → 'yes'. Sozinhos → 'ai'.
+   */
+  contextNames?: readonly string[];
+  /** Ingredientes que a receita precisa trazer. Vazio: só detecção. */
   defining: readonly DrinkDefiningIngredient[];
 }
 
 /**
- * Drinks que normalmente levam álcool, sem nomear o destilado. Citado sem
- * negação (e sem bebida alcoólica, pedido genérico nem pedido sem álcool),
- * a decisão fica com a IA ('ai'). Os que têm `defining` também entram na
- * conferência de ingredientes. Destilado no nome ("tequila sunrise", "pisco
- * sour", "gin tônica") já é 'yes' pela lista do CP-B5 e não precisa estar aqui.
- * Fora de propósito: "batida" (em pt também é "batido no liquidificador") e
- * "drink" (em en é verbo e "protein drink").
+ * CP-B5.3 — coquetéis que SEMPRE levam álcool: citados sem negação, o código
+ * decide 'yes' (a IA não decide mais). Lote 11: a IA marcou false em
+ * "piña colada sem gelo" e "mojito". Os 6 primeiros são os do CP-B5.2, na
+ * mesma ordem (a linha do prompt começa igual). Destilado no nome
+ * ("tequila sunrise", "gin fizz", "aperol spritz") já é 'yes' pela lista de
+ * bebidas do CP-B5; os que estão aqui também, por clareza.
+ *
+ * Falsos positivos: "margarita" e "martini" contam sozinhos ("Martini" também
+ * é marca de vermute), com a exceção da pizza margarita; os nomes de risco
+ * maior ficam em `contextNames` (ver COCKTAIL_NAME_EXCEPTIONS e
+ * DRINK_CONTEXT_TERMS).
  */
-export const CLASSIC_ALCOHOLIC_DRINKS: readonly ClassicDrink[] = [
+export const ALWAYS_ALCOHOLIC_COCKTAILS: readonly AlcoholicCocktail[] = [
   { label: 'caipirinha', names: ['caipirinha'], defining: ['lime'] },
-  { label: 'caipiroska', names: ['caipiroska', 'caipivodka'], defining: ['lime'] },
+  { label: 'caipiroska', names: ['caipiroska', 'caipirosca', 'caipivodka'], defining: ['lime'] },
   { label: 'piña colada', names: ['pina colada', 'pinacolada'], defining: ['pineapple', 'coconut'] },
   { label: 'mojito', names: ['mojito'], defining: ['mint', 'lime'] },
   { label: 'margarita', names: ['margarita'], defining: ['lime'] },
   { label: 'daiquiri', names: ['daiquiri'], defining: ['lime'] },
+  { label: 'quentão', names: ['quentao'], defining: ['ginger'] },
+  { label: 'moscow mule', names: ['moscow mule'], defining: ['lime', 'ginger'] },
+  { label: 'cosmopolitan', names: ['cosmopolitan'], defining: ['cranberry', 'lime'] },
+  { label: 'mai tai', names: ['mai tai'], defining: ['lime'] },
+  { label: 'paloma', names: [], contextNames: ['paloma'], defining: ['grapefruit'] },
+  { label: 'mint julep', names: ['mint julep'], defining: ['mint'] },
+  { label: 'tom collins', names: ['tom collins'], defining: ['lemon'] },
+  { label: 'lemon drop', names: [], contextNames: ['lemon drop'], defining: ['lemon'] },
+  { label: 'bloody mary', names: ['bloody mary'], defining: ['tomato'] },
+  { label: 'white russian', names: ['white russian'], defining: ['coffee', 'milk'] },
+  { label: 'mudslide', names: [], contextNames: ['mudslide'], defining: ['coffee', 'milk'] },
+  { label: 'espresso martini', names: ['espresso martini', 'expresso martini'], defining: ['coffee'] },
+  { label: 'mimosa', names: [], contextNames: ['mimosa'], defining: ['orange'] },
+  { label: 'bellini', names: ['bellini'], defining: ['peach'] },
+  // Sangria: "fruta (qualquer)" não cabe numa lista simples de sinônimos.
   { label: 'sangria', names: ['sangria'], defining: [] },
-  { label: 'cosmopolitan', names: ['cosmopolitan'], defining: [] },
-  { label: 'negroni', names: ['negroni'], defining: [] },
-  { label: 'spritz', names: ['spritz'], defining: [] },
-  { label: 'mimosa', names: ['mimosa'], defining: [] },
-  { label: 'bellini', names: ['bellini'], defining: [] },
   { label: 'martini', names: ['martini'], defining: [] },
+  { label: 'old fashioned', names: [], contextNames: ['old fashioned'], defining: [] },
+  { label: 'manhattan', names: [], contextNames: ['manhattan'], defining: [] },
+  { label: 'negroni', names: ['negroni'], defining: [] },
+  { label: 'long island', names: ['long island iced tea', 'long island ice tea'], contextNames: ['long island'], defining: [] },
+  { label: 'spritz', names: ['aperol spritz'], contextNames: ['spritz'], defining: [] },
   { label: 'cuba libre', names: ['cuba libre'], defining: [] },
-  { label: 'moscow mule', names: ['moscow mule'], defining: [] },
-  { label: 'mai tai', names: ['mai tai'], defining: [] },
-  { label: 'bloody mary', names: ['bloody mary'], defining: [] },
-  { label: 'michelada', names: ['michelada'], defining: [] },
-  { label: 'irish coffee', names: ['irish coffee'], defining: [] },
-  { label: 'eggnog', names: ['eggnog'], defining: [] },
-  { label: 'white russian', names: ['white russian'], defining: [] },
-  { label: 'long island', names: ['long island'], defining: [] },
+  { label: 'hurricane', names: [], contextNames: ['hurricane'], defining: [] },
+  { label: 'painkiller', names: [], contextNames: ['painkiller'], defining: [] },
+  { label: 'sidecar', names: [], contextNames: ['sidecar'], defining: [] },
+  { label: 'gin fizz', names: ['gin fizz'], defining: [] },
   { label: 'sex on the beach', names: ['sex on the beach'], defining: [] },
-  { label: 'cocktail', names: ['cocktail', 'coquetel', 'drinque'], defining: [] },
+  { label: 'michelada', names: ['michelada'], defining: [] },
 ];
+
+/**
+ * Palavras que, coladas a um nome de risco (`contextNames`), mostram que é o
+ * coquetel: "drink de mimosa", "paloma cocktail", "coquetel manhattan".
+ * "frozen" só antes do nome ("frozen paloma"; "old fashioned frozen yogurt" não).
+ */
+const DRINK_CONTEXT_TERMS = ['drink', 'drinque', 'cocktail', 'coquetel'] as const;
+const DRINK_CONTEXT_PREFIX_ONLY = ['frozen'] as const;
+
+/** Frases em que o nome do coquetel é outra coisa (comida). Nunca contam. */
+const COCKTAIL_NAME_EXCEPTIONS = [
+  'pizza margarita',
+  'margarita pizza',
+  'pizza de margarita',
+  'old fashioned oat',
+  'old fashioned oatmeal',
+  'old fashioned rolled oat',
+  'spritz cookie',
+  'spritz biscuit',
+] as const;
+
+/**
+ * Nomes ambíguos (podem ou não levar álcool): sem outro sinal, a decisão fica
+ * com a IA ('ai'). "drink" só conta em pt-BR: em inglês é verbo ("drink
+ * within 30 minutes") e "protein drink". "irish coffee" segue com a IA como
+ * no CP-B5.2 (também é sabor de café/creamer). "fruit cocktail"/"shrimp
+ * cocktail" são comida.
+ */
+export const AMBIGUOUS_DRINK_NAMES = {
+  en: ['eggnog', 'punch', 'cocktail', 'irish coffee'],
+  pt: ['batida', 'ponche', 'coquetel', 'drinque'],
+  ptBrOnly: ['drink'],
+  exceptions: ['fruit cocktail', 'shrimp cocktail'],
+} as const;
+
+/**
+ * Drinks famosos SEM álcool: nunca 'yes' por si. Sem outro sinal de álcool →
+ * 'no' (vencem os nomes ambíguos: "drink shirley temple" → 'no'). Com bebida
+ * alcoólica ou coquetel na mensagem, vale o outro sinal.
+ */
+export const ALCOHOL_FREE_FAMOUS_DRINKS = {
+  en: ['shirley temple', 'arnold palmer', 'roy rogers', 'virgin mary'],
+  pt: ['limonada suica'],
+} as const;
 
 // ─── Listas compiladas (mesma normalização e negação do validador) ───────────
 
 const COMPILED_ALCOHOL_FREE_REQUEST = compileTermList(ALCOHOL_FREE_REQUEST_TERMS);
 const COMPILED_GENERIC_ALCOHOL_REQUEST = compileTermList(GENERIC_ALCOHOL_REQUEST_TERMS);
 
-const DRINK_BY_NAME = new Map<string, ClassicDrink>(
-  CLASSIC_ALCOHOLIC_DRINKS.flatMap(drink => drink.names.map(name => [name, drink] as const))
+function contextPhrases(name: string): string[] {
+  return [
+    ...DRINK_CONTEXT_TERMS.flatMap(context => [`${context} ${name}`, `${name} ${context}`, `${context} de ${name}`]),
+    ...DRINK_CONTEXT_PREFIX_ONLY.map(context => `${context} ${name}`),
+  ];
+}
+
+// Frase (nome ou nome de risco com contexto) → coquetel.
+const COCKTAIL_BY_PHRASE = new Map<string, AlcoholicCocktail>(
+  ALWAYS_ALCOHOLIC_COCKTAILS.flatMap(cocktail => [
+    ...cocktail.names,
+    ...(cocktail.contextNames ?? []).flatMap(contextPhrases),
+  ].map(phrase => [phrase, cocktail] as const))
 );
 
-// Nomes de drink nos dois idiomas (iguais): ficam na lista 'pt' para que o
-// "no" puro do inglês não os negue em português ("no mojito" = "em o mojito").
-const COMPILED_DRINK_NAMES = compileTermList({ en: [], pt: [...DRINK_BY_NAME.keys()] });
+// Nomes de drink nos dois idiomas (iguais). Em pt-BR ficam na lista 'pt'
+// para que o "no" puro não os negue ("no mojito" = "em o mojito"); em inglês,
+// na lista 'en' ("no mojito, please" é negação). Sem idioma: como em pt-BR.
+const COCKTAIL_PHRASES = [...COCKTAIL_BY_PHRASE.keys()];
+const COMPILED_COCKTAIL_NAMES = compileTermList({ en: [], pt: COCKTAIL_PHRASES, exceptions: COCKTAIL_NAME_EXCEPTIONS });
+const COMPILED_COCKTAIL_NAMES_EN = compileTermList({ en: COCKTAIL_PHRASES, pt: [], exceptions: COCKTAIL_NAME_EXCEPTIONS });
+
+// Nomes de risco sozinhos (sem contexto): 'ai'.
+const COMPILED_RISKY_COCKTAIL_NAMES = compileTermList({
+  en: [],
+  pt: ALWAYS_ALCOHOLIC_COCKTAILS.flatMap(cocktail => cocktail.contextNames ?? []),
+  exceptions: COCKTAIL_NAME_EXCEPTIONS,
+});
+
+const COMPILED_AMBIGUOUS_DRINK_NAMES = compileTermList(AMBIGUOUS_DRINK_NAMES);
+const COMPILED_AMBIGUOUS_DRINK_NAMES_PT_BR = compileTermList({
+  en: AMBIGUOUS_DRINK_NAMES.en,
+  pt: [...AMBIGUOUS_DRINK_NAMES.pt, ...AMBIGUOUS_DRINK_NAMES.ptBrOnly],
+  exceptions: AMBIGUOUS_DRINK_NAMES.exceptions,
+});
+
+const COMPILED_ALCOHOL_FREE_FAMOUS_DRINKS = compileTermList(ALCOHOL_FREE_FAMOUS_DRINKS);
 
 const COMPILED_DEFINING_INGREDIENTS = Object.fromEntries(
   (Object.keys(DRINK_DEFINING_INGREDIENTS) as DrinkDefiningIngredient[]).map(id => [
@@ -188,21 +308,25 @@ function hasMention(text: string, list: CompiledTermList, negated: boolean): boo
   return findTermMentions(text, list).some(mention => mention.negated === negated);
 }
 
-/** Drinks clássicos citados sem negação no texto, na ordem da tabela. */
-function namedClassicDrinks(text: string): ClassicDrink[] {
+/**
+ * Coquetéis citados sem negação no texto (nome, ou nome de risco com
+ * contexto de bebida), na ordem da tabela.
+ */
+function namedCocktails(text: string, language: UserLocale | undefined): AlcoholicCocktail[] {
+  const list = language === 'en' ? COMPILED_COCKTAIL_NAMES_EN : COMPILED_COCKTAIL_NAMES;
   const named = new Set(
-    findTermMentions(text, COMPILED_DRINK_NAMES)
+    findTermMentions(text, list)
       .filter(mention => !mention.negated)
       .flatMap(mention => {
-        const drink = DRINK_BY_NAME.get(mention.term);
-        return drink ? [drink] : [];
+        const cocktail = COCKTAIL_BY_PHRASE.get(mention.term);
+        return cocktail ? [cocktail] : [];
       })
   );
 
-  return CLASSIC_ALCOHOLIC_DRINKS.filter(drink => named.has(drink));
+  return ALWAYS_ALCOHOLIC_COCKTAILS.filter(cocktail => named.has(cocktail));
 }
 
-// ─── Tarefa 1: detecção mista ────────────────────────────────────────────────
+// ─── Detecção mista ──────────────────────────────────────────────────────────
 
 /**
  * Decide, só pela mensagem ATUAL, se ela pede álcool. Ordem:
@@ -215,11 +339,18 @@ function namedClassicDrinks(text: string): ClassicDrink[] {
  * 3. pedido genérico ("boozy", "spiked", "batizado") → 'yes';
  * 4. só bebida negada ("caipirinha sem cachaça", "mojito without rum",
  *    "shake sem cachaça") → 'no': quem nega o destilado pede a versão sem
- *    álcool, mesmo citando o drink;
- * 5. nome de drink clássico citado sem negação → 'ai';
- * 6. nada disso → 'no'.
+ *    álcool, mesmo citando o drink (é a versão sem álcool vencendo);
+ * 5. coquetel que sempre leva álcool (ALWAYS_ALCOHOLIC_COCKTAILS) citado sem
+ *    negação → 'yes' (CP-B5.3);
+ * 6. drink famoso sem álcool ("shirley temple", "limonada suíça") → 'no';
+ * 7. nome ambíguo ("batida", "ponche", "eggnog", "drink" em pt-BR) ou nome
+ *    de coquetel de risco sem contexto ("mimosa", "manhattan") → 'ai';
+ * 8. nada disso → 'no'.
+ *
+ * `language` é o idioma do pedido (o mesmo do prompt): muda o "drink" e o
+ * "no" puro antes do nome do coquetel (negação só em inglês).
  */
-export function detectAlcoholRequest(message: string): AlcoholRequestDecision {
+export function detectAlcoholRequest(message: string, language?: UserLocale): AlcoholRequestDecision {
   if (!message.trim()) return 'no';
 
   const alcoholMentions = findAlcoholMentions(message);
@@ -243,10 +374,24 @@ export function detectAlcoholRequest(message: string): AlcoholRequestDecision {
     return 'no';
   }
 
-  return namedClassicDrinks(message).length > 0 ? 'ai' : 'no';
+  if (namedCocktails(message, language).length > 0) {
+    return 'yes';
+  }
+
+  if (hasMention(message, COMPILED_ALCOHOL_FREE_FAMOUS_DRINKS, false)) {
+    return 'no';
+  }
+
+  const ambiguous = language === 'pt-BR' ? COMPILED_AMBIGUOUS_DRINK_NAMES_PT_BR : COMPILED_AMBIGUOUS_DRINK_NAMES;
+
+  if (hasMention(message, ambiguous, false) || hasMention(message, COMPILED_RISKY_COCKTAIL_NAMES, false)) {
+    return 'ai';
+  }
+
+  return 'no';
 }
 
-// ─── Tarefa 2: ingredientes que definem o drink ──────────────────────────────
+// ─── Ingredientes que definem o drink ────────────────────────────────────────
 
 export interface MissingDrinkIngredients {
   /** Drink citado na mensagem. */
@@ -256,16 +401,18 @@ export interface MissingDrinkIngredients {
 }
 
 /**
- * Drinks clássicos citados na mensagem atual cuja receita não traz algum
- * ingrediente que os define. Um ingrediente que a própria mensagem nega
- * ("caipirinha sem limão") não é cobrado. Só os nomes dos ingredientes da
- * receita contam (com a negação do validador).
+ * Coquetéis citados na mensagem atual (com e sem álcool) cuja receita não
+ * traz algum ingrediente que os define. Um nome de risco só conta com
+ * contexto de bebida ("drink de mimosa"). Um ingrediente que a própria
+ * mensagem nega ("caipirinha sem limão") não é cobrado. Só os nomes dos
+ * ingredientes da receita contam (com a negação do validador).
  */
 export function findMissingDrinkIngredients(
   message: string,
-  ingredientNames: readonly string[]
+  ingredientNames: readonly string[],
+  language?: UserLocale
 ): MissingDrinkIngredients[] {
-  const drinks = namedClassicDrinks(message).filter(drink => drink.defining.length > 0);
+  const drinks = namedCocktails(message, language).filter(drink => drink.defining.length > 0);
   if (drinks.length === 0) return [];
 
   const result: MissingDrinkIngredients[] = [];
@@ -278,7 +425,7 @@ export function findMissingDrinkIngredients(
     });
 
     if (missing.length > 0) {
-      result.push({ drink: drink.label, missing });
+      result.push({ drink: drink.label, missing: [...missing] });
     }
   }
 
@@ -292,7 +439,7 @@ function joinEnglish(items: readonly string[]): string {
 
 /** Uma linha do prompt (chat) gerada da mesma tabela da conferência. */
 export function describeDrinkDefiningIngredients(): string {
-  const entries = CLASSIC_ALCOHOLIC_DRINKS
+  const entries = ALWAYS_ALCOHOLIC_COCKTAILS
     .filter(drink => drink.defining.length > 0)
     .map(drink => `${drink.label}: ${joinEnglish(drink.defining.map(id => DRINK_DEFINING_INGREDIENTS[id].label))}`);
 

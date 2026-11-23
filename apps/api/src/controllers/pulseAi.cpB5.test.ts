@@ -514,7 +514,9 @@ describe('CP-B5 — álcool', () => {
     fakeUser.hasRealBodyProfile = false;
     aiResponses = [virginCaipirinha()];
 
-    const res = await send(uniqueMessage('piña colada sem gelo'));
+    // CP-B5.3: "piña colada sem gelo" passou a ser 'yes' pelo código; o fluxo
+    // depois da IA continua para nome ambíguo ('ai').
+    const res = await send(uniqueMessage('batida de coco'));
 
     assert.equal(res.statusCode, 428);
     assert.equal(res.body?.code, 'pulseai/age-confirmation-required');
@@ -813,11 +815,13 @@ describe('CP-B5.2 — detecção mista: o código decide os casos óbvios', () =
     assert.equal(awardXPMock.mock.callCount(), 0);
   });
 
-  it('"ai" segue a flag da IA: drink pelo nome, sem data → 428 depois da chamada (fluxo de antes)', async () => {
+  // CP-B5.3: os dois testes de 'ai' usavam "piña colada sem gelo"; agora ela
+  // é 'yes' pelo código e o exemplo de nome ambíguo é "batida de coco".
+  it('"ai" segue a flag da IA: nome ambíguo, sem data → 428 depois da chamada (fluxo de antes)', async () => {
     fakeUser.hasRealBodyProfile = false;
     aiResponses = [virginColada({ alcoholRequested: true })];
 
-    const res = await send(uniqueMessage('piña colada sem gelo'));
+    const res = await send(uniqueMessage('batida de coco'));
 
     assert.equal(res.statusCode, 428);
     assert.equal(callAiMock.mock.callCount(), 1);
@@ -828,10 +832,46 @@ describe('CP-B5.2 — detecção mista: o código decide os casos óbvios', () =
   it('"ai" segue a flag da IA: false para 21+ → álcool proibido (receita com rum é refeita)', async () => {
     aiResponses = [colada({ alcoholRequested: false }), virginColada()];
 
-    const res = await send(uniqueMessage('piña colada sem gelo'));
+    const res = await send(uniqueMessage('batida de coco'));
 
     assert.equal(res.statusCode, 200);
     assert.match(lastUserMessageOfCall(1), /violates the no alcohol/);
+  });
+
+  it('CP-B5.3: coquetel pelo nome ("piña colada sem gelo") + idade desconhecida → 428 ANTES da IA', async () => {
+    fakeUser.hasRealBodyProfile = false;
+
+    const res = await send(uniqueMessage('piña colada sem gelo'));
+
+    assert.equal(res.statusCode, 428);
+    assert.equal(res.body?.code, 'pulseai/age-confirmation-required');
+    assert.equal(callAiMock.mock.callCount(), 0);
+    assert.equal(usageReservations().length, 0);
+  });
+
+  it('CP-B5.3: coquetel pelo nome ignora a flag false da IA: 21+ pede "mojito" → álcool permitido', async () => {
+    aiResponses = [withIngredients(['Rum branco', 'Hortelã', 'Limão'], {
+      alcoholRequested: false,
+      alcoholGrams: 16,
+      macros: { protein: 1, carbs: 20, fat: 0, calories: 196 },
+    })];
+
+    const res = await send(uniqueMessage('mojito'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholGrams, 16);
+    assert.ok(systemPromptOfCall(0).includes('The app has already checked the current message: it asks for alcohol.'));
+  });
+
+  it('CP-B5.3: coquetel pelo nome, menor → versão sem álcool COM aviso', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    aiResponses = [virginColada({ alcoholRequested: false })];
+
+    const res = await send(uniqueMessage('piña colada sem gelo'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal((res.body?.data as RecipeBody).recipe.alcoholFreeVersion, true);
   });
 
   it('cache: "no" decidido pelo código confere a receita gravada com álcool proibido, mesmo para 21+', async () => {
@@ -843,6 +883,30 @@ describe('CP-B5.2 — detecção mista: o código decide os casos óbvios', () =
     assert.equal(res.statusCode, 200);
     assert.equal(deleteFromCacheMock.mock.callCount(), 1);
     assert.equal((res.body?.data as { fromCache: boolean }).fromCache, false);
+  });
+});
+
+describe('CP-B5.3a — ginger beer não é álcool', () => {
+  it('menor pede "moscow mule": receita com limão + ginger beer sai de primeira, com aviso, 1 chamada', async () => {
+    fakeUser.birthDate = yearsAgo(19);
+    // 30 ml de limão + 150 ml de ginger beer: 0*4 + 15*4 + 0 = 60.
+    aiResponses = [recipe({
+      title: 'Moscow Mule sem álcool',
+      ingredients: [
+        { name: 'Suco de limão', amount: '30 ml' },
+        { name: 'Ginger beer', amount: '150 ml' },
+      ],
+      macros: { protein: 0, carbs: 15, fat: 0, calories: 60 },
+      alcoholRequested: true,
+    })];
+
+    const res = await send(uniqueMessage('moscow mule'));
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(callAiMock.mock.callCount(), 1);
+    const delivered = (res.body?.data as RecipeBody).recipe;
+    assert.equal(delivered.alcoholFreeVersion, true);
+    assert.equal(delivered.alcoholGrams, undefined);
   });
 });
 

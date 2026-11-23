@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-  CLASSIC_ALCOHOLIC_DRINKS,
+  ALWAYS_ALCOHOLIC_COCKTAILS,
   buildDrinkIngredientsRetryMessage,
   describeDrinkDefiningIngredients,
   detectAlcoholRequest,
@@ -105,9 +105,10 @@ describe('CP-B5.2 — detectAlcoholRequest: pedido genérico de álcool → "yes
   });
 });
 
-describe('CP-B5.2 — detectAlcoholRequest: só o nome do drink → "ai"', () => {
+describe('CP-B5.2 — detectAlcoholRequest: só o nome do drink (CP-B5.3: coquetel que sempre leva álcool → "yes")', () => {
   it('drinks clássicos, com outras mudanças ("sem gelo", sabor)', () => {
-    expectAll('ai', [
+    // CP-B5.3: eram 'ai' (a IA decidia); no lote 11 a IA errou "piña colada sem gelo" e "mojito".
+    expectAll('yes', [
       'piña colada sem gelo',
       'piña colada without ice',
       'caipirinha de morango',
@@ -208,9 +209,11 @@ describe('CP-B5.2 — ingredientes que definem o drink', () => {
     assert.deepEqual(findMissingDrinkIngredients('não quero caipirinha', ['Banana']), []);
   });
 
-  it('tabela: caipirinha/caipiroska, piña colada, mojito, margarita e daiquiri', () => {
+  it('tabela: caipirinha/caipiroska, piña colada, mojito, margarita e daiquiri (os 6 primeiros, mantidos no CP-B5.3)', () => {
     const defining = Object.fromEntries(
-      CLASSIC_ALCOHOLIC_DRINKS.filter(drink => drink.defining.length > 0).map(drink => [drink.label, drink.defining])
+      ALWAYS_ALCOHOLIC_COCKTAILS.filter(drink => drink.defining.length > 0)
+        .slice(0, 6)
+        .map(drink => [drink.label, drink.defining])
     );
     assert.deepEqual(defining, {
       caipirinha: ['lime'],
