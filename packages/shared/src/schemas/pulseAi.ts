@@ -3,9 +3,11 @@ import { z } from 'zod';
 import {
   RECIPE_CAPACITY_NOTICE_MAX_LENGTH,
   RECIPE_DIET_OVERRIDE_MAX_ITEMS,
+  RECIPE_MISSING_REQUEST_MAX_ITEMS,
 } from '../recipeContent';
 
-const PULSE_AI_MESSAGE_MAX = 500;
+/** Tamanho máximo da mensagem do Pulse AI (também o do pedido opcional do Pantry Scanner). */
+export const PULSE_AI_MESSAGE_MAX = 500;
 
 export const pulseAiChatSchema = z.object({
   message: z
@@ -80,6 +82,12 @@ export interface PulseAiRecipe {
    * backend, nunca pela IA.
    */
   alcoholFreeVersion?: boolean;
+  /**
+   * CP-B7a (Pantry Scanner): itens adicionados à mão que a receita não
+   * conseguiu incluir, mesmo depois da nova tentativa. Marcado pelo backend
+   * (o que vier da IA é descartado). O app mostra "Não conseguimos incluir: X".
+   */
+  missingRequestedIngredients?: string[];
   steps?: Array<{
     text: string;
     pulseCount?: number;
@@ -187,6 +195,10 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
     .optional(),
   alcoholFreeVersion: z
     .boolean({ invalid_type_error: 'errors.validation.invalid_option' })
+    .optional(),
+  missingRequestedIngredients: z
+    .array(z.string().trim().min(1, 'errors.validation.required'))
+    .max(RECIPE_MISSING_REQUEST_MAX_ITEMS, 'errors.validation.too_long')
     .optional(),
   steps: z.array(pulseAiStepSchema).optional(),
 });

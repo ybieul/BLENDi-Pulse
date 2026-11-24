@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  PULSE_AI_MESSAGE_MAX,
   pulseAiRecipePreviewSchema,
   pulseAiRecipeSchema,
   type PulseAiRecipe,
@@ -129,5 +130,113 @@ export const pantryPreviewUnlockResultSchema = z.object({
 
 export interface PantryPreviewUnlockResult
   extends Omit<z.infer<typeof pantryPreviewUnlockResultSchema>, 'recipes'> {
+  recipes: PulseAiRecipe[];
+}
+
+// ─── CP-B5.4: leitura e geração em duas etapas ──────────────────────────────
+// POST /pantry-scanner/read só lê a foto (não conta scan); a pessoa confirma
+// os ingredientes; POST /pantry-scanner/generate gera as receitas e conta o
+// scan. Constantes únicas dos limites (API e app).
+
+/** Free: leituras por scan (e por prévia) do ciclo — teto = (scans + prévia) × isto. */
+export const PANTRY_READS_PER_SCAN = 3;
+/** Pro: proteção contra robô — no máximo isto de leituras na janela abaixo. */
+export const PANTRY_PRO_READ_BURST_LIMIT = 10;
+export const PANTRY_PRO_READ_BURST_WINDOW_MS = 10 * 60 * 1000;
+/** Pro: teto de segurança de leituras por dia (fuso da conta). */
+export const PANTRY_PRO_READ_DAILY_LIMIT = 100;
+/** Validade de uma leitura guardada no servidor (sem a imagem). */
+export const PANTRY_READ_TTL_MS = 30 * 60 * 1000;
+/** Itens adicionados à mão: quantos e de que tamanho. */
+export const PANTRY_ADDED_ITEMS_MAX = 10;
+export const PANTRY_ADDED_ITEM_MAX_LENGTH = 40;
+/** O pedido opcional tem o mesmo tamanho máximo da mensagem do Pulse AI. */
+export const PANTRY_REQUEST_MAX_LENGTH = PULSE_AI_MESSAGE_MAX;
+/** Teto de itens marcados (a leitura nunca traz mais que isto de usáveis). */
+export const PANTRY_SELECTED_ITEMS_MAX = 60;
+
+export const pantryLiquidChoiceValues = ['water', 'milk', 'plant_milk', 'none'] as const;
+export type PantryLiquidChoice = (typeof pantryLiquidChoiceValues)[number];
+
+/** Idade para álcool como o backend resolveu (CP-B5): o app só desenha a tela. */
+export const pantryAlcoholAgeValues = ['of-age', 'under-age', 'unknown'] as const;
+export type PantryAlcoholAge = (typeof pantryAlcoholAgeValues)[number];
+
+/** Ingrediente lido da foto. isAlcoholic vem da lista do validador, não da IA. */
+export const pantryReadIngredientSchema = pantryIngredientSchema
+  .extend({ isAlcoholic: z.boolean() })
+  .strict();
+
+export type PantryReadIngredient = z.infer<typeof pantryReadIngredientSchema>;
+
+export const pantryReadResultSchema = z
+  .object({
+    /** Ausente quando não há o que confirmar (sem comida ou sem ingrediente usável). */
+    readId: z.string().trim().min(1).optional(),
+    readExpiresAt: z.string().datetime().optional(),
+    ingredients: z.array(pantryReadIngredientSchema),
+    hasLiquid: z.boolean(),
+    noFoodDetected: z.boolean(),
+    noUsableIngredients: z.boolean().optional(),
+    analysisNotes: z.string().trim().min(1).optional(),
+    alcoholAge: z.enum(pantryAlcoholAgeValues),
+    /** A próxima geração do free será a prévia bloqueada (scans do ciclo esgotados). */
+    nextGenerationIsPreview: z.boolean(),
+    scansUsed: z.number().int().min(0),
+    scansLimit: z.number().int().min(1),
+    resetDate: z.string().datetime(),
+  })
+  .strict();
+
+export type PantryReadResult = z.infer<typeof pantryReadResultSchema>;
+
+const pantryItemNameSchema = (maxLength: number) =>
+  z
+    .string({ required_error: 'errors.validation.required', invalid_type_error: 'errors.validation.invalid_option' })
+    .trim()
+    .min(1, 'errors.validation.required')
+    .max(maxLength, 'errors.validation.too_long');
+
+/**
+ * Corpo do POST /pantry-scanner/generate. Estrito: campo a mais é recusado.
+ * `selected` só aceita itens da leitura (conferido no backend); `added` é
+ * pedido explícito (obrigatório em todas as receitas); `request` é texto
+ * livre, tratado como dado no prompt.
+ */
+export const pantryGenerateSchema = z
+  .object({
+    readId: z.string({ required_error: 'errors.validation.required' }).trim().min(1, 'errors.validation.required').max(64, 'errors.validation.too_long'),
+    selected: z.array(pantryItemNameSchema(200)).max(PANTRY_SELECTED_ITEMS_MAX, 'errors.validation.too_long'),
+    added: z.array(pantryItemNameSchema(PANTRY_ADDED_ITEM_MAX_LENGTH)).max(PANTRY_ADDED_ITEMS_MAX, 'errors.validation.too_long').default([]),
+    liquid: z.enum(pantryLiquidChoiceValues, { message: 'errors.validation.invalid_option' }).optional(),
+    request: z
+      .string({ invalid_type_error: 'errors.validation.invalid_option' })
+      .trim()
+      .max(PANTRY_REQUEST_MAX_LENGTH, 'errors.validation.too_long')
+      .optional()
+      .transform(value => (value ? value : undefined)),
+  })
+  .strict()
+  .refine(input => input.selected.length + input.added.length > 0, {
+    message: 'errors.validation.required',
+    path: ['selected'],
+  });
+
+export type PantryGenerateInput = z.input<typeof pantryGenerateSchema>;
+export type PantryGenerateParsed = z.output<typeof pantryGenerateSchema>;
+
+/** Resposta do generate (receitas completas). */
+export const pantryGenerateResultSchema = z.object({
+  /** Novo id para editar e gerar de novo sem nova foto (mesmo vencimento). */
+  readId: z.string().trim().min(1),
+  readExpiresAt: z.string().datetime(),
+  ingredients: z.array(pantryIngredientSchema),
+  recipes: z.array(pulseAiRecipeSchema),
+  scansUsed: z.number().int().min(0).optional(),
+  scansLimit: z.number().int().min(1).optional(),
+  resetDate: z.string().datetime().optional(),
+});
+
+export interface PantryGenerateResult extends Omit<z.infer<typeof pantryGenerateResultSchema>, 'recipes'> {
   recipes: PulseAiRecipe[];
 }

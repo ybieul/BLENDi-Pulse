@@ -11,6 +11,8 @@ import { before, beforeEach, describe, it, mock } from 'node:test';
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 
+import { createFakePantryReadModel, readAndGenerate } from './pantryScannerTestFakes';
+
 // ─── Estado dos fakes ────────────────────────────────────────────────────────
 
 interface FakeUser {
@@ -27,6 +29,8 @@ interface FakeUser {
   scanCount: number;
   scanResetDate: Date;
   monthlyScanPreviewUsage?: number;
+  /** CP-B5.4: leituras de foto do ciclo (free). */
+  pantryReadCount?: number;
   isPro: boolean;
 }
 
@@ -85,6 +89,11 @@ function userMatches(user: FakeUser, filter: Filter): boolean {
     && user.scanResetDate.getTime() !== filter.scanResetDate.getTime()) return false;
   if (!counterMatches(user.scanCount, filter.scanCount)) return false;
   if (!counterMatches(user.monthlyScanPreviewUsage, filter.monthlyScanPreviewUsage)) return false;
+  if (!counterMatches(user.pantryReadCount, filter.pantryReadCount)) return false;
+  // CP-B5.4: a reserva de leitura combina condições com $and.
+  if (Array.isArray(filter.$and) && !(filter.$and as Filter[]).every(branch => userMatches(user, branch))) {
+    return false;
+  }
   if (Array.isArray(filter.$or)) {
     return (filter.$or as Filter[]).some(branch => userMatches(user, branch));
   }
@@ -264,14 +273,21 @@ mock.module('../services/missionProgress.service', {
   namedExports: { updateMissionProgress: missionMock },
 });
 
+// CP-B5.4: leitura guardada entre as duas etapas (pantryScannerTestFakes.ts).
+const fakePantryRead = createFakePantryReadModel();
+mock.module('../models/PantryRead', {
+  namedExports: { PantryReadModel: fakePantryRead.model },
+});
+
 type PantryModule = typeof import('./pantryScanner.controller.js');
 type PulseAiModule = typeof import('./pulseAi.controller.js');
-let analyzePantry: PantryModule['analyzePantry'];
+let readPantry: PantryModule['readPantry'];
+let generatePantry: PantryModule['generatePantry'];
 let unlockPantryPreview: PantryModule['unlockPantryPreview'];
 let unlockPulseAiPreview: PulseAiModule['unlockPreview'];
 
 before(async () => {
-  ({ analyzePantry, unlockPantryPreview } = await import('./pantryScanner.controller.js'));
+  ({ readPantry, generatePantry, unlockPantryPreview } = await import('./pantryScanner.controller.js'));
   ({ unlockPreview: unlockPulseAiPreview } = await import('./pulseAi.controller.js'));
 });
 
@@ -372,14 +388,11 @@ async function invoke(
   return Object.assign(res, { nextError });
 }
 
-// '/9j/' decodifica para FF D8 FF (assinatura JPEG).
-const JPEG_BASE64 = `/9j/${'A'.repeat(200)}`;
-
-function scan(userId = OWNER_ID) {
-  return invoke(analyzePantry, {
-    body: { imageBase64: JPEG_BASE64, mimeType: 'image/jpeg' },
-    user: { sub: userId },
-  });
+// CP-B5.4: o antigo /analyze virou leitura + geração com tudo marcado; a
+// resposta é a da geração, ou a da leitura quando não chega a gerar.
+async function scan(userId = OWNER_ID): Promise<FakeRes & { nextError?: unknown }> {
+  const { final } = await readAndGenerate({ readPantry, generatePantry, userId });
+  return final;
 }
 
 function unlock(id: string, userId = OWNER_ID) {
@@ -420,6 +433,7 @@ async function createPreview(): Promise<string> {
 beforeEach(() => {
   users = { [OWNER_ID]: makeUser(OWNER_ID), [OTHER_ID]: makeUser(OTHER_ID, { isPro: true }) };
   previews = [];
+  fakePantryRead.reset();
   initialRecipes = [recipeA(), recipeB()];
   retryByTitle = {};
   generationError = null;
@@ -503,7 +517,9 @@ describe('Pantry Scanner — 4º scan do grátis (prévia bloqueada)', () => {
     assert.equal(callVisionAiMock.mock.callCount(), 1);
   });
 
-  it('5º scan: 429 de hoje sem chamar a IA', async () => {
+  // CP-B5.4: sem scan nem prévia restante, a LEITURA já para (código
+  // próprio, com a data de renovação), antes da visão.
+  it('5º scan: 429 na leitura, sem chamar a IA', async () => {
     await createPreview();
     callVisionAiMock.mock.resetCalls();
     callAiMock.mock.resetCalls();
@@ -511,9 +527,8 @@ describe('Pantry Scanner — 4º scan do grátis (prévia bloqueada)', () => {
     const res = await scan();
 
     assert.equal(res.statusCode, 429);
-    assert.equal(res.body?.code, 'scanner/monthly-limit-reached');
-    assert.equal(res.body?.scansUsed, 3);
-    assert.equal(res.body?.scansLimit, 3);
+    assert.equal(res.body?.code, 'scanner/read-limit-reached');
+    assert.equal(res.body?.resetDate, SCAN_RESET_DATE.toISOString());
     assert.equal(callVisionAiMock.mock.callCount(), 0);
     assert.equal(callAiMock.mock.callCount(), 0);
     assert.equal(previews.length, 1);
@@ -550,7 +565,8 @@ describe('Pantry Scanner — 4º scan do grátis (prévia bloqueada)', () => {
     assert.ok(resetUpdate, 'update de reset não encontrado');
     assert.deepEqual(
       Object.keys((resetUpdate.arguments[1] as { $set: Record<string, unknown> }).$set).sort(),
-      ['monthlyScanPreviewUsage', 'scanCount', 'scanResetDate']
+      // CP-B5.4: as leituras do ciclo zeram no mesmo update.
+      ['monthlyScanPreviewUsage', 'pantryReadCount', 'scanCount', 'scanResetDate']
     );
   });
 
@@ -563,14 +579,17 @@ describe('Pantry Scanner — 4º scan do grátis (prévia bloqueada)', () => {
     assert.equal(users[OWNER_ID].monthlyScanPreviewUsage, 1);
   });
 
-  it('corrida: dois 4º scans simultâneos = 1 prévia e 1 chamada de visão', async () => {
+  // CP-B5.4: a leitura não reserva a prévia (as duas leem a foto); a trava
+  // atômica da prévia fica na geração.
+  it('corrida: dois 4º scans simultâneos = 1 prévia (2 leituras)', async () => {
     const [first, second] = await Promise.all([scan(), scan()]);
 
     const statuses = [first.statusCode, second.statusCode].sort();
     assert.deepEqual(statuses, [200, 429]);
     assert.equal(previews.length, 1);
     assert.equal(users[OWNER_ID].monthlyScanPreviewUsage, 1);
-    assert.equal(callVisionAiMock.mock.callCount(), 1);
+    assert.equal(callVisionAiMock.mock.callCount(), 2);
+    assert.equal(users[OWNER_ID].pantryReadCount, 2);
   });
 });
 

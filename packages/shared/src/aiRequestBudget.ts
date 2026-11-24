@@ -12,7 +12,10 @@
 /** Orçamento total de tempo de IA por requisição, no servidor. */
 export const AI_REQUEST_BUDGET_MS = {
   pulseAiChat: 55_000,
-  pantryScannerAnalyze: 85_000,
+  // CP-B5.4: o Pantry passou a ter duas etapas. A leitura é só a visão; a
+  // geração herda o teto de antes (geração + novas tentativas).
+  pantryScannerRead: 30_000,
+  pantryScannerGenerate: 85_000,
 } as const;
 
 /**
@@ -24,5 +27,6 @@ export const AI_CLIENT_TIMEOUT_MARGIN_MS = 15_000;
 /** Timeout do app nas rotas de IA (orçamento do servidor + folga). */
 export const AI_CLIENT_TIMEOUT_MS = {
   pulseAiChat: AI_REQUEST_BUDGET_MS.pulseAiChat + AI_CLIENT_TIMEOUT_MARGIN_MS,
-  pantryScannerAnalyze: AI_REQUEST_BUDGET_MS.pantryScannerAnalyze + AI_CLIENT_TIMEOUT_MARGIN_MS,
+  pantryScannerRead: AI_REQUEST_BUDGET_MS.pantryScannerRead + AI_CLIENT_TIMEOUT_MARGIN_MS,
+  pantryScannerGenerate: AI_REQUEST_BUDGET_MS.pantryScannerGenerate + AI_CLIENT_TIMEOUT_MARGIN_MS,
 } as const;

@@ -37,11 +37,14 @@ export function prepareAiRecipePayload(payload: unknown): unknown {
     usesWaterNotInPhoto: _ignoredWater,
     dietOverrideIngredients: _ignoredDietOverride,
     alcoholFreeVersion: _ignoredAlcoholFree,
+    // CP-B7a: o aviso de item pedido que faltou também é só do backend.
+    missingRequestedIngredients: _ignoredMissing,
     ...recipe
   } = payload as Record<string, unknown>;
   void _ignoredWater;
   void _ignoredDietOverride;
   void _ignoredAlcoholFree;
+  void _ignoredMissing;
 
   if (typeof recipe.capacityNotice === 'string') {
     recipe.capacityNotice = truncateCapacityNotice(recipe.capacityNotice);

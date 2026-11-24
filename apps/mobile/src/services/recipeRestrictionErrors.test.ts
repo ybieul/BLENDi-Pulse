@@ -77,7 +77,7 @@ describe('pantryScanner.service', () => {
   it('mapeia scanner/dietary-restriction-unmet para errors.scanner_dietary_restriction_unmet', async () => {
     mockPost.mockRejectedValueOnce(axiosError(422, 'scanner/dietary-restriction-unmet'));
 
-    await expect(pantry.analyzePantry('base64', 'image/jpeg')).rejects.toMatchObject({
+    await expect(pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] })).rejects.toMatchObject({
       name: 'PantryScannerServiceError',
       translationKey: 'errors.scanner_dietary_restriction_unmet',
       apiCode: 'scanner/dietary-restriction-unmet',
@@ -100,8 +100,8 @@ describe('pantryScanner.service', () => {
       },
     });
 
-    const result = await pantry.analyzePantry('base64', 'image/jpeg');
-    // CP-1.1.4b: analyzePantry também pode devolver a prévia bloqueada; aqui
+    const result = await pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] });
+    // CP-1.1.4b: a geração (CP-B5.4) também pode devolver a prévia bloqueada; aqui
     // é um scan normal (só estreita o tipo).
     if (pantry.isPantryLockedPreview(result)) throw new Error('esperava scan normal');
 
@@ -131,7 +131,7 @@ describe('limite físico do BLENDi (CP-1.1.9)', () => {
   it('scanner/blender-limit-unmet → errors.scanner_blender_limit_unmet', async () => {
     mockPost.mockRejectedValueOnce(axiosError(422, 'scanner/blender-limit-unmet'));
 
-    await expect(pantry.analyzePantry('base64', 'image/jpeg')).rejects.toMatchObject({
+    await expect(pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] })).rejects.toMatchObject({
       name: 'PantryScannerServiceError',
       translationKey: 'errors.scanner_blender_limit_unmet',
       apiCode: 'scanner/blender-limit-unmet',

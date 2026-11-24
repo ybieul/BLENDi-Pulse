@@ -103,7 +103,9 @@ jest.mock('expo-image-picker', () => ({
   MediaTypeOptions: { Images: 'Images' },
 }));
 
-const mockAnalyzePantry = jest.fn<Promise<unknown>, unknown[]>();
+// CP-B5.4: o antigo analyzePantry virou leitura (readPantryPhoto) + geração.
+const mockReadPantryPhoto = jest.fn<Promise<unknown>, unknown[]>();
+const mockGeneratePantry = jest.fn<Promise<unknown>, unknown[]>();
 const mockUnlockPantryPreview = jest.fn<Promise<unknown>, unknown[]>();
 jest.mock('../services/pantryScanner.service', () => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- idem
@@ -111,11 +113,15 @@ jest.mock('../services/pantryScanner.service', () => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- idem
   return {
     ...actual,
-    analyzePantry: (...args: unknown[]) => mockAnalyzePantry(...args),
+    readPantryPhoto: (...args: unknown[]) => mockReadPantryPhoto(...args),
+    generatePantryRecipes: (...args: unknown[]) => mockGeneratePantry(...args),
     unlockPantryPreview: (...args: unknown[]) => mockUnlockPantryPreview(...args),
     compressAndEncodeImage: () => Promise.resolve({ ok: true, imageBase64: 'base64' }),
   };
 });
+
+jest.mock('../components/pulseAi/AgeConfirmationSheet', () => ({ AgeConfirmationSheet: () => null }));
+jest.mock('../services/pulseAi.service', () => ({ confirmAlcoholAge: jest.fn() }));
 
 const mockTrackEvent = jest.fn<void, unknown[]>();
 jest.mock('../services/analytics.service', () => ({
@@ -200,6 +206,23 @@ const UNLOCKED = {
   recipes: [fullRecipe('Dragon Kefir'), fullRecipe('Pink Kefir Cooler')],
 };
 
+// CP-B5.4: leitura padrão (os ingredientes da foto) antes da geração.
+const READ_RESULT = {
+  readId: 'read-1',
+  readExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  ingredients: [
+    { name: 'banana', confidence: 'high', isAlcoholic: false },
+    { name: 'oats', confidence: 'medium', isAlcoholic: false },
+  ],
+  hasLiquid: true,
+  noFoodDetected: false,
+  alcoholAge: 'unknown',
+  nextGenerationIsPreview: true,
+  scansUsed: 3,
+  scansLimit: 3,
+  resetDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+};
+
 const mockNavigateUpgrade = jest.fn();
 
 function renderScreen() {
@@ -238,7 +261,7 @@ async function openRecipesStep(utils: Screen) {
 }
 
 async function scanToLockedCards(): Promise<Screen> {
-  mockAnalyzePantry.mockResolvedValueOnce(LEAKY_PREVIEW);
+  mockGeneratePantry.mockResolvedValueOnce(LEAKY_PREVIEW);
   const utils = renderScreen();
   await scanFromGallery(utils);
   await openRecipesStep(utils);
@@ -251,7 +274,9 @@ async function scanToLockedCards(): Promise<Screen> {
 beforeEach(() => {
   mockStorage.clear();
   mockAuthState.user = { id: 'user-1', isPro: false };
-  mockAnalyzePantry.mockReset();
+  mockGeneratePantry.mockReset();
+  mockReadPantryPhoto.mockReset();
+  mockReadPantryPhoto.mockResolvedValue(READ_RESULT);
   mockUnlockPantryPreview.mockReset();
   mockTrackEvent.mockReset();
   mockShowToast.mockReset();
@@ -360,9 +385,10 @@ describe('PantryScannerScreen — prévia bloqueada', () => {
     expect(readLastPantryPreview('user-1')).not.toBeNull();
   });
 
-  it('5º scan: limite de hoje (volta para a captura e abre Upgrade)', async () => {
-    mockAnalyzePantry.mockRejectedValueOnce(
-      new PantryScannerServiceError('limit', 'errors.scanner_monthly_limit_reached', 'scanner/monthly-limit-reached'),
+  // CP-B5.4: sem scan nem prévia, a LEITURA já para (código próprio).
+  it('5º scan: leitura bloqueada (volta para a captura, aviso e Upgrade)', async () => {
+    mockReadPantryPhoto.mockRejectedValueOnce(
+      new PantryScannerServiceError('limit', 'errors.scanner_read_limit_reached', 'scanner/read-limit-reached'),
     );
     const utils = renderScreen();
     await scanFromGallery(utils);
@@ -468,7 +494,7 @@ describe('PantryScannerScreen — "Receitas do seu último scan"', () => {
   it('scan novo depois de ver as receitas desbloqueadas limpa o id; sem ver, mantém', async () => {
     mockAuthState.user = { id: 'user-1', isPro: true };
     saveLastPantryPreview('user-1', { previewId: PREVIEW_ID, expiresAt: EXPIRES_AT });
-    mockAnalyzePantry.mockResolvedValue({
+    mockGeneratePantry.mockResolvedValue({
       ingredients: [{ name: 'banana', confidence: 'high' }],
       recipes: [fullRecipe('Fresh Scan')],
       noFoodDetected: false,

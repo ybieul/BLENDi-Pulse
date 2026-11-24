@@ -3,8 +3,6 @@ import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
   AI_REQUEST_BUDGET_MS,
-  ALCOHOL_MIN_AGE_YEARS,
-  RECIPE_DIET_OVERRIDE_MAX_ITEMS,
   pulseAiAgeConfirmationSchema,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
@@ -60,7 +58,8 @@ import {
   type AlcoholRequestDecision,
 } from '../utils/alcoholRequest.utils';
 import { parseAiJson, prepareAiRecipePayload, readAlcoholRequested } from '../utils/aiRecipePayload.utils';
-import { calculateAge } from '../utils/macroCalculation.utils';
+import { resolveAlcoholAge, type AlcoholAgeStatus } from '../utils/alcoholAge.utils';
+import { withRequestNotices } from '../utils/recipeNotices.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
@@ -82,6 +81,10 @@ import {
   type RecipeAlcoholPolicy,
   type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
+
+// CP-B5.4: a resolução da idade foi para alcoholAge.utils.ts (também usada
+// pelo Pantry Scanner); reexportada aqui para quem já importava daqui.
+export { resolveAlcoholAge };
 
 const DAILY_FREE_LIMIT = 3;
 // CP-1.1.4a ("Wow Moment Paywall"): prévias bloqueadas por dia para o usuário
@@ -135,8 +138,6 @@ interface PulseAiUserProfile {
   /** CP-B5: 21+ (data de nascimento real ou confirmação), menor, ou sem resposta. */
   alcoholAge: AlcoholAgeStatus;
 }
-
-type AlcoholAgeStatus = 'of-age' | 'under-age' | 'unknown';
 
 interface PulseAiCachedResponse {
   recipe: PulseAiRecipe;
@@ -363,25 +364,6 @@ async function rollbackPulseAiAccessReservation(
   }
 
   await rollbackPulseAiUsageReservation(user);
-}
-
-/**
- * CP-B5: idade para álcool. A data de nascimento só conta quando é real
- * (hasRealBodyProfile): toda conta nasce com o placeholder de 30 anos
- * (accountDefaults.utils.ts) e, sem esse cuidado, quem nunca informou a data
- * passaria como 21+. Sem data real, vale a resposta única gravada.
- */
-export function resolveAlcoholAge(
-  user: { birthDate?: Date | null; hasRealBodyProfile?: boolean | null; alcoholAgeConfirmed?: boolean | null },
-  now: Date = new Date()
-): AlcoholAgeStatus {
-  if (user.hasRealBodyProfile === true && user.birthDate instanceof Date && !Number.isNaN(user.birthDate.getTime())) {
-    return calculateAge(user.birthDate, now) >= ALCOHOL_MIN_AGE_YEARS ? 'of-age' : 'under-age';
-  }
-
-  if (user.alcoholAgeConfirmed === true) return 'of-age';
-  if (user.alcoholAgeConfirmed === false) return 'under-age';
-  return 'unknown';
 }
 
 async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfile | null> {
@@ -747,35 +729,6 @@ async function ensureDrinkDefiningIngredients(
  */
 export function resolveAlcoholRequested(decision: AlcoholRequestDecision, aiAlcoholRequested: boolean): boolean {
   return decision === 'ai' ? aiAlcoholRequested : decision === 'yes';
-}
-
-/**
- * CP-B5: marcações do backend para o card — ingredientes fora da dieta que a
- * mensagem atual pediu (pelos índices que o validador liberou) e "versão sem
- * álcool". Sempre recalculadas: nada disso vem da IA.
- */
-function withRequestNotices(
-  recipe: PulseAiRecipe,
-  dietOverrideIngredientIndexes: readonly number[],
-  alcoholFreeVersion: boolean
-): PulseAiRecipe {
-  const { dietOverrideIngredients: _previousOverride, alcoholFreeVersion: _previousAlcoholFree, ...rest } = recipe;
-  void _previousOverride;
-  void _previousAlcoholFree;
-
-  const overrideNames = [
-    ...new Set(
-      dietOverrideIngredientIndexes
-        .map(index => recipe.ingredients[index]?.name.trim())
-        .filter((name): name is string => Boolean(name))
-    ),
-  ].slice(0, RECIPE_DIET_OVERRIDE_MAX_ITEMS);
-
-  return {
-    ...rest,
-    ...(overrideNames.length > 0 ? { dietOverrideIngredients: overrideNames } : {}),
-    ...(alcoholFreeVersion ? { alcoholFreeVersion: true } : {}),
-  };
 }
 
 function alcoholCacheTier(user: Pick<PulseAiUserProfile, 'alcoholAge'>): AlcoholCacheTier {

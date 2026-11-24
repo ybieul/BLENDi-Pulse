@@ -46,6 +46,12 @@ export const RECIPE_TITLE_SIZE_WORDS = [
 
 // ─── CP-B5: pedido explícito, dieta furada e álcool ─────────────────────────
 
+/**
+ * CP-B7a: itens pedidos (adicionados à mão no Pantry) que a receita não
+ * conseguiu incluir — no máximo um por item adicionado.
+ */
+export const RECIPE_MISSING_REQUEST_MAX_ITEMS = 10;
+
 /** Calorias por grama de álcool puro (etanol), somadas à conferência de macros. */
 export const ALCOHOL_KCAL_PER_GRAM = 7;
 

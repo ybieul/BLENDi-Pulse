@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-// CP-B1: orçamento total de tempo de IA por requisição (Pulse AI chat e Pantry
-// analyze). O controller abre o orçamento uma vez (runWithAiRequestBudget) e
+// CP-B1: orçamento total de tempo de IA por requisição (Pulse AI chat e, desde
+// o CP-B5.4, Pantry read e generate). O controller abre o orçamento uma vez (runWithAiRequestBudget) e
 // cada chamada ao provedor (aiProvider.service.ts) lê o tempo restante daqui:
 // o timeout da chamada vira min(timeout da chamada, tempo restante), e sem
 // tempo suficiente a chamada nem começa (falha como provedor indisponível —

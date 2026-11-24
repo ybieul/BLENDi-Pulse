@@ -1,13 +1,16 @@
 // apps/mobile/src/screens/PantryScannerScreen.tsx
 // Tela Pantry Scanner — CP1.12.
-// Fluxo de 5 passos: permission → capture → analyzing → ingredients → recipes.
-// CP-1.1.4b: depois dos scans grátis do ciclo, 1 prévia bloqueada por ciclo —
-// o mesmo fluxo, com cards bloqueados (só macros) na etapa das receitas.
+// Fluxo: permission → capture → reading (lê a foto, não conta scan) →
+// ingredients (confirmação com efeito real) → generating (conta o scan) →
+// recipes. CP-1.1.4b: depois dos scans grátis do ciclo, 1 prévia bloqueada
+// por ciclo — o mesmo fluxo, com cards bloqueados (só macros) nas receitas.
+// CP-B5.4: marcar/desmarcar, adicionar à mão (obrigatório em todas as
+// receitas), líquido quando a foto não mostra, pedido opcional e álcool só
+// para 21+ (mesma folha de idade do Pulse AI).
 
 import { type ElementRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -32,8 +35,13 @@ import {
   fonts,
   fontWeights,
   spacing,
+  PANTRY_ADDED_ITEMS_MAX,
+  PANTRY_ADDED_ITEM_MAX_LENGTH,
+  PANTRY_REQUEST_MAX_LENGTH,
+  type PantryAlcoholAge,
   type PantryAnalysisResult,
   type PantryIngredient,
+  type PantryLiquidChoice,
   type PulseAiRecipe,
   type PulseAiRecipePreview,
 } from '@blendi/shared';
@@ -47,15 +55,23 @@ import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { AuthButton } from '../components/ui/AuthButton';
 import { IngredientCheckItem } from '../components/pantryScanner/IngredientCheckItem';
 import { LockedRecipeCard, RecipeCard } from '../components/pulseAi/RecipeCard';
+import { AgeConfirmationSheet } from '../components/pulseAi/AgeConfirmationSheet';
 import { images } from '../assets';
 import {
-  analyzePantry,
   compressAndEncodeImage,
+  generatePantryRecipes,
   isPantryLockedPreview,
+  PANTRY_AGE_CONFIRMATION_REQUIRED_CODE,
+  PANTRY_MONTHLY_LIMIT_REACHED_CODE,
   PANTRY_PREVIEW_NOT_FOUND_CODE,
+  PANTRY_READ_EXPIRED_CODE,
+  PANTRY_READ_LIMIT_REACHED_CODE,
   PantryScannerServiceError,
+  readPantryPhoto,
   unlockPantryPreview,
 } from '../services/pantryScanner.service';
+import { confirmAlcoholAge } from '../services/pulseAi.service';
+import type { TranslationKey } from '../locales/i18n';
 import { trackEvent } from '../services/analytics.service';
 import {
   clearLastPantryPreview,
@@ -84,13 +100,13 @@ const NO_RECIPES_ICON_SIZE = 40;
 // CP-1.1.4b: origem da prévia bloqueada nos eventos e no card.
 const PAYWALL_PREVIEW_SOURCE = 'pantry_scanner';
 
-const ANALYZING_STEP_KEYS = [
-  'pantryScanner.analyzingStep1',
-  'pantryScanner.analyzingStep2',
-  'pantryScanner.analyzingStep3',
-] as const;
-const ANALYZING_STEP_INTERVAL_MS = 6000;
-const ANALYZING_FADE_DURATION_MS = 200;
+// CP-B5.4: as opções do líquido quando a foto não mostra nenhum.
+const LIQUID_OPTIONS = [
+  { value: 'water', labelKey: 'pantryScanner.liquidWater' },
+  { value: 'milk', labelKey: 'pantryScanner.liquidMilk' },
+  { value: 'plant_milk', labelKey: 'pantryScanner.liquidPlantMilk' },
+  { value: 'none', labelKey: 'pantryScanner.liquidNone' },
+] as const satisfies ReadonlyArray<{ value: PantryLiquidChoice; labelKey: TranslationKey }>;
 
 // Overlay da câmera ao vivo — fica sempre com visual escuro fixo, não reage
 // ao tema claro/escuro do app (ver exceção documentada no plano de dark mode).
@@ -107,10 +123,20 @@ const CAMERA_PILL_TEXT_COLOR = colors.text.primary;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type Step = 'permission' | 'capture' | 'analyzing' | 'ingredients' | 'recipes';
+type Step = 'permission' | 'capture' | 'reading' | 'ingredients' | 'generating' | 'recipes';
 
 interface CheckedIngredient extends PantryIngredient {
   checked: boolean;
+  /** CP-B5.4: da lista do validador (backend). Começa desmarcado. */
+  isAlcoholic: boolean;
+}
+
+/** CP-B5.4: o que a folha de idade faz depois da resposta. */
+interface AgeSheetState {
+  /** Item alcoólico que a pessoa tentou marcar. */
+  pendingIndex: number | null;
+  /** O backend pediu a idade na geração: reenviar depois da resposta. */
+  resendGenerate: boolean;
 }
 
 interface LockedPreviewState {
@@ -157,11 +183,19 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [scansUsed, setScansUsed] = useState(0);
   const [scansLimit, setScansLimit] = useState(0);
   const [resetDate, setResetDate] = useState<string | undefined>(undefined);
-  const [isGeneratingRecipes, setIsGeneratingRecipes] = useState(false);
-  const [, setError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newIngredientText, setNewIngredientText] = useState('');
-  const [analyzingStepIndex, setAnalyzingStepIndex] = useState(0);
+  // CP-B5.4: leitura confirmada na tela.
+  const [readId, setReadId] = useState<string | null>(null);
+  const [readExpiresAt, setReadExpiresAt] = useState<string | null>(null);
+  const [hasLiquid, setHasLiquid] = useState(true);
+  const [liquid, setLiquid] = useState<PantryLiquidChoice | null>(null);
+  const [addedItems, setAddedItems] = useState<string[]>([]);
+  const [requestText, setRequestText] = useState('');
+  const [alcoholAge, setAlcoholAge] = useState<PantryAlcoholAge>('unknown');
+  const [nextIsPreview, setNextIsPreview] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
+  const [ageSheet, setAgeSheet] = useState<AgeSheetState | null>(null);
   // CP-1.1.4b: prévia bloqueada (só macros) e a última prévia guardada.
   const [lockedPreview, setLockedPreview] = useState<LockedPreviewState | null>(null);
   const [previewRecipes, setPreviewRecipes] = useState<PulseAiRecipePreview[]>([]);
@@ -171,7 +205,6 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const cameraRef = useRef<ElementRef<typeof CameraView>>(null);
-  const analyzingTextOpacity = useRef(new Animated.Value(1)).current;
   const unlockingPreviewIdRef = useRef<string | null>(null);
   const shownPreviewIdsRef = useRef(new Set<string>());
 
@@ -186,43 +219,6 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       .catch(() => undefined);
   }, []);
 
-  // ── Analyzing: alterna as 3 mensagens de status a cada 6s ──────────────────
-  useEffect(() => {
-    if (step !== 'analyzing') {
-      return;
-    }
-
-    setAnalyzingStepIndex(0);
-    analyzingTextOpacity.setValue(1);
-
-    const intervalId = setInterval(() => {
-      setAnalyzingStepIndex((current) => {
-        if (current >= ANALYZING_STEP_KEYS.length - 1) {
-          return current;
-        }
-
-        Animated.sequence([
-          Animated.timing(analyzingTextOpacity, {
-            toValue: 0,
-            duration: ANALYZING_FADE_DURATION_MS,
-            useNativeDriver: true,
-          }),
-          Animated.timing(analyzingTextOpacity, {
-            toValue: 1,
-            duration: ANALYZING_FADE_DURATION_MS,
-            useNativeDriver: true,
-          }),
-        ]).start();
-
-        return current + 1;
-      });
-    }, ANALYZING_STEP_INTERVAL_MS);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [step, analyzingTextOpacity]);
-
   const handleUpgradePress = useCallback(() => {
     navigation
       .getParent()
@@ -230,105 +226,90 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       ?.navigate('Upgrade');
   }, [navigation]);
 
-  // ── Analyzing: call API when step transitions to 'analyzing' ───────────────
+  const updateScanStatus = useCallback(
+    (status: { scansUsed?: number; scansLimit?: number; resetDate?: string }) => {
+      const nextScansUsed = status.scansUsed ?? 0;
+      const nextScansLimit = status.scansLimit ?? PANTRY_SCAN_LIMIT_FREE;
+
+      if (status.resetDate) {
+        setResetDate(status.resetDate);
+      }
+
+      queryClient.setQueryData<Pick<PantryAnalysisResult, 'scansUsed' | 'scansLimit' | 'resetDate'>>(
+        QUERY_KEYS.pantryScans,
+        { scansUsed: nextScansUsed, scansLimit: nextScansLimit, resetDate: status.resetDate },
+      );
+
+      setScansUsed(nextScansUsed);
+      setScansLimit(nextScansLimit);
+    },
+    [queryClient],
+  );
+
+  const errorMessage = useCallback(
+    (err: unknown) =>
+      err instanceof PantryScannerServiceError
+        ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
+        : t('errors.network_internal_server_error'),
+    [t],
+  );
+
+  // ── Reading: lê a foto quando a etapa vira 'reading' (CP-B5.4) ────────────
   useEffect(() => {
-    if (step !== 'analyzing' || !capturedBase64) return;
+    if (step !== 'reading' || !capturedBase64) return;
 
     let cancelled = false;
 
-    analyzePantry(capturedBase64, 'image/jpeg')
+    readPantryPhoto(capturedBase64, 'image/jpeg')
       .then((result) => {
         if (cancelled) return;
 
-        const nextScansUsed = result.scansUsed ?? 0;
-        const nextScansLimit = result.scansLimit ?? PANTRY_SCAN_LIMIT_FREE;
-
-        if (result.resetDate) {
-          setResetDate(result.resetDate);
-        }
-
-        queryClient.setQueryData<Pick<PantryAnalysisResult, 'scansUsed' | 'scansLimit' | 'resetDate'>>(
-          QUERY_KEYS.pantryScans,
-          {
-            scansUsed: nextScansUsed,
-            scansLimit: nextScansLimit,
-            resetDate: result.resetDate,
-          },
-        );
-
-        setScansUsed(nextScansUsed);
-        setScansLimit(nextScansLimit);
-
-        if (isPantryLockedPreview(result)) {
-          // Prévia: ingredientes detectados e só os macros de cada receita.
-          // O id fica no aparelho para quem virar Pro dentro da validade.
-          if (userId) {
-            saveLastPantryPreview(userId, {
-              previewId: result.previewId,
-              expiresAt: result.previewExpiresAt,
-            });
-          }
-          setIngredients(result.ingredients.map((i) => ({ ...i, checked: true })));
-          setRecipes([]);
-          setPreviewRecipes(result.recipes);
-          setLockedPreview({ previewId: result.previewId, status: 'locked' });
-          setUnlockedPreviewId(null);
-          setStep('ingredients');
-          return;
-        }
-
+        updateScanStatus(result);
+        setAlcoholAge(result.alcoholAge);
+        setNextIsPreview(result.nextGenerationIsPreview);
         setPreviewRecipes([]);
         setLockedPreview(null);
         setUnlockedPreviewId(null);
+        setRecipes([]);
 
-        if (result.noFoodDetected) {
+        if (result.noFoodDetected || result.noUsableIngredients || !result.readId) {
           setIngredients([]);
-          setRecipes([]);
           setStep('capture');
-          showToast(t('pantryScanner.noFoodDetected'));
+          showToast(t(result.noFoodDetected ? 'pantryScanner.noFoodDetected' : 'pantryScanner.noUsableIngredients'));
           return;
         }
 
-        if (result.noUsableIngredients) {
-          setIngredients([]);
-          setRecipes([]);
-          setStep('capture');
-          showToast(t('pantryScanner.noUsableIngredients'));
-          return;
-        }
-
-        const checkedIngredients: CheckedIngredient[] = result.ingredients
-          .filter((i) => i.confidence === 'high' || i.confidence === 'medium')
-          .map((i) => ({ ...i, checked: true }));
-
-        setIngredients(checkedIngredients);
-        setRecipes(result.recipes);
+        // Bebida alcoólica começa desmarcada (só 21+ marca).
+        setIngredients(result.ingredients.map((i) => ({ ...i, checked: !i.isAlcoholic })));
+        setReadId(result.readId);
+        setReadExpiresAt(result.readExpiresAt ?? null);
+        setHasLiquid(result.hasLiquid);
+        setLiquid(null);
+        setAddedItems([]);
+        setRequestText('');
+        setNewIngredientText('');
+        setHasGenerated(false);
         setStep('ingredients');
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const message =
-          err instanceof PantryScannerServiceError
-            ? t(resolveBlenderTextKey(err.translationKey, blendiOwnershipRef.current))
-            : t('errors.network_internal_server_error');
-
-        if (
-          err instanceof PantryScannerServiceError
-          && err.apiCode?.trim().toLowerCase() === 'scanner/monthly-limit-reached'
-        ) {
-          setStep('capture');
-          handleUpgradePress();
-          return;
-        }
-
         setStep('capture');
-        showToast(message);
+        showToast(errorMessage(err));
+
+        // Free sem leituras no ciclo: o mesmo caminho do limite de scans.
+        if (
+          isFreeTier
+          && err instanceof PantryScannerServiceError
+          && err.apiCode === PANTRY_READ_LIMIT_REACHED_CODE
+        ) {
+          handleUpgradePress();
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [handleUpgradePress, queryClient, step, capturedBase64, t, userId]);
+  }, [capturedBase64, errorMessage, handleUpgradePress, isFreeTier, step, t, updateScanStatus]);
 
   // ── Prévia bloqueada (CP-1.1.4b) ───────────────────────────────────────────
   const handleLockedPreviewPress = useCallback(() => {
@@ -414,7 +395,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
     try {
       const unlocked = await unlockPantryPreview(lastPreview.previewId);
-      setIngredients(unlocked.ingredients.map((i) => ({ ...i, checked: true })));
+      setIngredients(unlocked.ingredients.map((i) => ({ ...i, checked: true, isAlcoholic: false })));
+      setReadId(null);
       setRecipes(unlocked.recipes);
       setPreviewRecipes([]);
       setLockedPreview(null);
@@ -443,13 +425,6 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setLastPreview(null);
   }, [userId]);
 
-  // ── Dismiss isGeneratingRecipes when recipes step is active ───────────────
-  useEffect(() => {
-    if (step === 'recipes' && isGeneratingRecipes) {
-      setIsGeneratingRecipes(false);
-    }
-  }, [step, isGeneratingRecipes]);
-
   // ── Favorite map for RecipeCard ────────────────────────────────────────────
   const favoriteIdsByRecipeKey = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
@@ -475,11 +450,17 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const confirmedIngredients = ingredients.filter((i) => i.checked);
+  const recipeIngredientNames = useMemo(
+    () => [...confirmedIngredients.map((i) => i.name), ...addedItems],
+    [addedItems, confirmedIngredients],
+  );
+  const needsLiquidChoice = !hasLiquid && liquid === null;
+  const canGenerate = readId !== null && recipeIngredientNames.length > 0 && !needsLiquidChoice;
   const daysUntilReset = getDaysUntilReset(resetDate);
   const remainingScansCount = Math.max(0, scansLimit - scansUsed);
 
   const recipeSubtitle = useMemo(() => {
-    const names = confirmedIngredients.map((i) => i.name);
+    const names = recipeIngredientNames;
     const extras = names.length - 3;
     const base = names.slice(0, 3).join(', ');
     const suffix = extras > 0
@@ -487,7 +468,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       : '';
 
     return t('pantryScanner.basedOnIngredients', { ingredients: `${base}${suffix}`.trim() });
-  }, [confirmedIngredients, t]);
+  }, [recipeIngredientNames, t]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleRequestPermission = useCallback(async () => {
@@ -513,7 +494,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       }
       setCapturedUri(uri);
       setCapturedBase64(result.imageBase64);
-      setStep('analyzing');
+      setStep('reading');
     },
     [t, userId],
   );
@@ -541,33 +522,52 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     }
   }, [handleAnalyze]);
 
+  const checkIngredient = useCallback((index: number, checked: boolean) => {
+    setIngredients((prev) => prev.map((item, i) => (i === index ? { ...item, checked } : item)));
+  }, []);
+
+  // CP-B5.4: bebida alcoólica só para 21+. Menor/"Não": desativado. Sem
+  // idade: marcar abre a folha de idade (a mesma do Pulse AI).
   const handleToggleIngredient = useCallback((index: number) => {
-    setIngredients((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, checked: !item.checked } : item)),
-    );
-  }, []);
+    const item = ingredients[index];
+    if (!item) return;
 
+    if (item.isAlcoholic && !item.checked) {
+      if (alcoholAge === 'under-age') return;
+      if (alcoholAge === 'unknown') {
+        setAgeSheet({ pendingIndex: index, resendGenerate: false });
+        return;
+      }
+    }
+
+    checkIngredient(index, !item.checked);
+  }, [alcoholAge, checkIngredient, ingredients]);
+
+  // Adicionado à mão = pedido explícito (obrigatório em todas as receitas).
+  // Se for um item da leitura, só marca (não vira "você adicionou").
   const handleAddIngredient = useCallback(() => {
-    const name = newIngredientText.trim();
+    const name = newIngredientText.trim().slice(0, PANTRY_ADDED_ITEM_MAX_LENGTH);
     if (!name) return;
-    const newItem: CheckedIngredient = { name, confidence: 'high', checked: true };
-    setIngredients((prev) => [...prev, newItem]);
+    const key = name.toLowerCase();
+    const readIndex = ingredients.findIndex((i) => i.name.trim().toLowerCase() === key);
+
     setNewIngredientText('');
-  }, [newIngredientText]);
 
-  const handleGenerateRecipes = useCallback(() => {
-    setIsGeneratingRecipes(true);
-    setStep('recipes');
+    if (readIndex >= 0) {
+      if (!ingredients[readIndex].checked) handleToggleIngredient(readIndex);
+      return;
+    }
+
+    setAddedItems((prev) => (
+      prev.length >= PANTRY_ADDED_ITEMS_MAX || prev.some((item) => item.toLowerCase() === key)
+        ? prev
+        : [...prev, name]
+    ));
+  }, [handleToggleIngredient, ingredients, newIngredientText]);
+
+  const handleRemoveAdded = useCallback((name: string) => {
+    setAddedItems((prev) => prev.filter((item) => item !== name));
   }, []);
-
-  const handleStartBlend = useCallback(
-    (recipe: PulseAiRecipe) => {
-      navigation
-        .getParent<BottomTabNavigationProp<AppTabParamList>>()
-        ?.navigate('Blend', { recipe });
-    },
-    [navigation],
-  );
 
   const handleScanAgain = useCallback(() => {
     setCapturedUri(null);
@@ -578,9 +578,142 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setLockedPreview(null);
     setUnlockedPreviewId(null);
     setNewIngredientText('');
-    setError(null);
+    setReadId(null);
+    setReadExpiresAt(null);
+    setAddedItems([]);
+    setRequestText('');
+    setLiquid(null);
+    setHasGenerated(false);
     setStep('capture');
   }, []);
+
+  const handleGenerateRecipes = useCallback(async () => {
+    if (!readId || !canGenerate) return;
+
+    // Leitura vencida: pede nova foto sem gastar a chamada.
+    if (readExpiresAt && Date.parse(readExpiresAt) <= Date.now()) {
+      showToast(t('errors.scanner_read_expired'));
+      handleScanAgain();
+      return;
+    }
+
+    const trimmedRequest = requestText.trim();
+    setStep('generating');
+
+    try {
+      const result = await generatePantryRecipes({
+        readId,
+        selected: confirmedIngredients.map((i) => i.name),
+        added: addedItems,
+        ...(!hasLiquid && liquid ? { liquid } : {}),
+        ...(trimmedRequest ? { request: trimmedRequest.slice(0, PANTRY_REQUEST_MAX_LENGTH) } : {}),
+      });
+
+      updateScanStatus(result);
+
+      if (isPantryLockedPreview(result)) {
+        // Prévia: ingredientes e só os macros. O id fica no aparelho para
+        // quem virar Pro dentro da validade. A leitura foi usada.
+        if (userId) {
+          saveLastPantryPreview(userId, { previewId: result.previewId, expiresAt: result.previewExpiresAt });
+        }
+        setRecipes([]);
+        setPreviewRecipes(result.recipes);
+        setLockedPreview({ previewId: result.previewId, status: 'locked' });
+        setUnlockedPreviewId(null);
+        setReadId(null);
+        setNextIsPreview(false);
+        setStep('recipes');
+        return;
+      }
+
+      setPreviewRecipes([]);
+      setLockedPreview(null);
+      setUnlockedPreviewId(null);
+      setRecipes(result.recipes);
+      // Id novo para editar e gerar de novo sem nova foto.
+      setReadId(result.readId ?? null);
+      setReadExpiresAt(result.readExpiresAt ?? readExpiresAt);
+      setNextIsPreview(!isPro && (result.scansUsed ?? 0) >= (result.scansLimit ?? PANTRY_SCAN_LIMIT_FREE));
+      setHasGenerated(result.recipes.length > 0);
+      setStep('recipes');
+    } catch (err) {
+      const apiCode = err instanceof PantryScannerServiceError ? err.apiCode : undefined;
+
+      if (apiCode === PANTRY_AGE_CONFIRMATION_REQUIRED_CODE) {
+        setStep('ingredients');
+        setAgeSheet({ pendingIndex: null, resendGenerate: true });
+        return;
+      }
+
+      if (apiCode === PANTRY_READ_EXPIRED_CODE) {
+        showToast(errorMessage(err));
+        handleScanAgain();
+        return;
+      }
+
+      setStep('ingredients');
+
+      if (apiCode === PANTRY_MONTHLY_LIMIT_REACHED_CODE) {
+        handleUpgradePress();
+        return;
+      }
+
+      showToast(errorMessage(err));
+    }
+  }, [
+    addedItems,
+    canGenerate,
+    confirmedIngredients,
+    errorMessage,
+    handleScanAgain,
+    handleUpgradePress,
+    hasLiquid,
+    isPro,
+    liquid,
+    readExpiresAt,
+    readId,
+    requestText,
+    t,
+    updateScanStatus,
+    userId,
+  ]);
+
+  // Resposta da folha de idade: grava uma vez (POST /pulse-ai/age-confirmation)
+  // e segue com o que a pessoa estava fazendo.
+  const handleAgeAnswer = useCallback(async (isAdult: boolean) => {
+    const pending = ageSheet;
+    setAgeSheet(null);
+
+    try {
+      const confirmed = await confirmAlcoholAge(isAdult);
+      setAlcoholAge(confirmed ? 'of-age' : 'under-age');
+
+      if (confirmed && pending?.pendingIndex !== null && pending?.pendingIndex !== undefined) {
+        checkIngredient(pending.pendingIndex, true);
+      }
+
+      if (pending?.resendGenerate) {
+        await handleGenerateRecipes();
+      }
+    } catch (err) {
+      showToast(
+        err instanceof Error && 'translationKey' in err
+          ? t((err as { translationKey: TranslationKey }).translationKey)
+          : t('errors.network_internal_server_error'),
+      );
+    }
+  }, [ageSheet, checkIngredient, handleGenerateRecipes, t]);
+
+  const handleStartBlend = useCallback(
+    (recipe: PulseAiRecipe) => {
+      navigation
+        .getParent<BottomTabNavigationProp<AppTabParamList>>()
+        ?.navigate('Blend', { recipe });
+    },
+    [navigation],
+  );
+
 
   const styles = StyleSheet.create({
     screen: {
@@ -806,6 +939,126 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       paddingHorizontal: spacing.xl,
       paddingBottom: spacing.lg,
       paddingTop: spacing.md,
+      gap: spacing.sm,
+    },
+    scanNotice: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      textAlign: 'center',
+    },
+    regenerateNotice: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+      borderRadius: borderRadius.md,
+      backgroundColor: INPUT_BG,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    addedRow: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.lg,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.brand.pulse,
+      backgroundColor: INPUT_BG,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+    },
+    addedTextColumn: {
+      flex: 1,
+      minWidth: 0,
+    },
+    addedName: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    addedLabel: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+    },
+    addedRemove: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: spacing.sm,
+    },
+    addButton: {
+      minHeight: 48,
+      justifyContent: 'center',
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: GHOST_BORDER,
+      paddingHorizontal: spacing.lg,
+    },
+    addButtonLabel: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    liquidSection: {
+      marginTop: spacing.lg,
+      gap: spacing.xs,
+    },
+    fieldLabel: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.bold,
+    },
+    fieldHint: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      marginBottom: spacing.sm,
+    },
+    liquidOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    liquidOption: {
+      minHeight: 44,
+      justifyContent: 'center',
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: INPUT_BORDER,
+      paddingHorizontal: spacing.lg,
+    },
+    liquidOptionSelected: {
+      borderColor: colors.brand.pulse,
+      backgroundColor: colors.brand.pulse,
+    },
+    liquidOptionLabel: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+    },
+    liquidOptionLabelSelected: {
+      color: colors.text.primary,
+      fontWeight: fontWeights.medium,
+    },
+    requestLabel: {
+      marginTop: spacing.lg,
+    },
+    requestInput: {
+      marginTop: spacing.xs,
+      minHeight: 72,
+      textAlignVertical: 'top',
     },
 
     // ── Recipes ───────────────────────────────────────────────────────────────
@@ -997,24 +1250,30 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     );
   }
 
-  // ─── Step: analyzing ──────────────────────────────────────────────────────
-  if (step === 'analyzing') {
+  // ─── Steps: reading / generating ─────────────────────────────────────────
+  if (step === 'reading' || step === 'generating') {
     return (
       <View style={styles.screen}>
         <AuroraBackground intensity="full" />
-        <View style={styles.analyzingContainer}>
+        <View style={styles.analyzingContainer} accessible accessibilityLiveRegion="polite">
           <Image source={images.blendiLogo} resizeMode="contain" style={styles.logoPlaceholder} />
-          <Animated.Text style={[styles.analyzingText, { opacity: analyzingTextOpacity }]}>
-            {t(ANALYZING_STEP_KEYS[analyzingStepIndex])}
-          </Animated.Text>
+          <Text style={styles.analyzingText}>
+            {t(step === 'reading' ? 'pantryScanner.readingPhoto' : 'pantryScanner.generatingRecipes')}
+          </Text>
           <ActivityIndicator color={colors.brand.pulse} size="large" />
         </View>
       </View>
     );
   }
 
-  // ─── Step: ingredients ────────────────────────────────────────────────────
+  // ─── Step: ingredients (confirmação — CP-B5.4) ────────────────────────────
   if (step === 'ingredients') {
+    const scanNotice = isFreeTier
+      ? nextIsPreview
+        ? t('pantryScanner.usesPreview')
+        : t('pantryScanner.usesScan', { count: remainingScansCount })
+      : null;
+
     return (
       <View style={styles.screen}>
         <AuroraBackground intensity="reduced" />
@@ -1024,12 +1283,14 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('common.actions.back')}
-              onPress={() => setStep('capture')}
+              onPress={() => setStep(hasGenerated ? 'recipes' : 'capture')}
               style={styles.headerBackButton}
             >
               <Ionicons name="arrow-back" size={24} color={themeColors.text.primary} />
             </Pressable>
-            <Text style={styles.headerTitle}>{t('pantryScanner.ingredientsFound')}</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {t('pantryScanner.ingredientsFound')}
+            </Text>
             <View style={styles.headerPlaceholder} />
           </View>
 
@@ -1042,38 +1303,146 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               contentContainerStyle={styles.ingredientsScrollContent}
               keyboardShouldPersistTaps="handled"
             >
+              {hasGenerated ? (
+                <Text style={styles.regenerateNotice} testID="pantry-regenerate-notice">
+                  {t(isFreeTier ? 'pantryScanner.regenerateNotice' : 'pantryScanner.regenerateNoticePro')}
+                </Text>
+              ) : null}
+
               <Text style={styles.sectionSubtitle}>{t('pantryScanner.confirmIngredients')}</Text>
 
-              {ingredients.map((item, index) => (
-                <IngredientCheckItem
-                  key={`${item.name}-${index}`}
-                  ingredient={item}
-                  checked={item.checked}
-                  onToggle={() => handleToggleIngredient(index)}
-                />
+              {ingredients.map((item, index) => {
+                const alcoholDisabled = item.isAlcoholic && alcoholAge === 'under-age';
+                return (
+                  <IngredientCheckItem
+                    key={`${item.name}-${index}`}
+                    ingredient={item}
+                    checked={item.checked}
+                    disabled={alcoholDisabled}
+                    label={
+                      item.isAlcoholic
+                        ? t(alcoholDisabled ? 'pantryScanner.alcoholicUnavailable' : 'pantryScanner.alcoholicLabel')
+                        : undefined
+                    }
+                    onToggle={() => handleToggleIngredient(index)}
+                    testID={`pantry-ingredient-${index}`}
+                  />
+                );
+              })}
+
+              {addedItems.map((name) => (
+                <View key={`added-${name}`} style={styles.addedRow} testID="pantry-added-item">
+                  <Ionicons name="add-circle" size={22} color={colors.brand.pulse} />
+                  <View style={styles.addedTextColumn}>
+                    <Text numberOfLines={1} style={styles.addedName}>{name}</Text>
+                    <Text style={styles.addedLabel}>{t('pantryScanner.addedLabel')}</Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('pantryScanner.removeAdded', { name })}
+                    hitSlop={8}
+                    onPress={() => handleRemoveAdded(name)}
+                    style={styles.addedRemove}
+                  >
+                    <Ionicons name="close" size={18} color={themeColors.text.secondary} />
+                  </Pressable>
+                </View>
               ))}
 
+              {addedItems.length < PANTRY_ADDED_ITEMS_MAX ? (
+                <View style={styles.addRow}>
+                  <TextInput
+                    style={[styles.addIngredientInput, styles.flex]}
+                    accessibilityLabel={t('pantryScanner.addIngredient')}
+                    placeholder={t('pantryScanner.addIngredient')}
+                    placeholderTextColor={themeColors.text.tertiary}
+                    value={newIngredientText}
+                    onChangeText={setNewIngredientText}
+                    onSubmitEditing={handleAddIngredient}
+                    maxLength={PANTRY_ADDED_ITEM_MAX_LENGTH}
+                    returnKeyType="done"
+                    testID="pantry-add-input"
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('pantryScanner.addButton')}
+                    accessibilityState={{ disabled: !newIngredientText.trim() }}
+                    disabled={!newIngredientText.trim()}
+                    onPress={handleAddIngredient}
+                    style={styles.addButton}
+                    testID="pantry-add-button"
+                  >
+                    <Text style={styles.addButtonLabel}>{t('pantryScanner.addButton')}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {!hasLiquid ? (
+                <View style={styles.liquidSection} testID="pantry-liquid-question">
+                  <Text style={styles.fieldLabel} accessibilityRole="header">
+                    {t('pantryScanner.liquidQuestion')}
+                  </Text>
+                  <Text style={styles.fieldHint}>{t('pantryScanner.liquidHint')}</Text>
+                  <View style={styles.liquidOptions} accessibilityRole="radiogroup">
+                    {LIQUID_OPTIONS.map((option) => {
+                      const selected = liquid === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                          accessibilityLabel={t(option.labelKey)}
+                          onPress={() => setLiquid(option.value)}
+                          style={[styles.liquidOption, selected ? styles.liquidOptionSelected : null]}
+                          testID={`pantry-liquid-${option.value}`}
+                        >
+                          <Text style={[styles.liquidOptionLabel, selected ? styles.liquidOptionLabelSelected : null]}>
+                            {t(option.labelKey)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              <Text style={[styles.fieldLabel, styles.requestLabel]}>{t('pantryScanner.requestLabel')}</Text>
               <TextInput
-                style={styles.addIngredientInput}
-                placeholder={t('pantryScanner.addIngredient')}
+                style={[styles.addIngredientInput, styles.requestInput]}
+                accessibilityLabel={t('pantryScanner.requestLabel')}
+                placeholder={t('pantryScanner.requestPlaceholder')}
                 placeholderTextColor={themeColors.text.tertiary}
-                value={newIngredientText}
-                onChangeText={setNewIngredientText}
-                onSubmitEditing={handleAddIngredient}
-                returnKeyType="done"
+                value={requestText}
+                onChangeText={setRequestText}
+                maxLength={PANTRY_REQUEST_MAX_LENGTH}
+                multiline
+                testID="pantry-request-input"
               />
             </ScrollView>
 
             <View style={styles.footerContainer}>
               <AuthButton
-                onPress={handleGenerateRecipes}
-                disabled={confirmedIngredients.length === 0}
-                loading={isGeneratingRecipes}
+                onPress={() => {
+                  void handleGenerateRecipes();
+                }}
+                disabled={!canGenerate}
+                testID="pantry-generate-button"
               >
                 {t('pantryScanner.generateRecipes')}
               </AuthButton>
+              {scanNotice ? (
+                <Text style={styles.scanNotice} testID="pantry-scan-notice">{scanNotice}</Text>
+              ) : null}
             </View>
           </KeyboardAvoidingView>
+
+          <AgeConfirmationSheet
+            visible={ageSheet !== null}
+            onAnswer={(isAdult) => {
+              void handleAgeAnswer(isAdult);
+            }}
+            onDismiss={() => setAgeSheet(null)}
+          />
         </SafeAreaView>
       </View>
     );
@@ -1141,6 +1510,17 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               />
             );
           })}
+
+          {readId && recipes.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setStep('ingredients')}
+              style={styles.ghostButton}
+              testID="pantry-edit-ingredients"
+            >
+              <Text style={styles.ghostButtonLabel}>{t('pantryScanner.editIngredients')}</Text>
+            </Pressable>
+          ) : null}
 
           <Pressable
             accessibilityRole="button"

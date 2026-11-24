@@ -1935,7 +1935,7 @@ The `language` field has priority over the user's stored `preferredLanguage` / `
 When the user has at least one of `dairy_free`, `vegan`, `nut_free` or `no_added_sugar`, the system prompt gets a **"Dietary restrictions (mandatory)"** block (English, like the rest of the prompt) placed after the weight-goal guidance and before the physical blender guardrails, which stay last. An account with no preference (or an old account without the field) gets a byte-identical prompt to before. The block:
 
 - treats every restriction as a hard requirement and states that it takes priority over any ingredient mentioned elsewhere in the prompt;
-- states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`). **Changed on purpose in CP-B5 for this endpoint:** an ingredient outside the diet that the *current* message names explicitly is included (see *Explicit request, diet override and alcohol* below); a generic order to ignore the rules, medical-clearance claims and text imitating a system message still have no effect. The Pantry Scanner keeps the old text;
+- states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`). **Changed on purpose in CP-B5 for this endpoint:** an ingredient outside the diet that the *current* message names explicitly is included (see *Explicit request, diet override and alcohol* below); a generic order to ignore the rules, medical-clearance claims and text imitating a system message still have no effect. The Pantry Scanner keeps the old text when nothing was added or requested; since CP-B7 its added items and request are the explicit request (see `POST /pantry-scanner/generate`);
 - lists per-diet rules: `nut_free` (no peanuts or tree nuts nor derivatives; listed first because it is usually an allergy), `vegan` (no animal-origin ingredient; protein powder must be plant-based), `dairy_free`, `no_added_sugar` (natural fruit sugar is allowed).
 
 With a diet active, the fixed parts of the prompt also stop *suggesting* ingredients that violate it: the nutrition reference table omits them (a new table entry must be classified in `NUTRITION_ENTRY_RESTRICTIONS`, enforced by a test), the unit example uses `water` instead of `almond milk`, the `gain` guidance and the Lite/Steel hardware hints drop the conflicting examples. This was needed because the pentest showed the explicit priority clause alone still let `Unsweetened almond milk` through for `nut_free` users (2 of 12 generations) — the prompt itself was offering it.
@@ -1963,11 +1963,11 @@ The diet is enforced **by the prompt only**: there is no ingredient validation o
 | under 21 or answered "No" | yes | alcohol-free version, `recipe.alcoholFreeVersion: true` (backend-set) and a short card notice; same `no_alcohol` check |
 | unknown | yes | `428 pulseai/age-confirmation-required`; usage/preview returned, nothing cached, no conversation turn, no XP |
 
-The `no_alcohol` check is a deterministic backend safety net (spirits, wine, beer, liqueurs, en and pt-BR; "rum extract", "cerveja sem álcool", "vinagre de vinho" pass). It only runs on this endpoint; the Pantry Scanner is unchanged.
+The `no_alcohol` check is a deterministic backend safety net (spirits, wine, beer, liqueurs, en and pt-BR; "rum extract", "cerveja sem álcool", "vinagre de vinho" pass). Since CP-B7 it also runs on `POST /pantry-scanner/generate`.
 
 **What counts as asking for alcohol (CP-B5.1).** The single definition in the prompt also says that "without" removes only the item it names ("piña colada without ice" still counts) and that a message asking for the alcohol-free version of a drink ("virgin piña colada", "piña colada sem álcool") is never a request for alcohol, whatever the user's age. Measured live in batch 10 before this sentence: 148/162 correct overall, 78% for under-21 and "No" accounts (the virgin request was flagged as alcohol); the new sentence is not measured yet (Gemini free-tier quota ran out) — see [cp-b5-1-praia-refrescos-titulo-lote10.md](../fixes/cp-b5-1-praia-refrescos-titulo-lote10.md).
 
-**Title check (CP-B5.1).** The prompt says the title names only ingredients of this recipe, never from earlier messages or the recent blends. The backend checks `title` with the diet rules (same lists, normalization and negation: "Smoothie sem amendoim", "Peanut-free smoothie" pass) and, when alcohol is forbidden, with the `no_alcohol` list (drink names such as "Caipirinha" or "Piña Colada" pass; "…com Cachaça", "Rum Shake" do not). A forbidden diet term passes in the title only when the current message asked for it **and** it is in an ingredient of the recipe released by that request. A violation follows the same path as the ingredients (one retry asking to rename the title, then `422 pulseai/dietary-restriction-unmet`). Lite ice/frozen and the 21+ alcohol cap do not look at the title. The Pantry Scanner also checks the title against the diet (no alcohol check there).
+**Title check (CP-B5.1).** The prompt says the title names only ingredients of this recipe, never from earlier messages or the recent blends. The backend checks `title` with the diet rules (same lists, normalization and negation: "Smoothie sem amendoim", "Peanut-free smoothie" pass) and, when alcohol is forbidden, with the `no_alcohol` list (drink names such as "Caipirinha" or "Piña Colada" pass; "…com Cachaça", "Rum Shake" do not). A forbidden diet term passes in the title only when the current message asked for it **and** it is in an ingredient of the recipe released by that request. A violation follows the same path as the ingredients (one retry asking to rename the title, then `422 pulseai/dietary-restriction-unmet`). Lite ice/frozen and the 21+ alcohol cap do not look at the title. The Pantry Scanner also checks the title against the diet and, since CP-B7, against the alcohol list.
 
 **Cache key.** Gets a last segment `:alcohol21` (21+) or `:noalcohol` (`alcoholTier` in `generateCacheKey`), because the prompt text differs. Since this endpoint always sends it, entries written before CP-B5 (older prompt) are no longer read and expire by TTL.
 
@@ -2163,9 +2163,9 @@ None.
 
 ## Pantry Scanner
 
-### POST /pantry-scanner/analyze
+### POST /pantry-scanner/read
 
-Analyzes a pantry image, filters low-confidence ingredients, and generates up to two Pulse AI recipes from the usable ingredients.
+Reads the pantry photo (vision only) for the confirmation screen (CP-B7, two-step flow). **Does not count a scan**, generates no recipe and awards no XP. The image is never stored: only the read result is kept in `pantry_reads` for 30 min (`PANTRY_READ_TTL_MS`, TTL index on `expiresAt`).
 
 **JWT required:** Yes
 
@@ -2173,106 +2173,85 @@ Analyzes a pantry image, filters low-confidence ingredients, and generates up to
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `imageBase64` | string | Yes | Base64 image payload with an effective maximum size of approximately 2 MB |
-| `mimeType` | string | Yes | One of `image/jpeg` or `image/png` |
+| `imageBase64` | string | Yes | Base64 image payload with an effective maximum size of approximately 2 MB (this route uses the 4 MB JSON parser) |
+| `mimeType` | string | Yes | One of `image/jpeg` or `image/png`; the bytes must match the JPEG/PNG signature (`400 scanner/invalid-content` otherwise) |
 
-**Processing pipeline**
+**Processing**
 
-1. Validates the request body with `pantryScanSchema` and calculates the image size in KB for structured logging.
-2. Loads the authenticated user and checks `isPro`; Pro users skip the free-tier monthly limit gate.
-3. For free-tier users, if `Date.now() > scanResetDate`, resets `scanCount` to `0` and recalculates `scanResetDate` with `addMonths(previousScanResetDate, 1)`, preserving the original billing cycle anchor.
-4. If the current free-tier `scanCount >= 3`, returns `429 Too Many Requests` with code `scanner/monthly-limit-reached` plus `scansUsed`, `scansLimit`, and `resetDate`.
-5. Calls `callVisionAi` with the pantry-analysis prompt built by `pantryPromptBuilder.service.ts` (CP-B2: ingredient names are requested in the account language — `buildPantryAnalysisPrompt(locale)`).
-6. Parses and validates the returned JSON; if `noFoodDetected: true`, returns `200 OK` with empty arrays and does not increment the scanner.
-7. Filters the detected ingredients to confidence levels `high` and `medium`; if the filtered array becomes empty, returns `200 OK` with `noUsableIngredients: true` and does not increment the scanner.
-8. Only after valid ingredients are confirmed, increments `scanCount` atomically with `$inc`, then generates recipes through `promptBuilder.service.ts` (the same internal prompt function as Pulse AI, so the user's `dietaryPreferences` produce the same "Dietary restrictions (mandatory)" block — see `POST /pulse-ai/chat`) and returns the Pantry Scanner XP payload.
-8a. **Reading the recipes (CP-B1).** The response may be the array the prompt asks for, the `{ "recipes": [...] }` envelope or a single recipe object; 1 or 2 recipes are accepted (the prompt asks for 2 and allows 1 when the ingredients only make 1). Each recipe is validated on its own, so a valid recipe is kept even if the other one is malformed. Every outcome is logged as `[pantryScanner] recipe generation parsed` with `reason` (`ok`, `invalid-json`, `invalid-schema`, `empty`), `responseLength` and, for schema errors, the first Zod path and code (e.g. `1.macros (invalid_type)`) — never the response content. `invalid-json` / `invalid-schema` (no valid recipe, unknown shape or more than 2) get **one** retry with the same instruction as Pulse AI (`INVALID_JSON_RETRY_INSTRUCTION`); still invalid → `503 scanner/vision-unavailable`. `empty` (the AI returned `[]`) gets no retry and keeps the `200` "no recipes" answer below.
-8b. **Provider failure on generation (CP-B1).** Any exception from the generation call (or its format retry) answers `503 scanner/vision-unavailable`, with the scan returned (`scanCount` decremented), no XP and no mission progress. Before CP-B1 it was a `200` with `recipes: []`.
-9. Each generated recipe goes through the blender limit (volume only since CP-B2, one retry, then discarded — same rules as `POST /pulse-ai/chat` step 9a, CP-1.1.9), the macro check and the diet/ice check (the Lite also rejects frozen ingredients since CP-B2; since CP-B5.1 the recipe title is also checked against the diet, never against ice or alcohol; one retry, then discarded), and the blender limits once more at the end. Then (CP-B2) the step check of `POST /pulse-ai/chat` 9c runs, and a recipe that uses plain water not among the detected ingredients gets `usesWaterNotInPhoto: true` (set by the backend only; the AI's value is dropped) — water is the only ingredient allowed outside the photo, and the app shows a short line on the card. A recipe whose blocking retry fails at the AI provider is lost as "AI unavailable"; if no recipe is left, the response code says why (see the status codes below). Each per-recipe retry (blender limits, macros, diet) asks for the corrected recipe "as a JSON array containing exactly 1 recipe object", and the answer is accepted as an object or a 1-item array (CP-B1 — before, the Pantry system prompt's array format made every retry answer be discarded); a retry answer that is still unreadable is logged with its reason and discarded.
+1. Validates the body with `pantryScanSchema` and the magic bytes; loads the user and resets the free billing cycle when due (`scanCount`, `monthlyScanPreviewUsage` and `pantryReadCount` go back to 0 together).
+2. **Read limits (atomic, counted before the vision call):**
+   - Free: a fixed ceiling of `(3 scans + 1 preview) × PANTRY_READS_PER_SCAN (3)` = 12 reads per cycle (`pantryReadCount`), and no read at all without a scan or the preview left → `429 scanner/read-limit-reached` with `resetDate`.
+   - Pro: no practical daily limit; bot protection of `PANTRY_PRO_READ_BURST_LIMIT` (10) reads in `PANTRY_PRO_READ_BURST_WINDOW_MS` (10 min) → `429 scanner/read-rate-limited` ("wait a moment"), and a safety ceiling of `PANTRY_PRO_READ_DAILY_LIMIT` (100) per day in the account time zone → `429 scanner/read-daily-limit`.
+   - A provider failure gives the read back; a read that returns no food / no usable ingredient still counts (the vision call was spent).
+3. Calls `callVisionAi` with `buildPantryAnalysisPrompt(locale)` (names in the account language; CP-B7a: drinks are listed too — alcoholic beverages, including closed bottles and cans, and mixers such as ginger beer, tonic water, soda and non-alcoholic beer, with the label name when readable).
+4. Keeps the `high`/`medium` ingredients. Each one gets `isAlcoholic` from the backend's alcohol list (`findAlcoholMentions`, the same list as the recipe check, with its false friends: ginger beer, root beer, "cerveja sem álcool"/0,0 are not alcoholic) — never from the AI. `hasLiquid` is decided by code from a short list of blend bases (water, milk and plant milks, juice, kefir, coconut water…); yogurt, condensed/powdered milk, spirits and carbonated drinks (soda, tonic water, ginger beer, non-alcoholic beer) do not count.
 
-**AI time budget (CP-B1).** The whole request has a total AI budget of **85 s** (`AI_REQUEST_BUDGET_MS.pantryScannerAnalyze`): the vision call uses `min(45 s, time left)` and every text call `min(30 s, time left)`, and no call starts with less than 5 s left; running out is a provider failure (`503`, scan or preview returned). Without it the worst case was 195 s (vision 45 + generation 30 + format retry 30 + per-recipe limit/macro/diet retries 3 × 30, in parallel per recipe). With Google, `500`/`503` are retried up to 3 attempts inside each call's window (vision included); `AI_FALLBACK_MODEL` applies to the text calls only. The app calls this route with a 100 s timeout (`AI_CLIENT_TIMEOUT_MS.pantryScannerAnalyze`).
+**Success response** — `200 OK`, `data`:
+
+| Field | Notes |
+|---|---|
+| `readId`, `readExpiresAt` | Present only when there is something to confirm |
+| `ingredients` | `{ name, estimatedQuantity?, confidence, isAlcoholic }[]` |
+| `hasLiquid` | `false` → the app asks which liquid the user has |
+| `noFoodDetected`, `noUsableIngredients?`, `analysisNotes?` | Same meaning as before; no `readId` in these cases |
+| `alcoholAge` | `of-age` / `under-age` / `unknown` (same resolution as Pulse AI) |
+| `nextGenerationIsPreview` | Free user with the cycle's scans used: the generation will be the locked preview |
+| `scansUsed`, `scansLimit`, `resetDate` | Current cycle |
+
+**Status codes:** `200`; `400 scanner/invalid-image` / `scanner/invalid-content`; `401`; `404`; `429 scanner/read-limit-reached` / `scanner/read-rate-limited` / `scanner/read-daily-limit`; `500 scanner/vision-parse-error`; `503 scanner/vision-unavailable` (read given back).
+
+**AI time budget:** 30 s (`AI_REQUEST_BUDGET_MS.pantryScannerRead`); the app waits 45 s (`AI_CLIENT_TIMEOUT_MS.pantryScannerRead`).
+
+### POST /pantry-scanner/generate
+
+Generates up to two recipes from a confirmed read. **This is where the scan is counted** (or the free locked preview used), with the same rules as before: atomic increment/limit, scan returned on every path without a recipe, XP and `scanPantry` mission only on delivery.
+
+**JWT required:** Yes
+
+**Request body** (strict — an unknown field is `400 scanner/invalid-generate-request`)
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `readId` | string | Yes | Must belong to the user, not be expired and not have generated yet; otherwise `410 scanner/read-expired` (same answer for every case; the app asks for a new photo) |
+| `selected` | string[] | Yes | Checked items from the read (available, the recipe uses some). Only names from the read are accepted (`400 scanner/invalid-selection`); unchecked items are never sent to the AI |
+| `added` | string[] | No | Typed by the user, ≤ 10 items of ≤ 40 characters. **Explicit request**: mandatory in every recipe |
+| `liquid` | `water` \| `milk` \| `plant_milk` \| `none` | No | The app requires it when `hasLiquid` is `false`. `water`/`milk`/`plant_milk` become available (milk and plant milk replace plain water as the base); `none` = creamy recipe without any liquid. Absent → the previous behavior (plain water always allowed) |
+| `request` | string | No | "Any request?", ≤ 500 characters (the Pulse AI message limit), sent to the AI as JSON-encoded data |
+
+At least one item in `selected` or `added`.
+
+**Alcohol (CP-B5 rules on the Pantry, generation only).** The decision is `detectAlcoholRequest(request)` = `yes` **or** an alcoholic item checked/added. Unknown age → `428 scanner/age-confirmation-required` **before** counting the scan and before any AI call (the app shows the same age sheet as Pulse AI, calls `POST /pulse-ai/age-confirmation` and resends). Under 21 / "No" with an alcoholic item checked → `403 scanner/alcohol-not-allowed`; alcohol only added or asked for → alcohol-free recipe with `alcoholFreeVersion: true`. 21+ → alcohol allowed at a regular single-drink amount (cap 28 g of pure alcohol, `alcoholGrams` counted at 7 kcal/g; checked bottle = at least one recipe, added/asked = every recipe). The `no_alcohol` / `alcohol_limit` safety net now runs on the Pantry too.
+
+**Processing**
+
+1. The read is consumed atomically (a double tap does not generate twice), then the scan is counted (or the free preview reserved).
+2. Prompt: checked items as *Available ingredients*; `added` and `request` go in the user message as JSON data, with the Pulse AI explicit-request rules (priority physical limits > request > diet; required items in every recipe; amounts, flavors and calorie/macro values; closest recipe + `capacityNotice` when it does not fit). CP-B7a: when the ingredient name differs from what the user typed (another language or another name), the AI adds the typed name in parentheses, e.g. "Pasta de amendoim (peanut butter)".
+3. **Reading the recipes (CP-B1).** The response may be the array the prompt asks for, the `{ "recipes": [...] }` envelope or a single recipe object; 1 or 2 recipes are accepted (the prompt asks for 2 and allows 1 when the ingredients only make 1). Each recipe is validated on its own, so a valid recipe is kept even if the other one is malformed. Every outcome is logged as `[pantryScanner] recipe generation parsed` with `reason` (`ok`, `invalid-json`, `invalid-schema`, `empty`), `responseLength` and, for schema errors, the first Zod path and code (e.g. `1.macros (invalid_type)`) — never the response content. `invalid-json` / `invalid-schema` (no valid recipe, unknown shape or more than 2) get **one** retry with the same instruction as Pulse AI (`INVALID_JSON_RETRY_INSTRUCTION`); still invalid → `503 scanner/vision-unavailable`. `empty` (the AI returned `[]`) gets no retry and keeps the `200` "no recipes" answer below.
+4. Per recipe, first the **user-choices check** (CP-B7): every added item is in the ingredients (same normalization as the diet validator, singular/plural, the typed name in parentheses counts), no unchecked item is used, no water with `liquid: none`. One retry on a gap. After it, an unchecked item still used discards the recipe (`422 scanner/selection-unmet` when all are); a missing added item does **not** block: the recipe is delivered with `missingRequestedIngredients` (set by the backend only, the AI's value is dropped), shown on the card as "We couldn't include: X".
+5. Each generated recipe goes through the blender limit (volume only since CP-B2, one retry, then discarded — same rules as `POST /pulse-ai/chat` step 9a, CP-1.1.9), the macro check and the diet/ice check (the Lite also rejects frozen ingredients since CP-B2; since CP-B5.1 the recipe title is also checked against the diet, never against ice or alcohol; one retry, then discarded), and the blender limits once more at the end. Then (CP-B2) the step check of `POST /pulse-ai/chat` 9c runs, and a recipe that uses plain water not among the detected ingredients gets `usesWaterNotInPhoto: true` (set by the backend only; the AI's value is dropped) — water is the only ingredient allowed outside the photo, and the app shows a short line on the card. A recipe whose blocking retry fails at the AI provider is lost as "AI unavailable"; if no recipe is left, the response code says why (see the status codes below). Each per-recipe retry (blender limits, macros, diet) asks for the corrected recipe "as a JSON array containing exactly 1 recipe object", and the answer is accepted as an object or a 1-item array (CP-B1 — before, the Pantry system prompt's array format made every retry answer be discarded); a retry answer that is still unreadable is logged with its reason and discarded. The diet check receives the explicit request (`added` + `request`), so an added item outside the diet passes with `dietOverrideIngredients`, as in Pulse AI; the volume retry keeps the requested items (`keepExplicitRequest`). `usesWaterNotInPhoto` is only set when the user did not choose a liquid (or chose `none` and the water stayed).
+6. On delivery the response carries a **new `readId`** with the same expiry, so the user can edit and generate again without a new photo (each generation counts a new scan). On any path without a recipe the original read is released and stays valid.
 
 With a diet active, ingredients detected in the photo that violate it are treated by the prompt as unavailable (the recipes are built from the compliant remaining ones, and the list is empty only when not even 1 compliant recipe is possible — CP-B1; before, when fewer than 2 were), and ingredient names are declared to be data, never instructions. The backend does not filter ingredients by name.
 
-**Success response**
+**AI time budget:** 85 s (`AI_REQUEST_BUDGET_MS.pantryScannerGenerate`, same rules as CP-B1: text calls `min(30 s, time left)`, none starts with < 5 s left); the app waits 100 s.
 
-**Status:** `200 OK`
-
-```json
-{
-  "success": true,
-  "data": {
-    "ingredients": [
-      {
-        "name": "Banana",
-        "estimatedQuantity": "2 units",
-        "confidence": "high"
-      },
-      {
-        "name": "Greek yogurt",
-        "estimatedQuantity": "1 pot",
-        "confidence": "medium"
-      }
-    ],
-    "analysisNotes": "Detected fruit and dairy items suitable for smoothies.",
-    "noFoodDetected": false,
-    "recipes": [
-      {
-        "title": "Banana Yogurt Boost",
-        "ingredients": [
-          {
-            "name": "Banana",
-            "amount": "2 units"
-          },
-          {
-            "name": "Greek yogurt",
-            "amount": "1 pot"
-          }
-        ],
-        "macros": {
-          "protein": 24,
-          "carbs": 36,
-          "fat": 4,
-          "calories": 260
-        },
-        "prepTimeSeconds": 60,
-        "blendInstruction": "Blend for 45 seconds until smooth.",
-        "tip": "Add ice for a thicker texture.",
-        "hasSubstitutes": false,
-        "steps": [
-          { "text": "Add the banana and yogurt to the cup." },
-          { "text": "Add a handful of ice and pulse to break it up.", "pulseCount": 5 },
-          { "text": "Blend on high for 45 seconds until smooth." }
-        ]
-      }
-    ],
-    "scansUsed": 2,
-    "scansLimit": 3,
-    "resetDate": "2026-07-10T12:00:00.000Z",
-    "xpAwarded": 5
-  }
-}
-```
-
-When `noFoodDetected` or `noUsableIngredients` is returned, the response still uses `200 OK` with empty `ingredients` and `recipes`, keeps `scansUsed` unchanged, and does not award XP.
-
-`xpAwarded` is the multi-occurrence Pantry Scanner XP granted only after a successful scan with at least one usable ingredient and at least one delivered recipe.
-
-When the AI answers with no recipe — an empty array (CP-1.1.1d; logged with `reason: 'empty'` since CP-B1) — the response keeps the same `200 OK` shape with `recipes: []` and the usable `ingredients`, but the scan is given back (`scanCount` is decremented, so `scansUsed` is the value before this scan), `xpAwarded` is `0` (`leveledUp: false`, `newLevel: null`) and the `scanPantry` mission is not advanced. A vision failure never consumes a scan, since the increment happens only after the vision step. A **provider failure** on generation is no longer reported this way: since CP-B1 it is `503 scanner/vision-unavailable` (step 8b).
+**Success response** — `200 OK`: `ingredients` (checked + added), `recipes`, `noFoodDetected: false`, `scansUsed`, `scansLimit`, `resetDate`, `readId`, `readExpiresAt`, `xpAwarded`, `leveledUp`, `newLevel`. The free locked preview keeps its strict shape (CP-1.1.4b: ingredients and macros only, no `readId`). An empty AI answer keeps the `200` "no recipes" shape with the scan returned, no XP, and the same `readId` still valid.
 
 **Status codes**
 
 | Status | Meaning |
 |---|---|
-| `200` | Pantry image analyzed successfully, or no food / no usable ingredients was confirmed |
-| `400` | Request body failed validation |
-| `401` | Missing, invalid, or expired Bearer token |
-| `404` | Authenticated user record not found |
-| `429` | Free-tier monthly Pantry Scanner limit reached |
-| `500` | Vision provider returned invalid JSON after parsing |
-| `422` | `scanner/dietary-restriction-unmet`: every generated recipe was discarded and at least one by the diet/ice check (scan returned, no XP) |
-| `422` | `scanner/blender-limit-unmet`: every generated recipe was discarded, all of them by the blender volume limit (scan returned, no XP; CP-1.1.9) |
-| `503` | `scanner/vision-unavailable`: the AI is temporarily unavailable — the vision call failed; the recipe generation failed at the provider or stayed invalid after the format retry (CP-B1); the 85 s request budget ran out (CP-B1); or every recipe was lost and at least one because a blocking retry failed at the AI provider (CP-1.1.9). The scan (or the locked preview) is always returned |
+| `200` | Recipes delivered, locked preview, or no recipe (scan returned) |
+| `400` | `scanner/invalid-generate-request` (schema) or `scanner/invalid-selection` (item not in the read) |
+| `401` / `404` | Missing token / user not found |
+| `403` | `scanner/alcohol-not-allowed`: alcoholic item checked by an account under 21 or that answered "No" |
+| `410` | `scanner/read-expired`: read expired, already used, of another user or unknown |
+| `422` | `scanner/dietary-restriction-unmet`, `scanner/blender-limit-unmet` (as before) or `scanner/selection-unmet` (every recipe used an unchecked item) — scan returned, no XP |
+| `428` | `scanner/age-confirmation-required` (nothing counted, no AI call) |
+| `429` | `scanner/monthly-limit-reached` (free, no scan and no preview left) |
+| `503` | `scanner/vision-unavailable`: provider failure or budget exhausted (scan and read returned) |
+
+`GET /pantry-scanner/previews/:id` (unlock of the locked preview, CP-1.1.4b) is unchanged.
 
 ---
 

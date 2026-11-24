@@ -69,7 +69,7 @@ function buildCorsOriginNotAllowedError(origin?: string): ApiError {
 // Rotas que legitimamente recebem payloads grandes (imagens em base64) —
 // todo o resto usa o limite padrão pequeno. Ver uso na cadeia de
 // middlewares abaixo.
-const LARGE_JSON_PAYLOAD_PATHS = new Set(['/users/profile-photo', '/pantry-scanner/analyze']);
+const LARGE_JSON_PAYLOAD_PATHS = new Set(['/users/profile-photo', '/pantry-scanner/read']);
 const defaultJsonParser = express.json({ limit: '50kb' });
 const largeJsonParser = express.json({ limit: '4mb' });
 

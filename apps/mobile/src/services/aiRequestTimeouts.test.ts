@@ -54,8 +54,10 @@ beforeEach(() => {
 describe('timeout das rotas de IA (CP-B1)', () => {
   it('os timeouts do app passam do teto do servidor com folga', () => {
     expect(AI_CLIENT_TIMEOUT_MS.pulseAiChat).toBeGreaterThan(AI_REQUEST_BUDGET_MS.pulseAiChat);
-    expect(AI_CLIENT_TIMEOUT_MS.pantryScannerAnalyze).toBeGreaterThan(
-      AI_REQUEST_BUDGET_MS.pantryScannerAnalyze,
+    // CP-B5.4: o Pantry tem duas rotas (leitura e geração).
+    expect(AI_CLIENT_TIMEOUT_MS.pantryScannerRead).toBeGreaterThan(AI_REQUEST_BUDGET_MS.pantryScannerRead);
+    expect(AI_CLIENT_TIMEOUT_MS.pantryScannerGenerate).toBeGreaterThan(
+      AI_REQUEST_BUDGET_MS.pantryScannerGenerate,
     );
     expect(AI_CLIENT_TIMEOUT_MS.pulseAiChat).toBeGreaterThan(DEFAULT_TIMEOUT_MS);
   });
@@ -83,7 +85,33 @@ describe('timeout das rotas de IA (CP-B1)', () => {
     expect(config).toEqual({ timeout: AI_CLIENT_TIMEOUT_MS.pulseAiChat });
   });
 
-  it('Pantry analyze usa o timeout próprio', async () => {
+  it('Pantry read usa o timeout próprio', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          readId: 'read-1',
+          readExpiresAt: '2026-12-01T00:30:00.000Z',
+          ingredients: [{ name: 'Banana', confidence: 'high', isAlcoholic: false }],
+          hasLiquid: false,
+          noFoodDetected: false,
+          alcoholAge: 'unknown',
+          nextGenerationIsPreview: false,
+          scansUsed: 0,
+          scansLimit: 3,
+          resetDate: '2026-12-01T00:00:00.000Z',
+        },
+      },
+    });
+
+    await pantry.readPantryPhoto('/9j/AAAA', 'image/jpeg');
+
+    const [url, , config] = mockPost.mock.calls[0] as [string, unknown, { timeout?: number }];
+    expect(url).toBe('/pantry-scanner/read');
+    expect(config).toEqual({ timeout: AI_CLIENT_TIMEOUT_MS.pantryScannerRead });
+  });
+
+  it('Pantry generate usa o timeout próprio', async () => {
     mockPost.mockResolvedValue({
       data: {
         success: true,
@@ -99,12 +127,12 @@ describe('timeout das rotas de IA (CP-B1)', () => {
       },
     });
 
-    await pantry.analyzePantry('/9j/AAAA', 'image/jpeg');
+    await pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] });
 
     expect(mockPost).toHaveBeenCalledTimes(1);
     const [url, , config] = mockPost.mock.calls[0] as [string, unknown, { timeout?: number }];
-    expect(url).toBe('/pantry-scanner/analyze');
-    expect(config).toEqual({ timeout: AI_CLIENT_TIMEOUT_MS.pantryScannerAnalyze });
+    expect(url).toBe('/pantry-scanner/generate');
+    expect(config).toEqual({ timeout: AI_CLIENT_TIMEOUT_MS.pantryScannerGenerate });
   });
 
   it('as outras rotas desses serviços não passam timeout (ficam com o padrão)', async () => {
@@ -124,7 +152,7 @@ describe('timeout das rotas de IA (CP-B1)', () => {
       }),
     );
 
-    await expect(pantry.analyzePantry('/9j/AAAA', 'image/jpeg')).rejects.toMatchObject({
+    await expect(pantry.readPantryPhoto('/9j/AAAA', 'image/jpeg')).rejects.toMatchObject({
       translationKey: 'errors.network.timeout',
     });
   });

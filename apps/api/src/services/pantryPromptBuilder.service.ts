@@ -22,6 +22,12 @@ const PANTRY_ANALYSIS_PROMPT_SECTIONS = [
   '- honey and natural sweeteners',
   '- powdered supplements',
   '- beverages such as juices and sports drinks',
+  // CP-B7a: no teste ao vivo do CP-B7 (lote 13) rum, cachaça, cerveja, ginger
+  // beer e cerveja 0,0 ficavam fora da leitura. Se é alcoólica ou não, quem
+  // decide é o código (lista do validador), nunca a visão.
+  '- alcoholic beverages (spirits, wine, beer, liqueur), including closed bottles and cans',
+  '- mixers and other drinks (ginger beer, tonic water, soda, non-alcoholic beer)',
+  '- for drinks, use the name on the label when it is readable',
   '',
   'Ignore items that are clearly unrelated to blends and smoothies, including:',
   '- medicine packaging',

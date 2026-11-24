@@ -1,15 +1,25 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
   AI_REQUEST_BUDGET_MS,
+  PANTRY_PRO_READ_BURST_LIMIT,
+  PANTRY_PRO_READ_BURST_WINDOW_MS,
+  PANTRY_PRO_READ_DAILY_LIMIT,
+  PANTRY_READS_PER_SCAN,
+  PANTRY_READ_TTL_MS,
+  RECIPE_MISSING_REQUEST_MAX_ITEMS,
   pantryAnalysisResultSchema,
+  pantryGenerateSchema,
   pantryIngredientSchema,
   pantryLockedPreviewResultSchema,
+  pantryReadResultSchema,
   pantryScanSchema,
   pulseAiRecipeSchema,
   toPulseAiRecipePreview,
   type PantryAnalysisResult,
   type PantryIngredient,
+  type PantryLiquidChoice,
   type PantryLockedPreviewResult,
+  type PantryReadResult,
   type PantryScanInput,
   type PulseAiRecipe,
 } from '@blendi/shared';
@@ -19,6 +29,7 @@ import { ZodError, z } from 'zod';
 
 import { BlendLogModel } from '../models/BlendLog';
 import { LOCKED_PREVIEW_TTL_MS_BY_KIND, LockedPreviewModel } from '../models/LockedPreview';
+import { PantryReadModel, type IPantryReadIngredient } from '../models/PantryRead';
 import {
   UserModel,
   type BlendiModel,
@@ -41,8 +52,20 @@ import { buildPantryAnalysisPrompt } from '../services/pantryPromptBuilder.servi
 import {
   buildPantryRecipePrompt,
   type BuildPulseAiPromptResult,
+  type PantryAlcoholPromptOptions,
 } from '../services/promptBuilder.service';
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
+import { resolveAlcoholAge, type AlcoholAgeStatus } from '../utils/alcoholAge.utils';
+import { detectAlcoholRequest } from '../utils/alcoholRequest.utils';
+import {
+  findMissingItems,
+  findUnselectedItemsUsed,
+  hasPhotoLiquid,
+  isAlcoholicItemName,
+  recipeUsesPlainWater,
+} from '../utils/pantryRequest.utils';
+import { withRequestNotices } from '../utils/recipeNotices.utils';
+import { isSameDayInTimezone } from '../utils/timezone.utils';
 import { prepareAiRecipePayload } from '../utils/aiRecipePayload.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
 import { markWaterNotInPhoto } from '../utils/recipeWater.utils';
@@ -60,6 +83,7 @@ import {
   buildRecipeRestrictionRetryMessage,
   summarizeRestrictionViolations,
   validateRecipeRestrictions,
+  type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
 
 const FREE_MONTHLY_SCAN_LIMIT = 3;
@@ -88,6 +112,35 @@ const PANTRY_SINGLE_RECIPE_RETRY_FORMAT_INSTRUCTION =
 const PANTRY_RECIPE_MAX_TOKENS = 7000;
 const USABLE_CONFIDENCE_LEVELS = new Set<PantryIngredient['confidence']>(['high', 'medium']);
 
+// ─── CP-B5.4: leitura e geração em duas etapas ───────────────────────────────
+// Free: teto fixo de leituras por ciclo = (scans + prévia do ciclo) × leituras
+// por scan (decisão do Gabriel: fixo, para ninguém ficar preso com scan
+// sobrando), e nenhuma leitura sem scan nem prévia restante.
+const FREE_CYCLE_READ_LIMIT =
+  (FREE_MONTHLY_SCAN_LIMIT + FREE_MONTHLY_SCAN_PREVIEW_LIMIT) * PANTRY_READS_PER_SCAN;
+const READ_LIMIT_REACHED_CODE = 'scanner/read-limit-reached';
+const READ_RATE_LIMITED_CODE = 'scanner/read-rate-limited';
+const READ_DAILY_LIMIT_CODE = 'scanner/read-daily-limit';
+// Leitura inexistente, de outro usuário, vencida ou já usada: a mesma
+// resposta (não revela que um id existe); o app pede uma nova foto.
+const READ_EXPIRED_CODE = 'scanner/read-expired';
+const INVALID_GENERATE_REQUEST_CODE = 'scanner/invalid-generate-request';
+const INVALID_SELECTION_CODE = 'scanner/invalid-selection';
+// Mesmo fluxo do Pulse AI (CP-B5): a mesma folha e o mesmo POST
+// /pulse-ai/age-confirmation; o app reenvia depois.
+const AGE_CONFIRMATION_REQUIRED_CODE = 'scanner/age-confirmation-required';
+const ALCOHOL_NOT_ALLOWED_CODE = 'scanner/alcohol-not-allowed';
+// Todas as receitas usaram item desmarcado mesmo após a nova tentativa.
+const SELECTION_UNMET_CODE = 'scanner/selection-unmet';
+
+// Nomes do líquido escolhido, para não confundir com item desmarcado.
+const LIQUID_CHOICE_NAMES: Record<PantryLiquidChoice, readonly string[]> = {
+  water: ['water', 'água'],
+  milk: ['milk', 'leite'],
+  plant_milk: ['milk', 'leite', 'bebida vegetal', 'plant beverage'],
+  none: [],
+};
+
 interface PantryScannerUserProfile {
   id: string;
   blendiModel: BlendiModel;
@@ -104,7 +157,13 @@ interface PantryScannerUserProfile {
   dailyCalorieTarget: number;
   scanCount: number;
   scanResetDate: Date;
+  /** CP-1.1.4b: prévias usadas no ciclo. */
+  monthlyScanPreviewUsage: number;
   isPro: boolean;
+  /** CP-B5.4: idade para álcool (mesma resolução do Pulse AI). */
+  alcoholAge: AlcoholAgeStatus;
+  /** CP-B5.4 (Pro): leituras no dia e quando o contador foi zerado. */
+  pantryReadDayResetDate?: Date;
 }
 
 type PantryScanIncrementResult =
@@ -462,6 +521,9 @@ type PantryEnforcementFailure = 'unmet' | 'aiUnavailable';
 type PantryRecipeEnforcement =
   | { recipe: PulseAiRecipe; failure?: undefined }
   | { recipe: null; failure: PantryEnforcementFailure };
+type PantryRestrictionEnforcement =
+  | { recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[]; failure?: undefined }
+  | { recipe: null; failure: PantryEnforcementFailure };
 
 // Limite físico do BLENDi (CP-B2: só o volume — blenderGuardrail.utils.ts),
 // mesma rede de segurança das receitas do chat do Pulse AI
@@ -472,7 +534,8 @@ type PantryRecipeEnforcement =
 async function ensurePantryRecipeBlenderLimits(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
-  blendiModel: BlendiModel
+  blendiModel: BlendiModel,
+  options: { keepExplicitRequest?: boolean } = {}
 ): Promise<PantryRecipeEnforcement> {
   const initialCheck = validateBlenderLimits(recipe, blendiModel);
 
@@ -486,7 +549,11 @@ async function ensurePantryRecipeBlenderLimits(
   });
 
   try {
-    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext);
+    // CP-B5.4: com itens adicionados/pedido, a nova tentativa mantém o que
+    // foi pedido (mesma regra do Pulse AI).
+    const retryMessage = buildBlenderLimitRetryMessage(initialCheck.violation, prompt.textContext, {
+      keepExplicitRequest: options.keepExplicitRequest === true,
+    });
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
       messages: buildPantryRecipeRetryMessages(prompt, recipe, retryMessage),
@@ -583,15 +650,18 @@ async function ensurePantryRecipeMacroConsistency(
 // trazer de volta um ingrediente proibido. Um retry só desta receita, no mesmo
 // padrão de ensurePantryRecipeBlenderLimits; se continuar violando (ou o
 // retry falhar), a receita é descartada (null).
+// CP-B5.4: `options` traz o pedido explícito (adicionados + pedido) e a
+// política de álcool, como no Pulse AI; devolve os índices liberados.
 async function ensurePantryRecipeRestrictions(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
-  user: Pick<PantryScannerUserProfile, 'dietaryPreferences' | 'blendiModel'>
-): Promise<PantryRecipeEnforcement> {
-  const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel);
+  user: Pick<PantryScannerUserProfile, 'dietaryPreferences' | 'blendiModel'>,
+  options: RecipeRestrictionOptions = {}
+): Promise<PantryRestrictionEnforcement> {
+  const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel, options);
 
   if (initialCheck.compliant) {
-    return { recipe };
+    return { recipe, dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [] };
   }
 
   console.info('[pantryScanner] recipe restriction violated, retrying', {
@@ -622,7 +692,8 @@ async function ensurePantryRecipeRestrictions(
     const retriedCheck = validateRecipeRestrictions(
       retriedRecipe,
       user.dietaryPreferences,
-      user.blendiModel
+      user.blendiModel,
+      options
     );
 
     if (!retriedCheck.compliant) {
@@ -637,6 +708,7 @@ async function ensurePantryRecipeRestrictions(
         ...retriedRecipe,
         macrosValidated: validateMacroConsistency(retriedRecipe).macrosValidated,
       },
+      dietOverrideIngredientIndexes: retriedCheck.dietOverrideIngredientIndexes ?? [],
     };
   } catch (error) {
     console.error('[pantryScanner] recipe restriction retry failed, discarding', {
@@ -666,7 +738,12 @@ async function findPantryScannerUserProfile(
       dailyCalorieTarget: 1,
       scanCount: 1,
       scanResetDate: 1,
+      monthlyScanPreviewUsage: 1,
       isPro: 1,
+      birthDate: 1,
+      hasRealBodyProfile: 1,
+      alcoholAgeConfirmed: 1,
+      pantryReadDayResetDate: 1,
     })
     .lean()
     .exec();
@@ -692,7 +769,10 @@ async function findPantryScannerUserProfile(
     dailyCalorieTarget: user.dailyCalorieTarget,
     scanCount: user.scanCount ?? 0,
     scanResetDate: user.scanResetDate ?? new Date(),
+    monthlyScanPreviewUsage: user.monthlyScanPreviewUsage ?? 0,
     isPro: user.isPro ?? false,
+    alcoholAge: resolveAlcoholAge(user),
+    ...(user.pantryReadDayResetDate ? { pantryReadDayResetDate: user.pantryReadDayResetDate } : {}),
   };
 }
 
@@ -716,6 +796,8 @@ async function resetScanCycleIfNeeded(
         scanCount: 0,
         // CP-1.1.4b: a prévia do ciclo volta junto com os scans.
         monthlyScanPreviewUsage: 0,
+        // CP-B5.4: as leituras do ciclo também.
+        pantryReadCount: 0,
         scanResetDate: nextScanResetDate,
       },
     }
@@ -724,6 +806,7 @@ async function resetScanCycleIfNeeded(
   return {
     ...user,
     scanCount: 0,
+    monthlyScanPreviewUsage: 0,
     scanResetDate: nextScanResetDate,
   };
 }
@@ -942,21 +1025,246 @@ interface PantryGeneratedRecipes {
   recipes: PulseAiRecipe[];
   /** Quantas a IA gerou antes do descarte por restrição. */
   generatedCount: number;
-  /** Descartadas por dieta/gelo no Lite (CP-1.1.9: para escolher o código de erro). */
+  /** Descartadas por dieta/gelo no Lite/álcool (CP-1.1.9: para escolher o código de erro). */
   restrictionDiscards: number;
   /** Descartadas por limite físico (volume). */
   blenderLimitDiscards: number;
+  /** CP-B5.4: descartadas porque usaram item desmarcado mesmo após a nova tentativa. */
+  selectionDiscards: number;
   /** Perdidas porque a nova tentativa falhou no provedor de IA (não julgadas). */
   aiUnavailableDiscards: number;
 }
 
+type PantryDiscardReason = 'restriction' | 'blenderLimit' | 'selection' | 'aiUnavailable';
+
 type PantryRecipeCheck =
   | { recipe: PulseAiRecipe; discardedBy?: undefined }
-  | { recipe: null; discardedBy: 'restriction' | 'blenderLimit' | 'aiUnavailable' };
+  | { recipe: null; discardedBy: PantryDiscardReason };
+
+/**
+ * CP-B5.4: o que a pessoa confirmou na tela, já conferido contra a leitura.
+ * Os textos são dados da pessoa: nunca vão para o log.
+ */
+interface PantryUserChoices {
+  /** Itens marcados (lidos da foto): disponíveis. */
+  selected: PantryIngredient[];
+  /** Itens lidos e desmarcados: nunca entram. */
+  unselected: string[];
+  /** Adicionados à mão: pedido explícito, obrigatórios em todas as receitas. */
+  added: string[];
+  /** Pedido opcional (mesmas regras do Pulse AI). */
+  request?: string;
+  liquid?: PantryLiquidChoice;
+  alcohol: PantryAlcoholPromptOptions;
+  /** Álcool pedido por menor/"Não": receita sem álcool, com aviso. */
+  alcoholFreeVersion: boolean;
+}
+
+function hasExplicitRequest(choices: PantryUserChoices): boolean {
+  return choices.added.length > 0 || choices.request !== undefined;
+}
+
+/** Texto do pedido explícito para o validador (adicionados + pedido), como a mensagem atual do Pulse AI. */
+function buildPantryExplicitRequest(choices: PantryUserChoices): string | undefined {
+  const parts = [...choices.added, ...(choices.request ? [choices.request] : [])];
+  return parts.length > 0 ? parts.join('. ') : undefined;
+}
+
+/** Itens adicionados que precisam estar em cada receita (o alcoólico só quando o álcool é permitido). */
+function requiredItemsForCoverage(choices: PantryUserChoices): string[] {
+  return choices.alcohol.policy === 'allowed'
+    ? choices.added
+    : choices.added.filter(item => !isAlcoholicItemName(item));
+}
+
+interface PantryChoiceGaps {
+  missingAdded: string[];
+  unselectedUsed: string[];
+  forbiddenWater: boolean;
+}
+
+function findPantryChoiceGaps(recipe: PulseAiRecipe, choices: PantryUserChoices): PantryChoiceGaps {
+  const allowedNames = [
+    ...choices.selected.map(ingredient => ingredient.name),
+    ...choices.added,
+    ...(choices.liquid ? LIQUID_CHOICE_NAMES[choices.liquid] : []),
+  ];
+
+  return {
+    missingAdded: findMissingItems(recipe, requiredItemsForCoverage(choices)),
+    unselectedUsed: findUnselectedItemsUsed(recipe, choices.unselected, allowedNames),
+    forbiddenWater: choices.liquid === 'none' && recipeUsesPlainWater(recipe),
+  };
+}
+
+function withMissingRequestedIngredients(recipe: PulseAiRecipe, missing: readonly string[]): PulseAiRecipe {
+  const { missingRequestedIngredients: _previous, ...rest } = recipe;
+  void _previous;
+  const items = [...new Set(missing.map(item => item.trim()).filter(Boolean))].slice(0, RECIPE_MISSING_REQUEST_MAX_ITEMS);
+
+  return items.length > 0 ? { ...rest, missingRequestedIngredients: items } : rest;
+}
+
+function hasChoiceGaps(gaps: PantryChoiceGaps): boolean {
+  return gaps.missingAdded.length > 0 || gaps.unselectedUsed.length > 0 || gaps.forbiddenWater;
+}
+
+/** Resumo para log: só contagens, sem nome de ingrediente (dado da pessoa). */
+function summarizeChoiceGaps(gaps: PantryChoiceGaps) {
+  return {
+    missingAdded: gaps.missingAdded.length,
+    unselectedUsed: gaps.unselectedUsed.length,
+    forbiddenWater: gaps.forbiddenWater,
+  };
+}
+
+function buildChoiceGapsRetryMessage(gaps: PantryChoiceGaps): string {
+  return [
+    "Your previous recipe does not follow the user's choices.",
+    ...(gaps.missingAdded.length > 0
+      ? [
+          `It is missing these required items the user added by hand: ${JSON.stringify(gaps.missingAdded)}. Every recipe must contain every required item, in the requested amount or a sensible amount for one serving. When the ingredient name differs from what the user typed, add the typed name in parentheses, for example "Pasta de amendoim (peanut butter)".`,
+        ]
+      : []),
+    ...(gaps.unselectedUsed.length > 0
+      ? [
+          `It uses items the user unchecked, which are not available: ${JSON.stringify(gaps.unselectedUsed)}. Remove them and use only the available ingredients.`,
+        ]
+      : []),
+    ...(gaps.forbiddenWater
+      ? ['It uses water, but the user has no liquid: remove the water and make a thick, creamy recipe that still blends.']
+      : []),
+    'Keep the recipe idea and keep it within the cup volume, then return the corrected recipe with the macros recalculated from the new quantities.',
+  ].join(' ');
+}
+
+type PantryChoiceEnforcement =
+  | { recipe: PulseAiRecipe; failure?: undefined }
+  | { recipe: null; failure: 'selection' | 'aiUnavailable' };
+
+/**
+ * CP-B5.4: conferência das escolhas da pessoa, antes das outras (os retries
+ * de volume, macros e dieta conversam com a receita já corrigida). Uma nova
+ * tentativa pelo mesmo caminho das outras. Se depois dela ainda faltar item
+ * adicionado ou sobrar água com "Sem líquido", a receita SEGUE (decisão do
+ * prompt: não bloquear sem avisar o Gabriel; a conferência final registra no
+ * log). Item desmarcado que persiste descarta a receita ("desmarcado nunca
+ * entra").
+ */
+async function ensurePantryUserChoices(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  choices: PantryUserChoices
+): Promise<PantryChoiceEnforcement> {
+  const initialGaps = findPantryChoiceGaps(recipe, choices);
+
+  if (!hasChoiceGaps(initialGaps)) {
+    return { recipe };
+  }
+
+  console.info('[pantryScanner] user choices not followed, retrying', summarizeChoiceGaps(initialGaps));
+
+  try {
+    const retryResponse = await callAi({
+      systemPrompt: prompt.systemPrompt,
+      messages: buildPantryRecipeRetryMessages(prompt, recipe, buildChoiceGapsRetryMessage(initialGaps)),
+      maxTokens: 2000,
+    });
+    const retryParse = parsePantryRecipe(retryResponse.content);
+
+    if (retryParse.status !== 'ok') {
+      console.warn(
+        '[pantryScanner] user choices retry returned an invalid recipe',
+        describeRetryParseFailure(retryResponse.content, retryParse)
+      );
+      return initialGaps.unselectedUsed.length > 0 ? { recipe: null, failure: 'selection' } : { recipe };
+    }
+
+    const retriedGaps = findPantryChoiceGaps(retryParse.recipe, choices);
+
+    if (retriedGaps.unselectedUsed.length > 0) {
+      console.warn('[pantryScanner] unchecked item still used after retry, discarding', summarizeChoiceGaps(retriedGaps));
+      return { recipe: null, failure: 'selection' };
+    }
+
+    return { recipe: retryParse.recipe };
+  } catch (error) {
+    console.error('[pantryScanner] user choices retry failed', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return initialGaps.unselectedUsed.length > 0 ? { recipe: null, failure: 'aiUnavailable' } : { recipe };
+  }
+}
+
+async function checkPantryRecipe(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  user: PantryScannerUserProfile,
+  choices: PantryUserChoices
+): Promise<PantryRecipeCheck> {
+  const followed = await ensurePantryUserChoices(recipe, prompt, choices);
+  if (!followed.recipe) {
+    return { recipe: null, discardedBy: followed.failure };
+  }
+
+  const limited = await ensurePantryRecipeBlenderLimits(followed.recipe, prompt, user.blendiModel, {
+    keepExplicitRequest: hasExplicitRequest(choices),
+  });
+  if (!limited.recipe) {
+    return { recipe: null, discardedBy: limited.failure === 'aiUnavailable' ? 'aiUnavailable' : 'blenderLimit' };
+  }
+
+  const macroCheckedRecipe = await ensurePantryRecipeMacroConsistency(limited.recipe, prompt);
+  const restricted = await ensurePantryRecipeRestrictions(macroCheckedRecipe, prompt, user, {
+    explicitRequest: buildPantryExplicitRequest(choices),
+    // CP-B5.4: a rede de álcool passa a valer no Pantry.
+    alcohol: choices.alcohol.policy,
+  });
+  if (!restricted.recipe) {
+    return { recipe: null, discardedBy: restricted.failure === 'aiUnavailable' ? 'aiUnavailable' : 'restriction' };
+  }
+
+  // Conferência final: os retries de macros e de restrições refazem a
+  // receita e podem passar do limite físico de novo.
+  if (!validateBlenderLimits(restricted.recipe, user.blendiModel).withinLimits) {
+    console.warn('[pantryScanner] blender limit exceeded after later retries, discarding');
+    return { recipe: null, discardedBy: 'blenderLimit' };
+  }
+
+  // CP-B5.4: conferência final das escolhas (os retries refazem a receita).
+  const finalGaps = findPantryChoiceGaps(restricted.recipe, choices);
+  if (finalGaps.unselectedUsed.length > 0) {
+    console.warn('[pantryScanner] unchecked item used after later retries, discarding', summarizeChoiceGaps(finalGaps));
+    return { recipe: null, discardedBy: 'selection' };
+  }
+  if (hasChoiceGaps(finalGaps)) {
+    console.warn('[pantryScanner] user choices still not followed, delivering', summarizeChoiceGaps(finalGaps));
+  }
+
+  // CP-B7a: pedido explícito nunca some em silêncio — o item adicionado que
+  // faltou depois da nova tentativa vira aviso no card (só o backend preenche).
+  const noticed = withMissingRequestedIngredients(
+    withRequestNotices(restricted.recipe, restricted.dietOverrideIngredientIndexes, choices.alcoholFreeVersion),
+    finalGaps.missingAdded
+  );
+
+  // CP-B2: checagem objetiva dos passos. Água fora da foto: só quando a
+  // pessoa não escolheu o líquido (ou escolheu "Sem líquido" e a água ficou).
+  const stepChecked = applyRecipeStepCheck(noticed, user.blendiModel, '[pantryScanner]');
+  if (choices.liquid === undefined || choices.liquid === 'none') {
+    return { recipe: markWaterNotInPhoto(stepChecked, choices.selected) };
+  }
+
+  const { usesWaterNotInPhoto: _ignored, ...withoutWaterMark } = stepChecked;
+  void _ignored;
+  return { recipe: withoutWaterMark };
+}
 
 async function generatePantryRecipes(
   user: PantryScannerUserProfile,
-  ingredients: PantryIngredient[]
+  choices: PantryUserChoices
 ): Promise<PantryRecipeGeneration> {
   const prompt = buildPantryRecipePrompt({
     blendiModel: user.blendiModel,
@@ -971,10 +1279,14 @@ async function generatePantryRecipes(
     dailyCarbTarget: user.dailyCarbTarget,
     dailyCalorieTarget: user.dailyCalorieTarget,
     recentBlendRecipeNames: await getRecentBlendRecipeNames(user.id),
-    availableIngredients: ingredients.map(ingredient => ({
+    availableIngredients: choices.selected.map(ingredient => ({
       name: ingredient.name,
       estimatedQuantity: ingredient.estimatedQuantity,
     })),
+    requiredItems: choices.added,
+    userRequest: choices.request,
+    liquid: choices.liquid,
+    alcohol: choices.alcohol,
   });
 
   try {
@@ -1011,38 +1323,14 @@ async function generatePantryRecipes(
     // ingredientes) — segue para a resposta de hoje (200 sem receitas).
     const recipes = parseResult.status === 'ok' ? parseResult.recipes : [];
     const checkedRecipes = await Promise.all(
-      recipes.map(async (recipe): Promise<PantryRecipeCheck> => {
-        const limited = await ensurePantryRecipeBlenderLimits(recipe, prompt, user.blendiModel);
-        if (!limited.recipe) {
-          return { recipe: null, discardedBy: limited.failure === 'aiUnavailable' ? 'aiUnavailable' : 'blenderLimit' };
-        }
-
-        const macroCheckedRecipe = await ensurePantryRecipeMacroConsistency(limited.recipe, prompt);
-        const restricted = await ensurePantryRecipeRestrictions(macroCheckedRecipe, prompt, user);
-        if (!restricted.recipe) {
-          return { recipe: null, discardedBy: restricted.failure === 'aiUnavailable' ? 'aiUnavailable' : 'restriction' };
-        }
-        const restrictedRecipe = restricted.recipe;
-
-        // Conferência final: os retries de macros e de restrições refazem a
-        // receita e podem passar do limite físico de novo.
-        if (!validateBlenderLimits(restrictedRecipe, user.blendiModel).withinLimits) {
-          console.warn('[pantryScanner] blender limit exceeded after later retries, discarding');
-          return { recipe: null, discardedBy: 'blenderLimit' };
-        }
-
-        // CP-B2: checagem objetiva dos passos e a marcação de água fora da foto.
-        const stepChecked = applyRecipeStepCheck(restrictedRecipe, user.blendiModel, '[pantryScanner]');
-        return { recipe: markWaterNotInPhoto(stepChecked, ingredients) };
-      })
+      recipes.map(recipe => checkPantryRecipe(recipe, prompt, user, choices))
     );
 
     const compliantRecipes = checkedRecipes
       .map(check => check.recipe)
       .filter((recipe): recipe is PulseAiRecipe => recipe !== null);
-    const restrictionDiscards = checkedRecipes.filter(check => check.discardedBy === 'restriction').length;
-    const blenderLimitDiscards = checkedRecipes.filter(check => check.discardedBy === 'blenderLimit').length;
-    const aiUnavailableDiscards = checkedRecipes.filter(check => check.discardedBy === 'aiUnavailable').length;
+    const countDiscards = (reason: PantryDiscardReason) =>
+      checkedRecipes.filter(check => check.discardedBy === reason).length;
 
     if (compliantRecipes.length < recipes.length) {
       console.info('[pantryScanner] recipes discarded by restriction check', {
@@ -1055,9 +1343,10 @@ async function generatePantryRecipes(
       kind: 'generated',
       recipes: compliantRecipes,
       generatedCount: recipes.length,
-      restrictionDiscards,
-      blenderLimitDiscards,
-      aiUnavailableDiscards,
+      restrictionDiscards: countDiscards('restriction'),
+      blenderLimitDiscards: countDiscards('blenderLimit'),
+      selectionDiscards: countDiscards('selection'),
+      aiUnavailableDiscards: countDiscards('aiUnavailable'),
     };
   } catch (error) {
     // CP-B1: falha do provedor na geração (ou na nova tentativa de formato)
@@ -1072,36 +1361,181 @@ async function generatePantryRecipes(
   }
 }
 
-// CP-B1: teto de tempo de IA da requisição (visão + geração + novas
-// tentativas somadas). Estourado, a chamada seguinte falha como IA
-// indisponível (503) e o scan/prévia volta pelos caminhos de hoje.
-export function analyzePantry(req: Request, res: Response, next: NextFunction): Promise<void> {
-  return runWithAiRequestBudget(AI_REQUEST_BUDGET_MS.pantryScannerAnalyze, () =>
-    analyzePantryWithinBudget(req, res, next)
+// ─── CP-B5.4: limite de leituras ─────────────────────────────────────────────
+
+type PantryReadReservation =
+  | { ok: true; release: () => Promise<void> }
+  | { ok: false; code: string; message: string; resetDate?: Date };
+
+// Free: atômico no filtro do findOneAndUpdate — teto do ciclo e pelo menos
+// um scan ou a prévia restante. Conta antiga sem o campo conta como 0.
+async function reserveFreePantryRead(user: PantryScannerUserProfile): Promise<PantryReadReservation> {
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: user.id,
+      isPro: false,
+      $and: [
+        { $or: [{ pantryReadCount: { $lt: FREE_CYCLE_READ_LIMIT } }, { pantryReadCount: { $exists: false } }] },
+        {
+          $or: [
+            { scanCount: { $lt: FREE_MONTHLY_SCAN_LIMIT } },
+            { monthlyScanPreviewUsage: { $lt: FREE_MONTHLY_SCAN_PREVIEW_LIMIT } },
+            { monthlyScanPreviewUsage: { $exists: false } },
+          ],
+        },
+      ],
+    },
+    { $inc: { pantryReadCount: 1 } },
+    { new: true }
+  )
+    .select({ pantryReadCount: 1 })
+    .lean()
+    .exec();
+
+  if (!updatedUser) {
+    return {
+      ok: false,
+      code: READ_LIMIT_REACHED_CODE,
+      message: 'Pantry Scanner photo reads for this cycle are used up.',
+      resetDate: user.scanResetDate,
+    };
+  }
+
+  return {
+    ok: true,
+    release: async () => {
+      await UserModel.updateOne(
+        { _id: user.id, pantryReadCount: { $gt: 0 } },
+        { $inc: { pantryReadCount: -1 } }
+      ).exec();
+    },
+  };
+}
+
+// Pro: sem limite diário prático. Proteção contra robô: no máximo
+// PANTRY_PRO_READ_BURST_LIMIT leituras na janela (o array guarda os horários
+// das últimas N em ordem; o mais antigo é o índice 0) e o teto de segurança
+// por dia no fuso da conta. Os dois no filtro do mesmo update (atômico).
+async function reserveProPantryRead(user: PantryScannerUserProfile): Promise<PantryReadReservation> {
+  const now = new Date();
+
+  if (!user.pantryReadDayResetDate || !isSameDayInTimezone(user.pantryReadDayResetDate, now, user.timezone)) {
+    await UserModel.updateOne(
+      {
+        _id: user.id,
+        ...(user.pantryReadDayResetDate
+          ? { pantryReadDayResetDate: user.pantryReadDayResetDate }
+          : { pantryReadDayResetDate: { $exists: false } }),
+      },
+      { $set: { pantryReadDayCount: 0, pantryReadDayResetDate: now } }
+    ).exec();
+  }
+
+  const windowStart = new Date(now.getTime() - PANTRY_PRO_READ_BURST_WINDOW_MS);
+  const oldestIndex = `pantryReadRecent.${PANTRY_PRO_READ_BURST_LIMIT - 1}`;
+
+  const updatedUser = await UserModel.findOneAndUpdate(
+    {
+      _id: user.id,
+      isPro: true,
+      $and: [
+        { $or: [{ pantryReadDayCount: { $lt: PANTRY_PRO_READ_DAILY_LIMIT } }, { pantryReadDayCount: { $exists: false } }] },
+        { $or: [{ [oldestIndex]: { $exists: false } }, { 'pantryReadRecent.0': { $lte: windowStart } }] },
+      ],
+    },
+    {
+      $inc: { pantryReadDayCount: 1 },
+      $push: { pantryReadRecent: { $each: [now], $slice: -PANTRY_PRO_READ_BURST_LIMIT } },
+    },
+    { new: true }
+  )
+    .select({ pantryReadDayCount: 1 })
+    .lean()
+    .exec();
+
+  if (!updatedUser) {
+    const current = await UserModel.findById(user.id).select({ pantryReadDayCount: 1 }).lean().exec();
+    const dailyCapReached = (current?.pantryReadDayCount ?? 0) >= PANTRY_PRO_READ_DAILY_LIMIT;
+
+    return dailyCapReached
+      ? { ok: false, code: READ_DAILY_LIMIT_CODE, message: 'Daily Pantry Scanner photo reads limit reached.' }
+      : { ok: false, code: READ_RATE_LIMITED_CODE, message: 'Too many Pantry Scanner photo reads. Wait a moment.' };
+  }
+
+  return {
+    ok: true,
+    release: async () => {
+      await UserModel.updateOne(
+        { _id: user.id, pantryReadDayCount: { $gt: 0 } },
+        { $inc: { pantryReadDayCount: -1 }, $pull: { pantryReadRecent: now } }
+      ).exec();
+    },
+  };
+}
+
+function reservePantryRead(user: PantryScannerUserProfile): Promise<PantryReadReservation> {
+  return user.isPro ? reserveProPantryRead(user) : reserveFreePantryRead(user);
+}
+
+function sendReadLimit(res: Response, reservation: Extract<PantryReadReservation, { ok: false }>): void {
+  res.status(429).json({
+    success: false,
+    code: reservation.code,
+    message: reservation.message,
+    ...(reservation.resetDate ? { resetDate: reservation.resetDate.toISOString() } : {}),
+  });
+}
+
+function isNextGenerationPreview(user: PantryScannerUserProfile): boolean {
+  return !user.isPro && user.scanCount >= FREE_MONTHLY_SCAN_LIMIT;
+}
+
+function buildPantryReadResult(params: {
+  user: PantryScannerUserProfile;
+  readId?: string;
+  readExpiresAt?: Date;
+  ingredients: IPantryReadIngredient[];
+  hasLiquid: boolean;
+  noFoodDetected: boolean;
+  noUsableIngredients?: boolean;
+  analysisNotes?: string;
+}): PantryReadResult {
+  return pantryReadResultSchema.parse({
+    ...(params.readId && params.readExpiresAt
+      ? { readId: params.readId, readExpiresAt: params.readExpiresAt.toISOString() }
+      : {}),
+    ingredients: params.ingredients.map(ingredient => ({
+      name: ingredient.name,
+      ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
+      confidence: ingredient.confidence,
+      isAlcoholic: ingredient.isAlcoholic,
+    })),
+    hasLiquid: params.hasLiquid,
+    noFoodDetected: params.noFoodDetected,
+    ...(params.noUsableIngredients ? { noUsableIngredients: true } : {}),
+    ...(params.analysisNotes ? { analysisNotes: params.analysisNotes } : {}),
+    alcoholAge: params.user.alcoholAge,
+    nextGenerationIsPreview: isNextGenerationPreview(params.user),
+    scansUsed: params.user.scanCount,
+    scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+    resetDate: params.user.scanResetDate.toISOString(),
+  });
+}
+
+// ─── POST /pantry-scanner/read (CP-B5.4) ─────────────────────────────────────
+
+/**
+ * Lê a foto: só a visão. Não conta scan, não gera receita, não dá XP. Guarda
+ * a leitura (nunca a imagem) por PANTRY_READ_TTL_MS. Conta a leitura no
+ * limite do plano; falha do provedor devolve a leitura.
+ */
+export function readPantry(req: Request, res: Response, next: NextFunction): Promise<void> {
+  return runWithAiRequestBudget(AI_REQUEST_BUDGET_MS.pantryScannerRead, () =>
+    readPantryWithinBudget(req, res, next)
   );
 }
 
-async function analyzePantryWithinBudget(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
-  // CP-1.1.4b: id do dono da prévia reservada e ainda não entregue. Enquanto
-  // estiver preenchido, qualquer saída sem receita entregue devolve a prévia
-  // (releasePreview) — nos caminhos conhecidos antes de responder, e no catch
-  // para erros inesperados.
-  let heldPreviewUserId: string | null = null;
-
-  const releasePreview = async (): Promise<void> => {
-    if (!heldPreviewUserId) {
-      return;
-    }
-
-    const userIdToRelease = heldPreviewUserId;
-    heldPreviewUserId = null;
-    await rollbackPantryScanPreview(userIdToRelease);
-  };
-
+async function readPantryWithinBudget(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const parsed = pantryScanSchema.safeParse(req.body);
 
@@ -1124,11 +1558,9 @@ async function analyzePantryWithinBudget(
       return;
     }
 
-    const imageSizeKb = calculateImageSizeKb(imageBase64);
-
-    console.info('[pantryScanner] analyze request', {
+    console.info('[pantryScanner] read request', {
       mimeType,
-      imageSizeKb,
+      imageSizeKb: calculateImageSizeKb(imageBase64),
     });
 
     const initialUser = await findPantryScannerUserProfile(userId);
@@ -1139,19 +1571,11 @@ async function analyzePantryWithinBudget(
     }
 
     const currentUser = await resetScanCycleIfNeeded(initialUser);
+    const reservation = await reservePantryRead(currentUser);
 
-    // CP-1.1.4b: grátis com os scans do ciclo esgotados ainda tem 1 prévia
-    // bloqueada por ciclo. Reservada aqui, antes da visão: sem prévia livre,
-    // o 429 de hoje sai sem chamar a IA.
-    const isPreviewScan = !currentUser.isPro && currentUser.scanCount >= FREE_MONTHLY_SCAN_LIMIT;
-
-    if (isPreviewScan) {
-      if (!(await reservePantryScanPreview(currentUser))) {
-        sendMonthlyLimitReached(res, currentUser.scanResetDate);
-        return;
-      }
-
-      heldPreviewUserId = currentUser.id;
+    if (!reservation.ok) {
+      sendReadLimit(res, reservation);
+      return;
     }
 
     let visionResponseContent: string;
@@ -1166,7 +1590,7 @@ async function analyzePantryWithinBudget(
       visionResponseContent = visionResponse.content;
     } catch (error) {
       if (error instanceof AiProviderRequestError) {
-        await releasePreview();
+        await reservation.release();
         sendPantryAiUnavailable(res);
         return;
       }
@@ -1177,7 +1601,6 @@ async function analyzePantryWithinBudget(
     const visionAnalysis = parsePantryVisionAnalysis(visionResponseContent);
 
     if (!visionAnalysis) {
-      await releasePreview();
       sendErrorResponse(res, {
         statusCode: 500,
         code: 'scanner/vision-parse-error',
@@ -1187,51 +1610,306 @@ async function analyzePantryWithinBudget(
     }
 
     if (visionAnalysis.noFoodDetected) {
-      await releasePreview();
       res.status(200).json({
         success: true,
-        data: buildPantryAnalysisResult({
+        data: buildPantryReadResult({
+          user: currentUser,
           ingredients: [],
-          recipes: [],
-          analysisNotes: visionAnalysis.analysisNotes,
+          hasLiquid: false,
           noFoodDetected: true,
-          scansUsed: currentUser.scanCount,
-          resetDate: currentUser.scanResetDate,
+          analysisNotes: visionAnalysis.analysisNotes,
         }),
       });
       return;
     }
 
-    const usableIngredients = visionAnalysis.ingredients.filter(ingredient => (
-      USABLE_CONFIDENCE_LEVELS.has(ingredient.confidence)
-    ));
+    const usableIngredients: IPantryReadIngredient[] = visionAnalysis.ingredients
+      .filter(ingredient => USABLE_CONFIDENCE_LEVELS.has(ingredient.confidence))
+      .map(ingredient => ({
+        name: ingredient.name,
+        ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
+        confidence: ingredient.confidence,
+        // Da lista do validador (com os falsos amigos), nunca da IA.
+        isAlcoholic: isAlcoholicItemName(ingredient.name),
+      }));
 
     if (usableIngredients.length === 0) {
-      await releasePreview();
       res.status(200).json({
         success: true,
-        data: buildPantryAnalysisResult({
+        data: buildPantryReadResult({
+          user: currentUser,
           ingredients: [],
-          recipes: [],
-          analysisNotes: visionAnalysis.analysisNotes,
+          hasLiquid: false,
           noFoodDetected: false,
           noUsableIngredients: true,
-          scansUsed: currentUser.scanCount,
-          resetDate: currentUser.scanResetDate,
+          analysisNotes: visionAnalysis.analysisNotes,
         }),
       });
       return;
     }
 
-    if (isPreviewScan) {
+    const hasLiquid = hasPhotoLiquid(usableIngredients);
+    const expiresAt = new Date(Date.now() + PANTRY_READ_TTL_MS);
+    const read = await PantryReadModel.create({
+      userId: currentUser.id,
+      ingredients: usableIngredients,
+      hasLiquid,
+      expiresAt,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: buildPantryReadResult({
+        user: currentUser,
+        readId: String(read._id),
+        readExpiresAt: expiresAt,
+        ingredients: usableIngredients,
+        hasLiquid,
+        noFoodDetected: false,
+        analysisNotes: visionAnalysis.analysisNotes,
+      }),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ─── POST /pantry-scanner/generate (CP-B5.4) ─────────────────────────────────
+
+function sendReadExpired(res: Response): void {
+  sendErrorResponse(res, {
+    statusCode: 410,
+    code: READ_EXPIRED_CODE,
+    message: 'This photo read expired or was already used. Take a new photo.',
+  });
+}
+
+function normalizeItemKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function dedupeItems(items: readonly string[]): string[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const key = normalizeItemKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function generatePantry(req: Request, res: Response, next: NextFunction): Promise<void> {
+  return runWithAiRequestBudget(AI_REQUEST_BUDGET_MS.pantryScannerGenerate, () =>
+    generatePantryWithinBudget(req, res, next)
+  );
+}
+
+async function generatePantryWithinBudget(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  // CP-1.1.4b: id do dono da prévia reservada e ainda não entregue.
+  let heldPreviewUserId: string | null = null;
+  // CP-B5.4: leitura consumida e ainda sem receita entregue — qualquer saída
+  // sem receita a devolve (a pessoa tenta de novo sem nova foto).
+  let heldReadId: string | null = null;
+
+  const releasePreview = async (): Promise<void> => {
+    if (!heldPreviewUserId) {
+      return;
+    }
+
+    const userIdToRelease = heldPreviewUserId;
+    heldPreviewUserId = null;
+    await rollbackPantryScanPreview(userIdToRelease);
+  };
+
+  const releaseRead = async (): Promise<void> => {
+    if (!heldReadId) {
+      return;
+    }
+
+    const readIdToRelease = heldReadId;
+    heldReadId = null;
+    await PantryReadModel.updateOne({ _id: readIdToRelease }, { $set: { consumedAt: null } }).exec();
+  };
+
+  try {
+    const parsed = pantryGenerateSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: INVALID_GENERATE_REQUEST_CODE,
+        message: 'Invalid Pantry Scanner generate request.',
+        errors: formatZodErrors(parsed.error),
+      });
+      return;
+    }
+
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const { readId, liquid, request } = parsed.data;
+
+    if (!mongoose.isValidObjectId(readId)) {
+      sendReadExpired(res);
+      return;
+    }
+
+    const initialUser = await findPantryScannerUserProfile(userId);
+
+    if (!initialUser) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    const currentUser = await resetScanCycleIfNeeded(initialUser);
+
+    // Dono, validade e "ainda não usada" no próprio filtro: leitura de outro
+    // usuário, vencida (o TTL do Mongo pode levar ~1 min) ou já usada cai no
+    // mesmo 410.
+    const read = await PantryReadModel.findOne({
+      _id: readId,
+      userId: currentUser.id,
+      expiresAt: { $gt: new Date() },
+      consumedAt: null,
+    })
+      .lean()
+      .exec();
+
+    if (!read) {
+      sendReadExpired(res);
+      return;
+    }
+
+    // `selected` só aceita itens da leitura: o app não injeta ingrediente
+    // como "lido da foto".
+    const readByKey = new Map(read.ingredients.map(ingredient => [normalizeItemKey(ingredient.name), ingredient]));
+    const selectedKeys = new Set(parsed.data.selected.map(normalizeItemKey));
+
+    if ([...selectedKeys].some(key => !readByKey.has(key))) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: INVALID_SELECTION_CODE,
+        message: 'Selected items must come from the photo read.',
+      });
+      return;
+    }
+
+    const selectedRead = read.ingredients.filter(ingredient => selectedKeys.has(normalizeItemKey(ingredient.name)));
+    const unselected = read.ingredients
+      .filter(ingredient => !selectedKeys.has(normalizeItemKey(ingredient.name)))
+      .map(ingredient => ingredient.name);
+    const added = dedupeItems(parsed.data.added).filter(item => !selectedKeys.has(normalizeItemKey(item)));
+
+    // ── Álcool (CP-B5 no Pantry): decisão = pedido de álcool no texto OU item
+    // alcoólico marcado/adicionado. A pergunta de idade sai ANTES de contar
+    // scan e de chamar a IA.
+    const alcoholicSelected = selectedRead.filter(ingredient => ingredient.isAlcoholic);
+    const alcoholicAdded = added.filter(isAlcoholicItemName);
+    const requestDecision = request ? detectAlcoholRequest(request, currentUser.locale) : 'no';
+    const alcoholRequested =
+      requestDecision === 'yes' || alcoholicSelected.length > 0 || alcoholicAdded.length > 0;
+
+    console.info('[pantryScanner] generate request', {
+      selected: selectedRead.length,
+      unselected: unselected.length,
+      added: added.length,
+      hasRequest: request !== undefined,
+      liquid: liquid ?? 'unset',
+      hasLiquid: read.hasLiquid,
+      alcoholDecision: requestDecision,
+      alcoholRequested,
+      alcoholAge: currentUser.alcoholAge,
+    });
+
+    if (alcoholRequested && currentUser.alcoholAge === 'unknown') {
+      sendErrorResponse(res, {
+        statusCode: 428,
+        code: AGE_CONFIRMATION_REQUIRED_CODE,
+        message: 'Age confirmation is required for this request.',
+      });
+      return;
+    }
+
+    if (alcoholicSelected.length > 0 && currentUser.alcoholAge === 'under-age') {
+      sendErrorResponse(res, {
+        statusCode: 403,
+        code: ALCOHOL_NOT_ALLOWED_CODE,
+        message: 'Alcoholic items are not available for this account.',
+      });
+      return;
+    }
+
+    const alcoholAllowed = alcoholRequested && currentUser.alcoholAge === 'of-age';
+    const choices: PantryUserChoices = {
+      selected: selectedRead.map(ingredient => ({
+        name: ingredient.name,
+        ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
+        confidence: ingredient.confidence,
+      })),
+      unselected,
+      added,
+      ...(request ? { request } : {}),
+      ...(liquid ? { liquid } : {}),
+      alcohol: {
+        policy: alcoholAllowed ? 'allowed' : 'forbidden',
+        requested: alcoholRequested,
+        inEveryRecipe: alcoholicAdded.length > 0 || requestDecision === 'yes',
+      },
+      alcoholFreeVersion: alcoholRequested && currentUser.alcoholAge === 'under-age',
+    };
+    // O que a resposta e a prévia mostram como ingredientes: os marcados e os
+    // adicionados.
+    const deliveredIngredients: PantryIngredient[] = [
+      ...choices.selected,
+      ...added.map(name => ({ name, confidence: 'high' as const })),
+    ];
+
+    // Consome a leitura de forma atômica: dois toques no "Gerar" não geram duas vezes.
+    const consumed = await PantryReadModel.findOneAndUpdate(
+      { _id: readId, userId: currentUser.id, expiresAt: { $gt: new Date() }, consumedAt: null },
+      { $set: { consumedAt: new Date() } },
+      { new: true }
+    )
+      .lean()
+      .exec();
+
+    if (!consumed) {
+      sendReadExpired(res);
+      return;
+    }
+
+    heldReadId = readId;
+
+    // CP-1.1.4b: grátis com os scans do ciclo esgotados ainda tem 1 prévia
+    // bloqueada por ciclo, reservada antes da IA.
+    if (isNextGenerationPreview(currentUser)) {
+      if (!(await reservePantryScanPreview(currentUser))) {
+        await releaseRead();
+        sendMonthlyLimitReached(res, currentUser.scanResetDate);
+        return;
+      }
+
+      heldPreviewUserId = currentUser.id;
+
       await runPantryPreviewScan({
         res,
         user: currentUser,
-        usableIngredients,
-        analysisNotes: visionAnalysis.analysisNotes,
+        choices,
+        deliveredIngredients,
         releasePreview,
+        releaseRead,
+        read: { readId, expiresAt: read.expiresAt },
         markDelivered: () => {
           heldPreviewUserId = null;
+          heldReadId = null;
         },
       });
       return;
@@ -1240,51 +1918,63 @@ async function analyzePantryWithinBudget(
     const scanIncrement = await incrementPantryScanCount(currentUser);
 
     if (scanIncrement.kind === 'user-not-found') {
+      await releaseRead();
       sendUserNotFound(res);
       return;
     }
 
     if (scanIncrement.kind === 'limit-reached') {
+      await releaseRead();
       sendMonthlyLimitReached(res, scanIncrement.scanResetDate);
       return;
     }
 
-    const generation = await generatePantryRecipes(currentUser, usableIngredients);
+    const generation = await generatePantryRecipes(currentUser, choices);
 
     // CP-B1: a IA falhou na geração — devolve o scan, sem XP, 503.
     if (generation.kind === 'aiUnavailable') {
       await rollbackPantryScanCount(currentUser);
+      await releaseRead();
       sendPantryAiUnavailable(res);
       return;
     }
 
     const { recipes, generatedCount } = generation;
 
-    // CP-1.1.1c: a IA gerou receitas, mas todas violaram a dieta/gelo no Lite
-    // mesmo após o retry. Nada é entregue: devolve o scan e não dá XP.
-    // (Geração vazia ou falha da IA — generatedCount 0 — é tratada logo abaixo.)
+    // CP-1.1.1c: a IA gerou receitas, mas todas foram descartadas mesmo após
+    // as novas tentativas. Nada é entregue: devolve o scan e não dá XP.
     if (generatedCount > 0 && recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
+      await releaseRead();
       sendAllRecipesDiscarded(res, generation);
       return;
     }
 
-    // CP-1.1.1d: a geração voltou vazia (generatedCount 0; CP-B1: falha da IA
-    // já saiu acima como 503). O app
-    // recebe a mesma resposta 200 de antes (recipes: [], xpAwarded: 0), mas o
-    // scan é devolvido e não há XP nem progresso de missão — o usuário não
-    // recebeu nada por esse scan.
+    // CP-1.1.1d: a geração voltou vazia — 200 sem receitas, scan devolvido,
+    // sem XP. CP-B5.4: a leitura volta e o id segue valendo.
     if (recipes.length === 0) {
       await rollbackPantryScanCount(currentUser);
+      await releaseRead();
 
       sendNoRecipesGenerated(res, {
-        ingredients: usableIngredients,
-        analysisNotes: visionAnalysis.analysisNotes,
+        readId,
+        readExpiresAt: read.expiresAt,
+        ingredients: deliveredIngredients,
         scansUsed: Math.max(0, scanIncrement.scanCount - 1),
         resetDate: scanIncrement.scanResetDate,
       });
       return;
     }
+
+    // Receita entregue. Para editar e gerar de novo sem nova foto: uma
+    // leitura nova com os mesmos ingredientes e o MESMO vencimento.
+    const nextRead = await PantryReadModel.create({
+      userId: currentUser.id,
+      ingredients: read.ingredients,
+      hasLiquid: read.hasLiquid,
+      expiresAt: read.expiresAt,
+    });
+    heldReadId = null;
 
     const xpResult = await triggerPantryScannerXP(currentUser.id, currentUser.timezone);
     triggerPantryScannerMissionProgress(currentUser.id, currentUser.timezone);
@@ -1293,23 +1983,29 @@ async function analyzePantryWithinBudget(
       success: true,
       data: {
         ...buildPantryAnalysisResult({
-          ingredients: usableIngredients,
+          ingredients: deliveredIngredients,
           recipes,
-          analysisNotes: visionAnalysis.analysisNotes,
           noFoodDetected: false,
           scansUsed: scanIncrement.scanCount,
           resetDate: scanIncrement.scanResetDate,
         }),
+        readId: String(nextRead._id),
+        readExpiresAt: read.expiresAt.toISOString(),
         xpAwarded: xpResult.awarded ? xpResult.amount : 0,
         leveledUp: xpResult.leveledUp,
         newLevel: xpResult.newLevel,
       },
     });
   } catch (error) {
-    // Erro inesperado com a prévia ainda reservada (ex.: falha ao gravar a
-    // prévia): devolve antes de seguir para o handler de erro.
+    // Erro inesperado com a prévia ou a leitura ainda presas: devolve antes
+    // de seguir para o handler de erro.
     await releasePreview().catch(rollbackError => {
       console.error('[pantryScanner] failed to roll back the scan preview', {
+        errorName: rollbackError instanceof Error ? rollbackError.name : 'UnknownError',
+      });
+    });
+    await releaseRead().catch(rollbackError => {
+      console.error('[pantryScanner] failed to release the photo read', {
         errorName: rollbackError instanceof Error ? rollbackError.name : 'UnknownError',
       });
     });
@@ -1322,10 +2018,20 @@ async function analyzePantryWithinBudget(
 //   scanner/vision-unavailable ("temporariamente indisponível") — tentar de
 //   novo pode dar certo; não é culpa da dieta nem do copo.
 // - Senão, se alguma caiu pela dieta, o motivo é a dieta (como antes do
-//   CP-1.1.9); só quando todas caíram pelo limite físico o código é o novo.
+//   CP-1.1.9); CP-B5.4: se todas caíram por item desmarcado, o código é o
+//   da seleção; só quando todas caíram pelo limite físico, o do volume.
 function sendAllRecipesDiscarded(res: Response, generation: PantryGeneratedRecipes): void {
   if (generation.aiUnavailableDiscards > 0) {
     sendPantryAiUnavailable(res);
+    return;
+  }
+
+  if (generation.restrictionDiscards === 0 && generation.selectionDiscards > 0) {
+    sendErrorResponse(res, {
+      statusCode: 422,
+      code: SELECTION_UNMET_CODE,
+      message: 'Pantry Scanner could not generate a recipe with only the checked items.',
+    });
     return;
   }
 
@@ -1360,8 +2066,9 @@ function sendDietaryRestrictionUnmet(res: Response): void {
 function sendNoRecipesGenerated(
   res: Response,
   params: {
+    readId?: string;
+    readExpiresAt?: Date;
     ingredients: PantryIngredient[];
-    analysisNotes?: string;
     scansUsed: number;
     resetDate: Date;
   }
@@ -1372,11 +2079,13 @@ function sendNoRecipesGenerated(
       ...buildPantryAnalysisResult({
         ingredients: params.ingredients,
         recipes: [],
-        analysisNotes: params.analysisNotes,
         noFoodDetected: false,
         scansUsed: params.scansUsed,
         resetDate: params.resetDate,
       }),
+      ...(params.readId && params.readExpiresAt
+        ? { readId: params.readId, readExpiresAt: params.readExpiresAt.toISOString() }
+        : {}),
       xpAwarded: 0,
       leveledUp: false,
       newLevel: null,
@@ -1385,23 +2094,31 @@ function sendNoRecipesGenerated(
 }
 
 // CP-1.1.4b: scan de prévia (grátis, scans do ciclo esgotados, prévia
-// reservada). Gera as receitas com as mesmas validações de hoje, mas não
-// incrementa scanCount, não dá XP, não conta para missão e não grava cache.
-// Sem receita entregue, devolve a prévia e responde como o fluxo de hoje.
+// reservada). Gera as receitas com as mesmas validações, mas não incrementa
+// scanCount, não dá XP, não conta para missão e não grava cache. Sem receita
+// entregue, devolve a prévia (e a leitura) e responde como o fluxo normal.
+// CP-B5.4: roda na geração, com as escolhas da pessoa; a prévia mostra os
+// ingredientes (marcados + adicionados) e só os macros.
 async function runPantryPreviewScan(params: {
   res: Response;
   user: PantryScannerUserProfile;
-  usableIngredients: PantryIngredient[];
-  analysisNotes?: string;
+  choices: PantryUserChoices;
+  deliveredIngredients: PantryIngredient[];
   releasePreview: () => Promise<void>;
+  releaseRead: () => Promise<void>;
   markDelivered: () => void;
+  read: { readId: string; expiresAt: Date };
 }): Promise<void> {
-  const { res, user, usableIngredients } = params;
-  const generation = await generatePantryRecipes(user, usableIngredients);
+  const { res, user, choices, deliveredIngredients } = params;
+  const releaseAll = async () => {
+    await params.releasePreview();
+    await params.releaseRead();
+  };
+  const generation = await generatePantryRecipes(user, choices);
 
   // CP-B1: a IA falhou na geração — devolve a prévia, 503.
   if (generation.kind === 'aiUnavailable') {
-    await params.releasePreview();
+    await releaseAll();
     sendPantryAiUnavailable(res);
     return;
   }
@@ -1409,16 +2126,17 @@ async function runPantryPreviewScan(params: {
   const { recipes, generatedCount } = generation;
 
   if (generatedCount > 0 && recipes.length === 0) {
-    await params.releasePreview();
+    await releaseAll();
     sendAllRecipesDiscarded(res, generation);
     return;
   }
 
   if (recipes.length === 0) {
-    await params.releasePreview();
+    await releaseAll();
     sendNoRecipesGenerated(res, {
-      ingredients: usableIngredients,
-      analysisNotes: params.analysisNotes,
+      readId: params.read.readId,
+      readExpiresAt: params.read.expiresAt,
+      ingredients: deliveredIngredients,
       scansUsed: user.scanCount,
       resetDate: user.scanResetDate,
     });
@@ -1427,7 +2145,7 @@ async function runPantryPreviewScan(params: {
 
   const preview = await deliverPantryLockedPreview({
     userId: user.id,
-    ingredients: usableIngredients,
+    ingredients: deliveredIngredients,
     recipes,
     scansUsed: user.scanCount,
     resetDate: user.scanResetDate,

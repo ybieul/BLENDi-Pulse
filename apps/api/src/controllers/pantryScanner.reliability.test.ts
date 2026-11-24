@@ -8,7 +8,7 @@
 // Rodar com: pnpm --filter @blendi/api test
 import assert from 'node:assert/strict';
 import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
-import type { NextFunction, Request, Response } from 'express';
+import { createFakePantryReadModel, readAndGenerate } from './pantryScannerTestFakes';
 
 import { INVALID_JSON_RETRY_INSTRUCTION } from '../utils/aiResponseRetry.utils';
 import { getAiRequestRemainingMs } from '../services/aiRequestBudget.service';
@@ -127,11 +127,18 @@ mock.module('../services/missionProgress.service', {
   namedExports: { updateMissionProgress: updateMissionProgressMock },
 });
 
+// CP-B5.4: o antigo POST /analyze virou leitura + geração (pantryScannerTestFakes.ts).
+const fakePantryRead = createFakePantryReadModel();
+mock.module('../models/PantryRead', {
+  namedExports: { PantryReadModel: fakePantryRead.model },
+});
+
 type ControllerModule = typeof import('./pantryScanner.controller.js');
-let analyzePantry: ControllerModule['analyzePantry'];
+let readPantry: ControllerModule['readPantry'];
+let generatePantry: ControllerModule['generatePantry'];
 
 before(async () => {
-  ({ analyzePantry } = await import('./pantryScanner.controller.js'));
+  ({ readPantry, generatePantry } = await import('./pantryScanner.controller.js'));
 });
 
 function recipe(title: string, ingredientName = 'Oats') {
@@ -160,30 +167,13 @@ function heavy(title: string) {
   };
 }
 
-const JPEG_BASE64 = `/9j/${'A'.repeat(200)}`;
-
+// CP-B5.4: lê a foto e gera com todos os ingredientes lidos marcados (o
+// equivalente ao antigo /analyze); devolve a resposta final do fluxo.
 async function analyze() {
-  const res: { statusCode?: number; body?: Record<string, unknown> } & Partial<Response> = {};
-  res.status = ((code: number) => {
-    res.statusCode = code;
-    return res as Response;
-  }) as Response['status'];
-  res.json = ((body: Record<string, unknown>) => {
-    res.body = body;
-    return res as Response;
-  }) as Response['json'];
-
-  let nextError: unknown;
-  await analyzePantry(
-    { body: { imageBase64: JPEG_BASE64, mimeType: 'image/jpeg' }, user: { sub: 'user-1' } } as unknown as Request,
-    res as Response,
-    ((error: unknown) => {
-      nextError = error;
-    }) as NextFunction
-  );
-
-  if (nextError) throw nextError;
-  return res;
+  fakePantryRead.reset();
+  const { final } = await readAndGenerate({ readPantry, generatePantry, userId: 'user-1' });
+  if (final.nextError) throw final.nextError;
+  return final;
 }
 
 function titles(res: Awaited<ReturnType<typeof analyze>>): string[] {

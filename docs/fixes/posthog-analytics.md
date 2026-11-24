@@ -83,7 +83,7 @@ Disparados só depois da chamada à API ter sucesso (nunca em caso de erro):
 |---|---|---|
 | `blendLog.service.ts` (`createBlendLog`) | `blend_completed` | `blendiModel`, `durationSeconds` (de `result.log`) |
 | `pulseAi.service.ts` (`sendMessage`) | `ai_message_sent` | `fromCache` |
-| `pantryScanner.service.ts` (`analyzePantry`) | `pantry_scan_completed` | — |
+| `pantryScanner.service.ts` (`generatePantryRecipes`, CP-B7) | `pantry_scan_completed` | — |
 | `purchase.service.ts` (`purchasePlan`) | `purchase_completed` | `planId`, `productIdentifier`, `priceString`, `currencyCode` (de `targetPackage.product`) |
 
 **CP-1.1.4a (prévia bloqueada do Pulse AI):** dois eventos novos, disparados pela `PulseAIScreen` e não pelo serviço, sem nenhum dado da receita:

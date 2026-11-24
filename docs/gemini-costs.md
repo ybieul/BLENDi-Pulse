@@ -157,9 +157,12 @@ The table below shows three useful views:
 
 ## Pantry Scanner (Vision) cost
 
-A single Pantry Scanner scan (`POST /pantry-scanner/analyze`) can make up to two separate billed Gemini calls, both using the same `gemini-3.5-flash-lite` model/rates as above (image input is priced at the same $0.30/1M rate as text — see "Recommended model"):
+Since CP-B7 the Pantry Scanner has two routes: `POST /pantry-scanner/read` (Step 1, the vision call — no scan counted) and `POST /pantry-scanner/generate` (Step 2, the recipe generation — counts the scan). Both use the same `gemini-3.5-flash-lite` model/rates as above (image input is priced at the same $0.30/1M rate as text — see "Recommended model"). A photo can be read once and generated several times (editing the confirmed ingredients), so Step 2 can run more than once per Step 1, each time charging a scan:
 
-### Step 1 — ingredient detection (vision call, always happens)
+### Step 1 — ingredient detection (`POST /pantry-scanner/read`, vision call)
+
+- Read limits cap this call per user (CP-B7): free users get at most 12 reads per billing cycle (`(3 scans + 1 preview) × 3`, and none without a scan or the preview left); Pro users at most 10 reads per 10 min and 100 per day. Reads that find no food still count (the call was billed); a provider failure does not.
+- Since CP-B7a the prompt also lists drinks (alcoholic beverages and mixers), a few more output tokens per read.
 
 - The mobile app resizes the photo so its largest dimension is capped at 1024px before upload (`MAX_IMAGE_DIMENSION`, JPEG quality 0.7 — [apps/mobile/src/services/pantryScanner.service.ts](../apps/mobile/src/services/pantryScanner.service.ts)).
 - The fixed vision prompt (no per-user variables) is 2080 characters — a character-based estimate of about 520 input tokens ([apps/api/src/services/pantryPromptBuilder.service.ts](../apps/api/src/services/pantryPromptBuilder.service.ts)).
@@ -183,13 +186,13 @@ vision_call_ceiling_usd = $0.0029656
 | 500 | 1.482800 |
 | 1000 | 2.965600 |
 
-### Step 2 — recipe generation (text call, only when usable ingredients were found)
+### Step 2 — recipe generation (`POST /pantry-scanner/generate`, text call)
 
-When Step 1 finds at least one usable ingredient, the backend makes a second, separate call through the same `callAi` abstraction used by Pulse AI chat, reusing `promptBuilder.service` with the detected ingredients added as context, and generates an array of 2 recipes at once with a much higher output ceiling (`PANTRY_RECIPE_MAX_TOKENS = 7000` — [apps/api/src/controllers/pantryScanner.controller.ts](../apps/api/src/controllers/pantryScanner.controller.ts)).
+When the user confirms a read with at least one checked or added ingredient, the backend makes a separate call through the same `callAi` abstraction used by Pulse AI chat, reusing `promptBuilder.service` with the detected ingredients added as context, and generates an array of 2 recipes at once with a much higher output ceiling (`PANTRY_RECIPE_MAX_TOKENS = 7000` — [apps/api/src/controllers/pantryScanner.controller.ts](../apps/api/src/controllers/pantryScanner.controller.ts)).
 
 The prompt asks for 2 recipes and, since CP-B1, accepts 1 when the ingredients only make 1. If the generation answer is not valid JSON or matches no recipe schema, the backend sends **one format retry** with the same instruction as Pulse AI chat and the same 7000-token ceiling (CP-B1; before, an invalid answer was silently dropped).
 
-On top of that, each recipe is independently checked against three safety layers (the physical blender limits — protein and volume —, macro-math consistency, and the diet/ice check); each check failing on a given recipe triggers its own extra retry call for that recipe (`maxTokens: 2000` each). Before CP-B1 the blender-limit and diet retries were always discarded (the Pantry prompt demands an array and the parser only read an object), so they cost tokens without ever helping; they now work. In the worst case this means up to 2 generation calls (7000-token ceiling each) plus up to 6 extra retry calls (2000-token ceiling each, 2 recipes × 3 layers) — a wide enough range, and dependent enough on the actual ingredients/recipes generated, that this document does not attempt a single worked number for it the way the sections above do. Apply the same `cost_usd` formula above with these real ceilings if an exact worst-case figure is needed; for exact production accounting, the same advice as the rest of this document applies — capture real Gemini usage metadata per call.
+On top of that, each recipe is independently checked against four safety layers (CP-B7: the user's choices — added items present, unchecked items absent, no water with "no liquid" —, the physical blender limit — volume —, macro-math consistency, and the diet/ice/alcohol check); each check failing on a given recipe triggers its own extra retry call for that recipe (`maxTokens: 2000` each). Before CP-B1 the blender-limit and diet retries were always discarded (the Pantry prompt demands an array and the parser only read an object), so they cost tokens without ever helping; they now work. In the worst case this means up to 2 generation calls (7000-token ceiling each) plus up to 8 extra retry calls (2000-token ceiling each, 2 recipes × 4 layers) — a wide enough range, and dependent enough on the actual ingredients/recipes generated, that this document does not attempt a single worked number for it the way the sections above do. Apply the same `cost_usd` formula above with these real ceilings if an exact worst-case figure is needed; for exact production accounting, the same advice as the rest of this document applies — capture real Gemini usage metadata per call.
 
 ## Overload retries and the fallback model (CP-B1)
 
@@ -210,6 +213,7 @@ Each AI request also has a total time budget (55 s Pulse AI, 85 s Pantry). A cal
 - The Pulse AI locked preview (CP-1.1.4a): a free user who uses up the 3 daily messages can trigger **one more generation per day** (the 4th message). The AI runs normally, but only the macros are shown until the user subscribes. Worst case per free user, up to 4 Pulse AI generations a day instead of 3, plus retries. A preview served from the Mongo cache costs nothing, and a preview is not written to the cache. Unlocking after subscribing does not call the AI again
 - Disabling or missing the app-level Mongo cache (Pulse AI chat only — the Pantry Scanner path has no cache to disable)
 - Larger uploaded photos, or photos with an aspect ratio that tiles into more than ~4 tiles (Pantry Scanner)
+- Generating again from the same Pantry read after editing the ingredients (CP-B7): each generation is a new Step 2 (and a new scan)
 - Future use of grounding, tools, Batch API, or additional multimodal inputs
 
 ## What keeps the bill low in the current implementation
@@ -219,7 +223,7 @@ Each AI request also has a total time budget (55 s Pulse AI, 85 s Pantry). A cal
 - The backend uses a small, low-cost model for both text and vision
 - Pulse AI chat output is capped at 800 tokens; repeated identical chat requests can be served from the local cache for 7 days
 - Photos are resized to a 1024px cap before upload, limiting image tokens
-- Pantry Scanner only runs the (more expensive) recipe-generation step when ingredients were actually detected
+- Pantry Scanner only runs the (more expensive) recipe-generation step after the user confirms the ingredients (CP-B7), and photo reads are capped per plan
 
 ## Bottom line
 

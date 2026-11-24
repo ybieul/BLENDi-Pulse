@@ -330,6 +330,10 @@ export function RecipeCard({
   const dietOverrideItems = (recipe.dietOverrideIngredients ?? [])
     .map(toMidSentence)
     .filter(Boolean);
+  // CP-B7a: item pedido que a receita não conseguiu incluir (só o backend preenche).
+  const missingRequestedItems = (recipe.missingRequestedIngredients ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean);
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
   const shoppingListIngredients = useMemo(
     () => recipe.ingredients.map((ingredient) => ({
@@ -626,6 +630,13 @@ export function RecipeCard({
         <RecipeRequestNotice
           testID="recipe-diet-override-notice"
           text={t('pulseAi.dietOverrideNotice', { items: dietOverrideItems.join(', ') })}
+        />
+      ) : null}
+
+      {missingRequestedItems.length > 0 ? (
+        <RecipeRequestNotice
+          testID="recipe-missing-request-notice"
+          text={t('pulseAi.missingRequestedNotice', { items: missingRequestedItems.join(', ') })}
         />
       ) : null}
 

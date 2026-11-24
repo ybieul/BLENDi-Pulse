@@ -73,7 +73,7 @@ describe('pantryScanner.service — prévia bloqueada', () => {
   it('reconhece a prévia, sem XP, missão nem pantry_scan_completed', async () => {
     mockPost.mockResolvedValueOnce({ data: { success: true, data: PREVIEW_RESPONSE } });
 
-    const result = await pantry.analyzePantry('base64', 'image/jpeg');
+    const result = await pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] });
 
     expect(pantry.isPantryLockedPreview(result)).toBe(true);
     expect(result).toEqual(PREVIEW_RESPONSE);
@@ -98,7 +98,7 @@ describe('pantryScanner.service — prévia bloqueada', () => {
       },
     });
 
-    const result = await pantry.analyzePantry('base64', 'image/jpeg');
+    const result = await pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] });
 
     expect(pantry.isPantryLockedPreview(result)).toBe(false);
     expect(mockTrackEvent).toHaveBeenCalledWith('pantry_scan_completed');
@@ -113,7 +113,7 @@ describe('pantryScanner.service — prévia bloqueada', () => {
       },
     });
 
-    await expect(pantry.analyzePantry('base64', 'image/jpeg')).rejects.toBeInstanceOf(
+    await expect(pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] })).rejects.toBeInstanceOf(
       pantry.PantryScannerServiceError,
     );
     expect(mockTrackEvent).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe('pantryScanner.service — prévia bloqueada', () => {
       data: { success: true, data: { ...PREVIEW_RESPONSE, analysisNotes: '137 g dragonfruit' } },
     });
 
-    await expect(pantry.analyzePantry('base64', 'image/jpeg')).rejects.toBeInstanceOf(
+    await expect(pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] })).rejects.toBeInstanceOf(
       pantry.PantryScannerServiceError,
     );
   });

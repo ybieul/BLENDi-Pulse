@@ -40,12 +40,20 @@ export interface IngredientCheckItemProps {
   ingredient: PantryIngredient;
   checked: boolean;
   onToggle: () => void;
+  /** CP-B5.4: rótulo abaixo do nome (ex.: "Bebida alcoólica"). */
+  label?: string;
+  /** CP-B5.4: não pode ser marcado (ex.: bebida alcoólica para menor de 21). */
+  disabled?: boolean;
+  testID?: string;
 }
 
 export function IngredientCheckItem({
   ingredient,
   checked,
   onToggle,
+  label,
+  disabled = false,
+  testID,
 }: IngredientCheckItemProps) {
   const colors = useColors();
   const ROW_BACKGROUND = colors.overlay.plum[6];
@@ -100,6 +108,7 @@ export function IngredientCheckItem({
   const showMediumConfidenceDot = ingredient.confidence === 'medium';
 
   const handleToggle = () => {
+    if (disabled) return;
     triggerLightHaptic();
     onToggle();
   };
@@ -148,6 +157,15 @@ export function IngredientCheckItem({
       backgroundColor: colors.feedback.warning,
       marginLeft: spacing.md,
     },
+    labelText: {
+      marginTop: 2,
+      color: colors.feedback.warning,
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 12,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
     quantityText: {
       marginLeft: spacing.lg,
       color: colors.text.primary,
@@ -163,10 +181,12 @@ export function IngredientCheckItem({
   return (
     <Pressable
       accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      accessibilityLabel={ingredient.name}
+      accessibilityState={{ checked, disabled }}
+      accessibilityLabel={label ? `${ingredient.name}, ${label}` : ingredient.name}
+      disabled={disabled}
       onPress={handleToggle}
-      style={styles.pressable}
+      style={[styles.pressable, disabled ? styles.disabled : null]}
+      testID={testID}
     >
       <Animated.View
         style={[
@@ -197,6 +217,11 @@ export function IngredientCheckItem({
 
           {showMediumConfidenceDot ? <View style={styles.mediumConfidenceDot} /> : null}
         </View>
+        {label ? (
+          <Text numberOfLines={2} style={styles.labelText}>
+            {label}
+          </Text>
+        ) : null}
       </View>
 
       {normalizedEstimatedQuantity ? (
