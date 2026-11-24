@@ -258,15 +258,15 @@ export interface IUser {
    */
   monthlyScanPreviewUsage: number;
   /**
-   * CP-B5.4 (free): leituras de foto do Pantry Scanner no ciclo (POST
+   * CP-B7 (free): leituras de foto do Pantry Scanner no ciclo (POST
    * /pantry-scanner/read). Zera junto com scanCount.
    */
   pantryReadCount?: number;
-  /** CP-B5.4 (Pro): horários das últimas leituras (no máximo 10), para a janela anti-robô. */
+  /** CP-B7 (Pro): horários das últimas leituras (no máximo 10), para a janela anti-robô. */
   pantryReadRecent?: Date[];
-  /** CP-B5.4 (Pro): leituras no dia do fuso da conta (teto de segurança). */
+  /** CP-B7 (Pro): leituras no dia do fuso da conta (teto de segurança). */
   pantryReadDayCount?: number;
-  /** CP-B5.4 (Pro): quando pantryReadDayCount foi zerado pela última vez. */
+  /** CP-B7 (Pro): quando pantryReadDayCount foi zerado pela última vez. */
   pantryReadDayResetDate?: Date;
   /** Quantas consultas ao Pulse AI o usuário consumiu no dia atual do seu timezone. */
   dailyAiUsage: number;
@@ -807,7 +807,7 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
         message: 'errors.validation.integer',
       },
     },
-    // CP-B5.4: contagem de leituras do Pantry Scanner (ver a interface).
+    // CP-B7: contagem de leituras do Pantry Scanner (ver a interface).
     pantryReadCount: {
       type: Number,
       default: 0,

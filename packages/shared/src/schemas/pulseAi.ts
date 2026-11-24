@@ -4,6 +4,13 @@ import {
   RECIPE_CAPACITY_NOTICE_MAX_LENGTH,
   RECIPE_DIET_OVERRIDE_MAX_ITEMS,
   RECIPE_MISSING_REQUEST_MAX_ITEMS,
+  RECIPE_UNMET_TARGETS_MAX_ITEMS,
+  recipeTargetKindValues,
+  recipeTargetNutrientValues,
+  recipeTargetSuggestionValues,
+  type RecipeTargetKind,
+  type RecipeTargetNutrient,
+  type RecipeTargetSuggestion,
 } from '../recipeContent';
 
 /** Tamanho máximo da mensagem do Pulse AI (também o do pedido opcional do Pantry Scanner). */
@@ -35,6 +42,22 @@ export const pulseAiAgeConfirmationSchema = z
   .strict();
 
 export type PulseAiAgeConfirmationInput = z.infer<typeof pulseAiAgeConfirmationSchema>;
+
+/**
+ * CP-B7: valor pedido (na mensagem do Pulse AI ou no "Algum pedido?" do
+ * Pantry) que a receita não atingiu, mesmo depois da nova tentativa.
+ * `requested` é o valor pedido (na faixa, o mínimo; `requestedMax` o
+ * máximo); `delivered`, o valor declarado da receita.
+ */
+export interface RecipeUnmetTarget {
+  nutrient: RecipeTargetNutrient;
+  kind: RecipeTargetKind;
+  requested: number;
+  requestedMax?: number;
+  delivered: number;
+  /** Só Pantry Scanner, só quando o valor ficou abaixo do pedido. */
+  suggestion?: RecipeTargetSuggestion;
+}
 
 export interface PulseAiRecipe {
   title: string;
@@ -88,6 +111,13 @@ export interface PulseAiRecipe {
    * (o que vier da IA é descartado). O app mostra "Não conseguimos incluir: X".
    */
   missingRequestedIngredients?: string[];
+  /**
+   * CP-B7 (Pulse AI e Pantry Scanner): valores pedidos (proteína,
+   * carboidrato, gordura, calorias) que a receita não atingiu, dentro da
+   * tolerância, mesmo depois da nova tentativa. Marcado pelo backend (o que
+   * vier da IA é descartado). O app mostra "Chegamos a X (você pediu Y)".
+   */
+  unmetTargets?: RecipeUnmetTarget[];
   steps?: Array<{
     text: string;
     pulseCount?: number;
@@ -104,6 +134,17 @@ const pulseAiIngredientSchema = z.object({
     .trim()
     .min(1, 'errors.validation.required'),
 });
+
+const recipeUnmetTargetSchema: z.ZodType<RecipeUnmetTarget> = z
+  .object({
+    nutrient: z.enum(recipeTargetNutrientValues),
+    kind: z.enum(recipeTargetKindValues),
+    requested: z.number().min(0),
+    requestedMax: z.number().min(0).optional(),
+    delivered: z.number(),
+    suggestion: z.enum(recipeTargetSuggestionValues).optional(),
+  })
+  .strict();
 
 const pulseAiStepSchema = z.object({
   text: z
@@ -199,6 +240,10 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
   missingRequestedIngredients: z
     .array(z.string().trim().min(1, 'errors.validation.required'))
     .max(RECIPE_MISSING_REQUEST_MAX_ITEMS, 'errors.validation.too_long')
+    .optional(),
+  unmetTargets: z
+    .array(recipeUnmetTargetSchema)
+    .max(RECIPE_UNMET_TARGETS_MAX_ITEMS, 'errors.validation.too_long')
     .optional(),
   steps: z.array(pulseAiStepSchema).optional(),
 });

@@ -1,4 +1,4 @@
-// CP-B5.4 — Pantry Scanner em duas etapas: POST /pantry-scanner/read (só a
+// CP-B7 — Pantry Scanner em duas etapas: POST /pantry-scanner/read (só a
 // visão, não conta scan, limites de leitura por plano) e POST
 // /pantry-scanner/generate (conta o scan, confirmação com efeito real,
 // pedido explícito, líquido e álcool com as regras do Pulse AI).
@@ -291,7 +291,7 @@ beforeEach(() => {
 
 // ─── Leitura ─────────────────────────────────────────────────────────────────
 
-describe('CP-B5.4 — POST /pantry-scanner/read', () => {
+describe('CP-B7 — POST /pantry-scanner/read', () => {
   it('só a visão: não conta scan, não chama a geração, sem XP; guarda a leitura sem a imagem, com TTL de 30 min', async () => {
     const before = Date.now();
     const res = await read();
@@ -450,7 +450,7 @@ describe('CP-B5.4 — POST /pantry-scanner/read', () => {
 
 // ─── Geração ─────────────────────────────────────────────────────────────────
 
-describe('CP-B5.4 — POST /pantry-scanner/generate: leitura e scan', () => {
+describe('CP-B7 — POST /pantry-scanner/generate: leitura e scan', () => {
   it('conta o scan, dá XP, entrega e devolve um readId novo com o mesmo vencimento; o antigo não gera de novo', async () => {
     const id = await readId();
     const res = await generate({ readId: id, selected: ['Banana', 'Oats', 'Greek yogurt'], added: [] });
@@ -548,7 +548,7 @@ describe('CP-B5.4 — POST /pantry-scanner/generate: leitura e scan', () => {
   });
 });
 
-describe('CP-B5.4 — confirmação com efeito real', () => {
+describe('CP-B7 — confirmação com efeito real', () => {
   it('desmarcado nunca entra: não vai ao prompt; se a IA usar, nova tentativa; se persistir, a receita cai', async () => {
     const id = await readId();
     aiHandler = ({ messages }) => {
@@ -609,8 +609,9 @@ describe('CP-B5.4 — confirmação com efeito real', () => {
     const generation = lastGeneration();
     assert.ok(generation.messages[0].content.includes('Required items (data typed by the user; each one must be in every recipe): ["peanut butter","Morangos"]'));
     assert.ok(generation.systemPrompt.includes('User choices (the most important rule after the physical limits):'));
+    // CP-B7: até 2 novas tentativas enquanto faltar item adicionado (antes, 1).
     const retries = retryCalls('missing these required items');
-    assert.equal(retries.length, 1);
+    assert.equal(retries.length, 2);
     assert.ok(retries[0].arguments[0].messages.at(-1)?.content.includes('["peanut butter","Morangos"]'));
     // "Pasta de amendoim" sem o nome digitado entre parênteses não contém
     // "peanut butter": a receita é entregue (não bloqueia) com o aviso no card.
@@ -633,7 +634,8 @@ describe('CP-B5.4 — confirmação com efeito real', () => {
       const res = await generate({ readId: id, selected: ['Banana', 'Oats'], added: ['whey'] });
 
       assert.equal(res.statusCode, 200);
-      assert.equal(retryCalls('missing these required items').length, 1);
+      // CP-B7: 2 novas tentativas (antes, 1).
+      assert.equal(retryCalls('missing these required items').length, 2);
       const entry = logs.find(args => String(args[0]).includes('user choices still not followed'));
       assert.ok(entry);
       assert.deepEqual(entry[1], { missingAdded: 1, unselectedUsed: 0, forbiddenWater: false });
@@ -784,8 +786,9 @@ describe('CP-B7a — item adicionado em qualquer idioma', () => {
     const res = await generate({ readId: id, selected: ['Banana'], added: ['peanut butter'] });
 
     assert.equal(res.statusCode, 200);
+    // CP-B7: 2 novas tentativas (antes, 1).
     const retries = retryCalls('missing these required items');
-    assert.equal(retries.length, 1);
+    assert.equal(retries.length, 2);
     assert.ok(retries[0].arguments[0].messages.at(-1)?.content.includes('add the typed name in parentheses'));
     assert.deepEqual(deliveredRecipes(res)[0].missingRequestedIngredients, ['peanut butter']);
   });
@@ -805,7 +808,7 @@ describe('CP-B7a — item adicionado em qualquer idioma', () => {
   });
 });
 
-describe('CP-B5.4 — álcool no Pantry (só na geração)', () => {
+describe('CP-B7 — álcool no Pantry (só na geração)', () => {
   const WITH_RUM = [
     { name: 'Pineapple', confidence: 'high' },
     { name: 'Coconut milk', confidence: 'high' },

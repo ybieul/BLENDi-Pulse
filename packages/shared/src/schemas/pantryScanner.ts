@@ -133,7 +133,7 @@ export interface PantryPreviewUnlockResult
   recipes: PulseAiRecipe[];
 }
 
-// ─── CP-B5.4: leitura e geração em duas etapas ──────────────────────────────
+// ─── CP-B7: leitura e geração em duas etapas ──────────────────────────────
 // POST /pantry-scanner/read só lê a foto (não conta scan); a pessoa confirma
 // os ingredientes; POST /pantry-scanner/generate gera as receitas e conta o
 // scan. Constantes únicas dos limites (API e app).
@@ -162,9 +162,16 @@ export type PantryLiquidChoice = (typeof pantryLiquidChoiceValues)[number];
 export const pantryAlcoholAgeValues = ['of-age', 'under-age', 'unknown'] as const;
 export type PantryAlcoholAge = (typeof pantryAlcoholAgeValues)[number];
 
-/** Ingrediente lido da foto. isAlcoholic vem da lista do validador, não da IA. */
+/**
+ * Ingrediente lido da foto. isAlcoholic vem da lista do validador, não da IA.
+ * CP-B7: blendSuitable diz se o item serve para shake/smoothie (lista
+ * principal, marcado) ou não ("Outros itens na foto", desmarcado). Bebida
+ * alcoólica fica sempre na lista principal (blendSuitable true). O backend
+ * sempre preenche; opcional para resposta de API anterior ao CP-B7
+ * (ausente = true).
+ */
 export const pantryReadIngredientSchema = pantryIngredientSchema
-  .extend({ isAlcoholic: z.boolean() })
+  .extend({ isAlcoholic: z.boolean(), blendSuitable: z.boolean().optional() })
   .strict();
 
 export type PantryReadIngredient = z.infer<typeof pantryReadIngredientSchema>;

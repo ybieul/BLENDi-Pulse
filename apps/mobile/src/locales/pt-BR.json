@@ -1528,6 +1528,27 @@
     "dietOverrideNotice": "Inclui {{items}}, fora da sua dieta, como você pediu.",
     "alcoholFreeNotice": "Versão sem álcool: drinks com álcool são só para maiores de 21 anos.",
     "missingRequestedNotice": "Não conseguimos incluir: {{items}}.",
+    "unmetTarget": {
+      "protein": "Chegamos a {{delivered}} de proteína ({{asked}}).",
+      "carbs": "Chegamos a {{delivered}} de carboidrato ({{asked}}).",
+      "fat": "Chegamos a {{delivered}} de gordura ({{asked}}).",
+      "calories": "Chegamos a {{delivered}} ({{asked}})."
+    },
+    "unmetTargetAsked": {
+      "exact": "você pediu {{value}}",
+      "min": "você pediu pelo menos {{value}}",
+      "max": "você pediu no máximo {{value}}",
+      "range": "você pediu entre {{min}} e {{max}}"
+    },
+    "unmetTargetSuggestion": "Adicionar {{item}} ajudaria.",
+    "unmetTargetSuggestionItem": {
+      "wheyOrProteinPowder": "whey ou proteína em pó",
+      "plantProteinPowder": "proteína vegetal em pó",
+      "oatsOrBanana": "aveia ou banana",
+      "peanutButter": "pasta de amendoim",
+      "avocadoOrChia": "abacate ou chia",
+      "oatsOrPeanutButter": "aveia ou pasta de amendoim"
+    },
     "alcoholUnit": "g de álcool",
     "howToUse": {
       "button": "Como usar",
@@ -1663,6 +1684,9 @@
     "removeAdded": "Remover {{name}}",
     "alcoholicLabel": "Bebida alcoólica",
     "alcoholicUnavailable": "Bebida alcoólica · indisponível para a sua conta",
+    "otherItemsTitle": "Outros itens na foto ({{count}})",
+    "otherItemsHint": "Não costumam ir em shakes. Marque o que quiser usar.",
+    "otherItemsA11yHint": "Mostra ou esconde os outros itens lidos na foto",
     "liquidQuestion": "Qual líquido você tem?",
     "liquidHint": "A foto não mostra nenhum líquido. Escolha um para as receitas.",
     "liquidWater": "Água",

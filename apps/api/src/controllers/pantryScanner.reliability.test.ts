@@ -127,7 +127,7 @@ mock.module('../services/missionProgress.service', {
   namedExports: { updateMissionProgress: updateMissionProgressMock },
 });
 
-// CP-B5.4: o antigo POST /analyze virou leitura + geração (pantryScannerTestFakes.ts).
+// CP-B7: o antigo POST /analyze virou leitura + geração (pantryScannerTestFakes.ts).
 const fakePantryRead = createFakePantryReadModel();
 mock.module('../models/PantryRead', {
   namedExports: { PantryReadModel: fakePantryRead.model },
@@ -167,7 +167,7 @@ function heavy(title: string) {
   };
 }
 
-// CP-B5.4: lê a foto e gera com todos os ingredientes lidos marcados (o
+// CP-B7: lê a foto e gera com todos os ingredientes lidos marcados (o
 // equivalente ao antigo /analyze); devolve a resposta final do fluxo.
 async function analyze() {
   fakePantryRead.reset();

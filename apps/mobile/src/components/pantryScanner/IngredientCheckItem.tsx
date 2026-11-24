@@ -40,9 +40,9 @@ export interface IngredientCheckItemProps {
   ingredient: PantryIngredient;
   checked: boolean;
   onToggle: () => void;
-  /** CP-B5.4: rótulo abaixo do nome (ex.: "Bebida alcoólica"). */
+  /** CP-B7: rótulo abaixo do nome (ex.: "Bebida alcoólica"). */
   label?: string;
-  /** CP-B5.4: não pode ser marcado (ex.: bebida alcoólica para menor de 21). */
+  /** CP-B7: não pode ser marcado (ex.: bebida alcoólica para menor de 21). */
   disabled?: boolean;
   testID?: string;
 }

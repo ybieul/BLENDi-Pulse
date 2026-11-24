@@ -1160,6 +1160,8 @@ interface ViolatingOccurrence {
 interface ScannedOccurrence extends ViolatingOccurrence {
   /** Negada por prefixo/sufixo (regra 6) ou por frase (regra 7, quando ligada). */
   negated: boolean;
+  /** CP-B7: índice do segmento no texto (tokenizeSegments). */
+  segmentIndex: number;
 }
 
 /**
@@ -1175,7 +1177,7 @@ function scanOccurrences(
 ): ScannedOccurrence[] {
   const occurrences: ScannedOccurrence[] = [];
 
-  for (const tokens of tokenizeSegments(text)) {
+  for (const [segmentIndex, tokens] of tokenizeSegments(text).entries()) {
     const masked = maskExceptions(tokens, rules.exceptions);
 
     for (const term of rules.terms) {
@@ -1191,7 +1193,7 @@ function scanOccurrences(
 
         if (!negated && isNeutralized(tokens, start, end, term)) continue;
 
-        occurrences.push({ canonical: term.canonical, segment: tokens, start, end, negated });
+        occurrences.push({ canonical: term.canonical, segment: tokens, start, end, negated, segmentIndex });
       }
     }
   }
@@ -1250,6 +1252,23 @@ export function findTermMentions(text: string, list: CompiledTermList): TermMent
     .map(({ canonical, negated }) => ({ term: canonical, negated }));
 }
 
+export interface TermOccurrence extends TermMention {
+  /** Índice do segmento (tokenizeSegments) e posição dos tokens nele. */
+  segment: number;
+  start: number;
+  end: number;
+}
+
+/**
+ * CP-B7: como findTermMentions, com a posição de cada ocorrência — para saber
+ * quando um termo está dentro de outro maior ("amendoim" em "pasta de
+ * amendoim"). Mesma normalização e negação; nenhuma lógica de texto nova.
+ */
+export function findTermOccurrences(text: string, list: CompiledTermList): TermOccurrence[] {
+  return scanOccurrences(text, list.rules, { sentenceNegation: false })
+    .map(({ canonical, negated, segmentIndex, start, end }) => ({ term: canonical, negated, segment: segmentIndex, start, end }));
+}
+
 /**
  * CP-B5.2: bebidas alcoólicas citadas no texto, com a lista, as exceções
  * ("essência de rum", "cerveja sem álcool", "vinagre de vinho") e a negação
@@ -1257,6 +1276,20 @@ export function findTermMentions(text: string, list: CompiledTermList): TermMent
  */
 export function findAlcoholMentions(text: string): TermMention[] {
   return findTermMentions(text, { rules: COMPILED_RULES.no_alcohol });
+}
+
+/** CP-B7: como findAlcoholMentions, com a posição de cada ocorrência. */
+export function findAlcoholOccurrences(text: string): TermOccurrence[] {
+  return findTermOccurrences(text, { rules: COMPILED_RULES.no_alcohol });
+}
+
+/**
+ * CP-B7: a mesma normalização de caracteres do validador (sem acento,
+ * minúsculas), sem cortar o texto em tokens — para ler números com vírgula
+ * ou ponto ("27,5 g") nos valores pedidos.
+ */
+export function normalizeForMatching(text: string): string {
+  return stripAccents(text).toLowerCase();
 }
 
 /** Primeiro termo proibido encontrado no texto, ou null. */

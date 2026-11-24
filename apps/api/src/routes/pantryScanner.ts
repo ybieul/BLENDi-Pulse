@@ -7,7 +7,7 @@ export const pantryScannerRouter: IRouter = Router();
 
 /**
  * POST /pantry-scanner/read  🔒 autenticado
- * CP-B5.4: lê a foto (só a visão). Não conta scan; conta no limite de
+ * CP-B7: lê a foto (só a visão). Não conta scan; conta no limite de
  * leituras do plano. Guarda a leitura por ~30 min (nunca a imagem) e devolve
  * o readId para a confirmação dos ingredientes.
  */
@@ -15,7 +15,7 @@ pantryScannerRouter.post('/read', authenticate, readPantry);
 
 /**
  * POST /pantry-scanner/generate  🔒 autenticado
- * CP-B5.4: gera as receitas a partir da leitura confirmada (marcados,
+ * CP-B7: gera as receitas a partir da leitura confirmada (marcados,
  * adicionados, líquido e pedido). Conta o scan (ou a prévia do free).
  */
 pantryScannerRouter.post('/generate', authenticate, generatePantry);

@@ -974,7 +974,9 @@ describe('CP-B5.2 — ingredientes que definem o drink', () => {
   });
 
   it('drink sem pedido de drink na mensagem: nada é cobrado', async () => {
-    aiResponses = [recipe()];
+    // CP-B7: o morango pedido está na receita (sem ele, a conferência de
+    // alimento pedido faria uma nova tentativa).
+    aiResponses = [withIngredients(['Morango', 'Leite de aveia'])];
 
     const res = await send(uniqueMessage('um shake de morango'));
 

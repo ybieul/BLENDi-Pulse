@@ -1,5 +1,5 @@
 // apps/api/src/models/PantryRead.ts
-// CP-B5.4 — leitura da foto do Pantry Scanner guardada entre as duas etapas
+// CP-B7 — leitura da foto do Pantry Scanner guardada entre as duas etapas
 // (POST /pantry-scanner/read → POST /pantry-scanner/generate).
 //
 // Guarda SÓ o resultado da visão (nomes, quantidade estimada, confiança,
@@ -20,6 +20,12 @@ export interface IPantryReadIngredient {
   estimatedQuantity?: string;
   confidence: 'high' | 'medium' | 'low';
   isAlcoholic: boolean;
+  /**
+   * CP-B7: serve para shake/smoothie. false = "Outros itens na foto"
+   * (desmarcado). Leitura gravada antes do CP-B7 não tem o campo: ausente =
+   * true (isBlendSuitable, em pantryRequest.utils.ts).
+   */
+  blendSuitable?: boolean;
 }
 
 export interface IPantryRead {
@@ -39,6 +45,7 @@ const pantryReadIngredientSchema = new mongoose.Schema<IPantryReadIngredient>(
     estimatedQuantity: { type: String, required: false, trim: true, maxlength: 200 },
     confidence: { type: String, required: true, enum: ['high', 'medium', 'low'] },
     isAlcoholic: { type: Boolean, required: true },
+    blendSuitable: { type: Boolean, required: false },
   },
   { _id: false }
 );

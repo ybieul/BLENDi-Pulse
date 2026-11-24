@@ -1528,6 +1528,27 @@
     "dietOverrideNotice": "Includes {{items}}, outside your diet, as you asked.",
     "alcoholFreeNotice": "Alcohol-free version: drinks with alcohol are only for people 21 or older.",
     "missingRequestedNotice": "We couldn't include: {{items}}.",
+    "unmetTarget": {
+      "protein": "We reached {{delivered}} of protein ({{asked}}).",
+      "carbs": "We reached {{delivered}} of carbs ({{asked}}).",
+      "fat": "We reached {{delivered}} of fat ({{asked}}).",
+      "calories": "We reached {{delivered}} ({{asked}})."
+    },
+    "unmetTargetAsked": {
+      "exact": "you asked for {{value}}",
+      "min": "you asked for at least {{value}}",
+      "max": "you asked for at most {{value}}",
+      "range": "you asked for {{min}} to {{max}}"
+    },
+    "unmetTargetSuggestion": "Adding {{item}} would help.",
+    "unmetTargetSuggestionItem": {
+      "wheyOrProteinPowder": "whey or protein powder",
+      "plantProteinPowder": "plant protein powder",
+      "oatsOrBanana": "oats or banana",
+      "peanutButter": "peanut butter",
+      "avocadoOrChia": "avocado or chia",
+      "oatsOrPeanutButter": "oats or peanut butter"
+    },
     "alcoholUnit": "g alcohol",
     "howToUse": {
       "button": "How to use",
@@ -1663,6 +1684,9 @@
     "removeAdded": "Remove {{name}}",
     "alcoholicLabel": "Alcoholic drink",
     "alcoholicUnavailable": "Alcoholic drink · not available for your account",
+    "otherItemsTitle": "Other items in the photo ({{count}})",
+    "otherItemsHint": "Not usually used in shakes. Check anything you want to use.",
+    "otherItemsA11yHint": "Shows or hides the other items read in the photo",
     "liquidQuestion": "Which liquid do you have?",
     "liquidHint": "The photo doesn't show any liquid. Pick one for the recipes.",
     "liquidWater": "Water",

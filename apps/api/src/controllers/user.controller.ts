@@ -23,6 +23,8 @@ import { XPLogModel } from '../models/XPLog';
 import { DailyMissionModel } from '../models/DailyMission';
 import { GoogleAuthCodeModel } from '../models/GoogleAuthCode';
 import { LockedPreviewModel } from '../models/LockedPreview';
+import { OtpModel } from '../models/Otp';
+import { PantryReadModel } from '../models/PantryRead';
 import { invalidateUserCache } from '../services/cache.service';
 import { revokeAppleRefreshToken } from '../services/apple.service';
 import {
@@ -504,6 +506,9 @@ export async function deleteAccount(
       let deletedUser: { _id: unknown } | null = null;
 
       await session.withTransaction(async () => {
+        // CP-B8a: o código de verificação (Otp) é ligado pelo e-mail, não pelo id.
+        const owner = await UserModel.findById(userId).select({ email: 1 }).session(session).lean();
+
         await Promise.all([
           BlendLogModel.deleteMany({ userId }, { session }),
           ConversationModel.deleteMany({ userId }, { session }),
@@ -523,6 +528,10 @@ export async function deleteAccount(
           // Pulse AI, 7 dias no Pantry Scanner). O filtro só por userId apaga
           // todos os kinds.
           LockedPreviewModel.deleteMany({ userId }, { session }),
+          // CP-B8a: leituras da foto do Pantry Scanner (antes sumiam só pelo
+          // TTL de 30 min) e códigos de verificação pendentes do e-mail.
+          PantryReadModel.deleteMany({ userId }, { session }),
+          ...(owner?.email ? [OtpModel.deleteMany({ email: owner.email }, { session })] : []),
           invalidateUserCache(userId, session),
         ]);
 

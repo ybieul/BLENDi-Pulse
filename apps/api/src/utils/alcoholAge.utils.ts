@@ -1,5 +1,5 @@
 // apps/api/src/utils/alcoholAge.utils.ts
-// CP-B5: idade para álcool, usada pelo Pulse AI e (CP-B5.4) pelo Pantry Scanner.
+// CP-B5: idade para álcool, usada pelo Pulse AI e (CP-B7) pelo Pantry Scanner.
 
 import { ALCOHOL_MIN_AGE_YEARS } from '@blendi/shared';
 

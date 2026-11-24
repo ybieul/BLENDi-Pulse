@@ -1,4 +1,4 @@
-// PantryScannerScreen — fluxo em duas etapas (CP-B5.4): foto → leitura (não
+// PantryScannerScreen — fluxo em duas etapas (CP-B7): foto → leitura (não
 // conta scan) → confirmação com efeito real → geração (conta o scan) →
 // receitas. Também o estado vazio quando a IA não entrega receita
 // (CP-1.1.1d) e os outros estados com a mensagem própria.
@@ -222,7 +222,7 @@ beforeEach(() => {
   mockNavigateUpgrade.mockReset();
 });
 
-describe('PantryScannerScreen — fluxo em duas etapas (CP-B5.4)', () => {
+describe('PantryScannerScreen — fluxo em duas etapas (CP-B7)', () => {
   it('foto → leitura → confirmação → geração → receitas; desmarcar e adicionar mudam o pedido enviado', async () => {
     const utils = await toIngredients();
     expect(mockReadPantryPhoto).toHaveBeenCalledWith('base64', 'image/jpeg');
@@ -349,7 +349,7 @@ describe('PantryScannerScreen — fluxo em duas etapas (CP-B5.4)', () => {
   });
 });
 
-describe('PantryScannerScreen — álcool (CP-B5.4)', () => {
+describe('PantryScannerScreen — álcool (CP-B7)', () => {
   it('item alcoólico: rótulo, desmarcado por padrão e fora do pedido', async () => {
     const utils = await toIngredients(RUM_READ);
 
@@ -525,7 +525,7 @@ describe('PantryScannerScreen — os outros estados continuam com a mensagem pr�
     expect(utils.getByTestId('pantry-generate-button')).toBeTruthy();
   });
 
-  // CP-B5.4: a dieta não atendida vem da geração; a pessoa fica na
+  // CP-B7: a dieta não atendida vem da geração; a pessoa fica na
   // confirmação para ajustar (antes voltava para a câmera).
   it('dieta não atendida (scanner/dietary-restriction-unmet): aviso e fica na confirmação', async () => {
     const utils = await toIngredients();
@@ -547,5 +547,77 @@ describe('PantryScannerScreen — os outros estados continuam com a mensagem pr�
       expect(mockShowToast).toHaveBeenCalledWith('errors.network_internal_server_error');
     });
     await expectBackToCameraWithoutEmptyState(utils);
+  });
+});
+
+describe('PantryScannerScreen — "Outros itens na foto" (CP-B7)', () => {
+  const OTHER_ITEMS_READ = readResult({
+    ingredients: [
+      { name: 'banana', confidence: 'high', isAlcoholic: false, blendSuitable: true },
+      { name: 'ketchup', confidence: 'high', isAlcoholic: false, blendSuitable: false },
+      { name: 'pickles', confidence: 'medium', isAlcoholic: false, blendSuitable: false },
+      { name: 'white rum', confidence: 'high', isAlcoholic: true, blendSuitable: true },
+    ],
+  });
+
+  function expandedState(utils: Screen): boolean | undefined {
+    const props = utils.getByTestId('pantry-other-items-toggle').props as { accessibilityState?: { expanded?: boolean } };
+    return props.accessibilityState?.expanded;
+  }
+
+  it('grupo recolhido com a contagem; ao abrir, os itens aparecem desmarcados; fora do pedido', async () => {
+    const utils = await toIngredients(OTHER_ITEMS_READ);
+
+    const toggle = utils.getByTestId('pantry-other-items-toggle');
+    expect(toggle.props.accessibilityRole).toBe('button');
+    expect(toggle.props.accessibilityLabel).toBe('pantryScanner.otherItemsTitle:{"count":2}');
+    expect(toggle.props.accessibilityHint).toBe('pantryScanner.otherItemsA11yHint');
+    expect(expandedState(utils)).toBe(false);
+    expect(utils.queryByTestId('pantry-ingredient-1')).toBeNull();
+    expect(utils.queryByTestId('pantry-ingredient-2')).toBeNull();
+    // A bebida alcoólica fica no grupo principal (desmarcada, com rótulo).
+    expect(utils.getByTestId('pantry-ingredient-3')).toBeTruthy();
+    expect(utils.getByText('pantryScanner.alcoholicLabel')).toBeTruthy();
+
+    fireEvent.press(toggle);
+    expect(expandedState(utils)).toBe(true);
+    expect(utils.getByText('pantryScanner.otherItemsHint')).toBeTruthy();
+    for (const testID of ['pantry-ingredient-1', 'pantry-ingredient-2']) {
+      const props = utils.getByTestId(testID).props as { accessibilityRole: string; accessibilityState: { checked: boolean } };
+      expect(props.accessibilityRole).toBe('checkbox');
+      expect(props.accessibilityState.checked).toBe(false);
+    }
+
+    mockGeneratePantry.mockResolvedValueOnce(generated());
+    pressGenerate(utils);
+    await waitFor(() => expect(mockGeneratePantry).toHaveBeenCalled());
+    expect(lastGenerateBody().selected).toEqual(['banana']);
+  });
+
+  it('marcar um item de "Outros itens" o leva para o pedido', async () => {
+    const utils = await toIngredients(OTHER_ITEMS_READ);
+    fireEvent.press(utils.getByTestId('pantry-other-items-toggle'));
+    fireEvent.press(utils.getByTestId('pantry-ingredient-2'));
+
+    mockGeneratePantry.mockResolvedValueOnce(generated());
+    pressGenerate(utils);
+    await waitFor(() => expect(mockGeneratePantry).toHaveBeenCalled());
+    expect(lastGenerateBody().selected).toEqual(['banana', 'pickles']);
+  });
+
+  it('digitar o nome de um item de "Outros itens" marca o item e abre o grupo', async () => {
+    const utils = await toIngredients(OTHER_ITEMS_READ);
+    fireEvent.changeText(utils.getByTestId('pantry-add-input'), 'Ketchup');
+    fireEvent.press(utils.getByTestId('pantry-add-button'));
+
+    expect(utils.queryByTestId('pantry-added-item')).toBeNull();
+    expect(expandedState(utils)).toBe(true);
+    const ketchup = utils.getByTestId('pantry-ingredient-1').props as { accessibilityState: { checked: boolean } };
+    expect(ketchup.accessibilityState.checked).toBe(true);
+  });
+
+  it('sem "Outros itens": nenhum grupo', async () => {
+    const utils = await toIngredients();
+    expect(utils.queryByTestId('pantry-other-items')).toBeNull();
   });
 });

@@ -59,7 +59,22 @@ import {
 } from '../utils/alcoholRequest.utils';
 import { parseAiJson, prepareAiRecipePayload, readAlcoholRequested } from '../utils/aiRecipePayload.utils';
 import { resolveAlcoholAge, type AlcoholAgeStatus } from '../utils/alcoholAge.utils';
-import { withRequestNotices } from '../utils/recipeNotices.utils';
+import { applyRequestCheckNotices, hasLegitimateCapacityNotice, withRequestNotices } from '../utils/recipeNotices.utils';
+import {
+  REQUESTED_ITEM_MAX_RETRIES,
+  buildRequestedFoodsRetryMessage,
+  extractRequestedFoods,
+  findMissingRequestedFoods,
+  requiredRequestedFoods,
+  type RequestedFood,
+} from '../utils/requestedFoods.utils';
+import {
+  REQUESTED_TARGET_MAX_RETRIES,
+  buildRequestedTargetsRetryMessage,
+  findUnmetTargets,
+  parseRequestedTargets,
+  type RequestedTarget,
+} from '../utils/requestedTargets.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
@@ -82,7 +97,7 @@ import {
   type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
 
-// CP-B5.4: a resolução da idade foi para alcoholAge.utils.ts (também usada
+// CP-B7: a resolução da idade foi para alcoholAge.utils.ts (também usada
 // pelo Pantry Scanner); reexportada aqui para quem já importava daqui.
 export { resolveAlcoholAge };
 
@@ -722,6 +737,160 @@ async function ensureDrinkDefiningIngredients(
   }
 }
 
+// ─── CP-B7: item e valor pedidos na mensagem atual ───────────────────────────
+
+/** O que a mensagem ATUAL pede (nunca o histórico), já sem o que não é cobrado. */
+interface PulseAiRequestChecks {
+  foods: RequestedFood[];
+  targets: RequestedTarget[];
+  /** CP-B8a: o capacityNotice só vale perto do limite do copo deste modelo. */
+  blendiModel: BlendiModel;
+}
+
+function buildPulseAiRequestChecks(
+  message: string,
+  user: Pick<PulseAiUserProfile, 'blendiModel'>,
+  alcoholPolicy: RecipeAlcoholPolicy
+): PulseAiRequestChecks {
+  return {
+    foods: requiredRequestedFoods(extractRequestedFoods(message), {
+      blendiModel: user.blendiModel,
+      alcoholAllowed: alcoholPolicy === 'allowed',
+    }),
+    targets: parseRequestedTargets(message),
+    blendiModel: user.blendiModel,
+  };
+}
+
+function missingRequestedFoodsOf(recipe: PulseAiRecipe, checks: PulseAiRequestChecks): RequestedFood[] {
+  if (checks.foods.length === 0 || hasLegitimateCapacityNotice(recipe, checks.blendiModel)) return [];
+  return findMissingRequestedFoods(recipe.ingredients.map(ingredient => ingredient.name), checks.foods);
+}
+
+function unmetTargetsOf(recipe: PulseAiRecipe, checks: PulseAiRequestChecks) {
+  if (checks.targets.length === 0 || hasLegitimateCapacityNotice(recipe, checks.blendiModel)) return [];
+  return findUnmetTargets(recipe, checks.targets);
+}
+
+/**
+ * CP-B7: alimento pedido na mensagem atual que falta na receita. Até
+ * REQUESTED_ITEM_MAX_RETRIES novas tentativas pelo mesmo caminho das outras
+ * (mensagem dizendo o que faltou). NUNCA bloqueia: resposta inválida ou
+ * falha do provedor entrega a última receita; o que ainda faltar vira aviso
+ * na conferência final.
+ */
+async function ensureRequestedFoods(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  checks: PulseAiRequestChecks
+): Promise<{ recipe: PulseAiRecipe; attempts: number }> {
+  let current = recipe;
+  let attempts = 0;
+
+  while (attempts < REQUESTED_ITEM_MAX_RETRIES) {
+    const missing = missingRequestedFoodsOf(current, checks);
+    if (missing.length === 0) break;
+
+    attempts += 1;
+    // Só contagens no log: o nome do item é dado da pessoa.
+    console.info('[pulseAi.controller] requested ingredient missing, retrying', { missing: missing.length, attempt: attempts });
+
+    try {
+      const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+        ...prompt.messages,
+        { role: 'assistant', content: JSON.stringify(current) },
+        { role: 'user', content: buildRequestedFoodsRetryMessage(missing.map(food => food.display), 'object') },
+      ]);
+
+      if (!retried.recipe) {
+        console.warn('[pulseAi.controller] requested ingredient retry returned an invalid recipe, keeping the last one');
+        break;
+      }
+
+      current = retried.recipe;
+    } catch (error) {
+      console.error('[pulseAi.controller] requested ingredient retry failed, keeping the last one', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      break;
+    }
+  }
+
+  return { recipe: current, attempts };
+}
+
+/**
+ * CP-B7: valor pedido (proteína, carboidrato, gordura, kcal) fora da
+ * tolerância. Uma nova tentativa (valor pedido × entregue, com dicas); nunca
+ * bloqueia.
+ */
+async function ensureRequestedTargets(
+  recipe: PulseAiRecipe,
+  prompt: BuildPulseAiPromptResult,
+  checks: PulseAiRequestChecks,
+  user: Pick<PulseAiUserProfile, 'dietaryPreferences'>
+): Promise<{ recipe: PulseAiRecipe; attempts: number }> {
+  let current = recipe;
+  let attempts = 0;
+
+  while (attempts < REQUESTED_TARGET_MAX_RETRIES) {
+    const unmet = unmetTargetsOf(current, checks);
+    if (unmet.length === 0) break;
+
+    attempts += 1;
+    console.info('[pulseAi.controller] requested target unmet, retrying', {
+      nutrients: unmet.map(item => item.nutrient),
+      attempt: attempts,
+    });
+
+    try {
+      const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
+        ...prompt.messages,
+        { role: 'assistant', content: JSON.stringify(current) },
+        {
+          role: 'user',
+          content: buildRequestedTargetsRetryMessage(unmet, {
+            dietaryPreferences: user.dietaryPreferences,
+            format: 'object',
+          }),
+        },
+      ]);
+
+      if (!retried.recipe) {
+        console.warn('[pulseAi.controller] requested target retry returned an invalid recipe, keeping the last one');
+        break;
+      }
+
+      current = retried.recipe;
+    } catch (error) {
+      console.error('[pulseAi.controller] requested target retry failed, keeping the last one', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
+      break;
+    }
+  }
+
+  return { recipe: current, attempts };
+}
+
+/** Conferência final: o que ainda falta vira aviso (só o backend preenche) e evento de log. */
+function finalizePulseAiRequestChecks(
+  recipe: PulseAiRecipe,
+  checks: PulseAiRequestChecks,
+  meta: { itemAttempts: number; targetAttempts: number; provider?: string; model?: string }
+): PulseAiRecipe {
+  return applyRequestCheckNotices(recipe, {
+    origin: 'pulse_ai',
+    blendiModel: checks.blendiModel,
+    missing: missingRequestedFoodsOf(recipe, checks).map(food => food.display),
+    unmet: unmetTargetsOf(recipe, checks),
+    itemAttempts: meta.itemAttempts,
+    targetAttempts: meta.targetAttempts,
+    provider: meta.provider,
+    model: meta.model,
+  });
+}
+
 /**
  * CP-B5.2: decisão final sobre o pedido de álcool. O código decide os casos
  * óbvios ('yes'/'no') e, nesses, o campo da IA é ignorado; só no 'ai' (nome
@@ -1026,13 +1195,27 @@ async function runPulseAiChat(params: {
     }
 
     if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant && cachedWithinBlenderLimits) {
-      const cachedRecipe = withRequestNotices(
+      const cachedAlcoholPolicy: RecipeAlcoholPolicy =
+        currentUser.alcoholAge === 'of-age' && alcoholDecision !== 'no' ? 'allowed' : 'forbidden';
+      const noticedCachedRecipe = withRequestNotices(
         parsedCachedResponse.data.recipe,
         cachedRestrictionCheck.dietOverrideIngredientIndexes ?? [],
         // CP-B5.2: com a decisão do código, o aviso de "sem álcool" sai dela.
         alcoholDecision === 'ai'
           ? parsedCachedResponse.data.recipe.alcoholFreeVersion === true
           : alcoholDecision === 'yes' && currentUser.alcoholAge === 'under-age'
+      );
+      // CP-B7: a mesma conferência final da receita gerada (sem nova
+      // tentativa: a receita e a mensagem são as mesmas da gravação).
+      const cachedRecipe = finalizePulseAiRequestChecks(
+        noticedCachedRecipe,
+        buildPulseAiRequestChecks(message, currentUser, cachedAlcoholPolicy),
+        {
+          itemAttempts: 0,
+          targetAttempts: 0,
+          provider: parsedCachedResponse.data.aiProvider,
+          model: parsedCachedResponse.data.aiModel,
+        }
       );
       const usageReservation = await reservePulseAiAccess(currentUser);
 
@@ -1234,6 +1417,19 @@ async function runPulseAiChat(params: {
     // CP-B5.2: drink pelo nome traz os ingredientes que o definem (nunca bloqueia).
     recipe = await ensureDrinkDefiningIngredients(recipe, prompt, message, effectiveLanguage);
 
+    // CP-B7: alimento e valor pedidos na mensagem atual, conferidos pelo
+    // backend (nunca bloqueiam). Antes das outras conferências: os retries de
+    // volume, macros e dieta conversam com a receita já corrigida.
+    const requestChecks = buildPulseAiRequestChecks(message, currentUser, alcoholPolicy);
+    const requestedFoodsCheck = await ensureRequestedFoods(recipe, prompt, requestChecks);
+    const requestedTargetsCheck = await ensureRequestedTargets(
+      requestedFoodsCheck.recipe,
+      prompt,
+      requestChecks,
+      currentUser
+    );
+    recipe = requestedTargetsCheck.recipe;
+
     const blenderLimitEnforcement = await ensureBlenderGuardrail(recipe, prompt, currentUser.blendiModel);
 
     if (!blenderLimitEnforcement.ok) {
@@ -1271,6 +1467,14 @@ async function runPulseAiChat(params: {
       console.warn('[pulseAi.controller] blender limit exceeded after later retries');
       return sendBlenderLimitUnmet();
     }
+
+    // CP-B7: o que ainda faltar do pedido vira aviso no card (e evento de log).
+    recipe = finalizePulseAiRequestChecks(recipe, requestChecks, {
+      itemAttempts: requestedFoodsCheck.attempts,
+      targetAttempts: requestedTargetsCheck.attempts,
+      provider: aiResponse.provider,
+      model: aiResponse.model,
+    });
 
     // CP-B2: checagem objetiva dos passos, sem nova tentativa (pulseCount sem
     // gelo/congelado sai; inverter o copo fora do Steel vai para o log).

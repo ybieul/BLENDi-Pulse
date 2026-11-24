@@ -103,7 +103,7 @@ jest.mock('expo-image-picker', () => ({
   MediaTypeOptions: { Images: 'Images' },
 }));
 
-// CP-B5.4: o antigo analyzePantry virou leitura (readPantryPhoto) + geração.
+// CP-B7: o antigo analyzePantry virou leitura (readPantryPhoto) + geração.
 const mockReadPantryPhoto = jest.fn<Promise<unknown>, unknown[]>();
 const mockGeneratePantry = jest.fn<Promise<unknown>, unknown[]>();
 const mockUnlockPantryPreview = jest.fn<Promise<unknown>, unknown[]>();
@@ -206,7 +206,7 @@ const UNLOCKED = {
   recipes: [fullRecipe('Dragon Kefir'), fullRecipe('Pink Kefir Cooler')],
 };
 
-// CP-B5.4: leitura padrão (os ingredientes da foto) antes da geração.
+// CP-B7: leitura padrão (os ingredientes da foto) antes da geração.
 const READ_RESULT = {
   readId: 'read-1',
   readExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
@@ -385,7 +385,7 @@ describe('PantryScannerScreen — prévia bloqueada', () => {
     expect(readLastPantryPreview('user-1')).not.toBeNull();
   });
 
-  // CP-B5.4: sem scan nem prévia, a LEITURA já para (código próprio).
+  // CP-B7: sem scan nem prévia, a LEITURA já para (código próprio).
   it('5º scan: leitura bloqueada (volta para a captura, aviso e Upgrade)', async () => {
     mockReadPantryPhoto.mockRejectedValueOnce(
       new PantryScannerServiceError('limit', 'errors.scanner_read_limit_reached', 'scanner/read-limit-reached'),

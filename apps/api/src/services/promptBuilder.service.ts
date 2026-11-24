@@ -205,7 +205,7 @@ export interface PantryAvailableIngredient {
 }
 
 /**
- * CP-B5.4: álcool no Pantry (só na geração). 'allowed' = 21+ que marcou,
+ * CP-B7: álcool no Pantry (só na geração). 'allowed' = 21+ que marcou,
  * adicionou ou pediu bebida alcoólica; 'forbidden' = todo o resto.
  */
 export interface PantryAlcoholPromptOptions {
@@ -216,19 +216,19 @@ export interface PantryAlcoholPromptOptions {
   inEveryRecipe: boolean;
 }
 
-/** CP-B5.4: líquido escolhido na tela quando a foto não mostra líquido. */
+/** CP-B7: líquido escolhido na tela quando a foto não mostra líquido. */
 export type PantryLiquidPromptChoice = 'water' | 'milk' | 'plant_milk' | 'none';
 
 export interface BuildPantryRecipePromptInput extends PulseAiPromptUserContext {
   language?: PulseAiChatInput['language'];
   availableIngredients: PantryAvailableIngredient[];
-  /** CP-B5.4: adicionados à mão (pedido explícito, obrigatórios em todas as receitas). */
+  /** CP-B7: adicionados à mão (pedido explícito, obrigatórios em todas as receitas). */
   requiredItems?: string[];
-  /** CP-B5.4: pedido opcional ("Algum pedido?"), texto livre tratado como dado. */
+  /** CP-B7: pedido opcional ("Algum pedido?"), texto livre tratado como dado. */
   userRequest?: string;
-  /** CP-B5.4: líquido escolhido. Ausente = comportamento de antes (água sempre disponível). */
+  /** CP-B7: líquido escolhido. Ausente = comportamento de antes (água sempre disponível). */
   liquid?: PantryLiquidPromptChoice;
-  /** CP-B5.4: rede de álcool. Ausente = prompt de antes (sem seção de álcool). */
+  /** CP-B7: rede de álcool. Ausente = prompt de antes (sem seção de álcool). */
   alcohol?: PantryAlcoholPromptOptions;
 }
 
@@ -260,7 +260,7 @@ const PULSE_AI_CHAT_RECIPE_JSON_STRUCTURE =
 const PANTRY_RECIPES_JSON_ARRAY_STRUCTURE =
   '[{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}, {"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}]';
 
-// CP-B5.4: só quando o Pantry pode ter álcool (21+ que escolheu).
+// CP-B7: só quando o Pantry pode ter álcool (21+ que escolheu).
 const PANTRY_RECIPE_WITH_ALCOHOL_JSON_STRUCTURE =
   '{"title": string, "ingredients": [{"name": string, "amount": string}], "macros": {"protein": number, "carbs": number, "fat": number, "calories": number}, "alcoholGrams": number (optional), "prepTimeSeconds": integer, "blendInstruction": string, "tip": string (optional), "capacityNotice": string (optional), "hasSubstitutes": boolean, "steps": [{"text": string, "pulseCount": integer (optional)}]}';
 
@@ -525,7 +525,7 @@ function buildServingSizeSection(params: {
   textContext: RecipeTextContext;
   responseLanguage: string;
   responseMode: PulseAiResponseMode;
-  /** CP-B5.4: o Pantry com escolhas da pessoa usa as mesmas regras de pedido do chat. */
+  /** CP-B7: o Pantry com escolhas da pessoa usa as mesmas regras de pedido do chat. */
   followsUserRequest?: boolean;
 }): string {
   const { blendiModel, textContext, responseLanguage, responseMode } = params;
@@ -665,7 +665,7 @@ function buildDietaryRestrictionsSection(
     ].join('\n');
   }
 
-  // CP-B5.4: no Pantry, os itens adicionados à mão e o pedido opcional são o
+  // CP-B7: no Pantry, os itens adicionados à mão e o pedido opcional são o
   // pedido explícito — mesma regra do chat (só o item pedido, só nestas
   // receitas). Os ingredientes lidos da foto continuam sem exceção.
   if (pantryUserChoices) {
@@ -718,7 +718,7 @@ function buildResponseFormatRequirements(
   pantryAlcoholAllowed = false
 ): string[] {
   if (responseMode === 'recipe-array') {
-    // CP-B5.4: com álcool permitido, o formato ganha alcoholGrams (e a regra do
+    // CP-B7: com álcool permitido, o formato ganha alcoholGrams (e a regra do
     // ponto decimal, como no chat: alcoholGrams é número).
     if (pantryAlcoholAllowed) {
       return [
@@ -881,9 +881,9 @@ function buildSystemPrompt({
   language?: PulseAiChatInput['language'];
   alcoholOfAge?: boolean;
   alcoholRequestDecision?: AlcoholRequestDecision;
-  /** CP-B5.4: o Pantry tem itens adicionados à mão ou pedido opcional. */
+  /** CP-B7: o Pantry tem itens adicionados à mão ou pedido opcional. */
   pantryUserChoices?: boolean;
-  /** CP-B5.4: o Pantry pode ter álcool (21+ que escolheu). */
+  /** CP-B7: o Pantry pode ter álcool (21+ que escolheu). */
   pantryAlcoholAllowed?: boolean;
   responseMode?: PulseAiResponseMode;
   recipeCount?: number;
@@ -1028,7 +1028,7 @@ export function buildPulseAiPrompt({
   };
 }
 
-// ─── CP-B5.4: escolhas da pessoa no Pantry Scanner ──────────────────────────
+// ─── CP-B7: escolhas da pessoa no Pantry Scanner ──────────────────────────
 
 // Mesma ordem de prioridade do chat (CP-B5): limites físicos > pedido
 // explícito > dieta (para o que não foi pedido) > goal, metas, variedade.

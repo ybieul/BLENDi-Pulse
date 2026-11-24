@@ -54,7 +54,7 @@ beforeEach(() => {
 describe('timeout das rotas de IA (CP-B1)', () => {
   it('os timeouts do app passam do teto do servidor com folga', () => {
     expect(AI_CLIENT_TIMEOUT_MS.pulseAiChat).toBeGreaterThan(AI_REQUEST_BUDGET_MS.pulseAiChat);
-    // CP-B5.4: o Pantry tem duas rotas (leitura e geração).
+    // CP-B7: o Pantry tem duas rotas (leitura e geração).
     expect(AI_CLIENT_TIMEOUT_MS.pantryScannerRead).toBeGreaterThan(AI_REQUEST_BUDGET_MS.pantryScannerRead);
     expect(AI_CLIENT_TIMEOUT_MS.pantryScannerGenerate).toBeGreaterThan(
       AI_REQUEST_BUDGET_MS.pantryScannerGenerate,

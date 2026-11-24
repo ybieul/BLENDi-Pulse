@@ -101,7 +101,7 @@ describe('pantryScanner.service', () => {
     });
 
     const result = await pantry.generatePantryRecipes({ readId: 'read-1', selected: ['Banana'], added: [] });
-    // CP-1.1.4b: a geração (CP-B5.4) também pode devolver a prévia bloqueada; aqui
+    // CP-1.1.4b: a geração (CP-B7) também pode devolver a prévia bloqueada; aqui
     // é um scan normal (só estreita o tipo).
     if (pantry.isPantryLockedPreview(result)) throw new Error('esperava scan normal');
 

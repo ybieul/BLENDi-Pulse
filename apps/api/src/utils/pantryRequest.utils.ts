@@ -1,5 +1,5 @@
 // apps/api/src/utils/pantryRequest.utils.ts
-// CP-B5.4 — Pantry Scanner em duas etapas: o que a pessoa confirmou na tela
+// CP-B7 — Pantry Scanner em duas etapas: o que a pessoa confirmou na tela
 // (marcados, adicionados à mão, líquido e pedido) e as conferências
 // determinísticas sobre as receitas geradas.
 //
@@ -30,6 +30,16 @@ import { isPlainWater } from './recipeWater.utils';
 /** O nome cita bebida alcoólica (lista do validador, sem negação). */
 export function isAlcoholicItemName(name: string): boolean {
   return findAlcoholMentions(name).some(mention => !mention.negated);
+}
+
+// ─── Item de blend ou "Outros itens na foto" (CP-B7) ─────────────────────────
+
+/**
+ * O item lido serve para shake/smoothie. Leitura gravada antes do CP-B7 (sem
+ * o campo) conta como item de blend: ausente = true.
+ */
+export function isBlendSuitable(ingredient: { blendSuitable?: boolean }): boolean {
+  return ingredient.blendSuitable !== false;
 }
 
 // ─── Líquido na foto ─────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 **Ponto de partida:** até aqui, `POST /pantry-scanner/analyze` fazia tudo numa chamada só: lia a foto, contava o scan e gerava as receitas. Na tela de confirmação, desmarcar ou adicionar um ingrediente não mudava nada, porque as receitas já tinham vindo.
 
-**Nome nos comentários do código:** o trabalho foi feito com o rótulo provisório "CP-B5.4". Os comentários e os nomes dos testes (`pantryScanner.cpB54.test.ts`) usam esse rótulo; ele é o CP-B7 deste relatório. O CP-B7a é a correção feita antes do commit (bebidas na leitura e item adicionado em qualquer idioma).
+**Nome nos comentários do código:** o trabalho foi feito com o rótulo provisório "CP-B5.4"; desde o CP-B7b os comentários e os nomes dos testes usam "CP-B7" (só o arquivo `pantryScanner.cpB54.test.ts` manteve o nome). O CP-B7a é a correção feita antes do commit (bebidas na leitura e item adicionado em qualquer idioma).
 
 **Decisões do Gabriel (23/11):**
 - duas etapas: ler a foto (não conta scan) e gerar (conta);

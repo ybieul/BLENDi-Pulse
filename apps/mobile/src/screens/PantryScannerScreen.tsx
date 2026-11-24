@@ -4,7 +4,7 @@
 // ingredients (confirmação com efeito real) → generating (conta o scan) →
 // recipes. CP-1.1.4b: depois dos scans grátis do ciclo, 1 prévia bloqueada
 // por ciclo — o mesmo fluxo, com cards bloqueados (só macros) nas receitas.
-// CP-B5.4: marcar/desmarcar, adicionar à mão (obrigatório em todas as
+// CP-B7: marcar/desmarcar, adicionar à mão (obrigatório em todas as
 // receitas), líquido quando a foto não mostra, pedido opcional e álcool só
 // para 21+ (mesma folha de idade do Pulse AI).
 
@@ -100,7 +100,7 @@ const NO_RECIPES_ICON_SIZE = 40;
 // CP-1.1.4b: origem da prévia bloqueada nos eventos e no card.
 const PAYWALL_PREVIEW_SOURCE = 'pantry_scanner';
 
-// CP-B5.4: as opções do líquido quando a foto não mostra nenhum.
+// CP-B7: as opções do líquido quando a foto não mostra nenhum.
 const LIQUID_OPTIONS = [
   { value: 'water', labelKey: 'pantryScanner.liquidWater' },
   { value: 'milk', labelKey: 'pantryScanner.liquidMilk' },
@@ -127,11 +127,16 @@ type Step = 'permission' | 'capture' | 'reading' | 'ingredients' | 'generating' 
 
 interface CheckedIngredient extends PantryIngredient {
   checked: boolean;
-  /** CP-B5.4: da lista do validador (backend). Começa desmarcado. */
+  /** CP-B7: da lista do validador (backend). Começa desmarcado. */
   isAlcoholic: boolean;
+  /**
+   * CP-B7: serve para shake/smoothie. false = grupo "Outros itens na foto",
+   * recolhido e desmarcado (a pessoa pode marcar).
+   */
+  blendSuitable: boolean;
 }
 
-/** CP-B5.4: o que a folha de idade faz depois da resposta. */
+/** CP-B7: o que a folha de idade faz depois da resposta. */
 interface AgeSheetState {
   /** Item alcoólico que a pessoa tentou marcar. */
   pendingIndex: number | null;
@@ -185,7 +190,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [resetDate, setResetDate] = useState<string | undefined>(undefined);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [newIngredientText, setNewIngredientText] = useState('');
-  // CP-B5.4: leitura confirmada na tela.
+  // CP-B7: leitura confirmada na tela.
   const [readId, setReadId] = useState<string | null>(null);
   const [readExpiresAt, setReadExpiresAt] = useState<string | null>(null);
   const [hasLiquid, setHasLiquid] = useState(true);
@@ -196,6 +201,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [nextIsPreview, setNextIsPreview] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [ageSheet, setAgeSheet] = useState<AgeSheetState | null>(null);
+  // CP-B7: grupo "Outros itens na foto" começa recolhido.
+  const [otherItemsExpanded, setOtherItemsExpanded] = useState(false);
   // CP-1.1.4b: prévia bloqueada (só macros) e a última prévia guardada.
   const [lockedPreview, setLockedPreview] = useState<LockedPreviewState | null>(null);
   const [previewRecipes, setPreviewRecipes] = useState<PulseAiRecipePreview[]>([]);
@@ -254,7 +261,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     [t],
   );
 
-  // ── Reading: lê a foto quando a etapa vira 'reading' (CP-B5.4) ────────────
+  // ── Reading: lê a foto quando a etapa vira 'reading' (CP-B7) ────────────
   useEffect(() => {
     if (step !== 'reading' || !capturedBase64) return;
 
@@ -279,8 +286,13 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
           return;
         }
 
-        // Bebida alcoólica começa desmarcada (só 21+ marca).
-        setIngredients(result.ingredients.map((i) => ({ ...i, checked: !i.isAlcoholic })));
+        // Bebida alcoólica começa desmarcada (só 21+ marca). CP-B7: o que não
+        // serve para shake vai para "Outros itens na foto", desmarcado.
+        setIngredients(result.ingredients.map((i) => {
+          const blendSuitable = i.blendSuitable !== false;
+          return { ...i, blendSuitable, checked: blendSuitable && !i.isAlcoholic };
+        }));
+        setOtherItemsExpanded(false);
         setReadId(result.readId);
         setReadExpiresAt(result.readExpiresAt ?? null);
         setHasLiquid(result.hasLiquid);
@@ -395,7 +407,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
     try {
       const unlocked = await unlockPantryPreview(lastPreview.previewId);
-      setIngredients(unlocked.ingredients.map((i) => ({ ...i, checked: true, isAlcoholic: false })));
+      setIngredients(unlocked.ingredients.map((i) => ({ ...i, checked: true, isAlcoholic: false, blendSuitable: true })));
       setReadId(null);
       setRecipes(unlocked.recipes);
       setPreviewRecipes([]);
@@ -450,6 +462,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const confirmedIngredients = ingredients.filter((i) => i.checked);
+  const otherItemsCount = ingredients.filter((i) => !i.blendSuitable).length;
   const recipeIngredientNames = useMemo(
     () => [...confirmedIngredients.map((i) => i.name), ...addedItems],
     [addedItems, confirmedIngredients],
@@ -526,7 +539,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setIngredients((prev) => prev.map((item, i) => (i === index ? { ...item, checked } : item)));
   }, []);
 
-  // CP-B5.4: bebida alcoólica só para 21+. Menor/"Não": desativado. Sem
+  // CP-B7: bebida alcoólica só para 21+. Menor/"Não": desativado. Sem
   // idade: marcar abre a folha de idade (a mesma do Pulse AI).
   const handleToggleIngredient = useCallback((index: number) => {
     const item = ingredients[index];
@@ -555,6 +568,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
     if (readIndex >= 0) {
       if (!ingredients[readIndex].checked) handleToggleIngredient(readIndex);
+      // CP-B7: item de "Outros itens" fica visível ao ser marcado.
+      if (!ingredients[readIndex].blendSuitable) setOtherItemsExpanded(true);
       return;
     }
 
@@ -958,6 +973,34 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       paddingVertical: spacing.md,
       marginBottom: spacing.sm,
     },
+    otherItemsGroup: {
+      marginTop: spacing.md,
+      gap: spacing.sm,
+    },
+    otherItemsHeader: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+      borderRadius: borderRadius.md,
+      backgroundColor: INPUT_BG,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+    },
+    otherItemsTitle: {
+      flex: 1,
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
+    otherItemsHint: {
+      color: themeColors.text.secondary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      lineHeight: 18,
+    },
     addedRow: {
       minHeight: 56,
       flexDirection: 'row',
@@ -1266,7 +1309,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     );
   }
 
-  // ─── Step: ingredients (confirmação — CP-B5.4) ────────────────────────────
+  // ─── Step: ingredients (confirmação — CP-B7) ────────────────────────────
   if (step === 'ingredients') {
     const scanNotice = isFreeTier
       ? nextIsPreview
@@ -1312,6 +1355,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               <Text style={styles.sectionSubtitle}>{t('pantryScanner.confirmIngredients')}</Text>
 
               {ingredients.map((item, index) => {
+                if (!item.blendSuitable) return null;
                 const alcoholDisabled = item.isAlcoholic && alcoholAge === 'under-age';
                 return (
                   <IngredientCheckItem
@@ -1329,6 +1373,46 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
                   />
                 );
               })}
+
+              {otherItemsCount > 0 ? (
+                <View style={styles.otherItemsGroup} testID="pantry-other-items">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('pantryScanner.otherItemsTitle', { count: otherItemsCount })}
+                    accessibilityHint={t('pantryScanner.otherItemsA11yHint')}
+                    accessibilityState={{ expanded: otherItemsExpanded }}
+                    onPress={() => setOtherItemsExpanded((expanded) => !expanded)}
+                    style={styles.otherItemsHeader}
+                    testID="pantry-other-items-toggle"
+                  >
+                    <Text style={styles.otherItemsTitle}>
+                      {t('pantryScanner.otherItemsTitle', { count: otherItemsCount })}
+                    </Text>
+                    <Ionicons
+                      name={otherItemsExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={18}
+                      color={themeColors.text.secondary}
+                    />
+                  </Pressable>
+
+                  {otherItemsExpanded ? (
+                    <>
+                      <Text style={styles.otherItemsHint}>{t('pantryScanner.otherItemsHint')}</Text>
+                      {ingredients.map((item, index) => (
+                        item.blendSuitable ? null : (
+                          <IngredientCheckItem
+                            key={`${item.name}-${index}`}
+                            ingredient={item}
+                            checked={item.checked}
+                            onToggle={() => handleToggleIngredient(index)}
+                            testID={`pantry-ingredient-${index}`}
+                          />
+                        )
+                      ))}
+                    </>
+                  ) : null}
+                </View>
+              ) : null}
 
               {addedItems.map((name) => (
                 <View key={`added-${name}`} style={styles.addedRow} testID="pantry-added-item">

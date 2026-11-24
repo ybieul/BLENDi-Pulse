@@ -12,7 +12,7 @@
 /** Orçamento total de tempo de IA por requisição, no servidor. */
 export const AI_REQUEST_BUDGET_MS = {
   pulseAiChat: 55_000,
-  // CP-B5.4: o Pantry passou a ter duas etapas. A leitura é só a visão; a
+  // CP-B7: o Pantry passou a ter duas etapas. A leitura é só a visão; a
   // geração herda o teto de antes (geração + novas tentativas).
   pantryScannerRead: 30_000,
   pantryScannerGenerate: 85_000,

@@ -44,7 +44,7 @@ const PANTRY_SCANNER_ERROR_TRANSLATION_KEYS = {
   // CP-1.1.4b: desbloqueio da prévia — expirada/inexistente e ainda não Pro.
   'scanner/preview-not-found': 'errors.scanner_preview_expired',
   'scanner/preview-locked': 'errors.scanner_preview_locked',
-  // CP-B5.4: leitura e geração em duas etapas.
+  // CP-B7: leitura e geração em duas etapas.
   'scanner/read-limit-reached': 'errors.scanner_read_limit_reached',
   'scanner/read-rate-limited': 'errors.scanner_read_rate_limited',
   'scanner/read-daily-limit': 'errors.scanner_read_daily_limit',
@@ -66,7 +66,7 @@ interface ApiErrorResponse {
 /** CP-1.1.4b: código do desbloqueio para prévia expirada, inexistente ou de outro recurso. */
 export const PANTRY_PREVIEW_NOT_FOUND_CODE = 'scanner/preview-not-found';
 
-/** CP-B5.4: códigos que a tela trata além do texto. */
+/** CP-B7: códigos que a tela trata além do texto. */
 export const PANTRY_READ_EXPIRED_CODE = 'scanner/read-expired';
 export const PANTRY_READ_LIMIT_REACHED_CODE = 'scanner/read-limit-reached';
 export const PANTRY_MONTHLY_LIMIT_REACHED_CODE = 'scanner/monthly-limit-reached';
@@ -96,7 +96,7 @@ interface PantryPreviewUnlockResponse {
 }
 
 /**
- * CP-B5.4: resultado da geração completa. `readId` é o id novo para editar e
+ * CP-B7: resultado da geração completa. `readId` é o id novo para editar e
  * gerar de novo sem nova foto (o anterior já foi usado).
  */
 export type PantryGeneratedResult = PantryAnalysisResult & { readId?: string; readExpiresAt?: string };
@@ -264,7 +264,7 @@ export async function compressAndEncodeImage(
 }
 
 /**
- * CP-B5.4: lê a foto (só a visão). Não conta scan; conta no limite de
+ * CP-B7: lê a foto (só a visão). Não conta scan; conta no limite de
  * leituras do plano. Devolve o readId e os ingredientes para a confirmação.
  */
 export async function readPantryPhoto(
@@ -285,7 +285,7 @@ export async function readPantryPhoto(
 }
 
 /**
- * CP-B5.4: gera as receitas a partir da leitura confirmada. Conta o scan (ou
+ * CP-B7: gera as receitas a partir da leitura confirmada. Conta o scan (ou
  * a prévia do free). 428 scanner/age-confirmation-required: a tela pergunta a
  * idade (mesma folha e POST do Pulse AI) e reenvia.
  */

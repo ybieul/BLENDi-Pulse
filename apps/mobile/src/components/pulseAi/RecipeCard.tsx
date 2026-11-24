@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import type { PulseAiRecipe, PulseAiRecipePreview } from '@blendi/shared';
+import type {
+  PulseAiRecipe,
+  PulseAiRecipePreview,
+  RecipeTargetSuggestion,
+  RecipeUnmetTarget,
+} from '@blendi/shared';
 
 import {
   colors,
@@ -71,6 +76,43 @@ interface MacroPillData {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   value: number;
   unit: string;
+}
+
+// CP-B7: sugestão do Pantry (código do backend) → chave de tradução.
+const UNMET_TARGET_SUGGESTION_KEYS: Record<RecipeTargetSuggestion, TranslationKey> = {
+  whey_or_protein_powder: 'pulseAi.unmetTargetSuggestionItem.wheyOrProteinPowder',
+  plant_protein_powder: 'pulseAi.unmetTargetSuggestionItem.plantProteinPowder',
+  oats_or_banana: 'pulseAi.unmetTargetSuggestionItem.oatsOrBanana',
+  peanut_butter: 'pulseAi.unmetTargetSuggestionItem.peanutButter',
+  avocado_or_chia: 'pulseAi.unmetTargetSuggestionItem.avocadoOrChia',
+  oats_or_peanut_butter: 'pulseAi.unmetTargetSuggestionItem.oatsOrPeanutButter',
+};
+
+/**
+ * CP-B7: texto do valor pedido que a receita não atingiu — "Chegamos a 19,8 g
+ * de proteína (você pediu 30 g)." e, no Pantry, "Adicionar whey ou proteína
+ * em pó ajudaria." Os números vêm do backend; só a frase é do app.
+ */
+function useUnmetTargetText() {
+  const { t } = useAppTranslation();
+  const { formatDecimal } = useFormatNumbers();
+
+  return (target: RecipeUnmetTarget): string => {
+    const unit = t(target.nutrient === 'calories' ? 'common.units.kilocalories' : 'common.units.grams');
+    const withUnit = (value: number) => `${formatDecimal(value)} ${unit}`;
+    const asked = target.kind === 'range'
+      ? t('pulseAi.unmetTargetAsked.range', {
+          min: withUnit(target.requested),
+          max: withUnit(target.requestedMax ?? target.requested),
+        })
+      : t(`pulseAi.unmetTargetAsked.${target.kind}`, { value: withUnit(target.requested) });
+    const sentence = t(`pulseAi.unmetTarget.${target.nutrient}`, { delivered: withUnit(target.delivered), asked });
+    const suggestionKey = target.suggestion ? UNMET_TARGET_SUGGESTION_KEYS[target.suggestion] : undefined;
+
+    return suggestionKey
+      ? `${sentence} ${t('pulseAi.unmetTargetSuggestion', { item: t(suggestionKey) })}`
+      : sentence;
+  };
 }
 
 export interface RecipeCardProps {
@@ -334,6 +376,9 @@ export function RecipeCard({
   const missingRequestedItems = (recipe.missingRequestedIngredients ?? [])
     .map((item) => item.trim())
     .filter(Boolean);
+  // CP-B7: valor pedido não atingido (só o backend preenche).
+  const unmetTargetText = useUnmetTargetText();
+  const unmetTargets = recipe.unmetTargets ?? [];
   const isFavoriteMutationPending = addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
   const shoppingListIngredients = useMemo(
     () => recipe.ingredients.map((ingredient) => ({
@@ -639,6 +684,14 @@ export function RecipeCard({
           text={t('pulseAi.missingRequestedNotice', { items: missingRequestedItems.join(', ') })}
         />
       ) : null}
+
+      {unmetTargets.map((target) => (
+        <RecipeRequestNotice
+          key={`unmet-${target.nutrient}`}
+          testID={`recipe-unmet-target-notice-${target.nutrient}`}
+          text={unmetTargetText(target)}
+        />
+      ))}
 
       {recipe.alcoholFreeVersion ? (
         <RecipeRequestNotice testID="recipe-alcohol-free-notice" text={t('pulseAi.alcoholFreeNotice')} />

@@ -1,4 +1,4 @@
-// Apoio aos testes do Pantry Scanner (CP-B5.4): PantryRead falso em memória
+// Apoio aos testes do Pantry Scanner (CP-B7): PantryRead falso em memória
 // e o fluxo de duas etapas (POST /read → POST /generate) que substituiu o
 // antigo POST /analyze. Não é um arquivo de teste (não roda sozinho).
 import type { NextFunction, Request, Response } from 'express';
@@ -9,7 +9,7 @@ type Filter = Record<string, unknown>;
 export interface FakePantryReadDoc {
   _id: mongoose.Types.ObjectId;
   userId: string;
-  ingredients: Array<{ name: string; estimatedQuantity?: string; confidence: string; isAlcoholic: boolean }>;
+  ingredients: Array<{ name: string; estimatedQuantity?: string; confidence: string; isAlcoholic: boolean; blendSuitable?: boolean }>;
   hasLiquid: boolean;
   consumedAt: Date | null;
   expiresAt: Date;

@@ -52,6 +52,37 @@ export const RECIPE_TITLE_SIZE_WORDS = [
  */
 export const RECIPE_MISSING_REQUEST_MAX_ITEMS = 10;
 
+// ─── CP-B7: valores pedidos (proteína, carboidrato, gordura, calorias) ──────
+
+/** Nutrientes que a pessoa pode pedir com valor ("30 g de proteína", "400 kcal"). */
+export const recipeTargetNutrientValues = ['protein', 'carbs', 'fat', 'calories'] as const;
+export type RecipeTargetNutrient = (typeof recipeTargetNutrientValues)[number];
+
+/**
+ * Tipo do pedido: exato ("30 g"), mínimo ("pelo menos 30 g"), máximo ("até
+ * 300 kcal") ou faixa ("entre 20 e 30 g").
+ */
+export const recipeTargetKindValues = ['exact', 'min', 'max', 'range'] as const;
+export type RecipeTargetKind = (typeof recipeTargetKindValues)[number];
+
+/**
+ * Sugestão simples do Pantry Scanner quando o valor pedido não foi atingido
+ * por falta de ingrediente ("Adicionar whey ou proteína em pó ajudaria").
+ * Escolhida pelo backend respeitando a dieta; o app só traduz.
+ */
+export const recipeTargetSuggestionValues = [
+  'whey_or_protein_powder',
+  'plant_protein_powder',
+  'oats_or_banana',
+  'peanut_butter',
+  'avocado_or_chia',
+  'oats_or_peanut_butter',
+] as const;
+export type RecipeTargetSuggestion = (typeof recipeTargetSuggestionValues)[number];
+
+/** No máximo um aviso por nutriente. */
+export const RECIPE_UNMET_TARGETS_MAX_ITEMS = recipeTargetNutrientValues.length;
+
 /** Calorias por grama de álcool puro (etanol), somadas à conferência de macros. */
 export const ALCOHOL_KCAL_PER_GRAM = 7;
 

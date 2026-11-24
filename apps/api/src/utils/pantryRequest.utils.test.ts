@@ -1,4 +1,4 @@
-// CP-B5.4 — conferências do Pantry com a normalização do validador.
+// CP-B7 — conferências do Pantry com a normalização do validador.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -9,11 +9,12 @@ import {
   hasPhotoLiquid,
   identifyingTokens,
   isAlcoholicItemName,
+  isBlendSuitable,
 } from './pantryRequest.utils';
 
 const recipe = (...names: string[]) => ({ ingredients: names.map(name => ({ name, amount: '1' })) });
 
-describe('pantryRequest.utils (CP-B5.4)', () => {
+describe('pantryRequest.utils (CP-B7)', () => {
   it('bebida alcoólica pela lista do validador, com os falsos amigos', () => {
     for (const name of ['Rum', 'Cachaça 51', 'Vinho tinto', 'Vodka', 'Cerveja']) assert.equal(isAlcoholicItemName(name), true, name);
     for (const name of ['Ginger beer', 'Root beer', 'Cerveja sem álcool', 'Cerveja 0,0', 'Beer 0.0', 'Água tônica', 'Refrigerante de guaraná', 'Essência de rum', 'Gengibre', 'Vinagre de vinho']) {
@@ -54,5 +55,11 @@ describe('pantryRequest.utils (CP-B5.4)', () => {
       // A visão não decide álcool: nenhum campo novo no JSON.
       assert.ok(!prompt.includes('isAlcoholic'));
     }
+  });
+
+  it('CP-B7: item de blend ou "Outros itens"; leitura antiga sem o campo = item de blend', () => {
+    assert.equal(isBlendSuitable({}), true);
+    assert.equal(isBlendSuitable({ blendSuitable: true }), true);
+    assert.equal(isBlendSuitable({ blendSuitable: false }), false);
   });
 });
