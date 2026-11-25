@@ -31,6 +31,15 @@ const GOOGLE_TRANSIENT_RETRY_JITTER_RATIO = 0.25;
 // a cota é por modelo, então 429 ainda leva ao modelo reserva, se houver.
 const GOOGLE_TRANSIENT_STATUS_CODES: ReadonlySet<number> = new Set([500, 503]);
 const GOOGLE_FALLBACK_STATUS_CODES: ReadonlySet<number> = new Set([429, 500, 503]);
+
+// Modelo reserva sem "thinking". Em modelos que pensam por padrão (ex.:
+// gemini-3.5-flash), os tokens de raciocínio contam no maxOutputTokens: num
+// teste real, 1325 de 2000 foram gastos pensando, e a receita do Pulse AI
+// chegava cortada (JSON inválido → pulseai/invalid-ai-response). Com
+// thinkingBudget 0 a resposta veio completa em ~2 s em vez de ~8 s. O SDK
+// 0.24 não tipa thinkingConfig, mas repassa o campo como está para a API.
+// Só no reserva: o principal (flash-lite) já não pensa por padrão.
+const GOOGLE_NO_THINKING_CONFIG = { thinkingConfig: { thinkingBudget: 0 } } as Record<string, unknown>;
 // Não começa uma tentativa (nem a espera antes dela) se sobrar menos que isto
 // na janela — uma chamada de geração do Gemini quase nunca termina abaixo disso.
 const AI_MIN_ATTEMPT_BUDGET_MS = 5_000;
@@ -332,7 +341,7 @@ async function callGoogle(
   timeoutMs: number
 ): Promise<AiProviderResponse> {
   const client = new GoogleGenerativeAI(env.AI_API_KEY);
-  const getModel = (modelName: string): GoogleModelCandidate => ({
+  const getModel = (modelName: string, disableThinking = false): GoogleModelCandidate => ({
     name: modelName,
     model: client.getGenerativeModel({
       model: modelName,
@@ -340,6 +349,7 @@ async function callGoogle(
       generationConfig: {
         responseMimeType: 'application/json',
         maxOutputTokens: getMaxTokens(request.maxTokens),
+        ...(disableThinking ? GOOGLE_NO_THINKING_CONFIG : {}),
       },
     }),
   });
@@ -354,7 +364,7 @@ async function callGoogle(
       })),
     },
     timeoutMs,
-    fallbackModelName && fallbackModelName !== env.AI_MODEL ? getModel(fallbackModelName) : undefined
+    fallbackModelName && fallbackModelName !== env.AI_MODEL ? getModel(fallbackModelName, true) : undefined
   );
 
   return {

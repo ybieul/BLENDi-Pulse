@@ -1830,6 +1830,7 @@
     "auth_too_many_registrations": "Muitas contas criadas recentemente. Tente novamente mais tarde.",
     "pulseai_daily_limit": "Você atingiu o limite gratuito de Pulse AI de hoje.",
     "pulseai_unavailable": "O Pulse AI está indisponível no momento. Tente novamente em instantes.",
+    "pulseai_invalid_ai_response": "O Pulse AI não conseguiu montar esta receita. Tente novamente.",
     "pulseai_invalid_message": "Digite uma mensagem entre 1 e 500 caracteres.",
     "pulseai_dietary_restriction_unmet": "Não conseguimos montar uma receita que respeite a sua dieta e o seu BLENDi desta vez. Tente pedir de outro jeito.",
     "pulseai_dietary_restriction_unmet_generic": "Não conseguimos montar uma receita que respeite a sua dieta e o seu liquidificador portátil desta vez. Tente pedir de outro jeito.",

@@ -174,6 +174,14 @@ describe('aiProvider — sobrecarga do Gemini (CP-B1)', () => {
     // Mesmo system prompt e config no modelo reserva.
     const backupConfig = modelConfigs.find(config => config.model === 'backup-model');
     assert.equal(backupConfig?.systemInstruction, REQUEST.systemPrompt);
+    // Reserva sem thinking (senão o raciocínio come o maxOutputTokens e o JSON
+    // chega cortado); o principal fica sem thinkingConfig.
+    assert.deepEqual(
+      (backupConfig?.generationConfig as Record<string, unknown>)?.thinkingConfig,
+      { thinkingBudget: 0 }
+    );
+    const primaryConfig = modelConfigs.find(config => config.model === 'primary-model');
+    assert.equal((primaryConfig?.generationConfig as Record<string, unknown>)?.thinkingConfig, undefined);
   });
 
   it('reserva definida: 429 no principal vai direto para a reserva (cota é por modelo)', async () => {

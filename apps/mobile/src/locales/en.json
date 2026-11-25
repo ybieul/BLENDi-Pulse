@@ -1830,6 +1830,7 @@
     "auth_too_many_registrations": "Too many accounts created recently. Please try again later.",
     "pulseai_daily_limit": "You've reached today's free Pulse AI limit.",
     "pulseai_unavailable": "Pulse AI is temporarily unavailable. Please try again shortly.",
+    "pulseai_invalid_ai_response": "Pulse AI couldn't put this recipe together. Please try again.",
     "pulseai_invalid_message": "Enter a message between 1 and 500 characters.",
     "pulseai_dietary_restriction_unmet": "We couldn't put together a recipe that fits your diet and your BLENDi this time. Try asking a different way.",
     "pulseai_dietary_restriction_unmet_generic": "We couldn't put together a recipe that fits your diet and your portable blender this time. Try asking a different way.",
