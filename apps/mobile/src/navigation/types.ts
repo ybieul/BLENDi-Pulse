@@ -27,6 +27,8 @@ export type RootStackParamList = {
   WeeklyReport: undefined;
   CompleteProfile: undefined;
   NutritionGoals: undefined;
+  /** CP-B6: alergias do perfil (linha do Me e convite único). */
+  Allergies: undefined;
 };
 
 export type PulseAIStackParamList = {

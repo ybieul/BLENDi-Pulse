@@ -14,6 +14,10 @@ import argon2 from 'argon2';
 // schema) é a correção do CP-A.2.2: desacopla a validação de edição manual
 // do clamp do cálculo automático.
 import {
+  ALLERGY_CODE_VALUES,
+  ALLERGY_CUSTOM_ITEM_MAX_LENGTH,
+  ALLERGY_CUSTOM_MAX_ITEMS,
+  type AllergyCode,
   DAILY_CALORIE_TARGET_MAX,
   DAILY_CALORIE_TARGET_MIN,
   DAILY_CARB_TARGET_MAX,
@@ -148,6 +152,15 @@ export interface IUser {
   otherBlenderModel?: string;
   /** Restrições alimentares aplicadas pelo prompt da Pulse AI/Pantry Scanner. */
   dietaryPreferences: DietaryPreference[];
+  /**
+   * CP-B6: alergias (dado de saúde: nunca em log nem em analytics). Só furadas
+   * por pedido explícito confirmado na hora, por requisição (a confirmação
+   * nunca é gravada). Sai com a conta (campo do próprio documento).
+   * Conta antiga sem o campo = sem alergia.
+   */
+  allergies?: { common: AllergyCode[]; custom: string[] };
+  /** CP-B6: o convite único "Isso é alergia?" (quem marcou nut_free) foi fechado. */
+  allergyInviteDismissedAt?: Date;
   goal: UserGoal;
   /**
    * Objetivo de peso corporal (perder/manter/ganhar) — independente de
@@ -584,6 +597,37 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       required: false,
       trim: true,
       maxlength: [OTHER_BLENDER_MODEL_MAX_LENGTH, 'errors.validation.too_long'],
+    },
+    // CP-B6: alergias. Sem default: ausente = sem alergia (o serializador
+    // devolve { common: [], custom: [] }). Validação completa no Zod
+    // (userAllergiesSchema); aqui só a forma, o enum e os tetos.
+    allergies: {
+      type: new mongoose.Schema(
+        {
+          common: {
+            type: [{ type: String, enum: ALLERGY_CODE_VALUES }],
+            default: [],
+            validate: {
+              validator: (values: string[]) => new Set(values).size === values.length,
+              message: 'errors.validation.invalid_option',
+            },
+          },
+          custom: {
+            type: [{ type: String, trim: true, maxlength: ALLERGY_CUSTOM_ITEM_MAX_LENGTH }],
+            default: [],
+            validate: {
+              validator: (values: string[]) => values.length <= ALLERGY_CUSTOM_MAX_ITEMS,
+              message: 'errors.validation.too_long',
+            },
+          },
+        },
+        { _id: false }
+      ),
+      required: false,
+    },
+    allergyInviteDismissedAt: {
+      type: Date,
+      required: false,
     },
     dietaryPreferences: {
       type: [{ type: String, enum: dietaryPreferenceValues }],

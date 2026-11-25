@@ -31,7 +31,7 @@ function check(
   return validateRecipeRestrictions(recipeWithIngredient(name), diet, model);
 }
 
-function violatedRestrictions(name: string, diet: DietaryPreference[], model: BlendiModel = 'ProPlus'): RecipeRestriction[] {
+function violatedRestrictions(name: string, diet: DietaryPreference[], model: BlendiModel = 'ProPlus'): Array<RecipeRestriction | 'allergy'> {
   const result = check(name, diet, model);
   return result.compliant ? [] : [...new Set(result.violations.map(v => v.restriction))];
 }

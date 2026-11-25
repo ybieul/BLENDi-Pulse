@@ -3,6 +3,7 @@ import { ZodError, z } from 'zod';
 import {
   calculateMacrosSchema,
   dailyPulseTimeSchema,
+  normalizeUserAllergies,
   notificationPreferencesSchema,
   updateUserSchema,
   isWeightGoalAllowedForGoal,
@@ -860,6 +861,8 @@ export async function updateMe(
       blendiOwnership,
       otherBlenderModel,
       dietaryPreferences,
+      allergies,
+      allergyInviteDismissed,
       goal,
       weightGoal,
       dailyProteinTarget,
@@ -880,6 +883,10 @@ export async function updateMe(
 
     const updates: Record<string, unknown> = {
       ...(dietaryPreferences !== undefined && { dietaryPreferences }),
+      // CP-B6: alergias substituem o campo inteiro (já limpas e sem duplicados
+      // pelo userAllergiesSchema). Nunca entram em log.
+      ...(allergies !== undefined && { allergies }),
+      ...(allergyInviteDismissed === true && { allergyInviteDismissedAt: new Date() }),
       ...(goal !== undefined && { goal }),
       ...(dailyProteinTarget !== undefined && { dailyProteinTarget }),
       ...(dailyCalorieTarget !== undefined && { dailyCalorieTarget }),
@@ -1155,6 +1162,8 @@ export async function updateMe(
           blendiOwnership: user.blendiOwnership ?? 'blendi',
           otherBlenderModel: user.otherBlenderModel ?? null,
           dietaryPreferences: user.dietaryPreferences ?? [],
+          allergies: normalizeUserAllergies(user.allergies),
+          allergyInviteDismissed: Boolean(user.allergyInviteDismissedAt),
           goal: user.goal,
           weightGoal: user.weightGoal,
           locale: user.locale,

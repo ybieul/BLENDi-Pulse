@@ -1564,7 +1564,11 @@
       "exampleOffDiet": "Today I want it with whey, even though I'm vegan",
       "exampleA11yHint": "Fills in the message field without sending it",
       "limit": "If it doesn't fit in the cup, the recipe comes as close as possible, with a notice.",
-      "close": "Close"
+      "close": "Close",
+      "allergiesTitle": "Allergies",
+      "allergiesRegister": "Add your allergies under Profile › Allergies. Every recipe leaves those items out.",
+      "allergiesOtherPerson": "Want an item you are allergic to (for someone else, for example)? Write its name in your request and confirm right then. The confirmation is only for that request.",
+      "allergiesDish": "If you ask for a dish that usually has the item (like paçoca), the recipe comes without it, with the option to ask for it."
     },
     "ageConfirmation": {
       "title": "Confirm your age",
@@ -1713,6 +1717,25 @@
       "lastScanTitle": "Recipes from your last scan",
       "lastScanA11yLabel": "Open the recipes from your last scan",
       "lastScanDismiss": "Dismiss recipes from your last scan"
+    },
+    "howToUse": {
+      "button": "How to use",
+      "a11yLabel": "How to use Pantry Scanner",
+      "title": "How to use Pantry",
+      "photo": "Take a photo of your fridge or pantry. Reading the photo does not use a scan.",
+      "mark": "Check the list: tick what you want to use and untick what you don't. An unticked item never goes into a recipe.",
+      "otherItems": "\"Other items in the photo\" groups what doesn't usually go in a shake. Tap to see and tick them.",
+      "added": "Missing something? Add it by hand: an added item goes into every recipe.",
+      "request": "\"Any requests?\" applies to every recipe. Tap an example to fill it in:",
+      "exampleProtein": "With 30 g of protein",
+      "exampleFlavor": "Chocolate flavor",
+      "exampleLight": "Something light, up to 250 kcal",
+      "exampleA11yHint": "Fills in the \"Any requests?\" field",
+      "liquid": "No liquid in the photo? Choose water, milk, a plant-based beverage or no liquid.",
+      "alcohol": "Alcoholic drinks start unticked and are only for people 21 or older.",
+      "allergies": "An item you are allergic to shows \"⚠️ Allergy\", unticked. To use it, tick it and confirm right then.",
+      "scan": "Generating the recipes uses 1 scan.",
+      "close": "Close"
     }
   },
 
@@ -1859,7 +1882,9 @@
     "unexpected_error": "An unexpected error occurred.",
     "request_payload_too_large": "The data sent is too large.",
     "request_invalid_json": "The data sent is invalid.",
-    "resource_not_found": "The requested resource was not found."
+    "resource_not_found": "The requested resource was not found.",
+    "pulseai_allergy_confirmation_required": "This request includes an item you listed as an allergy. Confirm to continue.",
+    "scanner_allergy_confirmation_required": "There is an item you listed as an allergy. Confirm to continue."
   },
 
   "gamification": {
@@ -2122,5 +2147,80 @@
     "paywallTitle": "See your full report",
     "paywallSubtitle": "Every Monday with all the details of your week",
     "paywallButton": "Upgrade to Pro"
+  },
+  "allergies": {
+    "codes": {
+      "peanut": "Peanut",
+      "tree_nuts": "Tree nuts",
+      "milk": "Milk",
+      "lactose": "Lactose",
+      "soy": "Soy",
+      "wheat_gluten": "Wheat/gluten",
+      "sesame": "Sesame",
+      "egg": "Egg"
+    },
+    "inSentence": {
+      "peanut": "peanut",
+      "tree_nuts": "tree nuts",
+      "milk": "milk",
+      "lactose": "lactose",
+      "soy": "soy",
+      "wheat_gluten": "wheat/gluten",
+      "sesame": "sesame",
+      "egg": "egg"
+    },
+    "listAnd": " and ",
+    "picker": {
+      "title": "Do you have any allergies?",
+      "subtitle": "Optional. With an allergy on file, no recipe uses the item unless you ask for it and confirm right then.",
+      "commonLabel": "Most common",
+      "customLabel": "Other items",
+      "customPlaceholder": "E.g. kiwi, shrimp",
+      "customAdd": "Add",
+      "customAddA11y": "Add allergy",
+      "customRemoveA11y": "Remove {{item}}",
+      "customLimit": "You can add up to {{max}} items.",
+      "customDuplicate": "This item is already on the list.",
+      "optionA11y": "Allergy to {{item}}",
+      "honesty": "The app checks by ingredient name. It doesn't know what's inside processed products (flavored whey, granola, plant protein) or whether there was cross-contamination. Always check the labels.",
+      "skip": "Skip"
+    },
+    "confirm": {
+      "title": "Allergy check",
+      "body": "You listed an allergy to {{items}}. This recipe will include {{items}}. Continue?",
+      "confirm": "Yes, include it",
+      "decline": "No, make it without"
+    },
+    "card": {
+      "override_one": "⚠️ Contains {{items}}, which you listed as an allergy.",
+      "override_other": "⚠️ Contains {{items}}, which you listed as allergies.",
+      "suggestion": "{{dish}} usually has {{items}}, which you listed as an allergy. I made it without {{items}}. Want it with {{items}}?",
+      "suggestionButton": "Make it with {{items}}",
+      "suggestionButtonA11yHint": "Asks for the recipe again with {{items}}. You confirm first.",
+      "suggestionMessage": "{{message}} (with {{items}})",
+      "oats": "Use certified gluten-free oats."
+    },
+    "profile": {
+      "screenTitle": "Allergies",
+      "rowLabel": "Allergies",
+      "rowNone": "None",
+      "rowCount_one": "{{count}} item",
+      "rowCount_other": "{{count}} items",
+      "save": "Save",
+      "saved": "Allergies saved",
+      "back": "Back",
+      "unsavedTitle": "Discard changes?",
+      "unsavedMessage": "Your allergy changes haven't been saved.",
+      "unsavedDiscard": "Discard",
+      "unsavedKeep": "Keep editing"
+    },
+    "invite": {
+      "title": "Is it an allergy?",
+      "body": "Add it under Allergies for more protection.",
+      "cta": "Add allergy",
+      "dismiss": "Dismiss invite"
+    },
+    "pantryLabel": "⚠️ Allergy",
+    "pantryA11y": "{{name}}, an item you listed as an allergy"
   }
 }

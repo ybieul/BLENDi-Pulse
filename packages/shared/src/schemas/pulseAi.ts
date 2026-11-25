@@ -12,6 +12,14 @@ import {
   type RecipeTargetNutrient,
   type RecipeTargetSuggestion,
 } from '../recipeContent';
+import {
+  ALLERGY_CODE_VALUES,
+  ALLERGY_CUSTOM_ITEM_MAX_LENGTH,
+  ALLERGY_CUSTOM_MAX_ITEMS,
+  allergenSelectionSchema,
+  type AllergenSelection,
+  type AllergyCode,
+} from './allergies';
 
 /** Tamanho máximo da mensagem do Pulse AI (também o do pedido opcional do Pantry Scanner). */
 export const PULSE_AI_MESSAGE_MAX = 500;
@@ -23,9 +31,21 @@ export const pulseAiChatSchema = z.object({
     .min(1, 'errors.validation.required')
     .max(PULSE_AI_MESSAGE_MAX, 'errors.validation.too_long'),
   language: z.enum(['en', 'pt-BR']).optional(),
+  /**
+   * CP-B6: alérgenos que a pessoa confirmou na folha ("Sim, incluir") para
+   * ESTA mensagem. Nunca gravado. O backend só aceita os que a mensagem
+   * cita e que estão cadastrados.
+   */
+  allergyOverride: allergenSelectionSchema.optional(),
+  /**
+   * CP-B6: alérgenos citados na mensagem que a pessoa recusou na folha
+   * ("Não, fazer sem"): a receita sai sem eles e sem a sugestão de incluir.
+   */
+  allergyDeclined: allergenSelectionSchema.optional(),
 });
 
-export type PulseAiChatInput = z.infer<typeof pulseAiChatSchema>;
+export type PulseAiChatInput = z.input<typeof pulseAiChatSchema>;
+export type PulseAiChatParsed = z.output<typeof pulseAiChatSchema>;
 
 /**
  * CP-B5: resposta única à pergunta "Tenho 21 anos ou mais" (só para quem não
@@ -118,11 +138,53 @@ export interface PulseAiRecipe {
    * vier da IA é descartado). O app mostra "Chegamos a X (você pediu Y)".
    */
   unmetTargets?: RecipeUnmetTarget[];
+  /**
+   * CP-B6: alérgenos cadastrados que a receita contém porque a pessoa os
+   * pediu na mensagem atual E confirmou na hora. Marcado pelo backend (o que
+   * vier da IA é descartado). O app mostra o aviso forte "⚠️ Contém X, que
+   * você cadastrou como alergia".
+   */
+  allergyOverride?: AllergenSelection;
+  /**
+   * CP-B6: o pedido cita um prato/produto que normalmente leva um alérgeno
+   * cadastrado (paçoca, creme de avelã...) sem nomear o alérgeno. A receita
+   * saiu SEM ele; o app oferece "Quer com X?". Marcado pelo backend.
+   */
+  allergySuggestion?: RecipeAllergySuggestion;
+  /**
+   * CP-B6: alergia a trigo/glúten e a receita tem aveia — "Use aveia
+   * certificada sem glúten". Marcado pelo backend.
+   */
+  glutenFreeOatsNotice?: boolean;
   steps?: Array<{
     text: string;
     pulseCount?: number;
   }>;
 }
+
+/** CP-B6: prato/produto pedido que normalmente leva alérgeno cadastrado. */
+export interface RecipeAllergySuggestion {
+  /** Nome do prato/produto no idioma da receita ("Paçoca", "Hazelnut spread"). */
+  dish: string;
+  allergens: AllergyCode[];
+}
+
+/** No máximo um prato por receita (o primeiro citado). */
+export const RECIPE_ALLERGY_SUGGESTION_DISH_MAX_LENGTH = 60;
+
+const recipeAllergySuggestionSchema: z.ZodType<RecipeAllergySuggestion> = z
+  .object({
+    dish: z.string().trim().min(1).max(RECIPE_ALLERGY_SUGGESTION_DISH_MAX_LENGTH),
+    allergens: z.array(z.enum(ALLERGY_CODE_VALUES)).min(1).max(ALLERGY_CODE_VALUES.length),
+  })
+  .strict();
+
+const recipeAllergyOverrideSchema: z.ZodType<AllergenSelection> = z
+  .object({
+    common: z.array(z.enum(ALLERGY_CODE_VALUES)).max(ALLERGY_CODE_VALUES.length),
+    custom: z.array(z.string().trim().min(1).max(ALLERGY_CUSTOM_ITEM_MAX_LENGTH)).max(ALLERGY_CUSTOM_MAX_ITEMS),
+  })
+  .strict();
 
 const pulseAiIngredientSchema = z.object({
   name: z
@@ -245,6 +307,9 @@ export const pulseAiRecipeSchema: z.ZodType<PulseAiRecipe> = z.object({
     .array(recipeUnmetTargetSchema)
     .max(RECIPE_UNMET_TARGETS_MAX_ITEMS, 'errors.validation.too_long')
     .optional(),
+  allergyOverride: recipeAllergyOverrideSchema.optional(),
+  allergySuggestion: recipeAllergySuggestionSchema.optional(),
+  glutenFreeOatsNotice: z.boolean({ invalid_type_error: 'errors.validation.invalid_option' }).optional(),
   steps: z.array(pulseAiStepSchema).optional(),
 });
 // ─── Prévia bloqueada (CP-1.1.4a — "Wow Moment Paywall") ─────────────────────

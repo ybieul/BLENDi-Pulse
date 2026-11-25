@@ -41,8 +41,15 @@ export function prepareAiRecipePayload(payload: unknown): unknown {
     missingRequestedIngredients: _ignoredMissing,
     // CP-B7: o aviso de valor pedido não atingido também.
     unmetTargets: _ignoredUnmetTargets,
+    // CP-B6: os avisos de alergia são só do backend (nunca da IA).
+    allergyOverride: _ignoredAllergyOverride,
+    allergySuggestion: _ignoredAllergySuggestion,
+    glutenFreeOatsNotice: _ignoredOats,
     ...recipe
   } = payload as Record<string, unknown>;
+  void _ignoredAllergyOverride;
+  void _ignoredAllergySuggestion;
+  void _ignoredOats;
   void _ignoredWater;
   void _ignoredDietOverride;
   void _ignoredAlcoholFree;

@@ -35,6 +35,13 @@ export interface CacheKeyInput {
    * de ser lidas e expiram pelo TTL. Ausente = chave igual à de antes.
    */
   alcoholTier?: AlcoholCacheTier;
+  /**
+   * CP-B6: alergias cadastradas e a escolha desta requisição (confirmadas e
+   * recusadas na folha). Entram na chave só como hash (':allergy-<sha256>'
+   * no fim): mudar as alergias ou a resposta da folha muda a chave. Vazio ou
+   * ausente = chave igual à de antes (quem não tem alergia não perde o cache).
+   */
+  allergyParts?: readonly string[];
 }
 
 export type AlcoholCacheTier = 'of-age' | 'not-of-age';
@@ -68,8 +75,8 @@ function buildDietaryFlagsHash(dietaryFlags: string[]): string {
 /**
  * Entrada: metadados determinísticos da query do usuário.
  * Saída: cacheKey estável no formato userId:model:goal:language:unitSystem:weightGoal:aiProvider:aiModel:messageHash:dietaryFlagsHash,
- * com ':generic' no fim para conta sem BLENDi (CP-B3) e ':alcohol21'/':noalcohol'
- * por último (CP-B5).
+ * com ':generic' no fim para conta sem BLENDi (CP-B3), ':alcohol21'/':noalcohol'
+ * (CP-B5) e ':allergy-<hash>' por último (CP-B6, só com alergia cadastrada).
  */
 export function generateCacheKey({
   userId,
@@ -84,6 +91,7 @@ export function generateCacheKey({
   dietaryFlags = [],
   genericBlender = false,
   alcoholTier,
+  allergyParts = [],
 }: CacheKeyInput): string {
   const messageHash = sha256(normalizeText(rawMessage));
   const dietaryFlagsHash = buildDietaryFlagsHash(dietaryFlags);
@@ -101,6 +109,7 @@ export function generateCacheKey({
     dietaryFlagsHash,
     ...(genericBlender ? ['generic'] : []),
     ...(alcoholTier ? [alcoholTier === 'of-age' ? 'alcohol21' : 'noalcohol'] : []),
+    ...(allergyParts.length > 0 ? [`allergy-${sha256(allergyParts.join('|'))}`] : []),
   ].join(':');
 }
 
@@ -152,6 +161,7 @@ export async function setInCache({
   dietaryFlags = [],
   genericBlender = false,
   alcoholTier,
+  allergyParts = [],
   response,
 }: SetInCacheInput): Promise<void> {
   const expectedCacheKey = generateCacheKey({
@@ -167,6 +177,7 @@ export async function setInCache({
     dietaryFlags,
     genericBlender,
     alcoholTier,
+    allergyParts,
   });
 
   if (cacheKey !== expectedCacheKey) {

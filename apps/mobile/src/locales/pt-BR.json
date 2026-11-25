@@ -1564,7 +1564,11 @@
       "exampleOffDiet": "Hoje quero com whey, mesmo sendo vegano",
       "exampleA11yHint": "Preenche o campo de mensagem sem enviar",
       "limit": "Se não couber no copo, a receita vem o mais perto possível, com um aviso.",
-      "close": "Fechar"
+      "close": "Fechar",
+      "allergiesTitle": "Alergias",
+      "allergiesRegister": "Cadastre suas alergias em Perfil › Alergias. Toda receita sai sem esses itens.",
+      "allergiesOtherPerson": "Quer um item da sua alergia (para outra pessoa, por exemplo)? Escreva o nome dele no pedido e confirme na hora. A confirmação vale só para aquele pedido.",
+      "allergiesDish": "Se pedir um prato que costuma levar o item (como paçoca), a receita vem sem ele, com a opção de pedir com ele."
     },
     "ageConfirmation": {
       "title": "Confirme sua idade",
@@ -1713,6 +1717,25 @@
       "lastScanTitle": "Receitas do seu último scan",
       "lastScanA11yLabel": "Abrir as receitas do seu último scan",
       "lastScanDismiss": "Dispensar as receitas do seu último scan"
+    },
+    "howToUse": {
+      "button": "Como usar",
+      "a11yLabel": "Como usar o Pantry Scanner",
+      "title": "Como usar o Pantry",
+      "photo": "Tire uma foto da geladeira ou da despensa. Ler a foto não gasta scan.",
+      "mark": "Confira a lista: marque o que quer usar e desmarque o que não quer. Item desmarcado nunca entra na receita.",
+      "otherItems": "\"Outros itens na foto\" junta o que não costuma ir no shake. Toque para ver e marcar.",
+      "added": "Faltou algo? Adicione à mão: item adicionado entra em todas as receitas.",
+      "request": "\"Algum pedido?\" vale para todas as receitas. Toque num exemplo para preencher:",
+      "exampleProtein": "Com 30 g de proteína",
+      "exampleFlavor": "Sabor chocolate",
+      "exampleLight": "Algo leve, até 250 kcal",
+      "exampleA11yHint": "Preenche o campo \"Algum pedido?\"",
+      "liquid": "Sem líquido na foto? Escolha água, leite, bebida vegetal ou sem líquido.",
+      "alcohol": "Bebida alcoólica começa desmarcada e só entra para quem tem 21 anos ou mais.",
+      "allergies": "Item da sua alergia aparece com \"⚠️ Alergia\", desmarcado. Para usar, marque e confirme na hora.",
+      "scan": "Gerar as receitas conta 1 scan.",
+      "close": "Fechar"
     }
   },
 
@@ -1859,7 +1882,9 @@
     "unexpected_error": "Ocorreu um erro inesperado.",
     "request_payload_too_large": "Os dados enviados são grandes demais.",
     "request_invalid_json": "Os dados enviados são inválidos.",
-    "resource_not_found": "O recurso solicitado não foi encontrado."
+    "resource_not_found": "O recurso solicitado não foi encontrado.",
+    "pulseai_allergy_confirmation_required": "Este pedido inclui um item que você cadastrou como alergia. Confirme para continuar.",
+    "scanner_allergy_confirmation_required": "Há um item que você cadastrou como alergia. Confirme para continuar."
   },
 
   "gamification": {
@@ -2122,5 +2147,80 @@
     "paywallTitle": "Veja seu relatório completo",
     "paywallSubtitle": "Cada segunda com todos os detalhes da sua semana",
     "paywallButton": "Fazer upgrade"
+  },
+  "allergies": {
+    "codes": {
+      "peanut": "Amendoim",
+      "tree_nuts": "Castanhas",
+      "milk": "Leite",
+      "lactose": "Lactose",
+      "soy": "Soja",
+      "wheat_gluten": "Trigo/glúten",
+      "sesame": "Gergelim",
+      "egg": "Ovo"
+    },
+    "inSentence": {
+      "peanut": "amendoim",
+      "tree_nuts": "castanhas",
+      "milk": "leite",
+      "lactose": "lactose",
+      "soy": "soja",
+      "wheat_gluten": "trigo/glúten",
+      "sesame": "gergelim",
+      "egg": "ovo"
+    },
+    "listAnd": " e ",
+    "picker": {
+      "title": "Você tem alguma alergia?",
+      "subtitle": "Opcional. Com alergia cadastrada, nenhuma receita usa o item, a não ser que você peça e confirme na hora.",
+      "commonLabel": "Mais comuns",
+      "customLabel": "Outros itens",
+      "customPlaceholder": "Ex.: kiwi, camarão",
+      "customAdd": "Adicionar",
+      "customAddA11y": "Adicionar alergia",
+      "customRemoveA11y": "Remover {{item}}",
+      "customLimit": "Você pode cadastrar até {{max}} itens.",
+      "customDuplicate": "Esse item já está na lista.",
+      "optionA11y": "Alergia a {{item}}",
+      "honesty": "O app confere pelo nome do ingrediente. Ele não sabe o que há dentro de produtos industrializados (whey saborizado, granola, proteína vegetal) nem se houve contaminação cruzada. Sempre confira os rótulos.",
+      "skip": "Pular"
+    },
+    "confirm": {
+      "title": "Confirmar alergia",
+      "body": "Você cadastrou alergia a {{items}}. Essa receita vai levar {{items}}. Continuar?",
+      "confirm": "Sim, incluir",
+      "decline": "Não, fazer sem"
+    },
+    "card": {
+      "override_one": "⚠️ Contém {{items}}, item que você cadastrou como alergia.",
+      "override_other": "⚠️ Contém {{items}}, itens que você cadastrou como alergia.",
+      "suggestion": "{{dish}} leva {{items}}, que você cadastrou como alergia. Fiz sem {{items}}. Quer com {{items}}?",
+      "suggestionButton": "Quero com {{items}}",
+      "suggestionButtonA11yHint": "Pede a receita de novo com {{items}}. Você confirma antes.",
+      "suggestionMessage": "{{message}} (com {{items}})",
+      "oats": "Use aveia certificada sem glúten."
+    },
+    "profile": {
+      "screenTitle": "Alergias",
+      "rowLabel": "Alergias",
+      "rowNone": "Nenhuma",
+      "rowCount_one": "{{count}} item",
+      "rowCount_other": "{{count}} itens",
+      "save": "Salvar",
+      "saved": "Alergias salvas",
+      "back": "Voltar",
+      "unsavedTitle": "Descartar alterações?",
+      "unsavedMessage": "As alterações nas suas alergias não foram salvas.",
+      "unsavedDiscard": "Descartar",
+      "unsavedKeep": "Continuar editando"
+    },
+    "invite": {
+      "title": "Isso é alergia?",
+      "body": "Cadastre em Alergias para mais proteção.",
+      "cta": "Cadastrar alergia",
+      "dismiss": "Fechar convite"
+    },
+    "pantryLabel": "⚠️ Alergia",
+    "pantryA11y": "{{name}}, item que você cadastrou como alergia"
   }
 }

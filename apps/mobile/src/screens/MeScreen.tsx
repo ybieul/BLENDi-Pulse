@@ -53,7 +53,8 @@ import {
   fonts,
   fontWeights,
 } from "@blendi/shared";
-import type { BlendiOwnership, DietaryPreference, UserGoal } from "@blendi/shared";
+import type { BlendiOwnership, DietaryPreference, UserAllergies, UserGoal } from "@blendi/shared";
+import { hasAllergies } from "@blendi/shared";
 
 import { useColors } from "../hooks/useColors";
 import { api } from "../config/api";
@@ -97,6 +98,7 @@ import { usePulseProPurchase } from "../hooks/usePulseProPurchase";
 import { DailyPulseTimeSheet } from "../components/me/DailyPulseTimeSheet";
 import { DeleteAccountSheet } from "../components/me/DeleteAccountSheet";
 import { formatUsdCurrency } from "../utils/pricing.utils";
+import { countAllergens, readProfileAllergies } from "../utils/allergies.utils";
 import {
   cacheProfilePhoto,
   clearProfilePhotoCache,
@@ -232,6 +234,9 @@ interface UserProfileData {
   blendiOwnership?: BlendiOwnership;
   otherBlenderModel?: string | null;
   dietaryPreferences?: DietaryPreference[];
+  /** CP-B6 */
+  allergies?: UserAllergies;
+  allergyInviteDismissed?: boolean;
   goal: UserGoal;
   preferredLanguage: string;
   timezone: string;
@@ -469,6 +474,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const { formatCount } = useFormatNumbers();
   const { formatMonthYear } = useDateFormat();
   const authUser = useAuthStore((state) => state.user);
+  const [allergyInviteHidden, setAllergyInviteHidden] = useState(false);
   const logout = useAuthStore((state) => state.logout);
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const updateUserProfile = useAuthStore((state) => state.updateUserProfile);
@@ -690,6 +696,36 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
     formatCount(profile?.dailyCalorieTarget ?? authUser?.dailyCalorieTarget ?? 0) +
     " " +
     t("common.units.kilocalories");
+
+  // CP-B6: linha "Alergias" e o convite único para quem marcou nut_free e
+  // não cadastrou alergia. Fechado: gravado no usuário (allergyInviteDismissed);
+  // se o PATCH falhar, fica escondido nesta sessão (fallback seguro: o
+  // convite é só um atalho, nunca bloqueia nada).
+  const profileAllergies = readProfileAllergies(profile ?? authUser);
+  const allergyCount = countAllergens(profileAllergies);
+  const allergiesSummary = allergyCount > 0
+    ? t("allergies.profile.rowCount", { count: allergyCount })
+    : t("allergies.profile.rowNone");
+  const showAllergyInvite =
+    !allergyInviteHidden &&
+    !(profile?.allergyInviteDismissed ?? authUser?.allergyInviteDismissed ?? false) &&
+    !hasAllergies(profileAllergies) &&
+    (profile?.dietaryPreferences ?? authUser?.dietaryPreferences ?? []).includes("nut_free");
+
+  const openAllergies = () => {
+    navigation.getParent<RootNavigationProp<"Allergies">>()?.navigate("Allergies");
+  };
+
+  const dismissAllergyInvite = () => {
+    setAllergyInviteHidden(true);
+    updateUserProfile({ allergyInviteDismissed: true });
+    api
+      .patch("/users/me", { allergyInviteDismissed: true })
+      .then(() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userProfile }))
+      .catch(() => {
+        // Fica escondido nesta sessão; volta a aparecer só se o PATCH nunca gravar.
+      });
+  };
 
   const languageDisplayName = t(getLanguageKey(displayLanguage));
   const modelDisplay = getModelDisplay(displayModel, displayOwnership, displayOtherBlenderModel);
@@ -1405,6 +1441,54 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       marginTop: 24,
       paddingHorizontal: 16,
     },
+    allergyInvite: {
+      marginBottom: 16,
+      padding: 16,
+      gap: 8,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: colors.overlay.warning[42],
+      backgroundColor: colors.overlay.warning[8],
+    },
+    allergyInviteHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    allergyInviteTitle: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.medium,
+    },
+    allergyInviteClose: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    allergyInviteBody: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      lineHeight: 20,
+    },
+    allergyInviteCta: {
+      alignSelf: "flex-start",
+      minHeight: 44,
+      justifyContent: "center",
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.overlay.warning[42],
+      paddingHorizontal: 16,
+    },
+    allergyInviteCtaLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.medium,
+    },
     settingsCard: {
       backgroundColor: CARD_BACKGROUND,
       borderWidth: 1,
@@ -1844,6 +1928,33 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
         {/* ── Settings ────────────────────────────────────────────────────── */}
         <View style={styles.settingsSection}>
+          {showAllergyInvite ? (
+            <View style={styles.allergyInvite} testID="allergy-invite">
+              <View style={styles.allergyInviteHeader}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.feedback.warning} />
+                <Text style={styles.allergyInviteTitle} accessibilityRole="header">{t("allergies.invite.title")}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("allergies.invite.dismiss")}
+                  hitSlop={8}
+                  onPress={dismissAllergyInvite}
+                  style={styles.allergyInviteClose}
+                  testID="allergy-invite-dismiss"
+                >
+                  <Ionicons name="close" size={18} color={colors.text.secondary} />
+                </Pressable>
+              </View>
+              <Text style={styles.allergyInviteBody}>{t("allergies.invite.body")}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={openAllergies}
+                style={styles.allergyInviteCta}
+                testID="allergy-invite-cta"
+              >
+                <Text style={styles.allergyInviteCtaLabel}>{t("allergies.invite.cta")}</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.settingsCard}>
             <Text style={styles.settingsTitle}>
               {t("me.settings")}
@@ -1869,6 +1980,13 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               onPress={() => {
                 navigation.getParent<RootNavigationProp<"NutritionGoals">>()?.navigate("NutritionGoals");
               }}
+            />
+            <View style={styles.divider} />
+
+            <SettingRow
+              label={t("allergies.profile.rowLabel")}
+              value={allergiesSummary}
+              onPress={openAllergies}
             />
             <View style={styles.divider} />
 

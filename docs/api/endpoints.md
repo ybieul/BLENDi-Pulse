@@ -481,6 +481,8 @@ None.
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": "Ninja BN401",
       "dietaryPreferences": ["vegan", "nut_free"],
+      "allergies": { "common": ["peanut", "milk"], "custom": ["kiwi"] },
+      "allergyInviteDismissed": false,
       "goal": "Muscle | Wellness | Energy | Recovery | WeightLoss",
       "weightGoal": "lose | maintain | gain",
       "weight": 78,
@@ -532,6 +534,8 @@ None.
 
 `blendiOwnership` (`blendi`, `other` or `none`), `otherBlenderModel` (free text the user typed for an older/other blender, `null` unless `blendiOwnership` is `other`) and `dietaryPreferences` (zero or more of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`) were added by CP-1.1.1a (Onboarding Additions). Accounts created before that CP have none of the three stored; the API reads them as `"blendi"`, `null` and `[]` — no migration. The same three fields are returned by `POST /auth/register`, `POST /auth/login`, `POST /auth/google/exchange`, `POST /auth/apple`, `PATCH /users/me` and `POST /purchases/verify`; the mobile client replaces its whole cached user with the purchase response, so a missing field there would silently reset it.
 
+`allergies` and `allergyInviteDismissed` were added by CP-B6 (see `PATCH /users/me` and [cp-b6-alergias.md](../fixes/cp-b6-alergias.md)). Accounts saved before it have no `allergies` stored; the API reads them as `{ "common": [], "custom": [] }` and `allergyInviteDismissed: false` — no migration. Both are also returned by `PATCH /users/me` and by `POST /auth/google/exchange` (same serializer). `allergies` is health data: it never goes to logs or analytics, and it is deleted with the account (it lives in the `users` document).
+
 The current implementation also returns compatibility aliases `streakDays` and `totalBlends` with the same numeric values as `currentStreak` and `blendCount`.
 
 `hasProfilePhoto`/`profilePhotoUpdatedAt`, `weightGoal`/`weight`/`height`/`targetWeight`/`activityLevel`/`birthDate`/`biologicalSex` (onboarding body profile), `hasRealBodyProfile` (set once the onboarding body step has really been completed via `PATCH /users/me` with `completingBodyOnboarding: true`, see below), `pushToken`, `notificationPreferences`, `dailyPulseTime`, `dailyFatTarget`, the four `subscription*` fields plus `revenueCatCustomerId` (all `null` for a non-subscriber), `totalXP`, `lastLevelUp`, `currentLevel`, and `levelProgress` (a fraction between 0 and 1 toward the next level) are all real fields of this response that were missing from this document before — confirmed directly against `getMe` (`apps/api/src/controllers/user.controller.ts`).
@@ -561,6 +565,8 @@ All fields are optional. The endpoint only updates fields that are present in th
 | `blendiOwnership` | string | No | One of `blendi`, `other` (older model or another brand), `none` (no BLENDi yet) — see *Blender ownership rules* below |
 | `otherBlenderModel` | string | No | Free text with brand/model for `blendiOwnership: "other"`. Control characters (including line breaks and bidi overrides) are replaced by a space, then the text is trimmed; at most 60 characters after trimming (`errors.validation.too_long`); an empty/blank string clears the field. Never sent to the AI, to analytics or to logs |
 | `dietaryPreferences` | string[] | No | At most 16 items, each one of `dairy_free`, `vegan`, `nut_free`, `no_added_sugar`; duplicates are removed (order of first occurrence is kept); `[]` means "no restrictions". Unknown value, wrong type or more than 16 items → `400` with a single `errors.validation.invalid_option` issue. Applied by the Pulse AI and Pantry Scanner prompts (see those endpoints) |
+| `allergies` | object | No | CP-B6. **Replaces the whole field.** Strict object `{ "common": string[], "custom": string[] }`, both required. `common`: codes from `ALLERGY_CODE_VALUES` (`peanut`, `tree_nuts`, `milk`, `lactose`, `soy`, `wheat_gluten`, `sesame`, `egg`), duplicates removed, stored in that fixed order; more than 16 items or an unknown code → `errors.validation.invalid_option`. `custom`: free-text items, at most 10 (`ALLERGY_CUSTOM_MAX_ITEMS`, checked before item validation) of at most 40 characters (`ALLERGY_CUSTOM_ITEM_MAX_LENGTH`) after cleaning: control/bidi characters and markup (whole tags and `<`/`>`) become a space, spaces collapse, the text is trimmed; empty after cleaning → `errors.validation.required`; duplicates by the shared normalization (accents, case, plural: `Kiwi`/`kiwis`) are removed keeping the first. `{ "common": [], "custom": [] }` clears. Separate from `dietaryPreferences`: `nut_free` is never converted into an allergy. Never logged nor sent to analytics |
+| `allergyInviteDismissed` | boolean | No | CP-B6. Only `true` is accepted (`false` → `400`): the one-time "Is it an allergy?" invite (shown to `nut_free` users with no allergy) was closed. Stored as `allergyInviteDismissedAt` and returned as `allergyInviteDismissed: true` |
 | `goal` | string | No | One of `Muscle`, `Wellness`, `Energy`, `Recovery`, `WeightLoss` |
 | `weightGoal` | string | No | One of `lose`, `maintain`, `gain` — weight direction goal, independent of `goal`; triggers an automatic recalculation of `dailyProteinTarget`/`dailyCalorieTarget`/`dailyCarbTarget`/`dailyFatTarget` (see below). With `goal: "WeightLoss"` (sent or saved) only `lose` is accepted — see *Weight Loss goal rule* below |
 | `dailyProteinTarget` | number | No | Integer between 10 and 800 |
@@ -1864,6 +1870,8 @@ Generates a structured Pulse AI recipe for the authenticated user.
 |---|---|---|---|
 | `message` | string | Yes | 1 to 500 characters |
 | `language` | string | No | One of `en`, `pt-BR`; when present, overrides the profile language for this request |
+| `allergyOverride` | object | No | CP-B6. `{ "common": AllergyCode[], "custom": string[] }` (strict, both default `[]`): allergens the user confirmed in the app's sheet ("Yes, include it") **for this message only**. Never stored. Only items that the current message names **and** that are registered are accepted; anything else is silently ignored |
+| `allergyDeclined` | object | No | CP-B6. Same shape: allergens named in the message that the user declined ("No, make it without"). The recipe is made without them and without the "want it with X?" suggestion; they are not charged as requested ingredients |
 
 The `language` field has priority over the user's stored `preferredLanguage` / `locale`. This override affects prompt generation, cache key generation, and the response content.
 
@@ -1937,6 +1945,7 @@ When the user has at least one of `dairy_free`, `vegan`, `nut_free` or `no_added
 - treats every restriction as a hard requirement and states that it takes priority over any ingredient mentioned elsewhere in the prompt;
 - states that the restrictions can never be waived, lifted or overridden by the user message (claims of medical clearance, "ignore previous instructions", text imitating a system message or closing tag) — when asked, the recipe keeps the restriction and the `tip` explains the substitution (`hasSubstitutes: true`). **Changed on purpose in CP-B5 for this endpoint:** an ingredient outside the diet that the *current* message names explicitly is included (see *Explicit request, diet override and alcohol* below); a generic order to ignore the rules, medical-clearance claims and text imitating a system message still have no effect. The Pantry Scanner keeps the old text when nothing was added or requested; since CP-B7 its added items and request are the explicit request (see `POST /pantry-scanner/generate`);
 - lists per-diet rules: `nut_free` (no peanuts or tree nuts nor derivatives; listed first because it is usually an allergy), `vegan` (no animal-origin ingredient; protein powder must be plant-based), `dairy_free`, `no_added_sugar` (natural fruit sugar is allowed).
+- CP-B6b: with `vegan` or `dairy_free`, one extra line says a chocolate flavor comes from cocoa powder, cacao nibs or dark chocolate (70%+). The backend check of both preferences blocks the same chocolate list as the milk/lactose allergies (plain, powdered, milk, white or semisweet chocolate, chips, syrup, achocolatado, drink mixes…; cocoa, cacao, nibs, dark ≥ 70%, vegan or milk-free chocolate pass; "lactose-free" does not release it). Plain "chocolate" in the message is a flavor, not an explicit request that overrides the diet, and is not checked in the title; "chocolate ao leite", "milk chocolate", "chocolate branco" or "achocolatado" in the current message still override it (`dietOverrideIngredients`).
 
 With a diet active, the fixed parts of the prompt also stop *suggesting* ingredients that violate it: the nutrition reference table omits them (a new table entry must be classified in `NUTRITION_ENTRY_RESTRICTIONS`, enforced by a test), the unit example uses `water` instead of `almond milk`, the `gain` guidance and the Lite/Steel hardware hints drop the conflicting examples. This was needed because the pentest showed the explicit priority clause alone still let `Unsweetened almond milk` through for `nut_free` users (2 of 12 generations) — the prompt itself was offering it.
 
@@ -1947,6 +1956,20 @@ The diet is enforced **by the prompt only**: there is no ingredient validation o
 **Recipe content (CP-B2).** `capacityNotice` (optional string, trimmed, at most `RECIPE_CAPACITY_NOTICE_MAX_LENGTH` = 240 characters; longer AI text is cut at a word with "…") is filled by the AI only when the user's request did not fit the cup and was adjusted; the app shows it as an alert at the top of the card. It travels through cache, conversation and preview unlock; the locked preview (macros only) never carries it, and favorites keep their usual fields. The prompt gives the cup as a volume budget up front, treats daily targets as context (not the target of one blend), asks for at least 250 ml and 180 kcal (`RECIPE_MIN_SERVING_ML` / `RECIPE_MIN_SERVING_KCAL`) when nothing about size is asked, honours explicit calorie/macro requests, forbids size words in the title (`RECIPE_TITLE_SIZE_WORDS`), requires every visible text in the account language (pt-BR imperial: xícara, colher de sopa/chá, `fl oz`, `oz`; imperial quantities as fractions, never decimals), allows inverting the cup only on the Steel, forbids ice and any frozen ingredient on the Lite and asks for varied bases and protein sources.
 
 **Recipe text (CP-B3).** Imperial prompts show the cup limit also in cups, rounded down to a common fraction (Lite and Pro+ "13.5 fl oz, about 1 2/3 cups"; Steel "20.2 fl oz, about 2 1/2 cups"), with the rule that greens, fruit pieces, oats, powders, seeds, nut butters and yogurt in cups count by weight. pt-BR prompts write decimals with a comma ("13,5 fl oz") and ask the AI to do the same in every recipe text (the numeric JSON fields stay numbers). Accounts with `blendiOwnership` `other` or `none` keep the Lite limits and rules (400 ml, no ice, nothing frozen) but get a neutral prompt: no "BLENDi", model or wattage, the device is "your portable blender" / "seu liquidificador portátil", and the AI is told not to name a brand or model. The volume and ice retry messages follow the same locale and neutral text. The Pulse AI cache key gets a `:generic` suffix for those accounts (unchanged for `blendi`), so a recipe written for one is never served to the other.
+
+#### Allergies (CP-B6)
+
+Full description, lists and decisions: [cp-b6-alergias.md](../fixes/cp-b6-alergias.md). Allergies are separate from the diet: the diet can be overridden by the explicit request (CP-B5), an allergy only by a **confirmation of the request**.
+
+1. **Before anything else** (before the age check, the cache, the usage reservation and the AI), the backend checks whether the **current message** names a registered allergen (`findNamedAllergens`, `utils/allergyFamilies.utils.ts`, same normalization and negation as the validator: "sem amendoim", "peanut-free" do not count). If it names one that is neither in `allergyOverride` nor in `allergyDeclined` → `428 pulseai/allergy-confirmation-required` with `data.allergens` (the named allergens, same shape as the profile field). Nothing is spent, cached or saved in the conversation. Earlier messages and the history never count.
+2. A dish or product that normally contains a registered allergen but does not name it ("paçoca", "creme de avelã", "doce de leite", "tahine"; table `ALLERGEN_DISHES`) is **not** a confirmation case: the recipe is made without the allergen and gets `recipe.allergySuggestion` `{ dish, allergens }` (the app offers "want it with X?", which resends the request naming the allergen and falls into step 1).
+3. Prompt: a new **"Allergies (mandatory, stricter than the dietary restrictions and than the explicit request)"** section lists the registered allergies as quoted data, says nothing lifts them except the app's confirmation for this request, and adds the confirmed, declined and implied-dish lines. The fixed examples of the prompt (nutrition table, variety, hardware, weight-goal, unit and pt-BR naming examples) drop the allergen, like they already did for the diet. Without allergies the prompt is byte-identical to before.
+4. Validator: every registered allergy is a restriction (`options.allergies`), checked on ingredients, steps, blendInstruction (sentence negation), tip (sentence negation) and title (only the terms that *name* the allergen, so "Shake sabor paçoca" is allowed for the version without peanut). `explicitRequest` never releases it; only the confirmed ones are released. Violation → one retry → `422 pulseai/dietary-restriction-unmet` (existing path). Log lines for allergy violations carry only `restriction: "allergy"` and the field, never the term.
+5. Requested-food check (CP-B8): an allergen asked for and not confirmed is not charged; a confirmed one is.
+6. Cache: the key gets `:allergy-<sha256>` (registered allergies + confirmed + declined) only when the user has an allergy; a cached recipe is also re-validated against the current allergies.
+Chocolate: with a milk or lactose allergy, plain/milk/white chocolate, chocolate chips, syrup and drink mixes, achocolatado and similar are blocked (cocoa, cacao, nibs, dark chocolate ≥ 70%, vegan or milk-free chocolate are not); this only blocks — no confirmation, no suggestion, not checked in the title — and a requested chocolate flavor is still charged (cocoa or dark chocolate satisfy it). The prompt gets one extra line for those two allergies only.
+
+7. Backend-only recipe fields (the AI's values are dropped): `allergyOverride` (confirmed allergens actually present in an ingredient → strong card warning), `allergySuggestion`, `glutenFreeOatsNotice` (wheat/gluten allergy and an oat ingredient → "Use certified gluten-free oats"; oats are never blocked).
 
 #### Explicit request, diet override and alcohol (CP-B5)
 
@@ -2023,6 +2046,7 @@ The preview counter is reset together with `dailyAiUsage` (same `aiUsageResetDat
 | `404` | Authenticated user record not found |
 | `422` | `pulseai/dietary-restriction-unmet`: the recipe still violated the user's diet (or brought ice or, since CP-B2, a frozen ingredient for the Lite; since CP-B5, alcohol it could not have; since CP-B5.1, also in the title) after the retry |
 | `422` | `pulseai/blender-limit-unmet`: the recipe was still above the blender's volume limit after the retry (CP-B2: protein is no longer a limit), or went above it after the later retries (CP-1.1.9) |
+| `428` | `pulseai/allergy-confirmation-required` (CP-B6): the current message names an allergen the user registered, without a confirmation. Body has `data.allergens` (`{ common, custom }`). Checked before everything else: no AI call, no usage, no cache, no conversation turn. The app shows the confirmation sheet and resends the same message with `allergyOverride` or `allergyDeclined` |
 | `428` | `pulseai/age-confirmation-required` (CP-B5): the message asks for an alcoholic drink and the account has no real birth date nor a stored answer. Nothing is spent; the app asks once (`POST /pulse-ai/age-confirmation`) and sends the message again. CP-B5.2: when the backend itself detects the request (`yes`), this is returned before any AI call. CP-B5.3: this includes a cocktail named on its own (`mojito`, `piña colada sem gelo`) |
 | `429` | Daily Pulse AI limit reached for a non-Pro user, and the daily locked preview was already used |
 | `500` | AI provider returned invalid JSON after retry, or another unexpected server error occurred |
@@ -2197,7 +2221,7 @@ Reads the pantry photo (vision only) for the confirmation screen (CP-B7, two-ste
 | Field | Notes |
 |---|---|
 | `readId`, `readExpiresAt` | Present only when there is something to confirm |
-| `ingredients` | `{ name, estimatedQuantity?, confidence, isAlcoholic, blendSuitable }[]` — `blendSuitable: false` = "Other items in the photo" (collapsed, unchecked in the app; only used when the user checks them) |
+| `ingredients` | `{ name, estimatedQuantity?, confidence, isAlcoholic, blendSuitable, isAllergen?, allergens? }[]` — `blendSuitable: false` = "Other items in the photo" (collapsed, unchecked in the app; only used when the user checks them). CP-B6: `isAllergen: true` + `allergens` (`{ common, custom }`) when the name matches a registered allergy by the backend families (computed with the allergies saved **now**; the generation checks again). The app shows "⚠️ Allergy", starts the item unchecked (in whichever group it is) and asks for confirmation when it is checked. Absent = not an allergen |
 | `hasLiquid` | `false` → the app asks which liquid the user has |
 | `noFoodDetected`, `noUsableIngredients?`, `analysisNotes?` | Same meaning as before; no `readId` in these cases |
 | `alcoholAge` | `of-age` / `under-age` / `unknown` (same resolution as Pulse AI) |
@@ -2223,8 +2247,12 @@ Generates up to two recipes from a confirmed read. **This is where the scan is c
 | `added` | string[] | No | Typed by the user, ≤ 10 items of ≤ 40 characters. **Explicit request**: mandatory in every recipe |
 | `liquid` | `water` \| `milk` \| `plant_milk` \| `none` | No | The app requires it when `hasLiquid` is `false`. `water`/`milk`/`plant_milk` become available (milk and plant milk replace plain water as the base); `none` = creamy recipe without any liquid. Absent → the previous behavior (plain water always allowed) |
 | `request` | string | No | "Any request?", ≤ 500 characters (the Pulse AI message limit), sent to the AI as JSON-encoded data |
+| `allergyOverride` | object | No | CP-B6. `{ common, custom }`: allergens confirmed in the app for **this generation** (checked item, added item or named in `request`). Never stored. Only allergens that come from those sources and are registered are accepted |
+| `allergyDeclined` | object | No | CP-B6. Allergens named in `request` that the user declined: recipes without them, no suggestion, not charged. A checked or added item cannot be "declined" (the app unchecks/removes it) |
 
 At least one item in `selected` or `added`.
+
+**Allergies (CP-B6, generation only).** Allergens of the checked items (from the read, recomputed with the current allergies), of the added items and named in `request` must be in `allergyOverride` (or, for `request` only, in `allergyDeclined`); otherwise `428 scanner/allergy-confirmation-required` with `data.allergens`, **before** the alcohol check, before consuming the read, counting the scan or calling the AI. The prompt gets the same Allergies section as Pulse AI ("every recipe"), the validator gets the same allergy restrictions (unchecked items with an allergen are forbidden twice: unchecked and allergen), and a recipe with an unconfirmed allergen is retried once and then discarded (all discarded → `422 scanner/dietary-restriction-unmet`, scan returned). A dish implied in `request` ("sabor paçoca") gives `allergySuggestion` (text only on the Pantry card, no button). The requested-value suggestion (`unmetTargets[].suggestion`) respects the allergies (no peanut butter, whey or yogurt for those allergies). Same backend-only recipe fields as Pulse AI: `allergyOverride`, `allergySuggestion`, `glutenFreeOatsNotice`.
 
 **Alcohol (CP-B5 rules on the Pantry, generation only).** The decision is `detectAlcoholRequest(request)` = `yes` **or** an alcoholic item checked/added. Unknown age → `428 scanner/age-confirmation-required` **before** counting the scan and before any AI call (the app shows the same age sheet as Pulse AI, calls `POST /pulse-ai/age-confirmation` and resends). Under 21 / "No" with an alcoholic item checked → `403 scanner/alcohol-not-allowed`; alcohol only added or asked for → alcohol-free recipe with `alcoholFreeVersion: true`. 21+ → alcohol allowed at a regular single-drink amount (cap 28 g of pure alcohol, `alcoholGrams` counted at 7 kcal/g; checked bottle = at least one recipe, added/asked = every recipe). The `no_alcohol` / `alcohol_limit` safety net now runs on the Pantry too.
 
@@ -2254,11 +2282,37 @@ With a diet active, ingredients detected in the photo that violate it are treate
 | `403` | `scanner/alcohol-not-allowed`: alcoholic item checked by an account under 21 or that answered "No" |
 | `410` | `scanner/read-expired`: read expired, already used, of another user or unknown |
 | `422` | `scanner/dietary-restriction-unmet`, `scanner/blender-limit-unmet` (as before) or `scanner/selection-unmet` (every recipe used an unchecked item) — scan returned, no XP |
+| `428` | `scanner/allergy-confirmation-required` (CP-B6): checked/added item or `request` with a registered allergen and no confirmation; `data.allergens`. Nothing counted, read not consumed, no AI call |
 | `428` | `scanner/age-confirmation-required` (nothing counted, no AI call) |
 | `429` | `scanner/monthly-limit-reached` (free, no scan and no preview left) |
 | `503` | `scanner/vision-unavailable`: provider failure or budget exhausted (scan and read returned) |
 
 `GET /pantry-scanner/previews/:id` (unlock of the locked preview, CP-1.1.4b) is unchanged.
+
+---
+
+### POST /pantry-scanner/allergy-check
+
+CP-B6. Checks, at the moment the user adds an item by hand, whether it matches a registered allergy — with the same backend families as the generation (the app has no second matching logic). No AI call, does not count a scan or a read, stores nothing. The app calls it only when the user has at least one allergy; on a network failure the item is added and the generation asks.
+
+**JWT required:** Yes
+
+**Request body** (`pantryAllergyCheckSchema`, strict)
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `item` | string | Yes | 1 to 40 characters (`PANTRY_ADDED_ITEM_MAX_LENGTH`) |
+
+**Success response** — `200 OK`, `data`: `{ "isAllergen": boolean, "allergens": { "common": AllergyCode[], "custom": string[] } }`. Example: with lactose registered, `"leite sem lactose"` → `isAllergen: false`; `"pasta de amendoim"` with peanut → `{ "common": ["peanut"], "custom": [] }`.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Checked |
+| `400` | `scanner/invalid-generate-request`: invalid body or extra field |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | Authenticated user record not found |
 
 ---
 

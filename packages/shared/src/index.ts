@@ -9,6 +9,7 @@ export * from './aiRequestBudget';
 export * from './recipeContent';
 
 // Schemas Zod + tipos inferidos (backend e mobile)
+export * from './schemas/allergies';
 export * from './schemas/auth';
 export * from './schemas/blendLog';
 export * from './schemas/favorite';
@@ -20,6 +21,7 @@ export * from './schemas/user';
 export * from './schemas/weeklyReport';
 export * from './utils/level.utils';
 export * from './utils/homeRecipeCompatibility';
+export * from './utils/textMatching';
 export type { HistoryQuery, SupplementItem, UpdateSupplementStackInput } from './schemas/supplementStack';
 export type {
   CalculateMacrosInput,

@@ -81,7 +81,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 353,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeIngredientMuscle1Name', amountKey: 'home.dailyRecipeIngredientMuscle1Amount' },
         { nameKey: 'home.dailyRecipeIngredientMuscle2Name', amountKey: 'home.dailyRecipeIngredientMuscle2Amount' },
@@ -101,7 +101,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 15,
       calories: 358,
       durationMinutes: 4,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'peanut', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle02Ingredient1Name', amountKey: 'home.dailyRecipeMuscle02Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle02Ingredient2Name', amountKey: 'home.dailyRecipeMuscle02Ingredient2Amount' },
@@ -121,7 +121,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 295,
       durationMinutes: 3,
-      contains: ['dairy', 'animal', 'added_sugar'],
+      contains: ['dairy', 'animal', 'added_sugar', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle03Ingredient1Name', amountKey: 'home.dailyRecipeMuscle03Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle03Ingredient2Name', amountKey: 'home.dailyRecipeMuscle03Ingredient2Amount' },
@@ -141,7 +141,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 14,
       calories: 317,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle04Ingredient1Name', amountKey: 'home.dailyRecipeMuscle04Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle04Ingredient2Name', amountKey: 'home.dailyRecipeMuscle04Ingredient2Amount' },
@@ -161,7 +161,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 26,
       calories: 498,
       durationMinutes: 4,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'tree_nuts', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle05Ingredient1Name', amountKey: 'home.dailyRecipeMuscle05Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle05Ingredient2Name', amountKey: 'home.dailyRecipeMuscle05Ingredient2Amount' },
@@ -181,7 +181,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 333,
       durationMinutes: 3,
-      contains: ['dairy', 'animal', 'added_sugar'],
+      contains: ['dairy', 'animal', 'added_sugar', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle06Ingredient1Name', amountKey: 'home.dailyRecipeMuscle06Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle06Ingredient2Name', amountKey: 'home.dailyRecipeMuscle06Ingredient2Amount' },
@@ -201,7 +201,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 331,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle07Ingredient1Name', amountKey: 'home.dailyRecipeMuscle07Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle07Ingredient2Name', amountKey: 'home.dailyRecipeMuscle07Ingredient2Amount' },
@@ -222,7 +222,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 287,
       durationMinutes: 4,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle08Ingredient1Name', amountKey: 'home.dailyRecipeMuscle08Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle08Ingredient2Name', amountKey: 'home.dailyRecipeMuscle08Ingredient2Amount' },
@@ -243,7 +243,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 353,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle09Ingredient1Name', amountKey: 'home.dailyRecipeMuscle09Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle09Ingredient2Name', amountKey: 'home.dailyRecipeMuscle09Ingredient2Amount' },
@@ -263,7 +263,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 291,
       durationMinutes: 3,
-      contains: ['dairy', 'animal', 'nuts', 'added_sugar'],
+      contains: ['dairy', 'animal', 'nuts', 'added_sugar', 'peanut', 'tree_nuts', 'milk', 'lactose', 'wheat_gluten'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle10Ingredient1Name', amountKey: 'home.dailyRecipeMuscle10Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle10Ingredient2Name', amountKey: 'home.dailyRecipeMuscle10Ingredient2Amount' },
@@ -283,7 +283,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 14,
       calories: 319,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle11Ingredient1Name', amountKey: 'home.dailyRecipeMuscle11Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle11Ingredient2Name', amountKey: 'home.dailyRecipeMuscle11Ingredient2Amount' },
@@ -303,7 +303,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 21,
       calories: 418,
       durationMinutes: 3,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'peanut', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle12Ingredient1Name', amountKey: 'home.dailyRecipeMuscle12Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle12Ingredient2Name', amountKey: 'home.dailyRecipeMuscle12Ingredient2Amount' },
@@ -344,7 +344,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 372,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle14Ingredient1Name', amountKey: 'home.dailyRecipeMuscle14Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle14Ingredient2Name', amountKey: 'home.dailyRecipeMuscle14Ingredient2Amount' },
@@ -364,7 +364,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 239,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle15Ingredient1Name', amountKey: 'home.dailyRecipeMuscle15Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle15Ingredient2Name', amountKey: 'home.dailyRecipeMuscle15Ingredient2Amount' },
@@ -384,7 +384,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 13,
       calories: 321,
       durationMinutes: 4,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'tree_nuts', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle16Ingredient1Name', amountKey: 'home.dailyRecipeMuscle16Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle16Ingredient2Name', amountKey: 'home.dailyRecipeMuscle16Ingredient2Amount' },
@@ -404,7 +404,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 303,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle17Ingredient1Name', amountKey: 'home.dailyRecipeMuscle17Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle17Ingredient2Name', amountKey: 'home.dailyRecipeMuscle17Ingredient2Amount' },
@@ -424,7 +424,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 418,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle18Ingredient1Name', amountKey: 'home.dailyRecipeMuscle18Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle18Ingredient2Name', amountKey: 'home.dailyRecipeMuscle18Ingredient2Amount' },
@@ -445,7 +445,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 14,
       calories: 388,
       durationMinutes: 3,
-      contains: ['nuts'],
+      contains: ['nuts', 'peanut', 'soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle19Ingredient1Name', amountKey: 'home.dailyRecipeMuscle19Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle19Ingredient2Name', amountKey: 'home.dailyRecipeMuscle19Ingredient2Amount' },
@@ -466,7 +466,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 241,
       durationMinutes: 3,
-      contains: ['dairy', 'animal', 'added_sugar'],
+      contains: ['dairy', 'animal', 'added_sugar', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeMuscle20Ingredient1Name', amountKey: 'home.dailyRecipeMuscle20Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeMuscle20Ingredient2Name', amountKey: 'home.dailyRecipeMuscle20Ingredient2Amount' },
@@ -488,7 +488,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 222,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeIngredientWellness1Name', amountKey: 'home.dailyRecipeIngredientWellness1Amount' },
         { nameKey: 'home.dailyRecipeIngredientWellness2Name', amountKey: 'home.dailyRecipeIngredientWellness2Amount' },
@@ -508,7 +508,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 221,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness02Ingredient1Name', amountKey: 'home.dailyRecipeWellness02Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness02Ingredient2Name', amountKey: 'home.dailyRecipeWellness02Ingredient2Amount' },
@@ -528,7 +528,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 179,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness03Ingredient1Name', amountKey: 'home.dailyRecipeWellness03Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness03Ingredient2Name', amountKey: 'home.dailyRecipeWellness03Ingredient2Amount' },
@@ -548,7 +548,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 192,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness04Ingredient1Name', amountKey: 'home.dailyRecipeWellness04Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness04Ingredient2Name', amountKey: 'home.dailyRecipeWellness04Ingredient2Amount' },
@@ -568,7 +568,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 183,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness05Ingredient1Name', amountKey: 'home.dailyRecipeWellness05Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness05Ingredient2Name', amountKey: 'home.dailyRecipeWellness05Ingredient2Amount' },
@@ -588,7 +588,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 198,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness06Ingredient1Name', amountKey: 'home.dailyRecipeWellness06Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness06Ingredient2Name', amountKey: 'home.dailyRecipeWellness06Ingredient2Amount' },
@@ -608,7 +608,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 177,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness07Ingredient1Name', amountKey: 'home.dailyRecipeWellness07Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness07Ingredient2Name', amountKey: 'home.dailyRecipeWellness07Ingredient2Amount' },
@@ -628,7 +628,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 175,
       durationMinutes: 3,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness08Ingredient1Name', amountKey: 'home.dailyRecipeWellness08Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness08Ingredient2Name', amountKey: 'home.dailyRecipeWellness08Ingredient2Amount' },
@@ -648,7 +648,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 204,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness09Ingredient1Name', amountKey: 'home.dailyRecipeWellness09Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness09Ingredient2Name', amountKey: 'home.dailyRecipeWellness09Ingredient2Amount' },
@@ -668,7 +668,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 145,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness10Ingredient1Name', amountKey: 'home.dailyRecipeWellness10Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness10Ingredient2Name', amountKey: 'home.dailyRecipeWellness10Ingredient2Amount' },
@@ -688,7 +688,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 183,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness11Ingredient1Name', amountKey: 'home.dailyRecipeWellness11Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness11Ingredient2Name', amountKey: 'home.dailyRecipeWellness11Ingredient2Amount' },
@@ -708,7 +708,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 184,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness12Ingredient1Name', amountKey: 'home.dailyRecipeWellness12Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness12Ingredient2Name', amountKey: 'home.dailyRecipeWellness12Ingredient2Amount' },
@@ -728,7 +728,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 188,
       durationMinutes: 4,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness13Ingredient1Name', amountKey: 'home.dailyRecipeWellness13Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness13Ingredient2Name', amountKey: 'home.dailyRecipeWellness13Ingredient2Amount' },
@@ -748,7 +748,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 207,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness14Ingredient1Name', amountKey: 'home.dailyRecipeWellness14Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness14Ingredient2Name', amountKey: 'home.dailyRecipeWellness14Ingredient2Amount' },
@@ -768,7 +768,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 189,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness15Ingredient1Name', amountKey: 'home.dailyRecipeWellness15Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness15Ingredient2Name', amountKey: 'home.dailyRecipeWellness15Ingredient2Amount' },
@@ -788,7 +788,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 198,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness16Ingredient1Name', amountKey: 'home.dailyRecipeWellness16Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness16Ingredient2Name', amountKey: 'home.dailyRecipeWellness16Ingredient2Amount' },
@@ -808,7 +808,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 179,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness17Ingredient1Name', amountKey: 'home.dailyRecipeWellness17Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness17Ingredient2Name', amountKey: 'home.dailyRecipeWellness17Ingredient2Amount' },
@@ -828,7 +828,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 162,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness18Ingredient1Name', amountKey: 'home.dailyRecipeWellness18Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness18Ingredient2Name', amountKey: 'home.dailyRecipeWellness18Ingredient2Amount' },
@@ -848,7 +848,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 234,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness19Ingredient1Name', amountKey: 'home.dailyRecipeWellness19Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness19Ingredient2Name', amountKey: 'home.dailyRecipeWellness19Ingredient2Amount' },
@@ -868,7 +868,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 199,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWellness20Ingredient1Name', amountKey: 'home.dailyRecipeWellness20Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWellness20Ingredient2Name', amountKey: 'home.dailyRecipeWellness20Ingredient2Amount' },
@@ -890,7 +890,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 275,
       durationMinutes: 3,
-      contains: ['nuts'],
+      contains: ['nuts', 'tree_nuts'],
       ingredients: [
         { nameKey: 'home.dailyRecipeIngredientEnergy1Name', amountKey: 'home.dailyRecipeIngredientEnergy1Amount' },
         { nameKey: 'home.dailyRecipeIngredientEnergy2Name', amountKey: 'home.dailyRecipeIngredientEnergy2Amount' },
@@ -910,7 +910,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 353,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy02Ingredient1Name', amountKey: 'home.dailyRecipeEnergy02Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy02Ingredient2Name', amountKey: 'home.dailyRecipeEnergy02Ingredient2Amount' },
@@ -930,7 +930,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 251,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy03Ingredient1Name', amountKey: 'home.dailyRecipeEnergy03Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy03Ingredient2Name', amountKey: 'home.dailyRecipeEnergy03Ingredient2Amount' },
@@ -950,7 +950,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 235,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy04Ingredient1Name', amountKey: 'home.dailyRecipeEnergy04Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy04Ingredient2Name', amountKey: 'home.dailyRecipeEnergy04Ingredient2Amount' },
@@ -990,7 +990,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 476,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy06Ingredient1Name', amountKey: 'home.dailyRecipeEnergy06Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy06Ingredient2Name', amountKey: 'home.dailyRecipeEnergy06Ingredient2Amount' },
@@ -1010,7 +1010,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 233,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy07Ingredient1Name', amountKey: 'home.dailyRecipeEnergy07Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy07Ingredient2Name', amountKey: 'home.dailyRecipeEnergy07Ingredient2Amount' },
@@ -1030,7 +1030,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 234,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy08Ingredient1Name', amountKey: 'home.dailyRecipeEnergy08Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy08Ingredient2Name', amountKey: 'home.dailyRecipeEnergy08Ingredient2Amount' },
@@ -1050,7 +1050,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 10,
       calories: 332,
       durationMinutes: 3,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'peanut', 'tree_nuts', 'milk', 'lactose', 'wheat_gluten'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy09Ingredient1Name', amountKey: 'home.dailyRecipeEnergy09Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy09Ingredient2Name', amountKey: 'home.dailyRecipeEnergy09Ingredient2Amount' },
@@ -1090,7 +1090,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 10,
       calories: 293,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy11Ingredient1Name', amountKey: 'home.dailyRecipeEnergy11Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy11Ingredient2Name', amountKey: 'home.dailyRecipeEnergy11Ingredient2Amount' },
@@ -1110,7 +1110,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 322,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy12Ingredient1Name', amountKey: 'home.dailyRecipeEnergy12Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy12Ingredient2Name', amountKey: 'home.dailyRecipeEnergy12Ingredient2Amount' },
@@ -1130,7 +1130,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 203,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy13Ingredient1Name', amountKey: 'home.dailyRecipeEnergy13Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy13Ingredient2Name', amountKey: 'home.dailyRecipeEnergy13Ingredient2Amount' },
@@ -1170,7 +1170,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 11,
       calories: 307,
       durationMinutes: 3,
-      contains: ['nuts'],
+      contains: ['nuts', 'peanut'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy15Ingredient1Name', amountKey: 'home.dailyRecipeEnergy15Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy15Ingredient2Name', amountKey: 'home.dailyRecipeEnergy15Ingredient2Amount' },
@@ -1190,7 +1190,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 295,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy16Ingredient1Name', amountKey: 'home.dailyRecipeEnergy16Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy16Ingredient2Name', amountKey: 'home.dailyRecipeEnergy16Ingredient2Amount' },
@@ -1210,7 +1210,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 140,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy17Ingredient1Name', amountKey: 'home.dailyRecipeEnergy17Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy17Ingredient2Name', amountKey: 'home.dailyRecipeEnergy17Ingredient2Amount' },
@@ -1230,7 +1230,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 253,
       durationMinutes: 3,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy18Ingredient1Name', amountKey: 'home.dailyRecipeEnergy18Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy18Ingredient2Name', amountKey: 'home.dailyRecipeEnergy18Ingredient2Amount' },
@@ -1271,7 +1271,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 218,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeEnergy20Ingredient1Name', amountKey: 'home.dailyRecipeEnergy20Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeEnergy20Ingredient2Name', amountKey: 'home.dailyRecipeEnergy20Ingredient2Amount' },
@@ -1293,7 +1293,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 235,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeIngredientRecovery1Name', amountKey: 'home.dailyRecipeIngredientRecovery1Amount' },
         { nameKey: 'home.dailyRecipeIngredientRecovery2Name', amountKey: 'home.dailyRecipeIngredientRecovery2Amount' },
@@ -1313,7 +1313,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 333,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery02Ingredient1Name', amountKey: 'home.dailyRecipeRecovery02Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery02Ingredient2Name', amountKey: 'home.dailyRecipeRecovery02Ingredient2Amount' },
@@ -1333,7 +1333,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 207,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery03Ingredient1Name', amountKey: 'home.dailyRecipeRecovery03Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery03Ingredient2Name', amountKey: 'home.dailyRecipeRecovery03Ingredient2Amount' },
@@ -1353,7 +1353,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 272,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery04Ingredient1Name', amountKey: 'home.dailyRecipeRecovery04Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery04Ingredient2Name', amountKey: 'home.dailyRecipeRecovery04Ingredient2Amount' },
@@ -1373,7 +1373,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 224,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery05Ingredient1Name', amountKey: 'home.dailyRecipeRecovery05Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery05Ingredient2Name', amountKey: 'home.dailyRecipeRecovery05Ingredient2Amount' },
@@ -1393,7 +1393,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 234,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery06Ingredient1Name', amountKey: 'home.dailyRecipeRecovery06Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery06Ingredient2Name', amountKey: 'home.dailyRecipeRecovery06Ingredient2Amount' },
@@ -1433,7 +1433,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 203,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery08Ingredient1Name', amountKey: 'home.dailyRecipeRecovery08Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery08Ingredient2Name', amountKey: 'home.dailyRecipeRecovery08Ingredient2Amount' },
@@ -1473,7 +1473,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 257,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery10Ingredient1Name', amountKey: 'home.dailyRecipeRecovery10Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery10Ingredient2Name', amountKey: 'home.dailyRecipeRecovery10Ingredient2Amount' },
@@ -1493,7 +1493,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 218,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery11Ingredient1Name', amountKey: 'home.dailyRecipeRecovery11Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery11Ingredient2Name', amountKey: 'home.dailyRecipeRecovery11Ingredient2Amount' },
@@ -1513,7 +1513,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 227,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery12Ingredient1Name', amountKey: 'home.dailyRecipeRecovery12Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery12Ingredient2Name', amountKey: 'home.dailyRecipeRecovery12Ingredient2Amount' },
@@ -1533,7 +1533,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 226,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery13Ingredient1Name', amountKey: 'home.dailyRecipeRecovery13Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery13Ingredient2Name', amountKey: 'home.dailyRecipeRecovery13Ingredient2Amount' },
@@ -1553,7 +1553,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 242,
       durationMinutes: 3,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery14Ingredient1Name', amountKey: 'home.dailyRecipeRecovery14Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery14Ingredient2Name', amountKey: 'home.dailyRecipeRecovery14Ingredient2Amount' },
@@ -1574,7 +1574,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 221,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery15Ingredient1Name', amountKey: 'home.dailyRecipeRecovery15Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery15Ingredient2Name', amountKey: 'home.dailyRecipeRecovery15Ingredient2Amount' },
@@ -1615,7 +1615,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 8,
       calories: 275,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery17Ingredient1Name', amountKey: 'home.dailyRecipeRecovery17Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery17Ingredient2Name', amountKey: 'home.dailyRecipeRecovery17Ingredient2Amount' },
@@ -1635,7 +1635,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 242,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery18Ingredient1Name', amountKey: 'home.dailyRecipeRecovery18Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery18Ingredient2Name', amountKey: 'home.dailyRecipeRecovery18Ingredient2Amount' },
@@ -1655,7 +1655,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 6,
       calories: 265,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery19Ingredient1Name', amountKey: 'home.dailyRecipeRecovery19Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery19Ingredient2Name', amountKey: 'home.dailyRecipeRecovery19Ingredient2Amount' },
@@ -1676,7 +1676,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 179,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeRecovery20Ingredient1Name', amountKey: 'home.dailyRecipeRecovery20Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeRecovery20Ingredient2Name', amountKey: 'home.dailyRecipeRecovery20Ingredient2Amount' },
@@ -1698,7 +1698,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 276,
       durationMinutes: 4,
-      contains: ['dairy', 'animal'],
+      contains: ['dairy', 'animal', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeIngredientWeightLoss1Name', amountKey: 'home.dailyRecipeIngredientWeightLoss1Amount' },
         { nameKey: 'home.dailyRecipeIngredientWeightLoss2Name', amountKey: 'home.dailyRecipeIngredientWeightLoss2Amount' },
@@ -1718,7 +1718,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 227,
       durationMinutes: 4,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss02Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss02Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss02Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss02Ingredient2Amount' },
@@ -1738,7 +1738,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 233,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss03Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss03Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss03Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss03Ingredient2Amount' },
@@ -1758,7 +1758,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 218,
       durationMinutes: 3,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss04Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss04Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss04Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss04Ingredient2Amount' },
@@ -1778,7 +1778,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 217,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss05Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss05Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss05Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss05Ingredient2Amount' },
@@ -1818,7 +1818,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 0,
       calories: 186,
       durationMinutes: 4,
-      contains: ['dairy', 'animal'],
+      contains: ['dairy', 'animal', 'milk'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss07Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss07Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss07Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss07Ingredient2Amount' },
@@ -1838,7 +1838,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 2,
       calories: 212,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss08Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss08Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss08Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss08Ingredient2Amount' },
@@ -1858,7 +1858,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 271,
       durationMinutes: 4,
-      contains: ['animal'],
+      contains: ['animal', 'egg'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss09Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss09Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss09Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss09Ingredient2Amount' },
@@ -1878,7 +1878,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 219,
       durationMinutes: 4,
-      contains: ['dairy', 'animal', 'nuts'],
+      contains: ['dairy', 'animal', 'nuts', 'tree_nuts', 'milk'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss10Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss10Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss10Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss10Ingredient2Amount' },
@@ -1898,7 +1898,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 202,
       durationMinutes: 3,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss11Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss11Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss11Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss11Ingredient2Amount' },
@@ -1918,7 +1918,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 7,
       calories: 214,
       durationMinutes: 4,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss12Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss12Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss12Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss12Ingredient2Amount' },
@@ -1958,7 +1958,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 225,
       durationMinutes: 3,
-      contains: ['dairy', 'animal', 'nuts'],
+      contains: ['dairy', 'animal', 'nuts', 'tree_nuts', 'milk'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss14Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss14Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss14Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss14Ingredient2Amount' },
@@ -1978,7 +1978,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 186,
       durationMinutes: 3,
-      contains: ['nuts'],
+      contains: ['nuts', 'tree_nuts'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss15Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss15Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss15Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss15Ingredient2Amount' },
@@ -2018,7 +2018,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 194,
       durationMinutes: 4,
-      contains: [],
+      contains: ['soy'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss17Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss17Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss17Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss17Ingredient2Amount' },
@@ -2038,7 +2038,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 3,
       calories: 231,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss18Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss18Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss18Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss18Ingredient2Amount' },
@@ -2058,7 +2058,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 4,
       calories: 197,
       durationMinutes: 4,
-      contains: ['dairy', 'nuts'],
+      contains: ['dairy', 'nuts', 'tree_nuts', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss19Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss19Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss19Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss19Ingredient2Amount' },
@@ -2078,7 +2078,7 @@ export const DAILY_RECIPES: Record<UserGoal, DailyRecipe[]> = {
       fat: 5,
       calories: 212,
       durationMinutes: 4,
-      contains: ['dairy'],
+      contains: ['dairy', 'milk', 'lactose'],
       ingredients: [
         { nameKey: 'home.dailyRecipeWeightLoss20Ingredient1Name', amountKey: 'home.dailyRecipeWeightLoss20Ingredient1Amount' },
         { nameKey: 'home.dailyRecipeWeightLoss20Ingredient2Name', amountKey: 'home.dailyRecipeWeightLoss20Ingredient2Amount' },

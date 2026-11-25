@@ -7,6 +7,7 @@ import {
   type PulseAiRecipe,
   type PulseAiRecipePreview,
 } from './pulseAi';
+import { allergenSelectionSchema } from './allergies';
 
 const PANTRY_IMAGE_BASE64_MIN_LENGTH = 100;
 const PANTRY_IMAGE_BASE64_MAX_LENGTH = 2_800_000;
@@ -171,7 +172,17 @@ export type PantryAlcoholAge = (typeof pantryAlcoholAgeValues)[number];
  * (ausente = true).
  */
 export const pantryReadIngredientSchema = pantryIngredientSchema
-  .extend({ isAlcoholic: z.boolean(), blendSuitable: z.boolean().optional() })
+  .extend({
+    isAlcoholic: z.boolean(),
+    blendSuitable: z.boolean().optional(),
+    /**
+     * CP-B6: o item bate com uma alergia cadastrada (pelas famílias do
+     * backend). Começa desmarcado; marcar abre a confirmação na hora.
+     * Ausente = não é alérgeno (resposta anterior ao CP-B6 também).
+     */
+    isAllergen: z.boolean().optional(),
+    allergens: allergenSelectionSchema.optional(),
+  })
   .strict();
 
 export type PantryReadIngredient = z.infer<typeof pantryReadIngredientSchema>;
@@ -222,6 +233,14 @@ export const pantryGenerateSchema = z
       .max(PANTRY_REQUEST_MAX_LENGTH, 'errors.validation.too_long')
       .optional()
       .transform(value => (value ? value : undefined)),
+    /**
+     * CP-B6: alérgenos confirmados na hora para ESTA geração (item marcado,
+     * adicionado ou citado no pedido). Nunca gravado; o backend só aceita os
+     * que vieram dessas fontes e estão cadastrados.
+     */
+    allergyOverride: allergenSelectionSchema.optional(),
+    /** CP-B6: alérgenos citados no pedido que a pessoa recusou ("Não, fazer sem"). */
+    allergyDeclined: allergenSelectionSchema.optional(),
   })
   .strict()
   .refine(input => input.selected.length + input.added.length > 0, {
@@ -247,3 +266,25 @@ export const pantryGenerateResultSchema = z.object({
 export interface PantryGenerateResult extends Omit<z.infer<typeof pantryGenerateResultSchema>, 'recipes'> {
   recipes: PulseAiRecipe[];
 }
+
+// ─── CP-B6: item adicionado à mão × alergia ────────────────────────────────
+// POST /pantry-scanner/allergy-check: confere, na hora de adicionar, se o
+// item bate com uma alergia cadastrada (as mesmas famílias do backend, sem
+// uma segunda lógica no app). Não chama IA, não conta scan nem leitura.
+
+export const pantryAllergyCheckSchema = z
+  .object({
+    item: pantryItemNameSchema(PANTRY_ADDED_ITEM_MAX_LENGTH),
+  })
+  .strict();
+
+export type PantryAllergyCheckInput = z.infer<typeof pantryAllergyCheckSchema>;
+
+export const pantryAllergyCheckResultSchema = z
+  .object({
+    isAllergen: z.boolean(),
+    allergens: allergenSelectionSchema,
+  })
+  .strict();
+
+export type PantryAllergyCheckResult = z.output<typeof pantryAllergyCheckResultSchema>;

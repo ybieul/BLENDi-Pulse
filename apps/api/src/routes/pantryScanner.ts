@@ -1,6 +1,6 @@
 import { Router, type IRouter } from 'express';
 
-import { generatePantry, readPantry, unlockPantryPreview } from '../controllers/pantryScanner.controller';
+import { checkPantryAllergy, generatePantry, readPantry, unlockPantryPreview } from '../controllers/pantryScanner.controller';
 import { authenticate } from '../middlewares/authenticate';
 
 export const pantryScannerRouter: IRouter = Router();
@@ -19,6 +19,13 @@ pantryScannerRouter.post('/read', authenticate, readPantry);
  * adicionados, líquido e pedido). Conta o scan (ou a prévia do free).
  */
 pantryScannerRouter.post('/generate', authenticate, generatePantry);
+
+/**
+ * POST /pantry-scanner/allergy-check  🔒 autenticado
+ * CP-B6: o item adicionado à mão bate com uma alergia cadastrada? (mesmas
+ * famílias do backend). Sem IA, sem scan, sem leitura, nada gravado.
+ */
+pantryScannerRouter.post('/allergy-check', authenticate, checkPantryAllergy);
 
 /**
  * GET /pantry-scanner/previews/:id  🔒 autenticado

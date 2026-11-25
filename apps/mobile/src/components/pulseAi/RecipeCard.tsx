@@ -42,6 +42,7 @@ import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 import type { TranslationKey } from '../../locales/i18n';
+import { countAllergens, formatAllergenList } from '../../utils/allergies.utils';
 
 const BADGE_BACKGROUND = colors.overlay.pulse[20];
 const BADGE_BORDER = colors.overlay.pulse[35];
@@ -121,6 +122,11 @@ export interface RecipeCardProps {
   favoriteId?: string;
   onStartBlend: () => void;
   isFromCache?: boolean;
+  /**
+   * CP-B6: "Quer com X?" — pede a receita de novo nomeando o alérgeno (cai
+   * na confirmação). Ausente: a sugestão aparece sem o botão.
+   */
+  onAllergySuggestionPress?: (recipe: PulseAiRecipe) => void;
 }
 
 function useMacroPills(macros: PulseAiRecipe['macros'], alcoholGrams?: number): MacroPillData[] {
@@ -304,6 +310,129 @@ export function RecipeRequestNotice({ text, testID }: { text: string; testID: st
   );
 }
 
+/**
+ * CP-B6: avisos de alergia marcados pelo backend. Mais forte que os outros
+ * (vermelho, lido como alerta): "⚠️ Contém X, que você cadastrou como
+ * alergia"; a sugestão do prato feito sem o alérgeno (com o botão "Quero
+ * com X"); e "Use aveia certificada sem glúten".
+ */
+export function RecipeAllergyNotices({
+  recipe,
+  onSuggestionPress,
+}: {
+  recipe: PulseAiRecipe;
+  onSuggestionPress?: (recipe: PulseAiRecipe) => void;
+}) {
+  const colors = useColors();
+  const { t } = useAppTranslation();
+  const overrideCount = countAllergens(recipe.allergyOverride);
+  const suggestion = recipe.allergySuggestion;
+  const suggestionItems = suggestion ? formatAllergenList({ common: suggestion.allergens, custom: [] }, t) : '';
+
+  const noticeStyles = StyleSheet.create({
+    strong: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: colors.feedback.error,
+      backgroundColor: colors.overlay.error[12],
+      padding: spacing.md,
+    },
+    strongText: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      fontWeight: fontWeights.bold,
+      lineHeight: 20,
+    },
+    box: {
+      marginBottom: spacing.md,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.overlay.warning[42],
+      backgroundColor: colors.overlay.warning[8],
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+    },
+    text: {
+      flex: 1,
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    button: {
+      alignSelf: 'flex-start',
+      minHeight: 44,
+      justifyContent: 'center',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.overlay.warning[42],
+      paddingHorizontal: spacing.md,
+    },
+    buttonLabel: {
+      color: colors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: 13,
+      fontWeight: fontWeights.medium,
+    },
+  });
+
+  return (
+    <>
+      {overrideCount > 0 ? (
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel={t('allergies.card.override', { count: overrideCount, items: formatAllergenList(recipe.allergyOverride, t) })}
+          style={noticeStyles.strong}
+          testID="recipe-allergy-override-notice"
+        >
+          <Ionicons name="warning" size={20} color={colors.feedback.error} />
+          <Text style={noticeStyles.strongText}>
+            {t('allergies.card.override', { count: overrideCount, items: formatAllergenList(recipe.allergyOverride, t) })}
+          </Text>
+        </View>
+      ) : null}
+
+      {suggestion ? (
+        <View style={noticeStyles.box} testID="recipe-allergy-suggestion">
+          <View style={noticeStyles.row} accessible accessibilityRole="alert">
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.feedback.warning} />
+            <Text style={noticeStyles.text}>
+              {t('allergies.card.suggestion', { dish: suggestion.dish, items: suggestionItems })}
+            </Text>
+          </View>
+          {onSuggestionPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityHint={t('allergies.card.suggestionButtonA11yHint', { items: suggestionItems })}
+              onPress={() => { onSuggestionPress(recipe); }}
+              style={noticeStyles.button}
+              testID="recipe-allergy-suggestion-button"
+            >
+              <Text style={noticeStyles.buttonLabel}>{t('allergies.card.suggestionButton', { items: suggestionItems })}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {recipe.glutenFreeOatsNotice ? (
+        <RecipeRequestNotice testID="recipe-gluten-free-oats-notice" text={t('allergies.card.oats')} />
+      ) : null}
+    </>
+  );
+}
+
 /** "Proteína whey isolada" → "proteína whey isolada" no meio da frase; siglas ficam. */
 function toMidSentence(name: string): string {
   const trimmed = name.trim();
@@ -317,6 +446,7 @@ export function RecipeCard({
   favoriteId,
   onStartBlend,
   isFromCache = false,
+  onAllergySuggestionPress,
 }: RecipeCardProps) {
   const colors = useColors();
   const CARD_BACKGROUND = colors.overlay.plum[7];
@@ -669,6 +799,8 @@ export function RecipeCard({
   return (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
+      <RecipeAllergyNotices recipe={recipe} onSuggestionPress={onAllergySuggestionPress} />
+
       {capacityNotice ? <RecipeCapacityNotice notice={capacityNotice} /> : null}
 
       {dietOverrideItems.length > 0 ? (

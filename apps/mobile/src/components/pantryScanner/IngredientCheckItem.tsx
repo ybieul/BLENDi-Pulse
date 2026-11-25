@@ -44,6 +44,12 @@ export interface IngredientCheckItemProps {
   label?: string;
   /** CP-B7: não pode ser marcado (ex.: bebida alcoólica para menor de 21). */
   disabled?: boolean;
+  /**
+   * CP-B6: o item bate com uma alergia cadastrada — rótulo "⚠️ Alergia"
+   * (vermelho) e o leitor de tela diz que é alergia. O texto vem pronto.
+   */
+  allergyLabel?: string;
+  allergyA11yLabel?: string;
   testID?: string;
 }
 
@@ -53,6 +59,8 @@ export function IngredientCheckItem({
   onToggle,
   label,
   disabled = false,
+  allergyLabel,
+  allergyA11yLabel,
   testID,
 }: IngredientCheckItemProps) {
   const colors = useColors();
@@ -163,6 +171,12 @@ export function IngredientCheckItem({
       fontFamily: 'DMSans_500Medium',
       fontSize: 12,
     },
+    allergyText: {
+      marginTop: 2,
+      color: colors.feedback.error,
+      fontFamily: 'DMSans_500Medium',
+      fontSize: 12,
+    },
     disabled: {
       opacity: 0.5,
     },
@@ -182,7 +196,7 @@ export function IngredientCheckItem({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked, disabled }}
-      accessibilityLabel={label ? `${ingredient.name}, ${label}` : ingredient.name}
+      accessibilityLabel={[allergyA11yLabel ?? ingredient.name, label].filter(Boolean).join(', ')}
       disabled={disabled}
       onPress={handleToggle}
       style={[styles.pressable, disabled ? styles.disabled : null]}
@@ -217,6 +231,11 @@ export function IngredientCheckItem({
 
           {showMediumConfidenceDot ? <View style={styles.mediumConfidenceDot} /> : null}
         </View>
+        {allergyLabel ? (
+          <Text numberOfLines={1} style={styles.allergyText} testID={testID ? `${testID}-allergy` : undefined}>
+            {allergyLabel}
+          </Text>
+        ) : null}
         {label ? (
           <Text numberOfLines={2} style={styles.labelText}>
             {label}

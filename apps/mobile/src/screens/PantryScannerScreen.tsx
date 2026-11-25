@@ -38,6 +38,8 @@ import {
   PANTRY_ADDED_ITEMS_MAX,
   PANTRY_ADDED_ITEM_MAX_LENGTH,
   PANTRY_REQUEST_MAX_LENGTH,
+  hasAllergies,
+  type AllergenSelection,
   type PantryAlcoholAge,
   type PantryAnalysisResult,
   type PantryIngredient,
@@ -56,10 +58,15 @@ import { AuthButton } from '../components/ui/AuthButton';
 import { IngredientCheckItem } from '../components/pantryScanner/IngredientCheckItem';
 import { LockedRecipeCard, RecipeCard } from '../components/pulseAi/RecipeCard';
 import { AgeConfirmationSheet } from '../components/pulseAi/AgeConfirmationSheet';
+import { AllergyConfirmationSheet } from '../components/allergies/AllergyConfirmationSheet';
+import { PantryHowToUseSheet } from '../components/pantryScanner/PantryHowToUseSheet';
+import { addToSelection, EMPTY_ALLERGEN_SELECTION } from '../utils/allergies.utils';
 import { images } from '../assets';
 import {
+  checkPantryAllergy,
   compressAndEncodeImage,
   generatePantryRecipes,
+  PANTRY_ALLERGY_CONFIRMATION_CODE,
   isPantryLockedPreview,
   PANTRY_AGE_CONFIRMATION_REQUIRED_CODE,
   PANTRY_MONTHLY_LIMIT_REACHED_CODE,
@@ -134,6 +141,28 @@ interface CheckedIngredient extends PantryIngredient {
    * recolhido e desmarcado (a pessoa pode marcar).
    */
   blendSuitable: boolean;
+  /** CP-B6: bate com alergia cadastrada (backend). Começa desmarcado. */
+  isAllergen?: boolean;
+  allergens?: AllergenSelection;
+}
+
+/** CP-B6: o que a folha de alergia faz depois da resposta. */
+type AllergySheetAction =
+  | { kind: 'check'; index: number }
+  | { kind: 'add'; name: string }
+  | { kind: 'generate' };
+
+interface AllergySheetState {
+  allergens: AllergenSelection;
+  action: AllergySheetAction;
+}
+
+/** CP-B6: a seleção já está toda confirmada nesta geração. */
+function isCovered(selection: AllergenSelection | undefined, confirmed: AllergenSelection): boolean {
+  return (
+    (selection?.common ?? []).every((code) => confirmed.common.includes(code)) &&
+    (selection?.custom ?? []).every((item) => confirmed.custom.includes(item))
+  );
 }
 
 /** CP-B7: o que a folha de idade faz depois da resposta. */
@@ -172,6 +201,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const { favorites } = useFavorites();
   const isPro = useAuthStore((state) => state.user?.isPro ?? false);
   const userId = useAuthStore((state) => state.user?.id);
+  // CP-B6: sem alergia cadastrada, adicionar não consulta o backend.
+  const userHasAllergies = useAuthStore((state) => hasAllergies(state.user?.allergies));
   const blendiOwnership = useAuthStore((state) => state.user?.blendiOwnership);
   // CP-B4: quem não tem BLENDi lê os textos neutros (blenderText.utils). O ref
   // deixa os handlers de erro lerem o valor atual sem entrar nas dependências.
@@ -201,6 +232,12 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [nextIsPreview, setNextIsPreview] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [ageSheet, setAgeSheet] = useState<AgeSheetState | null>(null);
+  // CP-B6: alérgenos confirmados/recusados NESTA leitura (nunca gravados) e a
+  // folha de confirmação na hora.
+  const [confirmedAllergens, setConfirmedAllergens] = useState<AllergenSelection>(EMPTY_ALLERGEN_SELECTION);
+  const [declinedAllergens, setDeclinedAllergens] = useState<AllergenSelection>(EMPTY_ALLERGEN_SELECTION);
+  const [allergySheet, setAllergySheet] = useState<AllergySheetState | null>(null);
+  const [isHowToUseVisible, setIsHowToUseVisible] = useState(false);
   // CP-B7: grupo "Outros itens na foto" começa recolhido.
   const [otherItemsExpanded, setOtherItemsExpanded] = useState(false);
   // CP-1.1.4b: prévia bloqueada (só macros) e a última prévia guardada.
@@ -288,10 +325,13 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
         // Bebida alcoólica começa desmarcada (só 21+ marca). CP-B7: o que não
         // serve para shake vai para "Outros itens na foto", desmarcado.
+        // CP-B6: item com alergia cadastrada também começa desmarcado.
         setIngredients(result.ingredients.map((i) => {
           const blendSuitable = i.blendSuitable !== false;
-          return { ...i, blendSuitable, checked: blendSuitable && !i.isAlcoholic };
+          return { ...i, blendSuitable, checked: blendSuitable && !i.isAlcoholic && i.isAllergen !== true };
         }));
+        setConfirmedAllergens(EMPTY_ALLERGEN_SELECTION);
+        setDeclinedAllergens(EMPTY_ALLERGEN_SELECTION);
         setOtherItemsExpanded(false);
         setReadId(result.readId);
         setReadExpiresAt(result.readExpiresAt ?? null);
@@ -553,8 +593,14 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       }
     }
 
+    // CP-B6: marcar item com alergia cadastrada pede a confirmação NA HORA.
+    if (item.isAllergen && !item.checked && item.allergens && !isCovered(item.allergens, confirmedAllergens)) {
+      setAllergySheet({ allergens: item.allergens, action: { kind: 'check', index } });
+      return;
+    }
+
     checkIngredient(index, !item.checked);
-  }, [alcoholAge, checkIngredient, ingredients]);
+  }, [alcoholAge, checkIngredient, confirmedAllergens, ingredients]);
 
   // Adicionado à mão = pedido explícito (obrigatório em todas as receitas).
   // Se for um item da leitura, só marca (não vira "você adicionou").
@@ -573,12 +619,34 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       return;
     }
 
-    setAddedItems((prev) => (
-      prev.length >= PANTRY_ADDED_ITEMS_MAX || prev.some((item) => item.toLowerCase() === key)
-        ? prev
-        : [...prev, name]
-    ));
-  }, [handleToggleIngredient, ingredients, newIngredientText]);
+    const addItem = () => {
+      setAddedItems((prev) => (
+        prev.length >= PANTRY_ADDED_ITEMS_MAX || prev.some((item) => item.toLowerCase() === key)
+          ? prev
+          : [...prev, name]
+      ));
+    };
+
+    // CP-B6: item adicionado que bate com alergia cadastrada pede a
+    // confirmação na hora (as famílias são do backend). Sem resposta da
+    // conferência (rede), adiciona: a geração confere de novo e pergunta.
+    if (!userHasAllergies) {
+      addItem();
+      return;
+    }
+
+    checkPantryAllergy(name)
+      .then((check) => {
+        if (check.isAllergen && !isCovered(check.allergens, confirmedAllergens)) {
+          setAllergySheet({ allergens: check.allergens, action: { kind: 'add', name } });
+          return;
+        }
+        addItem();
+      })
+      .catch(() => {
+        addItem();
+      });
+  }, [confirmedAllergens, handleToggleIngredient, ingredients, newIngredientText, userHasAllergies]);
 
   const handleRemoveAdded = useCallback((name: string) => {
     setAddedItems((prev) => prev.filter((item) => item !== name));
@@ -599,11 +667,19 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     setRequestText('');
     setLiquid(null);
     setHasGenerated(false);
+    setConfirmedAllergens(EMPTY_ALLERGEN_SELECTION);
+    setDeclinedAllergens(EMPTY_ALLERGEN_SELECTION);
     setStep('capture');
   }, []);
 
-  const handleGenerateRecipes = useCallback(async () => {
+  const handleGenerateRecipes = useCallback(async (
+    allergyChoice: { override?: AllergenSelection; declined?: AllergenSelection; afterAnswer?: boolean } = {},
+  ) => {
     if (!readId || !canGenerate) return;
+    const override = allergyChoice.override ?? confirmedAllergens;
+    const declined = allergyChoice.declined ?? declinedAllergens;
+    const hasOverride = override.common.length > 0 || override.custom.length > 0;
+    const hasDeclined = declined.common.length > 0 || declined.custom.length > 0;
 
     // Leitura vencida: pede nova foto sem gastar a chamada.
     if (readExpiresAt && Date.parse(readExpiresAt) <= Date.now()) {
@@ -622,6 +698,10 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         added: addedItems,
         ...(!hasLiquid && liquid ? { liquid } : {}),
         ...(trimmedRequest ? { request: trimmedRequest.slice(0, PANTRY_REQUEST_MAX_LENGTH) } : {}),
+        // CP-B6: confirmações/recusas desta leitura (o backend só aceita as
+        // que vieram dos itens marcados, adicionados ou do pedido).
+        ...(hasOverride ? { allergyOverride: override } : {}),
+        ...(hasDeclined ? { allergyDeclined: declined } : {}),
       });
 
       updateScanStatus(result);
@@ -661,6 +741,20 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
         return;
       }
 
+      // CP-B6: alérgeno no pedido (ou item sem confirmação). Nada foi
+      // gasto; a folha pergunta e a geração vai de novo com a resposta. Se
+      // ainda pedir depois de responder, mostra o erro (sem laço).
+      if (
+        apiCode === PANTRY_ALLERGY_CONFIRMATION_CODE &&
+        err instanceof PantryScannerServiceError &&
+        err.allergens &&
+        !allergyChoice.afterAnswer
+      ) {
+        setStep('ingredients');
+        setAllergySheet({ allergens: err.allergens, action: { kind: 'generate' } });
+        return;
+      }
+
       if (apiCode === PANTRY_READ_EXPIRED_CODE) {
         showToast(errorMessage(err));
         handleScanAgain();
@@ -679,7 +773,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   }, [
     addedItems,
     canGenerate,
+    confirmedAllergens,
     confirmedIngredients,
+    declinedAllergens,
     errorMessage,
     handleScanAgain,
     handleUpgradePress,
@@ -719,6 +815,44 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       );
     }
   }, [ageSheet, checkIngredient, handleGenerateRecipes, t]);
+
+  // CP-B6: resposta da folha de alergia (vale só para esta leitura).
+  const handleAllergyAnswer = useCallback(async (include: boolean) => {
+    const pending = allergySheet;
+    setAllergySheet(null);
+    if (!pending) return;
+    const { action, allergens } = pending;
+
+    if (include) {
+      const nextConfirmed = addToSelection(confirmedAllergens, allergens);
+      setConfirmedAllergens(nextConfirmed);
+      if (action.kind === 'check') checkIngredient(action.index, true);
+      if (action.kind === 'add') {
+        setAddedItems((prev) => (
+          prev.length >= PANTRY_ADDED_ITEMS_MAX || prev.some((item) => item.toLowerCase() === action.name.toLowerCase())
+            ? prev
+            : [...prev, action.name]
+        ));
+      }
+      if (action.kind === 'generate') {
+        await handleGenerateRecipes({ override: nextConfirmed, afterAnswer: true });
+      }
+      return;
+    }
+
+    // "Não, fazer sem": o item fica desmarcado / não é adicionado; o
+    // alérgeno do pedido vai como recusado (receita sem ele, sem sugestão).
+    if (action.kind === 'generate') {
+      const nextDeclined = addToSelection(declinedAllergens, allergens);
+      setDeclinedAllergens(nextDeclined);
+      await handleGenerateRecipes({ declined: nextDeclined, afterAnswer: true });
+    }
+  }, [allergySheet, checkIngredient, confirmedAllergens, declinedAllergens, handleGenerateRecipes]);
+
+  const handleHowToUseExample = useCallback((text: string) => {
+    setIsHowToUseVisible(false);
+    setRequestText(text.slice(0, PANTRY_REQUEST_MAX_LENGTH));
+  }, []);
 
   const handleStartBlend = useCallback(
     (recipe: PulseAiRecipe) => {
@@ -1334,7 +1468,15 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             <Text style={styles.headerTitle} accessibilityRole="header">
               {t('pantryScanner.ingredientsFound')}
             </Text>
-            <View style={styles.headerPlaceholder} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('pantryScanner.howToUse.a11yLabel')}
+              onPress={() => setIsHowToUseVisible(true)}
+              style={styles.headerBackButton}
+              testID="pantry-how-to-use-button"
+            >
+              <Ionicons name="help-circle-outline" size={24} color={themeColors.text.primary} />
+            </Pressable>
           </View>
 
           <KeyboardAvoidingView
@@ -1368,6 +1510,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
                         ? t(alcoholDisabled ? 'pantryScanner.alcoholicUnavailable' : 'pantryScanner.alcoholicLabel')
                         : undefined
                     }
+                    allergyLabel={item.isAllergen ? t('allergies.pantryLabel') : undefined}
+                    allergyA11yLabel={item.isAllergen ? t('allergies.pantryA11y', { name: item.name }) : undefined}
                     onToggle={() => handleToggleIngredient(index)}
                     testID={`pantry-ingredient-${index}`}
                   />
@@ -1404,6 +1548,8 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
                             key={`${item.name}-${index}`}
                             ingredient={item}
                             checked={item.checked}
+                            allergyLabel={item.isAllergen ? t('allergies.pantryLabel') : undefined}
+                            allergyA11yLabel={item.isAllergen ? t('allergies.pantryA11y', { name: item.name }) : undefined}
                             onToggle={() => handleToggleIngredient(index)}
                             testID={`pantry-ingredient-${index}`}
                           />
@@ -1526,6 +1672,23 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               void handleAgeAnswer(isAdult);
             }}
             onDismiss={() => setAgeSheet(null)}
+          />
+
+          <AllergyConfirmationSheet
+            allergens={allergySheet?.allergens ?? null}
+            onConfirm={() => {
+              void handleAllergyAnswer(true);
+            }}
+            onDecline={() => {
+              void handleAllergyAnswer(false);
+            }}
+            onDismiss={() => setAllergySheet(null)}
+          />
+
+          <PantryHowToUseSheet
+            visible={isHowToUseVisible}
+            onClose={() => setIsHowToUseVisible(false)}
+            onExamplePress={handleHowToUseExample}
           />
         </SafeAreaView>
       </View>

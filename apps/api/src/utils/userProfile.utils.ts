@@ -4,7 +4,7 @@
 // POST /auth/google/exchange devolva exatamente o mesmo usuário completo,
 // sem uma segunda cópia da lista de campos para manter em sincronia.
 
-import { calculateLevel } from '@blendi/shared';
+import { calculateLevel, normalizeUserAllergies } from '@blendi/shared';
 import type { IUser } from '../models/User';
 import { calculateFatTargetFromCalories } from './macroCalculation.utils';
 
@@ -79,6 +79,9 @@ export function serializeUserProfile(user: SerializableUser) {
     blendiOwnership: user.blendiOwnership ?? 'blendi',
     otherBlenderModel: user.otherBlenderModel ?? null,
     dietaryPreferences: user.dietaryPreferences ?? [],
+    // CP-B6: conta antiga sem o campo = sem alergia.
+    allergies: normalizeUserAllergies(user.allergies),
+    allergyInviteDismissed: Boolean(user.allergyInviteDismissedAt),
     goal: user.goal,
     weightGoal: user.weightGoal,
     weight: user.weight,

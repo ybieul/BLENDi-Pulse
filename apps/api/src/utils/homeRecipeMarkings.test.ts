@@ -11,6 +11,9 @@
 //   nuts        ← nut_free violada
 //   added_sugar ← no_added_sugar violada
 //   ice         ← Lite violado (sem dieta)
+//   peanut, tree_nuts, milk, lactose, soy, wheat_gluten, sesame, egg
+//               ← CP-B6: a família da alergia (allergyFamilies.utils.ts)
+//                 violada, com a mesma marcação em en e em pt-BR
 // e precisa ser IGUAL à marcação declarada. Não existe uma segunda lista de
 // palavras: o app só lê a marcação.
 //
@@ -34,7 +37,11 @@ import { before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import {
+  ALLERGY_CODE_VALUES,
+  ALLERGY_FORBIDDEN_CONTENTS,
   DIETARY_PREFERENCE_FORBIDDEN_CONTENTS,
+  isHomeRecipeAllowed,
+  type AllergyCode,
   HOME_RECIPE_CONTENT_VALUES,
   USER_GOAL_VALUES,
   type HomeRecipeContent,
@@ -43,6 +50,7 @@ import {
 import { NUTRITION_REFERENCE_TABLE } from '../config/nutritionReference.config';
 import { BLENDER_LIMITS } from '../config/pricing.config';
 import type { DietaryPreference } from '../models/User';
+import { buildAllergyRestrictions } from './allergyFamilies.utils';
 import { isIceTerm, tokenizeSegments, validateRecipeRestrictions, type RestrictedRecipe } from './recipeRestrictions.utils';
 import { estimateIngredientVolumeMl, estimateRecipeVolumeMl } from './recipeVolume.utils';
 
@@ -95,6 +103,13 @@ function violatedTerms(recipe: RestrictedRecipe, diets: DietaryPreference[], mod
   return result.compliant ? [] : result.violations.map(violation => violation.term);
 }
 
+/** CP-B6: a família da alergia barra a receita. */
+function allergyBlocked(recipe: RestrictedRecipe, code: AllergyCode): boolean {
+  return !validateRecipeRestrictions(recipe, [], 'ProPlus', {
+    allergies: buildAllergyRestrictions({ common: [code], custom: [] }),
+  }).compliant;
+}
+
 function liteIceBlocked(recipe: RestrictedRecipe): boolean {
   return violatedTerms(recipe, [], 'Lite').some(isIceTerm);
 }
@@ -113,6 +128,10 @@ function deriveContains(recipe: HomeRecipe): HomeRecipeContent[] {
   // A marcação 'ice' da Home é só gelo. O Lite também barra congelado, mas
   // desde o CP-A nenhuma receita da Home tem congelado (ver "regras das 100").
   if (liteIceBlocked(restricted)) derived.add('ice');
+  // CP-B6: uma marcação por alergia comum, com o nome do código.
+  for (const code of ALLERGY_CODE_VALUES) {
+    if (allergyBlocked(restricted, code)) derived.add(code);
+  }
 
   return HOME_RECIPE_CONTENT_VALUES.filter(content => derived.has(content));
 }
@@ -157,6 +176,68 @@ describe('receitas da Home — marcação conferida pelas regras do backend', ()
         assert.equal(recipe.contains.includes('ice'), iceBlocked, `${recipe.nameKey} × Lite`);
       }
     }
+  });
+});
+
+// ─── CP-B6: alergias ──────────────────────────────────────────────────────────
+
+describe('receitas da Home — alergias (CP-B6)', () => {
+  const ptBR = JSON.parse(readFileSync(path.join(MOBILE_SRC, 'locales/pt-BR.json'), 'utf8')) as Record<string, unknown>;
+  const translatePt = (key: string) => String(key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], ptBR));
+  const toRestrictedRecipePt = (recipe: HomeRecipe): RestrictedRecipe => ({
+    ingredients: recipe.ingredients.map(ingredient => ({ name: translatePt(ingredient.nameKey), amount: translatePt(ingredient.amountKey) })),
+    steps: recipe.steps.map(step => ({ text: translatePt(step.textKey) })),
+    blendInstruction: translatePt(BLEND_INSTRUCTION_KEY),
+  });
+
+  it('cada alergia comum proíbe exatamente o que a família dela barra (en e pt-BR)', () => {
+    const problems: string[] = [];
+    for (const goal of USER_GOAL_VALUES) {
+      for (const recipe of DAILY_RECIPES[goal]) {
+        for (const code of ALLERGY_CODE_VALUES) {
+          const blockedByMarking = ALLERGY_FORBIDDEN_CONTENTS[code].some(content => recipe.contains.includes(content));
+          const blockedEn = allergyBlocked(toRestrictedRecipe(recipe), code);
+          const blockedPt = allergyBlocked(toRestrictedRecipePt(recipe), code);
+          if (blockedByMarking !== blockedEn || blockedEn !== blockedPt) {
+            problems.push(`${recipe.nameKey} × ${code}: marcação ${blockedByMarking}, en ${blockedEn}, pt-BR ${blockedPt}`);
+          }
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it('todo goal tem ao menos uma receita compatível com cada alergia comum (sem precisar do fallback)', () => {
+    const counts: Record<string, Record<string, number>> = {};
+    for (const goal of USER_GOAL_VALUES) {
+      counts[goal] = {};
+      for (const code of ALLERGY_CODE_VALUES) {
+        counts[goal][code] = DAILY_RECIPES[goal].filter(recipe =>
+          isHomeRecipeAllowed(recipe, [], 'ProPlus', { common: [code], custom: [] })
+        ).length;
+        assert.ok(counts[goal][code] > 0, `${goal} × ${code}`);
+      }
+    }
+    // Contagem de referência (CP-B6): muda só se as receitas mudarem.
+    assert.deepEqual(counts, {
+      Muscle: { peanut: 16, tree_nuts: 17, milk: 3, lactose: 3, soy: 18, wheat_gluten: 19, sesame: 20, egg: 20 },
+      Wellness: { peanut: 20, tree_nuts: 20, milk: 2, lactose: 2, soy: 18, wheat_gluten: 20, sesame: 20, egg: 20 },
+      Energy: { peanut: 18, tree_nuts: 18, milk: 7, lactose: 7, soy: 19, wheat_gluten: 19, sesame: 20, egg: 20 },
+      Recovery: { peanut: 20, tree_nuts: 20, milk: 4, lactose: 4, soy: 19, wheat_gluten: 20, sesame: 20, egg: 20 },
+      WeightLoss: { peanut: 20, tree_nuts: 16, milk: 9, lactose: 12, soy: 16, wheat_gluten: 20, sesame: 20, egg: 19 },
+    });
+  });
+
+  it('item do campo livre esconde a receita pelos nomes dos ingredientes (en e pt-BR)', () => {
+    const recipe = DAILY_RECIPES.WeightLoss.find(item => item.nameKey === 'home.dailyRecipeWeightLoss09Name');
+    assert.ok(recipe);
+    const names = recipe.ingredients.flatMap(ingredient => [translate(ingredient.nameKey), translatePt(ingredient.nameKey)]);
+    // "Raspberries" / "Framboesas": o item em qualquer número e idioma escrito.
+    assert.equal(isHomeRecipeAllowed(recipe, [], 'ProPlus', { common: [], custom: ['framboesa'] }, names), false);
+    assert.equal(isHomeRecipeAllowed(recipe, [], 'ProPlus', { common: [], custom: ['raspberry'] }, names), false);
+    assert.equal(isHomeRecipeAllowed(recipe, [], 'ProPlus', { common: [], custom: ['kiwi'] }, names), true);
+    // Falha segura: item livre sem os nomes → a receita não aparece.
+    assert.equal(isHomeRecipeAllowed(recipe, [], 'ProPlus', { common: [], custom: ['kiwi'] }), false);
   });
 });
 

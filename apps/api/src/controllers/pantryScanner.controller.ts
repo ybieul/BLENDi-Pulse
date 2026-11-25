@@ -1,11 +1,13 @@
 import type { NextFunction, Request, Response } from 'express';
 import {
   AI_REQUEST_BUDGET_MS,
+  PANTRY_ALLERGY_CONFIRMATION_REQUIRED_CODE,
   PANTRY_PRO_READ_BURST_LIMIT,
   PANTRY_PRO_READ_BURST_WINDOW_MS,
   PANTRY_PRO_READ_DAILY_LIMIT,
   PANTRY_READS_PER_SCAN,
   PANTRY_READ_TTL_MS,
+  pantryAllergyCheckSchema,
   pantryAnalysisResultSchema,
   pantryGenerateSchema,
   pantryIngredientSchema,
@@ -21,7 +23,10 @@ import {
   type PantryReadResult,
   type PantryScanInput,
   type PulseAiRecipe,
+  type AllergenSelection,
+  type PantryAllergyCheckResult,
   type RecipeUnmetTarget,
+  type UserAllergies,
 } from '@blendi/shared';
 import { addMonths } from 'date-fns';
 import mongoose from 'mongoose';
@@ -85,6 +90,17 @@ import {
 import { isSameDayInTimezone } from '../utils/timezone.utils';
 import { prepareAiRecipePayload } from '../utils/aiRecipePayload.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
+import {
+  buildPromptAllergyContext,
+  findAllergensInName,
+  forbiddenAllergyCodes,
+  isEmptySelection,
+  mentionsForbiddenAllergen,
+  readUserAllergies,
+  resolveAllergyRequest,
+  withAllergyNotices,
+  type AllergyRequestResolution,
+} from '../utils/allergyFamilies.utils';
 import { markWaterNotInPhoto } from '../utils/recipeWater.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import {
@@ -181,6 +197,8 @@ interface PantryScannerUserProfile {
   alcoholAge: AlcoholAgeStatus;
   /** CP-B7 (Pro): leituras no dia e quando o contador foi zerado. */
   pantryReadDayResetDate?: Date;
+  /** CP-B6: alergias cadastradas (conta antiga sem o campo = nenhuma). */
+  allergies: UserAllergies;
 }
 
 type PantryScanIncrementResult =
@@ -553,7 +571,7 @@ type PantryRecipeEnforcement =
   | { recipe: PulseAiRecipe; failure?: undefined }
   | { recipe: null; failure: PantryEnforcementFailure };
 type PantryRestrictionEnforcement =
-  | { recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[]; failure?: undefined }
+  | { recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[]; allergyOverrideKeys: string[]; failure?: undefined }
   | { recipe: null; failure: PantryEnforcementFailure };
 
 // Limite físico do BLENDi (CP-B2: só o volume — blenderGuardrail.utils.ts),
@@ -692,7 +710,11 @@ async function ensurePantryRecipeRestrictions(
   const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel, options);
 
   if (initialCheck.compliant) {
-    return { recipe, dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [] };
+    return {
+      recipe,
+      dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [],
+      allergyOverrideKeys: initialCheck.allergyOverrideKeys ?? [],
+    };
   }
 
   console.info('[pantryScanner] recipe restriction violated, retrying', {
@@ -702,6 +724,7 @@ async function ensurePantryRecipeRestrictions(
   try {
     const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations, {
       genericBlender: prompt.textContext?.genericBlender,
+      allergies: options.allergies,
     });
     const retryResponse = await callAi({
       systemPrompt: prompt.systemPrompt,
@@ -740,6 +763,7 @@ async function ensurePantryRecipeRestrictions(
         macrosValidated: validateMacroConsistency(retriedRecipe).macrosValidated,
       },
       dietOverrideIngredientIndexes: retriedCheck.dietOverrideIngredientIndexes ?? [],
+      allergyOverrideKeys: retriedCheck.allergyOverrideKeys ?? [],
     };
   } catch (error) {
     console.error('[pantryScanner] recipe restriction retry failed, discarding', {
@@ -775,6 +799,7 @@ async function findPantryScannerUserProfile(
       hasRealBodyProfile: 1,
       alcoholAgeConfirmed: 1,
       pantryReadDayResetDate: 1,
+      allergies: 1,
     })
     .lean()
     .exec();
@@ -804,6 +829,7 @@ async function findPantryScannerUserProfile(
     isPro: user.isPro ?? false,
     alcoholAge: resolveAlcoholAge(user),
     ...(user.pantryReadDayResetDate ? { pantryReadDayResetDate: user.pantryReadDayResetDate } : {}),
+    allergies: readUserAllergies(user.allergies),
   };
 }
 
@@ -1095,6 +1121,8 @@ interface PantryUserChoices {
   alcohol: PantryAlcoholPromptOptions;
   /** Álcool pedido por menor/"Não": receita sem álcool, com aviso. */
   alcoholFreeVersion: boolean;
+  /** CP-B6: alergias e o que foi confirmado/recusado nesta geração. */
+  allergy: AllergyRequestResolution;
 }
 
 function hasExplicitRequest(choices: PantryUserChoices): boolean {
@@ -1281,7 +1309,11 @@ async function ensurePantryRequestedTargets(
         messages: buildPantryRecipeRetryMessages(
           prompt,
           current,
-          buildRequestedTargetsRetryMessage(unmet, { dietaryPreferences: user.dietaryPreferences, format: 'pantry' })
+          buildRequestedTargetsRetryMessage(unmet, {
+            dietaryPreferences: user.dietaryPreferences,
+            allergies: forbiddenAllergyCodes(choices.allergy),
+            format: 'pantry',
+          })
         ),
         maxTokens: 2000,
       });
@@ -1340,6 +1372,8 @@ async function checkPantryRecipe(
     explicitRequest: buildPantryExplicitRequest(choices),
     // CP-B7: a rede de álcool passa a valer no Pantry.
     alcohol: choices.alcohol.policy,
+    // CP-B6: alergias (só as confirmadas nesta geração liberadas).
+    allergies: choices.allergy.restrictions,
   });
   if (!restricted.recipe) {
     return { recipe: null, discardedBy: restricted.failure === 'aiUnavailable' ? 'aiUnavailable' : 'restriction' };
@@ -1366,13 +1400,20 @@ async function checkPantryRecipe(
   // ou pedido que faltou e valor pedido não atingido viram aviso no card
   // (só o backend preenche), com a sugestão que respeita a dieta.
   const noticed = applyRequestCheckNotices(
-    withRequestNotices(restricted.recipe, restricted.dietOverrideIngredientIndexes, choices.alcoholFreeVersion),
+    withAllergyNotices(
+      withRequestNotices(restricted.recipe, restricted.dietOverrideIngredientIndexes, choices.alcoholFreeVersion),
+      {
+        profile: choices.allergy.profile,
+        overrideKeys: restricted.allergyOverrideKeys,
+        suggestion: choices.allergy.suggestion,
+      }
+    ),
     {
       origin: 'pantry',
       blendiModel: user.blendiModel,
       missing: finalGaps.missingAdded,
       unmet: pantryUnmetTargetsOf(restricted.recipe, choices).map(unmet => {
-        const suggestion = suggestionForUnmetTarget(unmet, user.dietaryPreferences);
+        const suggestion = suggestionForUnmetTarget(unmet, user.dietaryPreferences, forbiddenAllergyCodes(choices.allergy));
         return suggestion ? { ...unmet, suggestion } : unmet;
       }),
       itemAttempts: followed.attempts,
@@ -1419,6 +1460,7 @@ async function generatePantryRecipes(
     userRequest: choices.request,
     liquid: choices.liquid,
     alcohol: choices.alcohol,
+    allergies: buildPromptAllergyContext(choices.allergy),
   });
 
   try {
@@ -1637,13 +1679,18 @@ function buildPantryReadResult(params: {
     ...(params.readId && params.readExpiresAt
       ? { readId: params.readId, readExpiresAt: params.readExpiresAt.toISOString() }
       : {}),
-    ingredients: params.ingredients.map(ingredient => ({
-      name: ingredient.name,
-      ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
-      confidence: ingredient.confidence,
-      isAlcoholic: ingredient.isAlcoholic,
-      blendSuitable: isBlendSuitable(ingredient),
-    })),
+    ingredients: params.ingredients.map(ingredient => {
+      // CP-B6: pelas alergias de AGORA (o generate confere de novo).
+      const allergens = findAllergensInName(ingredient.name, params.user.allergies);
+      return {
+        name: ingredient.name,
+        ...(ingredient.estimatedQuantity ? { estimatedQuantity: ingredient.estimatedQuantity } : {}),
+        confidence: ingredient.confidence,
+        isAlcoholic: ingredient.isAlcoholic,
+        blendSuitable: isBlendSuitable(ingredient),
+        ...(!isEmptySelection(allergens) ? { isAllergen: true, allergens } : {}),
+      };
+    }),
     hasLiquid: params.hasLiquid,
     noFoodDetected: params.noFoodDetected,
     ...(params.noUsableIngredients ? { noUsableIngredients: true } : {}),
@@ -1895,7 +1942,7 @@ async function generatePantryWithinBudget(
       return;
     }
 
-    const { readId, liquid, request } = parsed.data;
+    const { readId, liquid, request, allergyOverride, allergyDeclined } = parsed.data;
 
     if (!mongoose.isValidObjectId(readId)) {
       sendReadExpired(res);
@@ -1948,6 +1995,37 @@ async function generatePantryWithinBudget(
       .map(ingredient => ingredient.name);
     const added = dedupeItems(parsed.data.added).filter(item => !selectedKeys.has(normalizeItemKey(item)));
 
+    // ── Alergias (CP-B6): item marcado ou adicionado que bate com alergia, ou
+    // alérgeno citado no pedido, só com a confirmação desta geração. Sem ela,
+    // a resposta própria sai ANTES de contar scan, consumir a leitura ou
+    // chamar a IA. As alergias são lidas do banco agora (não da leitura).
+    const chosenAllergens = [...selectedRead.map(ingredient => ingredient.name), ...added]
+      .map(name => findAllergensInName(name, currentUser.allergies))
+      .reduce<AllergenSelection>(
+        (all, found) => ({ common: [...all.common, ...found.common], custom: [...all.custom, ...found.custom] }),
+        { common: [], custom: [] }
+      );
+    const allergy = resolveAllergyRequest({
+      profile: currentUser.allergies,
+      text: request ?? '',
+      chosen: chosenAllergens,
+      override: allergyOverride,
+      declined: allergyDeclined,
+      language: currentUser.locale,
+    });
+
+    if (!isEmptySelection(allergy.unresolved)) {
+      // Sem o alérgeno no log (dado de saúde).
+      console.info('[pantryScanner] allergen chosen or requested without confirmation, asking');
+      sendErrorResponse(res, {
+        statusCode: 428,
+        code: PANTRY_ALLERGY_CONFIRMATION_REQUIRED_CODE,
+        message: 'Allergy confirmation is required for this request.',
+        data: { allergens: allergy.unresolved },
+      });
+      return;
+    }
+
     // ── Álcool (CP-B5 no Pantry): decisão = pedido de álcool no texto OU item
     // alcoólico marcado/adicionado. A pergunta de idade sai ANTES de contar
     // scan e de chamar a IA.
@@ -1999,11 +2077,12 @@ async function generatePantryWithinBudget(
       ...(request ? { request } : {}),
       // CP-B7: alimento e valor pedidos no "Algum pedido?" são conferidos
       // como no Pulse AI (álcool só quando permitido; gelo nunca no Lite).
+      // CP-B6: alérgeno pedido e não confirmado não é cobrado.
       requestFoods: request
         ? requiredRequestedFoods(extractRequestedFoods(request), {
             blendiModel: currentUser.blendiModel,
             alcoholAllowed: alcoholAllowed,
-          })
+          }).filter(food => !mentionsForbiddenAllergen(food.display, allergy.restrictions))
         : [],
       requestTargets: parseRequestedTargets(request),
       blendiModel: currentUser.blendiModel,
@@ -2014,6 +2093,7 @@ async function generatePantryWithinBudget(
         inEveryRecipe: alcoholicAdded.length > 0 || requestDecision === 'yes',
       },
       alcoholFreeVersion: alcoholRequested && currentUser.alcoholAge === 'under-age',
+      allergy,
     };
     // O que a resposta e a prévia mostram como ingredientes: os marcados e os
     // adicionados.
@@ -2402,6 +2482,51 @@ export async function unlockPantryPreview(
         recipes: parsedContent.data.recipes,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ─── POST /pantry-scanner/allergy-check (CP-B6) ────────────────────────────
+
+/**
+ * Confere, na hora de adicionar à mão, se o item bate com uma alergia
+ * cadastrada — as mesmas famílias do backend (o app não tem uma segunda
+ * lógica). Não chama IA, não conta scan nem leitura e não grava nada. A
+ * geração confere de novo (a resposta daqui é só para abrir a folha na hora).
+ */
+export async function checkPantryAllergy(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const parsed = pantryAllergyCheckSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: INVALID_GENERATE_REQUEST_CODE,
+        message: 'Invalid Pantry Scanner allergy check.',
+        errors: formatZodErrors(parsed.error),
+      });
+      return;
+    }
+
+    const userId = req.user?.sub;
+
+    if (!userId) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const user = await UserModel.findById(userId).select({ allergies: 1 }).lean().exec();
+
+    if (!user) {
+      sendUserNotFound(res);
+      return;
+    }
+
+    const allergens = findAllergensInName(parsed.data.item, readUserAllergies(user.allergies));
+    const data: PantryAllergyCheckResult = { isAllergen: !isEmptySelection(allergens), allergens };
+
+    res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
   }

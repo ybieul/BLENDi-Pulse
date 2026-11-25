@@ -36,6 +36,8 @@ interface AssistantChatMessageProps extends BaseChatMessageProps {
   favoriteId?: string;
   onStartBlend?: () => void;
   isFromCache?: boolean;
+  /** CP-B6: botão "Quero com X" da sugestão de alergia. */
+  onAllergySuggestionPress?: (recipe: PulseAiRecipe) => void;
   isError?: never;
   locked?: never;
 }
@@ -231,6 +233,7 @@ export function ChatMessage(props: ChatMessageProps) {
         favoriteId={props.favoriteId}
         onStartBlend={props.onStartBlend ?? NOOP}
         isFromCache={props.isFromCache}
+        onAllergySuggestionPress={props.onAllergySuggestionPress}
       />
     </Animated.View>
   );

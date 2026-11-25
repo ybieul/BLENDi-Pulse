@@ -551,3 +551,25 @@ describe('OnboardingMacrosScreen — goal Weight Loss (CP-1.1.9)', () => {
     )).toBeTruthy();
   });
 });
+
+describe('OnboardingMacrosScreen — alergias no PATCH (CP-B6)', () => {
+  it('com alergia marcada no onboarding, o PATCH final leva o campo inteiro', async () => {
+    mockOnboardingOverrides = { allergies: { common: ['peanut'], custom: ['kiwi'] } };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', expect.objectContaining({
+      allergies: { common: ['peanut'], custom: ['kiwi'] },
+    }));
+  });
+
+  it('pulada (nada marcado): o PATCH não leva o campo', async () => {
+    mockOnboardingOverrides = { allergies: { common: [], custom: [] } };
+
+    fillValidMacrosAndFinish(renderScreen());
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledTimes(1));
+    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('allergies');
+  });
+});

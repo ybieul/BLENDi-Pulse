@@ -25,7 +25,7 @@ jest.mock('react-native-safe-area-context', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment -- idem
   const { View } = require('react-native');
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- idem
-  return { SafeAreaView: View };
+  return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 
 jest.mock('../components/ui/AuroraBackground', () => ({ AuroraBackground: () => null }));

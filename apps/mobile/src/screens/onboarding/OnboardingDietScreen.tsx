@@ -5,12 +5,17 @@
 // e no_added_sugar. Pode continuar sem marcar nada — o botão deixa isso claro.
 // As escolhas ficam no onboarding store e vão no PATCH final do
 // OnboardingMacrosScreen; a Pulse AI e o Pantry Scanner aplicam pelo prompt.
+//
+// CP-B6: logo abaixo, a pergunta OPCIONAL "Você tem alguma alergia?" (os 8
+// botões e o campo livre, AllergiesPicker). Pular = não marcar nada; vai no
+// mesmo PATCH final só quando há alguma alergia.
 
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { fontSizes, fonts, spacing } from '@blendi/shared';
 import { AuthButton } from '../../components/ui/AuthButton';
+import { AllergiesPicker } from '../../components/allergies/AllergiesPicker';
 import { DietaryPreferencesPicker } from '../../components/ui/DietaryPreferencesPicker';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
@@ -28,6 +33,8 @@ export function OnboardingDietScreen({ navigation }: OnboardingDietScreenProps) 
   const { t } = useAppTranslation();
   const dietaryPreferences = useOnboardingStore((state) => state.dietaryPreferences);
   const toggleDietaryPreference = useOnboardingStore((state) => state.toggleDietaryPreference);
+  const allergies = useOnboardingStore((state) => state.allergies);
+  const setAllergies = useOnboardingStore((state) => state.setAllergies);
 
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(20)).current;
@@ -68,6 +75,15 @@ export function OnboardingDietScreen({ navigation }: OnboardingDietScreenProps) 
       fontSize: fontSizes.md,
       lineHeight: 24,
     },
+    allergySection: {
+      gap: spacing.md,
+      paddingTop: spacing.lg,
+    },
+    allergyTitle: {
+      color: colors.text.primary,
+      fontFamily: fonts.display,
+      fontSize: fontSizes['2xl'],
+    },
   });
 
   const hasSelection = dietaryPreferences.length > 0;
@@ -84,6 +100,11 @@ export function OnboardingDietScreen({ navigation }: OnboardingDietScreenProps) 
               selected={dietaryPreferences}
               onToggle={toggleDietaryPreference}
             />
+            <View style={styles.allergySection} testID="onboarding-allergies-section">
+              <Text style={styles.allergyTitle} accessibilityRole="header">{t('allergies.picker.title')}</Text>
+              <Text style={styles.subtitle}>{t('allergies.picker.subtitle')}</Text>
+              <AllergiesPicker value={allergies} onChange={setAllergies} />
+            </View>
           </View>
         )}
         bottomContent={(

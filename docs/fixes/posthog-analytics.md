@@ -93,6 +93,8 @@ Disparados só depois da chamada à API ter sucesso (nunca em caso de erro):
 | `PulseAIScreen.tsx` (prévia chega no chat) | `paywall_preview_shown` | `source: 'pulse_ai'` |
 | `PulseAIScreen.tsx` (toque no card bloqueado) | `paywall_preview_tapped` | `source: 'pulse_ai'` |
 
+**CP-B6 (alergias):** nenhum evento novo e nenhuma propriedade nova. Alergia é dado de saúde: não vai para analytics nem com o conteúdo nem como "tem/não tem" (não existe evento de perfil para receber essa contagem). A tela nova `Allergies` não está em `TRACKED_SCREEN_NAMES`, então não gera `screen_viewed`; a confirmação de alergia, o convite "Isso é alergia?" e a consulta `POST /pantry-scanner/allergy-check` também não disparam evento. `ai_message_sent` e `pantry_scan_completed` continuam sem nenhuma informação da receita ou do pedido.
+
 Na prévia, `sendMessage` **não** dispara `ai_message_sent`: o evento continua contando só receitas entregues de verdade. O CP-1.1.4b deve reaproveitar os mesmos eventos com `source: 'pantry_scanner'`. Ver [cp-1.1.4a-previa-bloqueada-pulse-ai.md](cp-1.1.4a-previa-bloqueada-pulse-ai.md).
 
 ## Tarefa 6 — Ciclo de vida da assinatura (backend)

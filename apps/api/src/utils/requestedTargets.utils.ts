@@ -23,6 +23,7 @@
 // tokenizador do validador usa para cortar o texto.
 
 import type {
+  AllergyCode,
   DietaryPreference,
   RecipeTargetKind,
   RecipeTargetNutrient,
@@ -211,12 +212,12 @@ export function findUnmetTargets(
  */
 export function suggestionForUnmetTarget(
   unmet: RecipeUnmetTarget,
-  dietaryPreferences: readonly DietaryPreference[]
+  dietaryPreferences: readonly DietaryPreference[],
+  allergies: readonly AllergyCode[] = []
 ): RecipeTargetSuggestion | undefined {
   if (unmet.delivered >= unmet.requested) return undefined;
 
-  const plantOnly = dietaryPreferences.includes('vegan') || dietaryPreferences.includes('dairy_free');
-  const nutFree = dietaryPreferences.includes('nut_free');
+  const { plantOnly, nutFree } = suggestionLimits(dietaryPreferences, allergies);
 
   switch (unmet.nutrient) {
     case 'protein':
@@ -254,10 +255,33 @@ function describeRequest(unmet: RecipeUnmetTarget): string {
   }
 }
 
-function hintFor(unmet: RecipeUnmetTarget, dietaryPreferences: readonly DietaryPreference[]): string {
+/**
+ * CP-B6: o que as sugestões evitam, pela dieta E pelas alergias (com alergia
+ * a leite/lactose nada de whey nem iogurte; com alergia a amendoim/castanhas,
+ * nada de pasta de amendoim nem castanhas). As alergias ainda proibidas
+ * nesta requisição.
+ */
+function suggestionLimits(
+  dietaryPreferences: readonly DietaryPreference[],
+  allergies: readonly AllergyCode[]
+): { plantOnly: boolean; nutFree: boolean } {
+  return {
+    plantOnly:
+      dietaryPreferences.includes('vegan') ||
+      dietaryPreferences.includes('dairy_free') ||
+      allergies.includes('milk') ||
+      allergies.includes('lactose'),
+    nutFree: dietaryPreferences.includes('nut_free') || allergies.includes('peanut') || allergies.includes('tree_nuts'),
+  };
+}
+
+function hintFor(
+  unmet: RecipeUnmetTarget,
+  dietaryPreferences: readonly DietaryPreference[],
+  allergies: readonly AllergyCode[]
+): string {
   const below = unmet.delivered < unmet.requested;
-  const plantOnly = dietaryPreferences.includes('vegan') || dietaryPreferences.includes('dairy_free');
-  const nutFree = dietaryPreferences.includes('nut_free');
+  const { plantOnly, nutFree } = suggestionLimits(dietaryPreferences, allergies);
 
   if (!below) {
     switch (unmet.nutrient) {
@@ -287,10 +311,15 @@ function hintFor(unmet: RecipeUnmetTarget, dietaryPreferences: readonly DietaryP
 /** Mensagem da nova tentativa: valor pedido × entregue, com dicas (respeitando dieta e volume). */
 export function buildRequestedTargetsRetryMessage(
   unmet: readonly RecipeUnmetTarget[],
-  options: { dietaryPreferences: readonly DietaryPreference[]; format: 'object' | 'pantry' }
+  options: {
+    dietaryPreferences: readonly DietaryPreference[];
+    /** CP-B6: alergias ainda proibidas nesta requisição. */
+    allergies?: readonly AllergyCode[];
+    format: 'object' | 'pantry';
+  }
 ): string {
   const details = unmet.map(item => (
-    `the user asked for ${describeRequest(item)} of ${NUTRIENT_LABEL[item.nutrient]} and the recipe has ${item.delivered} ${UNIT[item.nutrient]} (${hintFor(item, options.dietaryPreferences)})`
+    `the user asked for ${describeRequest(item)} of ${NUTRIENT_LABEL[item.nutrient]} and the recipe has ${item.delivered} ${UNIT[item.nutrient]} (${hintFor(item, options.dietaryPreferences, options.allergies ?? [])})`
   ));
 
   return [

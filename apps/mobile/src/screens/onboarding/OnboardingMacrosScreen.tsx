@@ -26,6 +26,7 @@ import {
   fontSizes,
   fonts,
   fontWeights,
+  hasAllergies,
   spacing,
 } from '@blendi/shared';
 import type { UserGoal } from '@blendi/shared';
@@ -138,6 +139,7 @@ export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'On
   const otherBlenderModel = useOnboardingStore((state) => state.otherBlenderModel);
   const selectedGoal     = useOnboardingStore((state) => state.selectedGoal);
   const dietaryPreferences = useOnboardingStore((state) => state.dietaryPreferences);
+  const allergies = useOnboardingStore((state) => state.allergies);
   const unitSystem       = useOnboardingStore((state) => state.unitSystem);
   const weight           = useOnboardingStore((state) => state.weight);
   const height           = useOnboardingStore((state) => state.height);
@@ -236,6 +238,8 @@ export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'On
           otherBlenderModel: trimmedOtherBlenderModel,
         }),
         dietaryPreferences,
+        // CP-B6: pergunta opcional — só vai quando a pessoa marcou algo.
+        ...(hasAllergies(allergies) && { allergies }),
         goal,
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,
@@ -271,6 +275,7 @@ export function OnboardingMacrosScreen({ navigation }: OnboardingScreenProps<'On
             ? trimmedOtherBlenderModel
             : null,
         dietaryPreferences,
+        ...(hasAllergies(allergies) && { allergies }),
         goal,
         dailyProteinTarget: proteinNum,
         dailyCalorieTarget: caloriesNum,

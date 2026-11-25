@@ -15,8 +15,10 @@
 
 import { z } from 'zod';
 
+import { UNSAFE_TEXT_CHARS_PATTERN } from '../utils/textMatching';
 import { isValidIanaTimezone } from '../utils/timezone.utils';
 import { rangeErrorMessage } from '../utils/validationRange.utils';
+import { userAllergiesSchema } from './allergies';
 
 // Fonte única dos valores de `goal` (proposta do blend). Backend (Zod,
 // Mongoose, missões, favoritos) e app importam esta lista em vez de repeti-la.
@@ -67,14 +69,11 @@ export type BlendiOwnership = (typeof BLENDI_OWNERSHIP_VALUES)[number];
 // entra no prompt da IA, em evento de analytics nem em log.
 export const OTHER_BLENDER_MODEL_MAX_LENGTH = 60;
 
-// Caracteres de controle (\p{Cc}: NUL, quebra de linha, tab...) e de controle
-// bidirecional (U+202A-202E, U+2066-2069 — o "RTL override" inverte a ordem
-// visual do texto) viram espaço. O campo é de uma linha só e vai ser lido por
+// Caracteres de controle e de controle bidirecional viram espaço (achado X01
+// do pentest do CP-1.1.1a). O campo é de uma linha só e vai ser lido por
 // listas/exports futuros (Shop Tab); em vez de rejeitar com 400 (o usuário não
-// teria como entender o motivo ao colar um texto com tab), saneia. Achado X01
-// do pentest do CP-1.1.1a. ZWJ/ZWNJ ficam de fora de propósito: fazem parte de
-// emojis compostos.
-const UNSAFE_TEXT_CHARS_PATTERN = /[\p{Cc}\u202A-\u202E\u2066-\u2069]+/gu;
+// teria como entender o motivo ao colar um texto com tab), saneia. CP-B6: o
+// padrão passou para utils/textMatching.ts (também usado pelas alergias).
 
 // Teto de itens enviados em dietaryPreferences. Há só 4 valores válidos; o
 // teto deixa margem para duplicados (que são aceitos e removidos) mas corta
@@ -266,6 +265,14 @@ export const updateUserSchema = z
           .array(z.enum(DIETARY_PREFERENCE_VALUES, { message: 'errors.validation.invalid_option' }))
           .transform(values => [...new Set(values)])
       ),
+
+    // CP-B6: alergias (substitui o campo inteiro). Separadas das preferências
+    // de dieta: alergia só é furada por pedido explícito CONFIRMADO na hora.
+    allergies: userAllergiesSchema,
+
+    // CP-B6: o convite único "Isso é alergia?" (quem marcou nut_free) foi
+    // fechado. Só aceita true: depois de fechado, não volta.
+    allergyInviteDismissed: z.literal(true, { message: 'errors.validation.invalid_option' }),
 
     goal: z.enum(userGoalValues, {
       required_error: 'errors.validation.required',

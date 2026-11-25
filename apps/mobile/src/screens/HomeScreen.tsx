@@ -54,7 +54,8 @@ import { usePulseAIStore } from '../store/pulseAi.store';
 import { logWater, getHydrationToday } from '../services/hydration.service';
 import { getTodayLogs, type BlendLogsTodayData } from '../services/blendLog.service';
 import type { AppTabScreenProps } from '../navigation/types';
-import type { DietaryPreference, PulseAiRecipe, UserGoal } from '@blendi/shared';
+import type { DietaryPreference, PulseAiRecipe, UserAllergies, UserGoal } from '@blendi/shared';
+import { readProfileAllergies } from '../utils/allergies.utils';
 
 import { AuroraBackground } from '../components/ui/AuroraBackground';
 import { ProfileSkeleton, RecipeCardSkeleton, SkeletonLoader } from '../components/ui';
@@ -102,6 +103,8 @@ interface UserProfileData {
   blendiModel: BlendiModel;
   goal: UserGoal;
   dietaryPreferences?: DietaryPreference[];
+  /** CP-B6 */
+  allergies?: UserAllergies;
   preferredLanguage: string;
   timezone: string;
   dailyProteinTarget: number;
@@ -260,6 +263,8 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   // com a dieta nova sem reiniciar o app.
   const dietaryPreferences = profile?.dietaryPreferences ?? authUser?.dietaryPreferences ?? [];
   const blendiModel: BlendiModel = profile?.blendiModel ?? authUser?.blendiModel ?? 'Lite';
+  // CP-B6: receita com alérgeno cadastrado não aparece (mesmo mecanismo da dieta).
+  const allergies = readProfileAllergies(profile ?? authUser);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -621,6 +626,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
               <DailyRecipeCard
                 goal={profile?.goal ?? 'Wellness'}
                 dietaryPreferences={dietaryPreferences}
+                allergies={allergies}
                 blendiModel={blendiModel}
                 onStartBlend={handleStartBlend}
                 onAskPulseAi={handleAskPulseAiForRecipe}

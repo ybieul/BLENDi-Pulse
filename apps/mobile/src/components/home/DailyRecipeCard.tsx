@@ -1,6 +1,14 @@
 import { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { DietaryPreference, HomeRecipeBlendiModel, PulseAiRecipe, UserGoal } from '@blendi/shared';
+import type {
+  DietaryPreference,
+  HomeRecipeAllergyFilter,
+  HomeRecipeBlendiModel,
+  PulseAiRecipe,
+  UserGoal,
+} from '@blendi/shared';
+import en from '../../locales/en.json';
+import ptBR from '../../locales/pt-BR.json';
 
 import {
   fontSizes,
@@ -11,7 +19,7 @@ import {
 import { AuthButton } from '../ui/AuthButton';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
-import { DAILY_RECIPE_BLEND_INSTRUCTION_KEY, DAILY_RECIPES } from './dailyRecipes.data';
+import { DAILY_RECIPE_BLEND_INSTRUCTION_KEY, DAILY_RECIPES, type DailyRecipe } from './dailyRecipes.data';
 import { selectDailyRecipe } from './dailyRecipeSelection';
 
 // Reexportado: os dados moraram aqui até o CP-1.1.9 (ver dailyRecipes.data.ts).
@@ -21,6 +29,8 @@ export interface DailyRecipeCardProps {
   goal: UserGoal;
   /** Dieta da pessoa (CP-1.1.9): a receita do dia nunca a viola. */
   dietaryPreferences: readonly DietaryPreference[];
+  /** CP-B6: alergias cadastradas (a receita com alérgeno não aparece). */
+  allergies?: HomeRecipeAllergyFilter;
   /** Modelo do BLENDi (CP-1.1.9): nada com gelo no Lite. */
   blendiModel: HomeRecipeBlendiModel;
   onStartBlend: (recipe: PulseAiRecipe) => void;
@@ -70,9 +80,26 @@ export function getLocalDayIndex(
   );
 }
 
+// CP-B6: o item livre de alergia é conferido nos nomes en e pt-BR (a pessoa
+// pode ter digitado em qualquer um dos dois), lidos direto dos dois JSON.
+function lookup(resources: unknown, key: string): string | undefined {
+  const value = key.split('.').reduce<unknown>(
+    (node, part) => (node !== null && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined),
+    resources,
+  );
+  return typeof value === 'string' ? value : undefined;
+}
+
+function ingredientNamesInBothLanguages(recipe: DailyRecipe): string[] {
+  return recipe.ingredients.flatMap((ingredient) =>
+    [lookup(en, ingredient.nameKey), lookup(ptBR, ingredient.nameKey)].filter((name): name is string => Boolean(name)),
+  );
+}
+
 export function DailyRecipeCard({
   goal,
   dietaryPreferences,
+  allergies,
   blendiModel,
   onStartBlend,
   onAskPulseAi,
@@ -92,7 +119,10 @@ export function DailyRecipeCard({
   // CP-1.1.9: filtro por dieta/modelo, fallback para os outros goals e
   // rotação (módulo não-negativo) sobre a lista filtrada —
   // dailyRecipeSelection.ts. null = nenhuma receita fixa compatível.
-  const recipe = selectDailyRecipe({ goal, dietaryPreferences, blendiModel }, daysSinceEpoch);
+  const recipe = selectDailyRecipe(
+    { goal, dietaryPreferences, blendiModel, allergies, ingredientNamesOf: ingredientNamesInBothLanguages },
+    daysSinceEpoch
+  );
 
   const handleStartBlendPress = useCallback(() => {
     if (!recipe) {

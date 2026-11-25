@@ -88,7 +88,21 @@
 // versão sem álcool. Gelo/congelado no Lite e o teto de álcool (21+) não
 // olham o título (nada muda nessas regras).
 
-import { RECIPE_MAX_ALCOHOL_GRAMS, type PulseAiRecipe } from '@blendi/shared';
+// CP-B6 — alergias: cada alergia cadastrada entra como uma restrição a mais
+// (options.allergies, famílias em allergyFamilies.utils.ts), com a mesma
+// normalização, exceções, qualificadores e negação. Diferente da dieta, o
+// pedido explícito da mensagem (explicitRequest) NÃO a fura: só a
+// confirmação na hora, por requisição (AllergyRestriction.overridden). A
+// alergia confere também a tip (com negação por frase, como o álcool): a
+// dica não pode sugerir o alérgeno. Nos logs, uma violação de alergia sai só
+// como restrição + campo, sem o termo (dado de saúde).
+
+import {
+  RECIPE_MAX_ALCOHOL_GRAMS,
+  stripAccents,
+  tokenMatches,
+  type PulseAiRecipe,
+} from '@blendi/shared';
 
 import type { BlendiModel, DietaryPreference } from '../models/User';
 
@@ -114,8 +128,13 @@ export type RecipeRestriction =
 
 export type RecipeRestrictionField = 'ingredient' | 'step' | 'blendInstruction' | 'tip' | 'title' | 'alcoholGrams';
 
+/** CP-B6: violação de uma alergia cadastrada (o código/item fica em `allergen`). */
+export const ALLERGY_RESTRICTION = 'allergy' as const;
+
 export interface RecipeRestrictionViolation {
-  restriction: RecipeRestriction;
+  restriction: RecipeRestriction | typeof ALLERGY_RESTRICTION;
+  /** CP-B6: chave da alergia violada (AllergyRestriction.key). */
+  allergen?: string;
   /** Termo canônico (normalizado) da lista que casou — ex.: "almond", "gelo". */
   term: string;
   field: RecipeRestrictionField;
@@ -131,6 +150,11 @@ export type RecipeRestrictionResult =
        * atual pediu (fora da dieta). Ausente quando nenhum.
        */
       dietOverrideIngredientIndexes?: number[];
+      /**
+       * CP-B6: chaves das alergias confirmadas que a receita de fato contém
+       * (num ingrediente). Ausente quando nenhuma.
+       */
+      allergyOverrideKeys?: string[];
     }
   | { compliant: false; violations: RecipeRestrictionViolation[] };
 
@@ -152,11 +176,38 @@ export interface RecipeRestrictionOptions {
    * e até RECIPE_MAX_ALCOHOL_GRAMS. Ausente: sem checagem de álcool (Pantry).
    */
   alcohol?: RecipeAlcoholPolicy;
+  /**
+   * CP-B6: alergias cadastradas (famílias já compiladas). Nunca liberadas
+   * pelo explicitRequest; só `overridden` (confirmação desta requisição).
+   */
+  allergies?: readonly AllergyRestriction[];
+}
+
+/** CP-B6: uma alergia cadastrada, pronta para o validador. */
+export interface AllergyRestriction {
+  /** Código ('peanut') ou 'custom:<item como cadastrado>'. */
+  key: string;
+  /** Nome em inglês para a mensagem de nova tentativa (vai só para a IA). */
+  label: string;
+  list: CompiledTermList;
+  /**
+   * Lista do título, quando diferente: só os termos que NOMEIAM o alérgeno
+   * (o nome do prato pode ficar no título da versão sem o alérgeno —
+   * "Shake sabor paçoca" —, como o nome do drink na versão sem álcool).
+   */
+  titleList?: CompiledTermList;
+  /**
+   * Lista que tira um alimento PEDIDO da conferência (CP-B8), quando diferente:
+   * a família sem o que só bloqueia por precaução (chocolate na alergia a leite).
+   */
+  requestList?: CompiledTermList;
+  /** Confirmada na hora para esta requisição: o alérgeno pode entrar. */
+  overridden: boolean;
 }
 
 // ─── Estrutura das listas ────────────────────────────────────────────────────
 
-interface RestrictedTerm {
+export interface RestrictedTerm {
   /** Frase normalizada, no singular, sem acento. */
   phrase: string;
   /**
@@ -174,7 +225,16 @@ interface RestrictedTerm {
    * Frases que, coladas antes ou depois do termo, o tornam permitido
    * ("nut-free granola", "granola sem castanhas").
    */
-  allowedWith?: { before?: readonly string[]; after?: readonly string[] };
+  allowedWith?: {
+    before?: readonly string[];
+    after?: readonly string[];
+    /**
+     * CP-B6: quantos tokens podem ficar entre o termo e a frase (padrão 0,
+     * colada), sem atravessar conjunção — "Iogurte grego zero lactose",
+     * "Lactose-free Greek yogurt".
+     */
+    gap?: number;
+  };
   /**
    * Quantos tokens podem ficar entre a negação e o termo (padrão 0). CP-B2:
    * adjetivo depois do nome em pt — "sem fruta congelada", "não use banana
@@ -183,7 +243,7 @@ interface RestrictedTerm {
   negationLookback?: number;
 }
 
-interface RestrictionRules {
+export interface RestrictionRules {
   /** Termos em inglês. O "no" puro só nega estes. */
   en: readonly RestrictedTerm[];
   /** Termos em português. */
@@ -192,7 +252,7 @@ interface RestrictionRules {
   exceptions: readonly string[];
 }
 
-function terms(phrases: readonly string[], neutralizedBy?: readonly string[]): RestrictedTerm[] {
+export function terms(phrases: readonly string[], neutralizedBy?: readonly string[]): RestrictedTerm[] {
   return phrases.map(phrase => ({ phrase, ...(neutralizedBy ? { neutralizedBy } : {}) }));
 }
 
@@ -201,7 +261,7 @@ function terms(phrases: readonly string[], neutralizedBy?: readonly string[]): R
 // Bases vegetais de "leite", "iogurte" e afins. Não inclui "chocolate",
 // "banana" nem "morango": "chocolate milk", "banana milk" e "iogurte de
 // morango" são laticínio.
-const PLANT_BASE_QUALIFIERS = [
+export const PLANT_BASE_QUALIFIERS = [
   'oat', 'aveia',
   'soy', 'soja',
   'coconut', 'coco',
@@ -226,7 +286,7 @@ const PLANT_BASE_QUALIFIERS = [
 
 // "manteiga"/"butter" vegetais: as bases acima mais cacau e girassol
 // ("manteiga de cacau", "cocoa butter", "sunflower seed butter").
-const PLANT_BUTTER_QUALIFIERS = [
+export const PLANT_BUTTER_QUALIFIERS = [
   ...PLANT_BASE_QUALIFIERS,
   'cocoa', 'cacau',
   'sunflower', 'girassol',
@@ -234,25 +294,25 @@ const PLANT_BUTTER_QUALIFIERS = [
 
 // "cream"/"creme": sem avelã de propósito — "creme de avelã" do tipo Nutella
 // leva leite em pó.
-const PLANT_CREAM_QUALIFIERS = PLANT_BASE_QUALIFIERS.filter(
+export const PLANT_CREAM_QUALIFIERS = PLANT_BASE_QUALIFIERS.filter(
   qualifier => qualifier !== 'hazelnut' && qualifier !== 'avela'
 );
 
 // Sorvete comum É laticínio. Só os qualificadores explícitos de "não é
 // laticínio" o liberam — "sorvete de coco" no Brasil costuma levar leite.
-const EXPLICIT_NON_DAIRY_QUALIFIERS = [
+export const EXPLICIT_NON_DAIRY_QUALIFIERS = [
   'plant', 'plantbased', 'vegetal',
   'vegan', 'vegano', 'vegana',
   'dairyfree', 'nondairy',
 ] as const;
 
 // Kefir de água / water kefir não é laticínio.
-const KEFIR_QUALIFIERS = [...PLANT_BASE_QUALIFIERS, 'water', 'agua'] as const;
+export const KEFIR_QUALIFIERS = [...PLANT_BASE_QUALIFIERS, 'water', 'agua'] as const;
 
 // Origem vegetal declarada da proteína em pó (vegan). Sem isso, "protein
 // powder" pode ser whey ou caseína. Inclui as formas flexionadas de
 // vegan/plant e o cânhamo (proteína vegetal comum).
-const PLANT_PROTEIN_QUALIFIERS = [
+export const PLANT_PROTEIN_QUALIFIERS = [
   'plant', 'plantbased', 'vegetal',
   'vegan', 'vegano', 'vegana',
   'pea', 'ervilha',
@@ -262,12 +322,12 @@ const PLANT_PROTEIN_QUALIFIERS = [
 ] as const;
 
 // Até 2 tokens antes: "pea vanilla protein powder", "vegan unflavored protein powder".
-const PLANT_PROTEIN_LOOKBACK = 2;
+export const PLANT_PROTEIN_LOOKBACK = 2;
 
 // Granola costuma levar castanhas; só é permitida quando o nome diz que não
 // leva. "sem amendoim"/"peanut-free" não basta (ainda pode ter castanhas).
-const NUT_FREE_GRANOLA_BEFORE = ['nut free', 'tree nut free'] as const;
-const NUT_FREE_GRANOLA_AFTER = [
+export const NUT_FREE_GRANOLA_BEFORE = ['nut free', 'tree nut free'] as const;
+export const NUT_FREE_GRANOLA_AFTER = [
   'nut free',
   'without nut',
   'free of nut',
@@ -290,7 +350,7 @@ const NUT_FREE_GRANOLA_AFTER = [
  * creme"). Proibido: sorvete comum, leite sem lactose (ainda é leite),
  * chocolate ao leite, leite condensado, doce de leite, whey, caseína, ghee.
  */
-const DAIRY_RULES: RestrictionRules = {
+export const DAIRY_RULES: RestrictionRules = {
   en: [
     ...terms(['milk', 'milkshake', 'buttermilk', 'milk powder'], PLANT_BASE_QUALIFIERS),
     ...terms(['yogurt', 'yoghurt', 'skyr'], PLANT_BASE_QUALIFIERS),
@@ -316,6 +376,68 @@ const DAIRY_RULES: RestrictionRules = {
   ],
 };
 
+// ─── Chocolate (CP-B6a/B6b) ───────────────────────────────────────────────────
+// Chocolate comum, ao leite, branco e achocolatado quase sempre levam leite.
+// Lista ÚNICA, usada pelas alergias a leite e a lactose (allergyFamilies)
+// e pelas preferências vegan e dairy_free (CP-B6b). Libera (frase COLADA
+// ao termo: "chocolate meio amargo" não é liberado pelo "amargo"): amargo,
+// dark, 70% ou mais, vegano/vegan, sem leite, dairy-free/non-dairy/
+// plant-based, unsweetened. Cacau, cacao, cocoa e nibs não são termos.
+// "Sem lactose" libera só a alergia a lactose (extraBefore/extraAfter).
+const CHOCOLATE_PERCENT_FREE = Array.from({ length: 31 }, (_, index) => String(70 + index));
+const CHOCOLATE_FREE_BEFORE = [
+  'dark', 'vegan', 'dairyfree', 'nondairy', 'plantbased', 'unsweetened', 'milk free',
+  ...CHOCOLATE_PERCENT_FREE,
+] as const;
+const CHOCOLATE_FREE_AFTER = [
+  'amargo', 'amarga', 'vegano', 'vegana', 'vegan', 'sem leite', 'dairyfree', 'nondairy', 'plantbased',
+  ...CHOCOLATE_PERCENT_FREE,
+] as const;
+
+/** Termos de chocolate com leite provável (lista reportada no CP-B6a). */
+export const MILK_CHOCOLATE_TERMS = [
+  'chocolate',
+  'chocolate branco',
+  'white chocolate',
+  'achocolatado',
+  'hot cocoa mix',
+  'cocoa drink mix',
+  'cocoa mix',
+  'nescau',
+  'toddy',
+  'nesquik',
+  'bombom',
+  'bonbon',
+  'trufa',
+  'truffle',
+  'ganache',
+] as const;
+
+/**
+ * "Chocolate" sozinho é sabor ambíguo ("shake sabor chocolate"): na
+ * mensagem não conta como pedido explícito que fura a dieta. Quem quer
+ * chocolate com leite nomeia ("chocolate ao leite", "milk chocolate",
+ * "chocolate branco", "achocolatado"). Também não pesa no título.
+ */
+const AMBIGUOUS_CHOCOLATE_TERM = 'chocolate';
+
+export function chocolateTerms(extraBefore: readonly string[] = [], extraAfter: readonly string[] = []): RestrictedTerm[] {
+  return terms(MILK_CHOCOLATE_TERMS).map(term => ({
+    ...term,
+    allowedWith: { before: [...CHOCOLATE_FREE_BEFORE, ...extraBefore], after: [...CHOCOLATE_FREE_AFTER, ...extraAfter] },
+  }));
+}
+
+/**
+ * CP-B6b: dairy_free = laticínios + chocolate com leite provável. A
+ * família da alergia a leite usa DAIRY_RULES (sem o chocolate) e soma o
+ * chocolate à parte, só para bloquear.
+ */
+const DAIRY_FREE_RULES: RestrictionRules = {
+  ...DAIRY_RULES,
+  en: [...DAIRY_RULES.en, ...chocolateTerms()],
+};
+
 /**
  * Oleaginosas (nut_free) — erra para o lado de bloquear.
  * Inclui amendoim (não é castanha botanicamente, mas é a alergia mais
@@ -335,7 +457,7 @@ const DAIRY_RULES: RestrictionRules = {
  * "granola sem oleaginosas"). "Peanut-free granola" e "granola sem
  * amendoim" continuam barradas — não dizem nada sobre as castanhas.
  */
-const NUT_RULES: RestrictionRules = {
+export const NUT_RULES: RestrictionRules = {
   en: [
     ...terms(['granola']).map(term => ({
       ...term,
@@ -397,6 +519,8 @@ const NUT_RULES: RestrictionRules = {
 const VEGAN_RULES: RestrictionRules = {
   en: [
     ...DAIRY_RULES.en,
+    // CP-B6b: chocolate com leite provável.
+    ...chocolateTerms(),
     ...terms(['protein powder', 'protein isolate'], PLANT_PROTEIN_QUALIFIERS).map(term => ({
       ...term,
       qualifierLookback: PLANT_PROTEIN_LOOKBACK,
@@ -684,7 +808,7 @@ const ALCOHOL_RULES: RestrictionRules = {
 };
 
 const RULES_BY_RESTRICTION: Record<RecipeRestriction, RestrictionRules> = {
-  dairy_free: DAIRY_RULES,
+  dairy_free: DAIRY_FREE_RULES,
   nut_free: NUT_RULES,
   vegan: VEGAN_RULES,
   no_added_sugar: NO_ADDED_SUGAR_RULES,
@@ -865,9 +989,8 @@ const COMPOUND_TOKENS: ReadonlyArray<readonly [readonly string[], string]> = [
 
 // ─── Normalização e tokenização ──────────────────────────────────────────────
 
-function stripAccents(value: string): string {
-  return value.normalize('NFD').replace(/\p{M}/gu, '');
-}
+// CP-B6: stripAccents, singularCandidates e tokenMatches vêm do shared
+// (packages/shared/src/utils/textMatching.ts): a mesma normalização no app.
 
 /** Corta o texto em segmentos e cada segmento em tokens normalizados. */
 export function tokenizeSegments(text: string): string[][] {
@@ -901,37 +1024,6 @@ function mergeCompounds(tokens: string[]): string[] {
   }
 
   return merged;
-}
-
-/** Candidatos de singular de um token (en e pt). Inclui o próprio token. */
-function singularCandidates(token: string): string[] {
-  const candidates = [token];
-
-  if (token.length < 4) {
-    return candidates;
-  }
-
-  const replaceSuffix = (suffix: string, replacement: string) => {
-    if (token.endsWith(suffix)) {
-      candidates.push(token.slice(0, -suffix.length) + replacement);
-    }
-  };
-
-  replaceSuffix('s', '');
-  replaceSuffix('es', '');
-  replaceSuffix('ies', 'y');
-  replaceSuffix('oes', 'ao');
-  replaceSuffix('aes', 'ao');
-  replaceSuffix('ais', 'al');
-  replaceSuffix('eis', 'el');
-  replaceSuffix('ois', 'ol');
-  replaceSuffix('ns', 'm');
-
-  return candidates;
-}
-
-function tokenMatches(textToken: string, termToken: string): boolean {
-  return textToken === termToken || singularCandidates(textToken).includes(termToken);
 }
 
 function phraseTokens(phrase: string): string[] {
@@ -998,6 +1090,7 @@ interface CompiledTerm {
   qualifierLookback: number;
   allowedBefore: string[][];
   allowedAfter: string[][];
+  allowedGap: number;
 }
 
 interface CompiledRules {
@@ -1015,6 +1108,7 @@ function compileRules(rules: RestrictionRules): CompiledRules {
     negationLookback: term.negationLookback ?? 0,
     allowedBefore: (term.allowedWith?.before ?? []).map(phraseTokens),
     allowedAfter: (term.allowedWith?.after ?? []).map(phraseTokens),
+    allowedGap: term.allowedWith?.gap ?? 0,
   });
 
   return {
@@ -1096,10 +1190,26 @@ function isAllowedByAdjacentPhrase(
   end: number,
   term: CompiledTerm
 ): boolean {
-  return (
-    term.allowedBefore.some(phrase => endsWithPhrase(tokens, start, phrase)) ||
-    term.allowedAfter.some(phrase => matchesAt(tokens, end, phrase))
-  );
+  for (let gap = 0; gap <= term.allowedGap; gap += 1) {
+    if (gap > 0) {
+      // Não atravessa conjunção: "leite e iogurte sem lactose" não libera o leite.
+      const beforeToken = tokens[start - gap];
+      const afterToken = tokens[end + gap - 1];
+      const beforeOpen = beforeToken !== undefined && !QUALIFIER_STOP_TOKENS.has(beforeToken);
+      const afterOpen = afterToken !== undefined && !QUALIFIER_STOP_TOKENS.has(afterToken);
+      if (!beforeOpen && !afterOpen) break;
+      if (beforeOpen && term.allowedBefore.some(phrase => endsWithPhrase(tokens, start - gap, phrase))) return true;
+      if (afterOpen && term.allowedAfter.some(phrase => matchesAt(tokens, end + gap, phrase))) return true;
+      continue;
+    }
+    if (
+      term.allowedBefore.some(phrase => endsWithPhrase(tokens, start, phrase)) ||
+      term.allowedAfter.some(phrase => matchesAt(tokens, end, phrase))
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isNeutralized(tokens: readonly string[], start: number, end: number, term: CompiledTerm): boolean {
@@ -1239,6 +1349,20 @@ export function compileTermList(list: {
   };
 }
 
+/**
+ * CP-B6: compila uma lista completa no formato do validador (termos com
+ * qualificadores, frases permitidas e negação a distância), para as famílias
+ * de alergia.
+ */
+export function compileRestrictionRules(rules: RestrictionRules): CompiledTermList {
+  return { rules: compileRules(rules) };
+}
+
+/** CP-B6: o texto cita algum termo da lista sem negação (mesmas regras dos ingredientes). */
+export function mentionsTermList(text: string, list: CompiledTermList): boolean {
+  return findViolatingOccurrences(text, list.rules, { sentenceNegation: false }).length > 0;
+}
+
 export interface TermMention {
   /** Termo canônico da lista. */
   term: string;
@@ -1321,6 +1445,8 @@ function explicitlyRequestedTerms(
   return new Set(
     findViolatingOccurrences(explicitRequest, COMPILED_RULES[restriction], { sentenceNegation: false })
       .map(occurrence => occurrence.canonical)
+      // CP-B6b: "chocolate" sozinho é sabor, não pedido de chocolate com leite.
+      .filter(term => term !== AMBIGUOUS_CHOCOLATE_TERM)
   );
 }
 
@@ -1392,8 +1518,9 @@ export function validateRecipeRestrictions(
   options: RecipeRestrictionOptions = {}
 ): RecipeRestrictionResult {
   const restrictions = getActiveRecipeRestrictions(dietaryPreferences, blendiModel, options.alcohol);
+  const allergies = options.allergies ?? [];
 
-  if (restrictions.length === 0) {
+  if (restrictions.length === 0 && allergies.length === 0) {
     return { compliant: true };
   }
 
@@ -1452,7 +1579,10 @@ export function validateRecipeRestrictions(
 
     // Título: o termo fora da dieta só passa se foi pedido E está na receita.
     if (TITLE_RESTRICTIONS.has(restriction) && recipe.title?.trim()) {
-      const occurrences = findViolatingOccurrences(recipe.title, rules, { sentenceNegation: false });
+      // CP-B6b: "Shake de chocolate" continua valendo como nome (o chocolate
+      // do ingrediente é que é conferido).
+      const occurrences = findViolatingOccurrences(recipe.title, rules, { sentenceNegation: false })
+        .filter(occurrence => occurrence.canonical !== AMBIGUOUS_CHOCOLATE_TERM);
       const requested = occurrences.filter(occurrence => (
         requestedTerms.has(occurrence.canonical) && overriddenTerms.has(occurrence.canonical)
       ));
@@ -1469,13 +1599,50 @@ export function validateRecipeRestrictions(
     }
   }
 
+  // CP-B6: alergias. Nenhum pedido explícito libera; só a confirmação.
+  const allergyOverrideKeys = new Set<string>();
+  for (const allergy of allergies) {
+    const allergyFields = [
+      ...fields,
+      ...(recipe.tip?.trim() ? [{ field: 'tip' as const, text: recipe.tip }] : []),
+      ...(recipe.title?.trim() ? [{ field: 'title' as const, text: recipe.title }] : []),
+    ];
+
+    for (const { field, index, text } of allergyFields) {
+      const list = field === 'title' ? allergy.titleList ?? allergy.list : allergy.list;
+      const occurrence = findViolatingOccurrences(text, list.rules, {
+        sentenceNegation: field === 'blendInstruction' || field === 'tip',
+      })[0];
+      if (!occurrence) continue;
+
+      if (allergy.overridden) {
+        if (field === 'ingredient') allergyOverrideKeys.add(allergy.key);
+        continue;
+      }
+
+      violations.push({
+        restriction: ALLERGY_RESTRICTION,
+        allergen: allergy.key,
+        term: occurrence.canonical,
+        field,
+        ...(index !== undefined ? { index } : {}),
+      });
+    }
+  }
+
   if (violations.length > 0) {
     return { compliant: false, violations };
   }
 
-  return overriddenIngredients.size > 0
-    ? { compliant: true, dietOverrideIngredientIndexes: [...overriddenIngredients].sort((a, b) => a - b) }
-    : { compliant: true };
+  const overrideKeys = allergies.map(allergy => allergy.key).filter(key => allergyOverrideKeys.has(key));
+
+  return {
+    compliant: true,
+    ...(overriddenIngredients.size > 0
+      ? { dietOverrideIngredientIndexes: [...overriddenIngredients].sort((a, b) => a - b) }
+      : {}),
+    ...(overrideKeys.length > 0 ? { allergyOverrideKeys: overrideKeys } : {}),
+  };
 }
 
 /**
@@ -1528,11 +1695,17 @@ export function isIceTerm(term: string): boolean {
   return (LITE_ICE_TERMS.en as readonly string[]).includes(term) || (LITE_ICE_TERMS.pt as readonly string[]).includes(term);
 }
 
-/** Versão para log: só restrição, termo e campo — sem texto da receita nem usuário. */
+/**
+ * Versão para log: só restrição, termo e campo — sem texto da receita nem
+ * usuário. CP-B6: violação de alergia sai SEM o termo e sem o alérgeno (dado
+ * de saúde): só 'allergy' e o campo.
+ */
 export function summarizeRestrictionViolations(
   violations: readonly RecipeRestrictionViolation[]
-): Array<Pick<RecipeRestrictionViolation, 'restriction' | 'term' | 'field'>> {
-  return violations.map(({ restriction, term, field }) => ({ restriction, term, field }));
+): Array<{ restriction: RecipeRestrictionViolation['restriction']; term?: string; field: RecipeRestrictionField }> {
+  return violations.map(({ restriction, term, field }) => (
+    restriction === ALLERGY_RESTRICTION ? { restriction, field } : { restriction, term, field }
+  ));
 }
 
 const RESTRICTION_LABELS: Record<RecipeRestriction, string> = {
@@ -1586,14 +1759,18 @@ function describeViolationLocation(
 export function buildRecipeRestrictionRetryMessage(
   recipe: RestrictedRecipe,
   violations: readonly RecipeRestrictionViolation[],
-  options: { genericBlender?: boolean } = {}
+  options: { genericBlender?: boolean; allergies?: readonly AllergyRestriction[] } = {}
 ): string {
-  const labelOf = (restriction: RecipeRestriction) => (
-    (options.genericBlender ? GENERIC_BLENDER_RESTRICTION_LABELS[restriction] : undefined)
-      ?? RESTRICTION_LABELS[restriction]
-  );
+  const labelOf = (violation: RecipeRestrictionViolation) => {
+    if (violation.restriction === ALLERGY_RESTRICTION) {
+      const label = options.allergies?.find(allergy => allergy.key === violation.allergen)?.label ?? 'a listed allergen';
+      return `allergy (the user listed ${JSON.stringify(label)} as an allergy: never use it or anything made from it, never mention it as optional, and replace it with a safe equivalent)`;
+    }
+    return (options.genericBlender ? GENERIC_BLENDER_RESTRICTION_LABELS[violation.restriction] : undefined)
+      ?? RESTRICTION_LABELS[violation.restriction];
+  };
   const details = violations.map(violation => (
-    `${describeViolationLocation(recipe, violation)} uses "${violation.term}", which violates the ${labelOf(violation.restriction)} restriction`
+    `${describeViolationLocation(recipe, violation)} uses "${violation.term}", which violates the ${labelOf(violation)} restriction`
   ));
 
   const hints = [...new Set(violations.flatMap(violation => {

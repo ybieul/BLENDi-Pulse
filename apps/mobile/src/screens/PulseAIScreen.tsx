@@ -24,6 +24,7 @@ import { type NavigationProp } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
+  AllergenSelection,
   FavoriteItem,
   PantryAnalysisResult,
   PulseAiRecipe,
@@ -32,6 +33,7 @@ import type {
 } from '@blendi/shared';
 
 import {
+  PULSE_AI_MESSAGE_MAX,
   borderRadius,
   colors,
   fontSizes,
@@ -57,7 +59,14 @@ import { images } from '../assets';
 import * as pulseAiService from '../services/pulseAi.service';
 import * as conversationService from '../services/conversation.service';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
-import { AGE_CONFIRMATION_REQUIRED_CODE, PulseAiServiceError } from '../services/pulseAi.service';
+import {
+  AGE_CONFIRMATION_REQUIRED_CODE,
+  ALLERGY_CONFIRMATION_REQUIRED_CODE,
+  PulseAiServiceError,
+  type SendMessageAllergyChoice,
+} from '../services/pulseAi.service';
+import { AllergyConfirmationSheet } from '../components/allergies/AllergyConfirmationSheet';
+import { formatAllergenList, readProfileAllergies } from '../utils/allergies.utils';
 import { trackEvent } from '../services/analytics.service';
 import { showToast } from '../utils/toast.events';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
@@ -302,6 +311,13 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   // reenviar depois da resposta sem repetir o balão do usuário).
   const [isHowToUseVisible, setIsHowToUseVisible] = useState(false);
   const [pendingAgeMessage, setPendingAgeMessage] = useState<string | null>(null);
+  // CP-B6: resposta da folha de alergia que acompanha o reenvio depois da
+  // idade (o mesmo pedido pode precisar das duas confirmações).
+  const pendingAgeAllergyChoiceRef = useRef<SendMessageAllergyChoice>({});
+  // CP-B6: mensagem que nomeou um alérgeno cadastrado (428) e os alérgenos.
+  const [pendingAllergy, setPendingAllergy] = useState<{ message: string; allergens: AllergenSelection } | null>(null);
+  const messagesRef = useRef<ChatMessageItem[]>([]);
+  messagesRef.current = messages;
 
   const flatListRef = useRef<FlatList<ChatMessageItem>>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -485,11 +501,15 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   // handleSend para o reenvio depois da confirmação de idade não duplicar o
   // balão do usuário.
   const requestRecipe = useCallback(
-    async (trimmed: string, options: { afterAgeConfirmation?: boolean } = {}) => {
+    async (
+      trimmed: string,
+      options: { afterAgeConfirmation?: boolean; allergyChoice?: SendMessageAllergyChoice } = {},
+    ) => {
       setIsLoading(true);
+      const allergyChoice = options.allergyChoice ?? {};
 
       try {
-        const result = await pulseAiService.sendMessage(trimmed);
+        const result = await pulseAiService.sendMessage(trimmed, allergyChoice);
 
         if (result.locked) {
           // Prévia bloqueada: só nome e macros; o chat fica como no limite
@@ -532,7 +552,22 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
           err.apiCode === AGE_CONFIRMATION_REQUIRED_CODE &&
           !options.afterAgeConfirmation
         ) {
+          pendingAgeAllergyChoiceRef.current = allergyChoice;
           setPendingAgeMessage(trimmed);
+          return;
+        }
+
+        // CP-B6: a mensagem nomeia um alérgeno cadastrado. Nada foi gasto; a
+        // folha pergunta e o app reenvia o MESMO pedido com a resposta (que
+        // vale só para ele). Sem os alérgenos no corpo, cai no erro comum.
+        if (
+          err instanceof PulseAiServiceError &&
+          err.apiCode === ALLERGY_CONFIRMATION_REQUIRED_CODE &&
+          err.allergens &&
+          !allergyChoice.allergyOverride &&
+          !allergyChoice.allergyDeclined
+        ) {
+          setPendingAllergy({ message: trimmed, allergens: err.allergens });
           return;
         }
 
@@ -606,6 +641,28 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
     [requestRecipe],
   );
 
+  // ── CP-B6: "Quero com X" — o pedido de antes, agora nomeando o alérgeno.
+  // Vai como mensagem nova (balão do usuário) e cai na confirmação.
+  const handleAllergySuggestion = useCallback(
+    (recipe: PulseAiRecipe) => {
+      if (!recipe.allergySuggestion || isLoading) return;
+
+      const list = messagesRef.current;
+      const recipeIndex = list.findIndex((item) => item.content === recipe);
+      const previousUser = [...list.slice(0, recipeIndex < 0 ? list.length : recipeIndex)]
+        .reverse()
+        .find((item) => item.role === 'user' && typeof item.content === 'string');
+      const items = formatAllergenList({ common: recipe.allergySuggestion.allergens, custom: [] }, t);
+      const suffix = t('allergies.card.suggestionMessage', { message: '', items }).trim();
+      const original = typeof previousUser?.content === 'string'
+        ? previousUser.content
+        : recipe.allergySuggestion.dish;
+      const room = Math.max(0, PULSE_AI_MESSAGE_MAX - suffix.length - 1);
+      void handleSend(t('allergies.card.suggestionMessage', { message: original.slice(0, room).trim(), items }));
+    },
+    [handleSend, isLoading, t],
+  );
+
   // ── CP-B5: confirmação única de idade → grava e reenvia o mesmo pedido ────
   const handleAgeAnswer = useCallback(
     async (isAdult: boolean) => {
@@ -637,12 +694,35 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         return;
       }
 
-      await requestRecipe(pendingMessage, { afterAgeConfirmation: true });
+      const allergyChoice = pendingAgeAllergyChoiceRef.current;
+      pendingAgeAllergyChoiceRef.current = {};
+      await requestRecipe(pendingMessage, { afterAgeConfirmation: true, allergyChoice });
     },
     [pendingAgeMessage, requestRecipe, t],
   );
 
+  // ── CP-B6: confirmação de alergia → reenvia o mesmo pedido ────────────────
+  const handleAllergyAnswer = useCallback(
+    async (include: boolean) => {
+      const pending = pendingAllergy;
+      setPendingAllergy(null);
+      if (!pending) return;
+
+      await requestRecipe(pending.message, {
+        allergyChoice: include
+          ? { allergyOverride: pending.allergens }
+          : { allergyDeclined: pending.allergens },
+      });
+    },
+    [pendingAllergy, requestRecipe],
+  );
+
+  const handleAllergyDismiss = useCallback(() => {
+    setPendingAllergy(null);
+  }, []);
+
   const handleAgeDismiss = useCallback(() => {
+    pendingAgeAllergyChoiceRef.current = {};
     setPendingAgeMessage(null);
   }, []);
 
@@ -962,9 +1042,10 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         isFavorited={Boolean(favoriteIdsByRecipeKey[favoriteKey])}
         favoriteId={favoriteIdsByRecipeKey[favoriteKey]}
         onStartBlend={() => handleStartBlend(recipe)}
+        onAllergySuggestionPress={handleAllergySuggestion}
       />
     );
-  }, [favoriteIdsByRecipeKey, handleLockedPreviewPress, handleStartBlend]);
+  }, [favoriteIdsByRecipeKey, handleAllergySuggestion, handleLockedPreviewPress, handleStartBlend]);
 
   const ListFooterComponent = isLoading ? (
     <View>
@@ -1117,9 +1198,21 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       />
 
       <HowToUseSheet
+        allergies={readProfileAllergies(authUser)}
         visible={isHowToUseVisible}
         onClose={handleHowToUseClose}
         onExamplePress={handleHowToUseExample}
+      />
+
+      <AllergyConfirmationSheet
+        allergens={pendingAllergy?.allergens ?? null}
+        onConfirm={() => {
+          void handleAllergyAnswer(true);
+        }}
+        onDecline={() => {
+          void handleAllergyAnswer(false);
+        }}
+        onDismiss={handleAllergyDismiss}
       />
 
       <AgeConfirmationSheet

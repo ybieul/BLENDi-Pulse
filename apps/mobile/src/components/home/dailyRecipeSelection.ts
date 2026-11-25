@@ -10,6 +10,11 @@
 // 3. Nenhuma em lugar nenhum: null — a Home troca o card por um atalho para
 //    pedir uma receita à Pulse AI.
 //
+// CP-B6: alergias. Alergia comum pela marcação `contains` (conferida no
+// backend pelas famílias); item do campo livre pelos nomes dos ingredientes
+// em en e pt-BR (ingredientNamesOf), com a normalização do shared. Mesmo
+// filtro e mesmo fallback da dieta.
+//
 // A rotação continua determinística (dia local % tamanho da lista), agora
 // sobre a lista filtrada. Sem dieta e fora do Lite, a lista é exatamente o
 // pool do goal, na mesma ordem: a receita de cada dia é a mesma de antes.
@@ -17,6 +22,7 @@ import {
   USER_GOAL_VALUES,
   isHomeRecipeAllowed,
   type DietaryPreference,
+  type HomeRecipeAllergyFilter,
   type HomeRecipeBlendiModel,
   type UserGoal,
 } from '@blendi/shared';
@@ -34,13 +40,25 @@ export interface DailyRecipeSelectionInput {
   goal: UserGoal;
   dietaryPreferences: readonly DietaryPreference[];
   blendiModel: HomeRecipeBlendiModel;
+  /** CP-B6: alergias cadastradas (ausente = nenhuma). */
+  allergies?: HomeRecipeAllergyFilter;
+  /** CP-B6: nomes dos ingredientes (en e pt-BR) para o campo livre. */
+  ingredientNamesOf?: (recipe: DailyRecipe) => readonly string[];
 }
 
 function filterCompatible(
   recipes: readonly DailyRecipe[],
-  { dietaryPreferences, blendiModel }: DailyRecipeSelectionInput
+  { dietaryPreferences, blendiModel, allergies, ingredientNamesOf }: DailyRecipeSelectionInput
 ): DailyRecipe[] {
-  return recipes.filter((recipe) => isHomeRecipeAllowed(recipe, dietaryPreferences, blendiModel));
+  return recipes.filter((recipe) =>
+    isHomeRecipeAllowed(
+      recipe,
+      dietaryPreferences,
+      blendiModel,
+      allergies,
+      allergies && allergies.custom.length > 0 ? ingredientNamesOf?.(recipe) : undefined
+    )
+  );
 }
 
 /** Lista de onde sai a receita do dia, ou null quando nenhuma receita é compatível. */

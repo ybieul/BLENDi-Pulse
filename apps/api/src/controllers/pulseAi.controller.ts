@@ -3,11 +3,14 @@ import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import {
   AI_REQUEST_BUDGET_MS,
+  PULSE_AI_ALLERGY_CONFIRMATION_REQUIRED_CODE,
   pulseAiAgeConfirmationSchema,
   pulseAiChatSchema,
   pulseAiRecipeSchema,
   toPulseAiRecipePreview,
+  type AllergenSelection,
   type PulseAiRecipe,
+  type UserAllergies,
 } from '@blendi/shared';
 import { ZodError, z } from 'zod';
 
@@ -76,6 +79,17 @@ import {
   type RequestedTarget,
 } from '../utils/requestedTargets.utils';
 import { applyRecipeStepCheck } from '../utils/recipeSteps.utils';
+import {
+  allergyCacheParts,
+  buildPromptAllergyContext,
+  forbiddenAllergyCodes,
+  isEmptySelection,
+  mentionsForbiddenAllergen,
+  readUserAllergies,
+  resolveAllergyRequest,
+  withAllergyNotices,
+  type AllergyRequestResolution,
+} from '../utils/allergyFamilies.utils';
 import { sendErrorResponse } from '../utils/error.utils';
 import { toLastRecipeName } from '../utils/recipeName.utils';
 import { isSameDayInTimezone } from '../utils/timezone.utils';
@@ -152,6 +166,8 @@ interface PulseAiUserProfile {
   isPro: boolean;
   /** CP-B5: 21+ (data de nascimento real ou confirmação), menor, ou sem resposta. */
   alcoholAge: AlcoholAgeStatus;
+  /** CP-B6: alergias cadastradas (conta antiga sem o campo = nenhuma). */
+  allergies: UserAllergies;
 }
 
 interface PulseAiCachedResponse {
@@ -392,6 +408,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
       goal: 1,
       weightGoal: 1,
       dietaryPreferences: 1,
+      allergies: 1,
       locale: 1,
       unitSystem: 1,
       timezone: 1,
@@ -428,6 +445,7 @@ async function findPulseAiUserProfile(userId: string): Promise<PulseAiUserProfil
     aiUsageResetDate: user.aiUsageResetDate ?? new Date(),
     isPro: user.isPro ?? false,
     alcoholAge: resolveAlcoholAge(user),
+    allergies: readUserAllergies(user.allergies),
   };
 }
 
@@ -597,7 +615,7 @@ async function ensureMacroConsistency(
 }
 
 type RecipeRestrictionEnforcement =
-  | { ok: true; recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[] }
+  | { ok: true; recipe: PulseAiRecipe; dietOverrideIngredientIndexes: number[]; allergyOverrideKeys: string[] }
   | { ok: false; failure: EnforcementFailure };
 
 // CP-1.1.1c: última conferência antes de entregar — roda depois do guardrail
@@ -619,7 +637,12 @@ async function ensureRecipeRestrictions(
   const initialCheck = validateRecipeRestrictions(recipe, user.dietaryPreferences, user.blendiModel, options);
 
   if (initialCheck.compliant) {
-    return { ok: true, recipe, dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [] };
+    return {
+      ok: true,
+      recipe,
+      dietOverrideIngredientIndexes: initialCheck.dietOverrideIngredientIndexes ?? [],
+      allergyOverrideKeys: initialCheck.allergyOverrideKeys ?? [],
+    };
   }
 
   console.info('[pulseAi.controller] recipe restriction violated, retrying', {
@@ -629,6 +652,7 @@ async function ensureRecipeRestrictions(
   try {
     const retryMessage = buildRecipeRestrictionRetryMessage(recipe, initialCheck.violations, {
       genericBlender: prompt.textContext?.genericBlender,
+      allergies: options.allergies,
     });
     const retried = await generatePulseAiRecipe(prompt.systemPrompt, [
       ...prompt.messages,
@@ -662,6 +686,7 @@ async function ensureRecipeRestrictions(
         macrosValidated: validateMacroConsistency(retried.recipe).macrosValidated,
       },
       dietOverrideIngredientIndexes: retriedCheck.dietOverrideIngredientIndexes ?? [],
+      allergyOverrideKeys: retriedCheck.allergyOverrideKeys ?? [],
     };
   } catch (error) {
     console.error('[pulseAi.controller] recipe restriction retry failed', {
@@ -750,13 +775,16 @@ interface PulseAiRequestChecks {
 function buildPulseAiRequestChecks(
   message: string,
   user: Pick<PulseAiUserProfile, 'blendiModel'>,
-  alcoholPolicy: RecipeAlcoholPolicy
+  alcoholPolicy: RecipeAlcoholPolicy,
+  allergy: Pick<AllergyRequestResolution, 'restrictions'>
 ): PulseAiRequestChecks {
   return {
+    // CP-B6: alérgeno pedido e não confirmado (recusado ou só implícito)
+    // não é cobrado; confirmado é cobrado normalmente.
     foods: requiredRequestedFoods(extractRequestedFoods(message), {
       blendiModel: user.blendiModel,
       alcoholAllowed: alcoholPolicy === 'allowed',
-    }),
+    }).filter(food => !mentionsForbiddenAllergen(food.display, allergy.restrictions)),
     targets: parseRequestedTargets(message),
     blendiModel: user.blendiModel,
   };
@@ -828,7 +856,8 @@ async function ensureRequestedTargets(
   recipe: PulseAiRecipe,
   prompt: BuildPulseAiPromptResult,
   checks: PulseAiRequestChecks,
-  user: Pick<PulseAiUserProfile, 'dietaryPreferences'>
+  user: Pick<PulseAiUserProfile, 'dietaryPreferences'>,
+  allergy: Pick<AllergyRequestResolution, 'profile' | 'confirmed'>
 ): Promise<{ recipe: PulseAiRecipe; attempts: number }> {
   let current = recipe;
   let attempts = 0;
@@ -851,6 +880,7 @@ async function ensureRequestedTargets(
           role: 'user',
           content: buildRequestedTargetsRetryMessage(unmet, {
             dietaryPreferences: user.dietaryPreferences,
+            allergies: forbiddenAllergyCodes(allergy),
             format: 'object',
           }),
         },
@@ -953,7 +983,7 @@ async function resolveConversationContext(userId: string): Promise<ConversationC
 
 type PulseAiChatOutcome =
   | { kind: 'success'; data: Record<string, unknown> }
-  | { kind: 'error'; statusCode: number; code: string; message: string; errors?: unknown };
+  | { kind: 'error'; statusCode: number; code: string; message: string; errors?: unknown; data?: unknown };
 
 // Deduplicação de duplo-toque: mesma dimensão do cache de resposta (usuário +
 // hash da mensagem), em memória de processo — proteção de curta duração contra
@@ -964,8 +994,8 @@ function successOutcome(data: Record<string, unknown>): PulseAiChatOutcome {
   return { kind: 'success', data };
 }
 
-function errorOutcome(statusCode: number, code: string, message: string, errors?: unknown): PulseAiChatOutcome {
-  return { kind: 'error', statusCode, code, message, errors };
+function errorOutcome(statusCode: number, code: string, message: string, errors?: unknown, data?: unknown): PulseAiChatOutcome {
+  return { kind: 'error', statusCode, code, message, errors, data };
 }
 
 function sendPulseAiChatOutcome(res: Response, outcome: PulseAiChatOutcome): void {
@@ -979,6 +1009,7 @@ function sendPulseAiChatOutcome(res: Response, outcome: PulseAiChatOutcome): voi
     code: outcome.code,
     message: outcome.message,
     errors: outcome.errors,
+    data: outcome.data,
   });
 }
 
@@ -1090,6 +1121,9 @@ async function runPulseAiChat(params: {
   normalizedMessage: string;
   normalizedMessageHash: string;
   requestedLanguage: UserLocale | undefined;
+  /** CP-B6: resposta da folha de alergia para ESTA mensagem (nunca gravada). */
+  allergyOverride?: AllergenSelection;
+  allergyDeclined?: AllergenSelection;
 }): Promise<PulseAiChatOutcome> {
   const { userId, message, normalizedMessage, normalizedMessageHash, requestedLanguage } = params;
 
@@ -1110,6 +1144,30 @@ async function runPulseAiChat(params: {
   // CP-B5.3: o idioma do pedido só muda o "drink" (ambíguo em pt-BR; em
   // inglês é verbo e "protein drink").
   const effectiveLanguage = requestedLanguage ?? currentUser.locale;
+
+  // CP-B6: a mensagem ATUAL nomeia um alérgeno cadastrado sem resposta na
+  // folha → pergunta antes de tudo (sem IA, sem uso, sem cache, sem turno).
+  // Mensagens anteriores e o histórico nunca liberam alergia.
+  const allergy = resolveAllergyRequest({
+    profile: currentUser.allergies,
+    text: message,
+    override: params.allergyOverride,
+    declined: params.allergyDeclined,
+    language: effectiveLanguage,
+  });
+
+  if (!isEmptySelection(allergy.unresolved)) {
+    // Sem o alérgeno no log (dado de saúde).
+    console.info('[pulseAi.controller] allergen named without confirmation, asking');
+    return errorOutcome(
+      428,
+      PULSE_AI_ALLERGY_CONFIRMATION_REQUIRED_CODE,
+      'Allergy confirmation is required for this request.',
+      undefined,
+      { allergens: allergy.unresolved }
+    );
+  }
+
   const alcoholDecision = detectAlcoholRequest(message, effectiveLanguage);
 
   if (alcoholDecision === 'yes' && currentUser.alcoholAge === 'unknown') {
@@ -1137,6 +1195,8 @@ async function runPulseAiChat(params: {
     dietaryFlags: currentUser.dietaryPreferences,
     // CP-B5: o prompt muda para quem tem 21+ confirmado.
     alcoholTier: alcoholCacheTier(currentUser),
+    // CP-B6: alergias e a resposta da folha mudam a receita.
+    allergyParts: allergyCacheParts(allergy),
   });
 
   const cacheKeyParts = cacheKey.split(':');
@@ -1163,6 +1223,8 @@ async function runPulseAiChat(params: {
             explicitRequest: message,
             // CP-B5.2: 'no' decidido pelo código vale também para a receita do cache.
             alcohol: currentUser.alcoholAge === 'of-age' && alcoholDecision !== 'no' ? 'allowed' : 'forbidden',
+            // CP-B6: a receita do cache também passa pelas alergias de agora.
+            allergies: allergy.restrictions,
           }
         )
       : null;
@@ -1197,19 +1259,26 @@ async function runPulseAiChat(params: {
     if (parsedCachedResponse.success && cachedRestrictionCheck?.compliant && cachedWithinBlenderLimits) {
       const cachedAlcoholPolicy: RecipeAlcoholPolicy =
         currentUser.alcoholAge === 'of-age' && alcoholDecision !== 'no' ? 'allowed' : 'forbidden';
-      const noticedCachedRecipe = withRequestNotices(
-        parsedCachedResponse.data.recipe,
-        cachedRestrictionCheck.dietOverrideIngredientIndexes ?? [],
-        // CP-B5.2: com a decisão do código, o aviso de "sem álcool" sai dela.
-        alcoholDecision === 'ai'
-          ? parsedCachedResponse.data.recipe.alcoholFreeVersion === true
-          : alcoholDecision === 'yes' && currentUser.alcoholAge === 'under-age'
+      const noticedCachedRecipe = withAllergyNotices(
+        withRequestNotices(
+          parsedCachedResponse.data.recipe,
+          cachedRestrictionCheck.dietOverrideIngredientIndexes ?? [],
+          // CP-B5.2: com a decisão do código, o aviso de "sem álcool" sai dela.
+          alcoholDecision === 'ai'
+            ? parsedCachedResponse.data.recipe.alcoholFreeVersion === true
+            : alcoholDecision === 'yes' && currentUser.alcoholAge === 'under-age'
+        ),
+        {
+          profile: allergy.profile,
+          overrideKeys: cachedRestrictionCheck.allergyOverrideKeys ?? [],
+          suggestion: allergy.suggestion,
+        }
       );
       // CP-B7: a mesma conferência final da receita gerada (sem nova
       // tentativa: a receita e a mensagem são as mesmas da gravação).
       const cachedRecipe = finalizePulseAiRequestChecks(
         noticedCachedRecipe,
-        buildPulseAiRequestChecks(message, currentUser, cachedAlcoholPolicy),
+        buildPulseAiRequestChecks(message, currentUser, cachedAlcoholPolicy, allergy),
         {
           itemAttempts: 0,
           targetAttempts: 0,
@@ -1294,6 +1363,7 @@ async function runPulseAiChat(params: {
     message,
     alcoholOfAge: currentUser.alcoholAge === 'of-age',
     alcoholRequestDecision: alcoholDecision,
+    allergies: buildPromptAllergyContext(allergy),
   });
 
   if (conversationContext.historyMessages.length > 0) {
@@ -1420,13 +1490,14 @@ async function runPulseAiChat(params: {
     // CP-B7: alimento e valor pedidos na mensagem atual, conferidos pelo
     // backend (nunca bloqueiam). Antes das outras conferências: os retries de
     // volume, macros e dieta conversam com a receita já corrigida.
-    const requestChecks = buildPulseAiRequestChecks(message, currentUser, alcoholPolicy);
+    const requestChecks = buildPulseAiRequestChecks(message, currentUser, alcoholPolicy, allergy);
     const requestedFoodsCheck = await ensureRequestedFoods(recipe, prompt, requestChecks);
     const requestedTargetsCheck = await ensureRequestedTargets(
       requestedFoodsCheck.recipe,
       prompt,
       requestChecks,
-      currentUser
+      currentUser,
+      allergy
     );
     recipe = requestedTargetsCheck.recipe;
 
@@ -1445,6 +1516,7 @@ async function runPulseAiChat(params: {
     const restrictionEnforcement = await ensureRecipeRestrictions(recipe, prompt, currentUser, {
       explicitRequest: message,
       alcohol: alcoholPolicy,
+      allergies: allergy.restrictions,
     });
 
     if (!restrictionEnforcement.ok) {
@@ -1455,10 +1527,17 @@ async function runPulseAiChat(params: {
       );
     }
 
-    recipe = withRequestNotices(
-      restrictionEnforcement.recipe,
-      restrictionEnforcement.dietOverrideIngredientIndexes,
-      alcoholFreeVersion
+    recipe = withAllergyNotices(
+      withRequestNotices(
+        restrictionEnforcement.recipe,
+        restrictionEnforcement.dietOverrideIngredientIndexes,
+        alcoholFreeVersion
+      ),
+      {
+        profile: allergy.profile,
+        overrideKeys: restrictionEnforcement.allergyOverrideKeys,
+        suggestion: allergy.suggestion,
+      }
     );
 
     // Conferência final do limite físico (CP-1.1.9): os retries de macros e de
@@ -1517,6 +1596,7 @@ async function runPulseAiChat(params: {
       dietaryFlags: currentUser.dietaryPreferences,
       genericBlender: isGenericBlender(currentUser.blendiOwnership),
       alcoholTier: alcoholCacheTier(currentUser),
+      allergyParts: allergyCacheParts(allergy),
       response: {
         recipe,
         aiProvider: aiResponse.provider,
@@ -1572,7 +1652,7 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
-    const { message, language: requestedLanguage } = parsed.data;
+    const { message, language: requestedLanguage, allergyOverride, allergyDeclined } = parsed.data;
     const normalizedMessage = normalizeMessageForCache(message);
 
     if (!normalizedMessage) {
@@ -1587,7 +1667,12 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
     const normalizedMessageHash = sha256(normalizedMessage);
     // Escopo por usuário + hash: mesma dimensão do cache de resposta, evita que
     // dois usuários diferentes enviando o mesmo texto colidam na mesma chave.
-    const inFlightKey = `${userId}:${normalizedMessageHash}`;
+    // CP-B6: a resposta da folha de alergia muda a requisição (o reenvio
+    // confirmado não pode reaproveitar a promessa do pedido sem confirmação).
+    const allergyChoiceKey = allergyOverride || allergyDeclined
+      ? `:${sha256(JSON.stringify([allergyOverride ?? null, allergyDeclined ?? null]))}`
+      : '';
+    const inFlightKey = `${userId}:${normalizedMessageHash}${allergyChoiceKey}`;
 
     let requestPromise = inFlightRequests.get(inFlightKey);
 
@@ -1602,6 +1687,8 @@ export async function chat(req: Request, res: Response, next: NextFunction): Pro
           normalizedMessage,
           normalizedMessageHash,
           requestedLanguage,
+          allergyOverride,
+          allergyDeclined,
         })
       ).finally(() => {
         inFlightRequests.delete(inFlightKey);

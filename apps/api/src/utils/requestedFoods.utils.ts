@@ -40,6 +40,7 @@ import {
   findAlcoholOccurrences,
   findTermMentions,
   findTermOccurrences,
+  tokenizeSegments,
   type CompiledTermList,
   type TermOccurrence,
 } from './recipeRestrictions.utils';
@@ -501,6 +502,27 @@ export function extractRequestedFoods(text: string): RequestedFood[] {
     foods.push({ id, display: displayTerm(occurrence.term), kind });
   }
   return foods;
+}
+
+/**
+ * CP-B6: o grupo do vocabulário que o item INTEIRO nomeia (alergia do campo
+ * livre: "kiwi" → kiwi/kiwifruit; "morango" → morango/strawberry...), com as
+ * frases que não são ele ("caju" não pega "castanha de caju"). null quando o
+ * item não é um alimento conhecido (o chamador usa o próprio texto).
+ */
+export function foodGroupTermsForItem(item: string): { terms: string[]; exceptions: string[] } | null {
+  const segments = tokenizeSegments(item);
+  if (segments.length !== 1) return null;
+
+  const tokenCount = segments[0].length;
+  const whole = findTermOccurrences(item, COMPILED_REQUEST_TERMS).find(occurrence => (
+    !occurrence.negated && occurrence.start === 0 && occurrence.end === tokenCount
+  ));
+  const group = whole ? GROUP_BY_TERM.get(whole.term) : undefined;
+
+  return group && group.kind === 'food'
+    ? { terms: [...group.request], exceptions: [...(group.notSatisfiedBy ?? [])] }
+    : null;
 }
 
 function alcoholSynonymKey(term: string): string {

@@ -15,10 +15,12 @@ import type {
   GoogleExchangeInput,
   RegisterInput,
   LoginInput,
+  UserAllergies,
   UserGoal,
   ResetPasswordInput,
   VerifyOtpInput,
 } from '@blendi/shared';
+import { normalizeUserAllergies } from '@blendi/shared';
 import { api } from '../config/api';
 
 // ─── Tipos de resposta da API ─────────────────────────────────────────────────
@@ -41,6 +43,14 @@ export interface AuthUser {
   blendiOwnership?: BlendiOwnership;
   otherBlenderModel?: string | null;
   dietaryPreferences?: DietaryPreference[];
+  /**
+   * CP-B6: alergias (dado de saúde — nunca em log nem analytics). Opcional:
+   * usuário salvo antes do CP-B6 não tem até o próximo GET /users/me.
+   * Ausente = sem alergia.
+   */
+  allergies?: UserAllergies;
+  /** CP-B6: o convite único "Isso é alergia?" já foi fechado. */
+  allergyInviteDismissed?: boolean;
   goal: UserGoal;
   locale: 'en' | 'pt-BR';
   unitSystem: 'metric' | 'imperial';
@@ -92,6 +102,8 @@ export type CurrentUserProfile = {
   blendiOwnership: NonNullable<AuthUser['blendiOwnership']>;
   otherBlenderModel: string | null;
   dietaryPreferences: NonNullable<AuthUser['dietaryPreferences']>;
+  allergies?: UserAllergies;
+  allergyInviteDismissed?: boolean;
   goal: AuthUser['goal'];
   preferredLanguage: AuthUser['locale'];
   unitSystem: AuthUser['unitSystem'];
@@ -146,6 +158,8 @@ export function mapCurrentUserProfile(user: CurrentUserProfile): AuthUser {
     blendiOwnership: user.blendiOwnership,
     otherBlenderModel: user.otherBlenderModel,
     dietaryPreferences: user.dietaryPreferences,
+    allergies: normalizeUserAllergies(user.allergies),
+    allergyInviteDismissed: user.allergyInviteDismissed ?? false,
     goal: user.goal,
     locale: user.preferredLanguage,
     unitSystem: user.unitSystem,

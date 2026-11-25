@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { WEIGHT_LOSS_GOAL, WEIGHT_LOSS_REQUIRED_WEIGHT_GOAL } from '@blendi/shared';
-import type { BlendiOwnership, DietaryPreference, UserGoal, WeightGoal } from '@blendi/shared';
+import type { BlendiOwnership, DietaryPreference, UserAllergies, UserGoal, WeightGoal } from '@blendi/shared';
 
 interface OnboardingState {
   selectedModel: string | null;
@@ -17,6 +17,8 @@ interface OnboardingState {
   otherBlenderModel: string;
   selectedGoal: UserGoal | null;
   dietaryPreferences: DietaryPreference[];
+  /** CP-B6: pergunta opcional "Você tem alguma alergia?" (junto da dieta). */
+  allergies: UserAllergies;
   unitSystem: 'metric' | 'imperial' | null;
   weight: number | null;
   height: number | null;
@@ -51,6 +53,7 @@ interface OnboardingActions {
   setOtherBlenderModel: (otherBlenderModel: string) => void;
   setGoal: (selectedGoal: UserGoal) => void;
   toggleDietaryPreference: (preference: DietaryPreference) => void;
+  setAllergies: (allergies: UserAllergies) => void;
   setUnitSystem: (unitSystem: 'metric' | 'imperial') => void;
   setBodyData: (input: SetBodyDataInput) => void;
   setCalculatedMacros: (input: SetCalculatedMacrosInput) => void;
@@ -63,6 +66,7 @@ const initialState: OnboardingState = {
   otherBlenderModel: '',
   selectedGoal: null,
   dietaryPreferences: [],
+  allergies: { common: [], custom: [] },
   unitSystem: null,
   weight: null,
   height: null,
@@ -112,6 +116,10 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>((s
         ? state.dietaryPreferences.filter((current) => current !== preference)
         : [...state.dietaryPreferences, preference],
     }));
+  },
+
+  setAllergies: (allergies) => {
+    set({ allergies });
   },
 
   setUnitSystem: (unitSystem) => {

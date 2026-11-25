@@ -199,7 +199,8 @@ describe('MeScreen — card de configurações', () => {
     expect(queryByText(/protein_target|settingCarbs|calories_target|track\.hydration/)).toBeNull();
   });
 
-  it('o card tem exatamente 6 linhas: modelo, goal, minhas metas, unidade, idioma e tema', () => {
+  // CP-B6: + "Alergias", logo depois de "Minhas metas" (antes eram 6 linhas).
+  it('o card tem exatamente 7 linhas: modelo, goal, minhas metas, alergias, unidade, idioma e tema', () => {
     const { UNSAFE_getAllByType, getByText } = renderMe();
     const labels = UNSAFE_getAllByType(SettingRow).map((row) => (row.props as { label: string }).label);
 
@@ -207,6 +208,7 @@ describe('MeScreen — card de configurações', () => {
       en.profile.fields.model,
       en.profile.fields.goal,
       en.nutritionGoals.rowLabel,
+      en.allergies.profile.rowLabel,
       en.profile.unitSystem,
       en.profile.language.label,
       en.me.theme.label,

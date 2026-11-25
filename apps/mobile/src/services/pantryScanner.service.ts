@@ -6,11 +6,15 @@ import {
 } from 'expo-image-manipulator';
 import {
   AI_CLIENT_TIMEOUT_MS,
+  PANTRY_ALLERGY_CONFIRMATION_REQUIRED_CODE,
   calculateLevel,
+  pantryAllergyCheckResultSchema,
   pantryAnalysisResultSchema,
   pantryLockedPreviewResultSchema,
   pantryPreviewUnlockResultSchema,
   pantryReadResultSchema,
+  type AllergenSelection,
+  type PantryAllergyCheckResult,
   type PantryAnalysisResult,
   type PantryGenerateInput,
   type PantryReadResult,
@@ -22,6 +26,7 @@ import {
 import { api } from '../config/api';
 import { trackEvent } from './analytics.service';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
+import { readAllergensFromErrorData } from '../utils/allergies.utils';
 import { handleMissionResponse, handleXPResponse } from '../utils/xp.utils';
 import type { TranslationKey } from '../locales/i18n';
 
@@ -55,12 +60,18 @@ const PANTRY_SCANNER_ERROR_TRANSLATION_KEYS = {
   'scanner/selection-unmet': 'errors.scanner_selection_unmet',
   // A tela abre a folha de idade (mesma do Pulse AI) e reenvia; o texto é o do Pulse AI.
   'scanner/age-confirmation-required': 'errors.pulseai_age_confirmation_required',
+  // CP-B6: item/pedido com alergia cadastrada sem confirmação; a tela abre a folha.
+  'scanner/allergy-confirmation-required': 'errors.scanner_allergy_confirmation_required',
 } as const satisfies Record<string, TranslationKey>;
+
+/** CP-B6: código do backend que pede a confirmação de alergia (por geração). */
+export const PANTRY_ALLERGY_CONFIRMATION_CODE = PANTRY_ALLERGY_CONFIRMATION_REQUIRED_CODE;
 
 interface ApiErrorResponse {
   success: false;
   code?: string;
   message?: string;
+  data?: unknown;
 }
 
 /** CP-1.1.4b: código do desbloqueio para prévia expirada, inexistente ou de outro recurso. */
@@ -121,7 +132,9 @@ export class PantryScannerServiceError extends Error {
   constructor(
     message: string,
     public readonly translationKey: TranslationKey,
-    public readonly apiCode?: string
+    public readonly apiCode?: string,
+    /** CP-B6: alérgenos citados no 428 de alergia. */
+    public readonly allergens?: AllergenSelection
   ) {
     super(message);
     this.name = 'PantryScannerServiceError';
@@ -203,6 +216,7 @@ function toPantryScannerServiceError(error: unknown): PantryScannerServiceError 
       error.response?.data?.message ?? error.message,
       translationKey,
       apiCode,
+      apiCode === PANTRY_ALLERGY_CONFIRMATION_CODE ? readAllergensFromErrorData(error.response?.data?.data) : undefined,
     );
   }
 
@@ -313,6 +327,19 @@ export async function generatePantryRecipes(input: PantryGenerateInput): Promise
       ...(typeof data.readId === 'string' ? { readId: data.readId } : {}),
       ...(typeof data.readExpiresAt === 'string' ? { readExpiresAt: data.readExpiresAt } : {}),
     };
+  } catch (error) {
+    throw toPantryScannerServiceError(error);
+  }
+}
+
+/**
+ * CP-B6: o item que a pessoa vai adicionar bate com uma alergia cadastrada?
+ * (famílias do backend; sem IA, sem scan). A geração confere de novo.
+ */
+export async function checkPantryAllergy(item: string): Promise<PantryAllergyCheckResult> {
+  try {
+    const response = await api.post<{ success: true; data: unknown }>('/pantry-scanner/allergy-check', { item });
+    return pantryAllergyCheckResultSchema.parse(response.data.data);
   } catch (error) {
     throw toPantryScannerServiceError(error);
   }
