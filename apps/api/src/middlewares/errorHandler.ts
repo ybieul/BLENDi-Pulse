@@ -40,7 +40,7 @@ const BODY_PARSER_ERRORS: Record<string, { statusCode: number; code: string; mes
 
 export function errorHandler(
   err: ApiError,
-  _req: Request,
+  req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
@@ -75,6 +75,23 @@ export function errorHandler(
   // mensagem original pode conter detalhe interno e só deve vazar em
   // desenvolvimento, para facilitar debug.
   const isDeliberate = err.code !== undefined;
+
+  // Antes só o app recebia o 'unexpected-error': em produção a causa não ia
+  // para lugar nenhum (o requestLogger só roda em development) e o log do
+  // Railway ficava sem rastro da exceção. Só o que NÃO é deliberado entra
+  // aqui (os 4xx de negócio seguem silenciosos). Nome, mensagem e stack vão
+  // para o log do servidor, nunca para a resposta; sem corpo nem query da
+  // requisição.
+  if (!isDeliberate) {
+    console.error('[errorHandler] unhandled error', {
+      method: req.method,
+      path: req.path,
+      statusCode,
+      errorName: err instanceof Error ? err.name : 'UnknownError',
+      errorMessage: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+  }
 
   const code = isDeliberate ? (err.code ?? DEFAULT_ERROR_CODE) : isDev ? DEFAULT_ERROR_CODE : UNEXPECTED_ERROR_CODE;
   const message = isDeliberate || isDev

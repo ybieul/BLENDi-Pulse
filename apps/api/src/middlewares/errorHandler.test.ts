@@ -123,3 +123,44 @@ describe('errorHandler — erro não tratado continua igual', () => {
     assert.equal(body.message, 'segredo interno do banco');
   });
 });
+
+describe('errorHandler — log do erro não tratado', () => {
+  it('em produção: registra nome, mensagem e stack no log, sem vazar na resposta', async () => {
+    envMock.NODE_ENV = 'production';
+    const errorLog = mock.method(console, 'error', () => undefined);
+
+    try {
+      const res = await fetch(`${baseUrl}/boom`);
+      const body = (await res.json()) as Record<string, unknown>;
+
+      assert.equal(res.status, 500);
+      assert.equal(body.message, 'An unexpected error occurred.');
+      assert.equal(errorLog.mock.callCount(), 1);
+
+      const [label, details] = errorLog.mock.calls[0].arguments as [string, Record<string, unknown>];
+      assert.equal(label, '[errorHandler] unhandled error');
+      assert.equal(details.method, 'GET');
+      assert.equal(details.path, '/boom');
+      assert.equal(details.statusCode, 500);
+      assert.equal(details.errorName, 'Error');
+      assert.equal(details.errorMessage, 'segredo interno do banco');
+      assert.match(String(details.stack), /segredo interno do banco/);
+    } finally {
+      errorLog.mock.restore();
+    }
+  });
+
+  it('erro deliberado (4xx de negócio) e erro do body-parser não entram no log', async () => {
+    envMock.NODE_ENV = 'production';
+    const errorLog = mock.method(console, 'error', () => undefined);
+
+    try {
+      await fetch(`${baseUrl}/deliberate`);
+      await post('/json', '{"productId": ');
+
+      assert.equal(errorLog.mock.callCount(), 0);
+    } finally {
+      errorLog.mock.restore();
+    }
+  });
+});
