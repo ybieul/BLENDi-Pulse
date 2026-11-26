@@ -64,8 +64,15 @@ export interface GoogleUserInfo {
    * assuma a conta de outra pessoa que já tenha esse endereço cadastrado.
    */
   emailVerified: boolean;
-  /** Nome completo do usuário. */
-  name: string;
+  /**
+   * Nome completo (claim `name`). Pode faltar: contas Google sem nome no
+   * perfil — antes isso derrubava o login inteiro (erro "missing name").
+   */
+  name?: string;
+  /** Nome (claim `given_name`), quando o perfil tem. */
+  givenName?: string;
+  /** Sobrenome (claim `family_name`), quando o perfil tem. */
+  familyName?: string;
   /** URL da foto de perfil (pode estar ausente em contas sem foto). */
   picture?: string;
 }
@@ -145,7 +152,8 @@ export async function exchangeCodeForTokens(code: string): Promise<string> {
  *
  * @throws Error se a assinatura for inválida, o token expirado ou os claims
  *   não corresponderem às nossas credenciais.
- * @throws Error se os campos obrigatórios (sub, email, name) estiverem ausentes.
+ * @throws Error se os campos obrigatórios (sub, email) estiverem ausentes. O
+ *   nome é opcional: sem ele, a conta nasce com "nome a confirmar".
  */
 export async function getUserInfoFromToken(idToken: string): Promise<GoogleUserInfo> {
   const ticket = await oauth2Client.verifyIdToken({
@@ -155,15 +163,17 @@ export async function getUserInfoFromToken(idToken: string): Promise<GoogleUserI
 
   const payload = ticket.getPayload();
 
-  if (!payload?.sub || !payload.email || !payload.name) {
-    throw new Error('Google id_token missing required fields: sub, email or name');
+  if (!payload?.sub || !payload.email) {
+    throw new Error('Google id_token missing required fields: sub or email');
   }
 
   return {
     googleId: payload.sub,
     email: payload.email,
     emailVerified: payload.email_verified === true,
-    name: payload.name,
+    name: payload.name || undefined,
+    givenName: payload.given_name || undefined,
+    familyName: payload.family_name || undefined,
     picture: payload.picture ?? undefined,
   };
 }

@@ -12,6 +12,7 @@ import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
+  splitFullName,
   updateTimezoneSchema,
 } from '@blendi/shared';
 import { UserModel } from '../models/User';
@@ -24,6 +25,7 @@ import {
 import { EmailService } from '../services/email.service';
 import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
 import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
+import { buildAccountNameFields, serializeUserName } from '../utils/userName.utils';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -81,6 +83,8 @@ export async function register(
       email,
       password,
       name,
+      firstName,
+      lastName,
       blendiModel,
       goal,
       preferredLanguage,
@@ -88,6 +92,27 @@ export async function register(
       dailyProteinTarget,
       dailyCalorieTarget,
     } = parsed.data;
+
+    // Nome e sobrenome: o app atual manda firstName/lastName; versões antigas
+    // mandam só `name` (dividido em nome + sobrenome, leitura tolerante).
+    // Um dos dois é obrigatório.
+    const nameSource = firstName
+      ? { firstName, lastName }
+      : name
+        ? splitFullName(name)
+        : null;
+
+    if (!nameSource) {
+      sendErrorResponse(res, {
+        statusCode: 400,
+        code: VALIDATION_ERROR_CODE,
+        message: VALIDATION_ERROR_MESSAGE,
+        errors: [{ field: 'firstName', message: 'errors.validation.required' }],
+      });
+      return;
+    }
+
+    const nameFields = buildAccountNameFields({ ...nameSource, email });
 
     // 2. Verificar se o email já está cadastrado
     const existing = await UserModel.findOne({ email }).lean();
@@ -112,7 +137,11 @@ export async function register(
       user = await UserModel.create({
         email,
         password,
-        name,
+        name: nameFields.name,
+        firstName: nameFields.firstName,
+        lastName: nameFields.lastName,
+        // Cadastro por e-mail: a pessoa digitou o nome — nunca "a confirmar".
+        nameNeedsConfirmation: false,
         blendiModel,
         goal,
         locale: preferredLanguage,
@@ -159,7 +188,7 @@ export async function register(
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          ...serializeUserName(user),
           blendiModel: user.blendiModel,
           blendiOwnership: user.blendiOwnership ?? 'blendi',
           otherBlenderModel: user.otherBlenderModel ?? null,
@@ -243,7 +272,7 @@ export async function login(
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          ...serializeUserName(user),
           blendiModel: user.blendiModel,
           blendiOwnership: user.blendiOwnership ?? 'blendi',
           otherBlenderModel: user.otherBlenderModel ?? null,

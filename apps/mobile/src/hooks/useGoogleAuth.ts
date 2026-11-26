@@ -24,6 +24,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { exchangeGoogleCode, getGoogleAuthUrl } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
 import { createPkcePair } from '../utils/pkce.utils';
+import { getAppPreferredLanguage } from '../utils/preferredLanguage.utils';
 
 // Necessário para fechar o browser corretamente no Android após o redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -73,10 +74,11 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       }
 
       // ── Passo 2: obter a URL de autorização do backend ─────────────────────
-      // A URL inclui o state JWT (CSRF + desafio) gerado pelo backend.
+      // A URL inclui o state JWT (CSRF + desafio + idioma do aparelho, este
+      // usado só se o login criar a conta) gerado pelo backend.
       let authUrl: string;
       try {
-        authUrl = await getGoogleAuthUrl(codeChallenge);
+        authUrl = await getGoogleAuthUrl(codeChallenge, getAppPreferredLanguage());
       } catch (err) {
         console.error('[useGoogleAuth] Falha ao obter URL de autorização', {
           errorName: err instanceof Error ? err.name : 'UnknownError',

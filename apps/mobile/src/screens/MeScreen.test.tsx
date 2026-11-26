@@ -200,11 +200,13 @@ describe('MeScreen — card de configurações', () => {
   });
 
   // CP-B6: + "Alergias", logo depois de "Minhas metas" (antes eram 6 linhas).
-  it('o card tem exatamente 7 linhas: modelo, goal, minhas metas, alergias, unidade, idioma e tema', () => {
+  // Teste no build EAS (25-26/11): + "Nome" no topo (antes eram 7 linhas).
+  it('o card tem exatamente 8 linhas: nome, modelo, goal, minhas metas, alergias, unidade, idioma e tema', () => {
     const { UNSAFE_getAllByType, getByText } = renderMe();
     const labels = UNSAFE_getAllByType(SettingRow).map((row) => (row.props as { label: string }).label);
 
     expect(labels).toEqual([
+      en.me.name.rowLabel,
       en.profile.fields.model,
       en.profile.fields.goal,
       en.nutritionGoals.rowLabel,

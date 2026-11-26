@@ -29,6 +29,7 @@ export type RootStackParamList = {
   NutritionGoals: undefined;
   /** CP-B6: alergias do perfil (linha do Me e convite único). */
   Allergies: undefined;
+  ProfileName: undefined;
 };
 
 export type PulseAIStackParamList = {

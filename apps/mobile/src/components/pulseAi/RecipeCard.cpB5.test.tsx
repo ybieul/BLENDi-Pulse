@@ -82,8 +82,10 @@ describe('RecipeCard — avisos de pedido (CP-B5)', () => {
   it('álcool > 0 aparece junto dos macros; 0 não aparece', () => {
     const withAlcohol = renderCard({ ...RECIPE, alcoholGrams: 16 });
     expect(withAlcohol.getByTestId('macro-pill-alcohol')).toBeTruthy();
-    expect(withAlcohol.getByText('pulseAi.alcoholUnit')).toBeTruthy();
-    expect(withAlcohol.getByText('16')).toBeTruthy();
+    // Teste no build EAS (25-26/11): o chip mostra o número ("16 g") e o nome
+    // visível embaixo (common.macroChips.alcohol), não mais "g de álcool".
+    expect(withAlcohol.getByText('common.macroChips.alcohol')).toBeTruthy();
+    expect(withAlcohol.getByText(/^16 /)).toBeTruthy();
 
     const zero = renderCard({ ...RECIPE, alcoholGrams: 0 });
     expect(zero.queryByTestId('macro-pill-alcohol')).toBeNull();
@@ -94,7 +96,10 @@ describe('RecipeCard — avisos de pedido (CP-B5)', () => {
     expect(ptBR.pulseAi.dietOverrideNotice).toBe('Inclui {{items}}, fora da sua dieta, como você pediu.');
     expect(en.pulseAi.alcoholFreeNotice.length).toBeGreaterThan(0);
     expect(ptBR.pulseAi.alcoholFreeNotice.length).toBeGreaterThan(0);
-    expect(en.pulseAi.alcoholUnit).toBe('g alcohol');
-    expect(ptBR.pulseAi.alcoholUnit).toBe('g de álcool');
+    // Teste no build EAS (25-26/11): "g de álcool" virou o chip com rótulo
+    // visível (common.macroChips.alcohol) e leitura completa no leitor de tela.
+    expect(en.common.macroChips.alcohol).toBe('Alcohol');
+    expect(ptBR.common.macroChips.alcohol).toBe('Álcool');
+    expect(ptBR.common.macroChips.a11y.alcohol).toBe('{{value}} gramas de álcool');
   });
 });

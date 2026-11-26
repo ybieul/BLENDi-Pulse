@@ -1,7 +1,7 @@
 // Tela de modelo (passo 1 de 5): 5 cards (3 BLENDi + "outro modelo" + "ainda não
 // tenho"), badges de potência certos, campo opcional de marca/modelo só em
 // "other" (máx. 60) e o que cada opção grava na store.
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { TextInput } from 'react-native';
 
 jest.mock('../../hooks/useColors', () => {
@@ -28,6 +28,20 @@ jest.mock('../../components/ui/OnboardingLayout', () => {
   };
 });
 
+// Teste no build EAS (25-26/11): a etapa de nome usa o usuário logado e o
+// PATCH /users/me — os dois simulados aqui (sem rede, sem SecureStore).
+const mockPatch = jest.fn<Promise<unknown>, [string, unknown]>();
+jest.mock('../../config/api', () => ({
+  api: { patch: (url: string, body: unknown) => mockPatch(url, body) },
+}));
+
+let mockAuthUser: Record<string, unknown> | null = null;
+const mockUpdateUserProfile = jest.fn();
+jest.mock('../../store/auth.store', () => ({
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ user: mockAuthUser, updateUserProfile: mockUpdateUserProfile }),
+}));
+
 import { useOnboardingStore } from '../../store/onboarding.store';
 import { OnboardingModelScreen } from './OnboardingModelScreen';
 
@@ -40,6 +54,9 @@ function renderScreen() {
 
 beforeEach(() => {
   navigate.mockReset();
+  mockPatch.mockReset();
+  mockUpdateUserProfile.mockReset();
+  mockAuthUser = null;
   act(() => {
     store().resetOnboarding();
   });
@@ -140,5 +157,93 @@ describe('OnboardingModelScreen', () => {
     expect(getAllByRole('button', { selected: true })).toHaveLength(1);
     expect(store().selectedModel).toBe('ProPlus');
     expect(store().blendiOwnership).toBe('blendi');
+  });
+});
+
+describe('OnboardingModelScreen — nome a confirmar (Apple/Google sem nome real)', () => {
+  const pendingUser = {
+    id: 'u1',
+    email: 'biel782003@privaterelay.appleid.com',
+    name: 'biel782003 Silva',
+    firstName: 'biel782003',
+    lastName: 'Silva',
+    nameNeedsConfirmation: true,
+  };
+
+  it('conta sem a marca: nenhum campo de nome, continua direto', () => {
+    mockAuthUser = { id: 'u1', name: 'Gabriel Silva', nameNeedsConfirmation: false };
+    const { getByText, getByRole, queryByTestId } = renderScreen();
+
+    expect(queryByTestId('onboarding-name-step')).toBeNull();
+    fireEvent.press(getByText('onboarding.model.steel.name'));
+    fireEvent.press(getByRole('button', { name: 'onboarding.continue' }));
+
+    expect(mockPatch).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith('OnboardingGoal');
+  });
+
+  it('conta "a confirmar": mostra Nome (vazio) e Sobrenome (o real, já preenchido)', () => {
+    mockAuthUser = pendingUser;
+    const { getByTestId } = renderScreen();
+
+    expect(getByTestId('onboarding-name-step')).toBeTruthy();
+    expect(getByTestId('onboarding-name-first').props.value).toBe('');
+    expect(getByTestId('onboarding-name-last').props.value).toBe('Silva');
+  });
+
+  it('Nome vazio: mostra o erro e não salva nem avança', () => {
+    mockAuthUser = pendingUser;
+    const { getByText, getByRole } = renderScreen();
+
+    fireEvent.press(getByText('onboarding.model.lite.name'));
+    fireEvent.press(getByRole('button', { name: 'onboarding.continue' }));
+
+    expect(getByText('errors.validation.required')).toBeTruthy();
+    expect(mockPatch).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('Nome preenchido: PATCH só com firstName/lastName limpos, atualiza o usuário e avança', async () => {
+    mockAuthUser = pendingUser;
+    mockPatch.mockResolvedValue({ data: {} });
+    const { getByText, getByRole, getByTestId } = renderScreen();
+
+    fireEvent.changeText(getByTestId('onboarding-name-first'), '  Gabriel ');
+    fireEvent.press(getByText('onboarding.model.lite.name'));
+    fireEvent.press(getByRole('button', { name: 'onboarding.continue' }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('OnboardingGoal'));
+    expect(mockPatch).toHaveBeenCalledWith('/users/me', { firstName: 'Gabriel', lastName: 'Silva' });
+    expect(mockUpdateUserProfile).toHaveBeenCalledWith({
+      firstName: 'Gabriel',
+      lastName: 'Silva',
+      name: 'Gabriel Silva',
+      nameNeedsConfirmation: false,
+    });
+  });
+
+  it('falha ao salvar: mostra o erro e não avança', async () => {
+    mockAuthUser = pendingUser;
+    mockPatch.mockRejectedValue(new Error('offline'));
+    const { getByText, getByRole, getByTestId, findByText } = renderScreen();
+
+    fireEvent.changeText(getByTestId('onboarding-name-first'), 'Gabriel');
+    fireEvent.press(getByText('onboarding.model.lite.name'));
+    fireEvent.press(getByRole('button', { name: 'onboarding.continue' }));
+
+    expect(await findByText('errors.network_internal_server_error')).toBeTruthy();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('a marca chega depois do primeiro render (hydrate do login): a etapa aparece', () => {
+    mockAuthUser = null;
+    const utils = renderScreen();
+    expect(utils.queryByTestId('onboarding-name-step')).toBeNull();
+
+    mockAuthUser = pendingUser;
+    utils.rerender(<OnboardingModelScreen navigation={{ navigate }} />);
+
+    expect(utils.getByTestId('onboarding-name-step')).toBeTruthy();
+    expect(utils.getByTestId('onboarding-name-last').props.value).toBe('Silva');
   });
 });

@@ -26,6 +26,8 @@ import {
   DAILY_FAT_TARGET_MIN,
   DAILY_PROTEIN_TARGET_VALIDATION_MAX,
   DAILY_PROTEIN_TARGET_VALIDATION_MIN,
+  FIRST_NAME_MAX_LENGTH,
+  LAST_NAME_MAX_LENGTH,
   MAX_PLAUSIBLE_AGE_YEARS,
   MIN_PLAUSIBLE_AGE_YEARS,
   OTHER_BLENDER_MODEL_MAX_LENGTH,
@@ -137,7 +139,25 @@ export interface IUser {
   profilePhoto?: string;
   hasProfilePhoto: boolean;
   profilePhotoUpdatedAt?: Date;
+  /**
+   * Nome completo de exibição (e-mails, compartilhamento, foto sem imagem).
+   * Sempre "firstName lastName" (ou só firstName), montado pelo backend.
+   */
   name: string;
+  /**
+   * Nome e sobrenome (teste no build EAS 25-26/11). Opcionais no documento:
+   * contas anteriores não os têm e são lidas de forma tolerante
+   * (resolvePersonNameParts, derivado do `name`), sem migração.
+   */
+  firstName?: string;
+  lastName?: string;
+  /**
+   * true = o nome gravado não é real (só o começo do e-mail, porque a Apple
+   * ou o Google não mandaram o nome). O app pede o nome no onboarding;
+   * PATCH /users/me com firstName tira a marca. Ausente em contas antigas —
+   * lida por looksLikeDerivedName (ver utils/userName.utils.ts).
+   */
+  nameNeedsConfirmation?: boolean;
   blendiModel: BlendiModel;
   /**
    * Posse de liquidificador. 'other'/'none' sempre gravam blendiModel 'Lite'
@@ -581,6 +601,24 @@ const userSchema = new mongoose.Schema<IUser, UserModel, IUserMethods>(
       type: String,
       required: [true, 'errors.validation.required'],
       trim: true,
+    },
+    // Sem `required`: contas antigas não têm (leitura tolerante). O teto é o
+    // mesmo do Zod — rede de segurança dos caminhos que gravam direto.
+    firstName: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: [FIRST_NAME_MAX_LENGTH, 'errors.validation.too_long'],
+    },
+    lastName: {
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: [LAST_NAME_MAX_LENGTH, 'errors.validation.too_long'],
+    },
+    nameNeedsConfirmation: {
+      type: Boolean,
+      required: false,
     },
     blendiModel: {
       type: String,

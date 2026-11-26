@@ -393,3 +393,211 @@ describe('handleAppleSignIn — TOCTOU (corrida de criação concorrente)', () =
     assert.equal(nextMock.mock.calls[0]?.arguments[0], duplicateKeyError);
   });
 });
+
+// ─── Teste no build EAS (25-26/11): nome/sobrenome e idioma do aparelho ──────
+
+describe('handleAppleSignIn — nome e sobrenome', () => {
+  it('givenName/familyName da Apple → firstName/lastName, name composto, sem "nome a confirmar"', async () => {
+    const req = buildReq({ ...VALID_BODY, givenName: ' Gabriel ', familyName: 'Barboza da Silva' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'Gabriel');
+    assert.equal(createdArgs.lastName, 'Barboza da Silva');
+    assert.equal(createdArgs.name, 'Gabriel Barboza da Silva');
+    assert.equal(createdArgs.nameNeedsConfirmation, false);
+  });
+
+  it('givenName tem prioridade sobre fullName (app antigo)', async () => {
+    const req = buildReq({ ...VALID_BODY, givenName: 'Ana', fullName: 'Outro Nome' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'Ana');
+    assert.equal(createdArgs.name, 'Ana');
+  });
+
+  it('só fullName (app antigo) → dividido em nome + sobrenome', async () => {
+    const req = buildReq({ ...VALID_BODY, fullName: 'Fulano da Silva' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'Fulano');
+    assert.equal(createdArgs.lastName, 'da Silva');
+    assert.equal(createdArgs.nameNeedsConfirmation, false);
+  });
+
+  it('sem nome nenhum → começo do e-mail e conta marcada "nome a confirmar"', async () => {
+    const req = buildReq(VALID_BODY);
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'user');
+    assert.equal(createdArgs.name, 'user');
+    assert.equal(createdArgs.nameNeedsConfirmation, true);
+  });
+
+  it('só familyName → sobrenome real mantido, nome do e-mail e marca "a confirmar"', async () => {
+    const req = buildReq({ ...VALID_BODY, familyName: 'Silva' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'user');
+    assert.equal(createdArgs.lastName, 'Silva');
+    assert.equal(createdArgs.nameNeedsConfirmation, true);
+  });
+
+  it('nome com marcação/controle é limpo; nome longo demais é cortado (nunca 400 no login)', async () => {
+    const longName = 'A'.repeat(80);
+    const req = buildReq({ ...VALID_BODY, givenName: '<b>Gabi</b>‮', familyName: longName });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    assert.equal(res.statusCode, 200);
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.firstName, 'Gabi');
+    assert.equal((createdArgs.lastName as string).length, 50);
+  });
+
+  it('Caso 1: conta "a confirmar" + Apple manda o nome agora → grava o nome real', async () => {
+    const existing = buildFakeUser({
+      appleUserId: 'apple-sub-1',
+      email: 'biel782003@example.com',
+      name: 'biel782003',
+      firstName: 'biel782003',
+      nameNeedsConfirmation: true,
+    });
+    findOneMock.mock.mockImplementation(() => fakeQuery(existing));
+
+    const req = buildReq({ ...VALID_BODY, givenName: 'Gabriel', familyName: 'Silva' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    assert.equal(existing.name, 'Gabriel Silva');
+    assert.equal(existing.firstName, 'Gabriel');
+    assert.equal(existing.nameNeedsConfirmation, false);
+    const body = res.body as { data: { user: Record<string, unknown> } };
+    assert.equal(body.data.user.firstName, 'Gabriel');
+    assert.equal(body.data.user.nameNeedsConfirmation, false);
+  });
+
+  it('Caso 1: conta ANTIGA sem a marca, nome = começo do e-mail → também corrige com o nome da Apple', async () => {
+    const existing = buildFakeUser({
+      appleUserId: 'apple-sub-1',
+      email: 'biel782003@example.com',
+      name: 'biel782003',
+    });
+    findOneMock.mock.mockImplementation(() => fakeQuery(existing));
+
+    const req = buildReq({ ...VALID_BODY, givenName: 'Gabriel' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    assert.equal(existing.name, 'Gabriel');
+  });
+
+  it('Caso 1: nome já confirmado NUNCA é trocado pelo da Apple', async () => {
+    const existing = buildFakeUser({
+      appleUserId: 'apple-sub-1',
+      name: 'Nome Escolhido',
+      firstName: 'Nome',
+      lastName: 'Escolhido',
+      nameNeedsConfirmation: false,
+    });
+    findOneMock.mock.mockImplementation(() => fakeQuery(existing));
+
+    const req = buildReq({ ...VALID_BODY, givenName: 'Outro' });
+    const res = buildRes();
+
+    await handleAppleSignIn(req, res, nextMock);
+
+    assert.equal(existing.name, 'Nome Escolhido');
+    assert.equal(existing.firstName, 'Nome');
+  });
+
+  it('resposta traz firstName/lastName/nameNeedsConfirmation (conta antiga: derivados do name)', async () => {
+    const existing = buildFakeUser({ appleUserId: 'apple-sub-1', name: 'Maria Clara Souza' });
+    findOneMock.mock.mockImplementation(() => fakeQuery(existing));
+
+    const res = buildRes();
+    await handleAppleSignIn(buildReq(VALID_BODY), res, nextMock);
+
+    const body = res.body as { data: { user: Record<string, unknown> } };
+    assert.equal(body.data.user.name, 'Maria Clara Souza');
+    assert.equal(body.data.user.firstName, 'Maria');
+    assert.equal(body.data.user.lastName, 'Clara Souza');
+    assert.equal(body.data.user.nameNeedsConfirmation, false);
+  });
+});
+
+describe('handleAppleSignIn — idioma do aparelho', () => {
+  it('conta nova com preferredLanguage pt-BR → locale pt-BR', async () => {
+    const res = buildRes();
+    await handleAppleSignIn(buildReq({ ...VALID_BODY, preferredLanguage: 'pt-BR' }), res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.locale, 'pt-BR');
+  });
+
+  it('conta nova com preferredLanguage en → locale en', async () => {
+    const res = buildRes();
+    await handleAppleSignIn(buildReq({ ...VALID_BODY, preferredLanguage: 'en' }), res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.locale, 'en');
+  });
+
+  it('app antigo sem preferredLanguage → en (como antes)', async () => {
+    const res = buildRes();
+    await handleAppleSignIn(buildReq(VALID_BODY), res, nextMock);
+
+    const createdArgs = createMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+    assert.equal(createdArgs.locale, 'en');
+  });
+
+  it('idioma fora da lista → 400, sem tocar na Apple nem no banco', async () => {
+    const res = buildRes();
+    await handleAppleSignIn(buildReq({ ...VALID_BODY, preferredLanguage: 'es' }), res, nextMock);
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(verifyAppleIdentityTokenMock.mock.callCount(), 0);
+    assert.equal(createMock.mock.callCount(), 0);
+  });
+
+  it('Caso 1 (conta existente) mantém o idioma escolhido, mesmo com outro idioma no aparelho', async () => {
+    const existing = buildFakeUser({ appleUserId: 'apple-sub-1', locale: 'en' });
+    findOneMock.mock.mockImplementation(() => fakeQuery(existing));
+
+    const res = buildRes();
+    await handleAppleSignIn(buildReq({ ...VALID_BODY, preferredLanguage: 'pt-BR' }), res, nextMock);
+
+    assert.equal(existing.locale, 'en');
+    assert.equal((res.body as { data: { user: { locale: string } } }).data.user.locale, 'en');
+  });
+
+  it('Caso 2 (vincular conta por e-mail) mantém o idioma da conta', async () => {
+    const existing = buildFakeUser({ email: 'user@example.com', locale: 'en' });
+    findOneMock.mock.mockImplementation((filter: unknown) =>
+      fakeQuery((filter as { email?: string }).email ? existing : null)
+    );
+
+    const res = buildRes();
+    await handleAppleSignIn(buildReq({ ...VALID_BODY, preferredLanguage: 'pt-BR' }), res, nextMock);
+
+    assert.equal(existing.locale, 'en');
+    assert.equal(createMock.mock.callCount(), 0);
+  });
+});

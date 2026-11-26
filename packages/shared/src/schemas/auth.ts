@@ -18,6 +18,13 @@
 
 import { z } from 'zod';
 
+import {
+  cleanPersonNamePart,
+  FIRST_NAME_MAX_LENGTH,
+  firstNameSchema,
+  LAST_NAME_MAX_LENGTH,
+  lastNameSchema,
+} from '../utils/personName';
 import { isValidIanaTimezone } from '../utils/timezone.utils';
 import { rangeErrorMessage } from '../utils/validationRange.utils';
 import {
@@ -35,6 +42,25 @@ const PASSWORD_MAX = 72;
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
 
+// Idioma do aparelho enviado pelo app nos cadastros (e-mail, Apple, Google):
+// 'pt-BR' ou 'en' (qualquer outro idioma o app já manda como 'en').
+export const PREFERRED_LANGUAGE_VALUES = ['en', 'pt-BR'] as const;
+export type PreferredLanguage = (typeof PREFERRED_LANGUAGE_VALUES)[number];
+
+const preferredLanguageSchema = z.enum(PREFERRED_LANGUAGE_VALUES, {
+  required_error: 'errors.validation.required',
+  message: 'errors.validation.invalid_option',
+});
+
+// Nome vindo de um provedor (Apple): limpo e cortado no limite, NUNCA
+// recusado — um nome longo demais da Apple não pode impedir o login.
+function providerNamePartSchema(maxLength: number) {
+  return z
+    .string()
+    .transform(value => cleanPersonNamePart(value).slice(0, maxLength).trim())
+    .optional();
+}
+
 // ─── Schema: registro ─────────────────────────────────────────────────────────
 
 export const registerSchema = z.object({
@@ -51,11 +77,21 @@ export const registerSchema = z.object({
     .max(PASSWORD_MAX, 'errors.validation.too_long')
     .regex(PASSWORD_REGEX, 'errors.validation.password_complexity'),
 
+  // Nome completo antigo (versões do app antes de nome/sobrenome). Opcional:
+  // o app atual manda firstName/lastName; sem firstName, o backend deriva
+  // nome/sobrenome deste campo (splitFullName). Um dos dois é obrigatório —
+  // conferido no controller (register), para o schema continuar um z.object
+  // (o app valida campo a campo por registerSchema.shape).
   name: z
     .string({ required_error: 'errors.validation.required' })
     .min(2, 'errors.validation.too_short')
     .max(60, 'errors.validation.too_long')
-    .trim(),
+    .trim()
+    .optional(),
+
+  firstName: firstNameSchema.optional(),
+
+  lastName: lastNameSchema.optional(),
 
   blendiModel: z.enum(['Lite', 'ProPlus', 'Steel'], {
     required_error: 'errors.validation.required',
@@ -67,7 +103,7 @@ export const registerSchema = z.object({
     message: 'errors.validation.invalid_option',
   }),
 
-  preferredLanguage: z.enum(['en', 'pt-BR']).default('en'),
+  preferredLanguage: z.enum(PREFERRED_LANGUAGE_VALUES).default('en'),
 
   // Mesmas constantes de updateUserSchema (./user.ts) — antes duplicadas aqui
   // com números menores (10-400 / 500-10.000), o que deixava o registro mais
@@ -168,6 +204,11 @@ export const googleAuthUrlQuerySchema = z.object({
       invalid_type_error: 'errors.validation.invalid_option',
     })
     .regex(GOOGLE_CODE_CHALLENGE_PATTERN, 'errors.validation.invalid_option'),
+
+  // Idioma do aparelho — usado só se o login CRIAR a conta (vai no state
+  // assinado até o callback). Login de conta existente não muda o idioma.
+  // Ausente (app antigo) = 'en', como antes.
+  preferredLanguage: preferredLanguageSchema.optional(),
 });
 
 export const googleExchangeSchema = z.object({
@@ -202,11 +243,20 @@ export const appleSignInSchema = z.object({
     .string({ required_error: 'errors.validation.required' })
     .min(1, 'errors.validation.required'),
 
+  // Nome completo montado pelo app (versões antes de nome/sobrenome).
   fullName: z
     .string()
     .trim()
     .max(60, 'errors.validation.too_long')
     .optional(),
+
+  // Nome e sobrenome como a Apple os entrega (credential.fullName). Só vêm no
+  // primeiro login — e às vezes nem nele. Têm prioridade sobre fullName.
+  givenName: providerNamePartSchema(FIRST_NAME_MAX_LENGTH),
+  familyName: providerNamePartSchema(LAST_NAME_MAX_LENGTH),
+
+  // Idioma do aparelho — usado só na CRIAÇÃO da conta. Ausente = 'en'.
+  preferredLanguage: preferredLanguageSchema.optional(),
 });
 
 // ─── Schema: solicitação de OTP (forgot password) ────────────────────────────

@@ -41,6 +41,7 @@ import {
   type MacroEditWarning,
 } from '../utils/macroCalculation.utils';
 import { resolveBlenderOwnershipUpdates } from '../utils/blenderOwnership.utils';
+import { buildNameUpdate, serializeUserName } from '../utils/userName.utils';
 import {
   WEIGHT_LOSS_REQUIRES_LOSE_ERROR_CODE,
   WEIGHT_LOSS_REQUIRES_LOSE_MESSAGE,
@@ -857,6 +858,8 @@ export async function updateMe(
     }
 
     const {
+      firstName,
+      lastName,
       blendiModel,
       blendiOwnership,
       otherBlenderModel,
@@ -926,6 +929,11 @@ export async function updateMe(
         goal: 1,
         targetWeight: 1,
         blendiOwnership: 1,
+        // Nome: só para remontar `name` quando firstName/lastName vêm sozinhos.
+        name: 1,
+        firstName: 1,
+        lastName: 1,
+        email: 1,
       })
       .lean();
 
@@ -936,6 +944,25 @@ export async function updateMe(
         message: 'User not found.',
       });
       return;
+    }
+
+    // Nome e sobrenome: `name` é sempre remontado aqui ("firstName lastName");
+    // o que não veio no corpo sai do estado atual (leitura tolerante de conta
+    // antiga). firstName no corpo tira a marca de "nome a confirmar".
+    if (firstName !== undefined || lastName !== undefined) {
+      const nameUpdate = buildNameUpdate(currentUser, { firstName, lastName });
+
+      if (!nameUpdate.firstName) {
+        sendErrorResponse(res, {
+          statusCode: 400,
+          code: VALIDATION_ERROR_CODE,
+          message: VALIDATION_ERROR_MESSAGE,
+          errors: [{ field: 'firstName', message: 'errors.validation.required' }],
+        });
+        return;
+      }
+
+      Object.assign(updates, nameUpdate);
     }
 
     // CP-1.1.9 — WeightLoss sempre com weightGoal 'lose', sobre o estado final
@@ -1156,7 +1183,7 @@ export async function updateMe(
         user: {
           id: String(user._id),
           email: user.email,
-          name: user.name,
+          ...serializeUserName(user),
           profilePhoto: user.profilePhoto,
           blendiModel: user.blendiModel,
           blendiOwnership: user.blendiOwnership ?? 'blendi',

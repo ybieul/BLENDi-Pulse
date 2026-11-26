@@ -11,7 +11,7 @@
 // Quando os dados chegam, um fade de 300 ms substitui os skeletons.
 //
 // ── Estrutura de layout (ScrollView) ─────────────────────────────────────────
-//   safe area top + 16  →  greetingContainer (px 24) + badge absoluto
+//   safe area top + 16  →  HomeGreetingHeader (px 24): saudação | nível + badge
 //   20                  →  QuickActionTrigger (px 24)
 //   24                  →  GoalRingsSection (px 24)
 //   24                  →  StreakBadge (px 24)
@@ -28,7 +28,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,9 +36,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   calculateLevel,
-  colors,
+  getDisplayFirstName,
   fonts,
-  fontSizes,
   fontWeights,
 } from '@blendi/shared';
 import { api } from '../config/api';
@@ -65,6 +63,7 @@ import { StreakBadge } from '../components/home/StreakBadge';
 import { QuickProtocolCards } from '../components/home/QuickProtocolCards';
 import type { QuickProtocol } from '../components/home/QuickProtocolCards';
 import { DailyRecipeCard } from '../components/home/DailyRecipeCard';
+import { HomeGreetingHeader, LEVEL_PROGRESS_BAR_WIDTH } from '../components/home/HomeGreetingHeader';
 import { MissionCard } from '../components/missions/MissionCard';
 import { getDailyMissions } from '../services/dailyMission.service';
 
@@ -73,11 +72,6 @@ import { getDailyMissions } from '../services/dailyMission.service';
 const FADE_DURATION = 300;
 /** Fallback de meta de hidratação diária, usado só se a API não retornar goalMl. Alinhado com DEFAULT_DAILY_HYDRATION_TARGET do backend. */
 const HYDRATION_TARGET_ML = 2500;
-const BADGE_HEIGHT = 24;
-const BADGE_PADDING_H = 10;
-const BADGE_PRO_BACKGROUND = colors.overlay.pulse[25];
-const BADGE_PRO_BORDER = colors.overlay.pulse[40];
-const LEVEL_PROGRESS_BAR_WIDTH = 40;
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -99,6 +93,8 @@ type BlendiModel = 'Lite' | 'ProPlus' | 'Steel';
 interface UserProfileData {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   blendiModel: BlendiModel;
   goal: UserGoal;
@@ -147,9 +143,6 @@ function getGreetingKey(): 'home.greeting_morning' | 'home.greeting_afternoon' |
 
 export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const colors = useColors();
-  const BADGE_FREE_BACKGROUND = colors.overlay.plum[8];
-  const BADGE_FREE_BORDER = colors.overlay.plum[12];
-  const LEVEL_PROGRESS_TRACK_COLOR = colors.overlay.plum[10];
 
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
@@ -251,8 +244,10 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const logsData = logsResponse;
   const hydrationData = hydrationResponse?.data;
 
-  const displayName = profile?.name ?? authUser?.name ?? '';
-  const greeting = t(getGreetingKey(), { name: displayName });
+  // Só o primeiro nome (firstName; sem ele, a primeira palavra do name —
+  // contas antigas). O nome completo não cabe ao lado do nível e do badge.
+  const displayFirstName = getDisplayFirstName(profile ?? authUser ?? {});
+  const greeting = t(getGreetingKey(), { name: displayFirstName });
   const formattedDate = formatDate(new Date());
 
   // Pro se o modelo for ProPlus ou Steel; Free se for Lite ou indefinido
@@ -337,79 +332,6 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
     },
     skeletonSpacer: {
       height: 20,
-    },
-
-    // ── Greeting ────────────────────────────────────────────────────────────────
-    greetingContainer: {
-      paddingHorizontal: 24,
-    },
-    headerActions: {
-      position: 'absolute',
-      top: 0,
-      right: 24,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    greetingText: {
-      color: colors.text.primary,
-      fontFamily: fonts.display,
-      fontSize: fontSizes.xl,
-      fontWeight: fontWeights.bold,
-    },
-    greetingDate: {
-      marginTop: 4,
-      color: colors.text.secondary,
-      fontFamily: fonts.body,
-      fontSize: fontSizes.sm,
-    },
-    levelIndicatorButton: {
-      marginRight: 8,
-    },
-    levelIndicatorContent: {
-      alignItems: 'center',
-    },
-    levelIndicatorText: {
-      color: colors.brand.pulse,
-      fontFamily: fonts.body,
-      fontSize: 11,
-      fontWeight: fontWeights.bold,
-    },
-    levelIndicatorTrack: {
-      marginTop: 3,
-      width: LEVEL_PROGRESS_BAR_WIDTH,
-      height: 3,
-      borderRadius: 1.5,
-      backgroundColor: LEVEL_PROGRESS_TRACK_COLOR,
-      overflow: 'hidden',
-    },
-    levelIndicatorFill: {
-      height: 3,
-      borderRadius: 1.5,
-      backgroundColor: colors.brand.pulse,
-    },
-
-    // ── Badge Free / Pro ─────────────────────────────────────────────────────────
-    badge: {
-      height: BADGE_HEIGHT,
-      paddingHorizontal: BADGE_PADDING_H,
-      borderRadius: BADGE_HEIGHT / 2,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    badgeFree: {
-      backgroundColor: BADGE_FREE_BACKGROUND,
-      borderColor: BADGE_FREE_BORDER,
-    },
-    badgePro: {
-      backgroundColor: BADGE_PRO_BACKGROUND,
-      borderColor: BADGE_PRO_BORDER,
-    },
-    badgeText: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: fontSizes.xs,
-      fontWeight: fontWeights.semibold,
     },
 
     // ── Section title ────────────────────────────────────────────────────────────
@@ -502,44 +424,17 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
           // ── Estado de conteúdo com fade in 300 ms ──────────────────────
           <Animated.View style={{ opacity: fadeAnim }}>
 
-            {/* ── Saudação + badge de plano ───────────────────────────────── */}
-            <View style={styles.greetingContainer}>
-              <Text style={styles.greetingText}>{greeting}</Text>
-              <Text style={styles.greetingDate}>{formattedDate}</Text>
-
-              <View style={styles.headerActions}>
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setShowLevelDetail(true);
-                  }}
-                  style={styles.levelIndicatorButton}
-                >
-                  <View style={styles.levelIndicatorContent}>
-                    <Text style={styles.levelIndicatorText}>
-                      {`${t('gamification.levelPrefix')} ${levelInfo.level}`}
-                    </Text>
-                    <View style={styles.levelIndicatorTrack}>
-                      <Animated.View
-                        style={[styles.levelIndicatorFill, { width: levelProgressWidth }]}
-                      />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-
-                <View
-                  style={[
-                    styles.badge,
-                    isPro ? styles.badgePro : styles.badgeFree,
-                  ]}
-                >
-                  <Text style={styles.badgeText}>
-                    {isPro ? t('home.proPlan') : t('home.freePlan')}
-                  </Text>
-                </View>
-              </View>
-            </View>
+            {/* ── Saudação (primeiro nome) + nível + badge de plano ────────── */}
+            <HomeGreetingHeader
+              greeting={greeting}
+              formattedDate={formattedDate}
+              level={levelInfo.level}
+              levelProgressWidth={levelProgressWidth}
+              isPro={isPro}
+              onLevelPress={() => {
+                setShowLevelDetail(true);
+              }}
+            />
 
             <View style={styles.spacer20} />
 

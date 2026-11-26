@@ -117,17 +117,21 @@ describe('useAppleAuth', () => {
       await hook.current.signInWithApple();
     });
 
-    expect(mockSetSession).toHaveBeenCalledWith({
-      user: { id: 'u1' },
-      accessToken: 'at',
-      refreshToken: 'rt',
-      isNewUser: false,
-    });
+    // Teste no build EAS (25-26/11): o segundo argumento marca o sign_up como Apple.
+    expect(mockSetSession).toHaveBeenCalledWith(
+      {
+        user: { id: 'u1' },
+        accessToken: 'at',
+        refreshToken: 'rt',
+        isNewUser: false,
+      },
+      'apple',
+    );
     expect(hook.current.isNewUser).toBe(false);
     expect(hook.current.error).toBeNull();
   });
 
-  it('monta fullName a partir de givenName+familyName (primeiro signInAsync)', async () => {
+  it('manda givenName/familyName separados (e fullName para backend antigo) + idioma (primeiro signInAsync)', async () => {
     mockSignInAsync.mockResolvedValue(
       buildCredential({
         fullName: {
@@ -152,10 +156,15 @@ describe('useAppleAuth', () => {
       await hook.current.signInWithApple();
     });
 
+    // Teste no build EAS (25-26/11): nome e sobrenome separados e o idioma do
+    // app (i18next sem idioma no teste → 'en').
     expect(mockSignInWithApple).toHaveBeenCalledWith({
       identityToken: 'fake-identity-token',
       authorizationCode: 'fake-authorization-code',
       fullName: 'Gabriel Silva',
+      givenName: 'Gabriel',
+      familyName: 'Silva',
+      preferredLanguage: 'en',
     });
   });
 
@@ -265,5 +274,31 @@ describe('useAppleAuth', () => {
 
     expect(hook.current.error).toBe('errors.auth.apple_auth_failed');
     expect(hook.current.isLoading).toBe(false);
+  });
+
+  it('idioma do app pt-BR → preferredLanguage pt-BR; outro idioma → en', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- mesmo padrão de carga do hook acima
+    const i18next = require('i18next') as typeof import('i18next');
+    const original = Object.getOwnPropertyDescriptor(i18next, 'language');
+
+    for (const [language, expected] of [['pt-BR', 'pt-BR'], ['es', 'en'], ['en', 'en']] as const) {
+      Object.defineProperty(i18next, 'language', { configurable: true, get: () => language });
+      mockSignInWithApple.mockClear();
+      mockSignInAsync.mockResolvedValue(buildCredential());
+      mockSignInWithApple.mockResolvedValue({ user: {}, accessToken: 'at', refreshToken: 'rt', isNewUser: true });
+
+      const hook = await renderAppleAuthHook();
+      await act(async () => {
+        await hook.current.signInWithApple();
+      });
+
+      expect(mockSignInWithApple).toHaveBeenCalledWith(expect.objectContaining({ preferredLanguage: expected }));
+    }
+
+    if (original) {
+      Object.defineProperty(i18next, 'language', original);
+    } else {
+      Reflect.deleteProperty(i18next, 'language');
+    }
   });
 });

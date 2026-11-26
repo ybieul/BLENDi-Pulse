@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ComponentProps } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Animated,
   FlatList,
@@ -11,79 +11,20 @@ import { Ionicons } from '@expo/vector-icons';
 import type { PulseAiRecipe } from '@blendi/shared';
 
 import {
-  colors,
   fonts,
   fontWeights,
   spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
-import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useBlendStore } from '../../store/blend.store';
+import { MacroChips } from '../ui/MacroChips';
 
-const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
-const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
-const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
-const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
 const INGREDIENT_AMOUNT_OPACITY = 0.7;
 const INSTRUCTION_OPACITY = 0.8;
 
-type MacroTone = 'protein' | 'carbs' | 'fat' | 'calories';
-
 interface ActiveRecipeHeaderProps {
   recipe: PulseAiRecipe;
-}
-
-interface MacroPillData {
-  tone: MacroTone;
-  icon: ComponentProps<typeof Ionicons>['name'];
-  value: number;
-  unit: string;
-}
-
-function MacroPill({ icon, value, unit, tone }: MacroPillData) {
-  const colors = useColors();
-  const { formatDecimal } = useFormatNumbers();
-  const backgroundColor =
-    tone === 'protein'
-      ? PROTEIN_PILL_BACKGROUND
-      : tone === 'carbs'
-        ? CARBS_PILL_BACKGROUND
-        : tone === 'fat'
-          ? FAT_PILL_BACKGROUND
-          : CALORIES_PILL_BACKGROUND;
-
-  const pillStyles = StyleSheet.create({
-    macroPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    macroValue: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: 12,
-      fontWeight: fontWeights.medium,
-    },
-    macroUnit: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: 10,
-      fontWeight: fontWeights.regular,
-      opacity: 0.7,
-    },
-  });
-
-  return (
-    <View style={[pillStyles.macroPill, { backgroundColor }]}>
-      <Ionicons color={colors.text.primary} name={icon} size={10} />
-      <Text style={pillStyles.macroValue}>{formatDecimal(value)}</Text>
-      <Text style={pillStyles.macroUnit}>{unit}</Text>
-    </View>
-  );
 }
 
 export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
@@ -101,32 +42,6 @@ export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
 
-  const macroPills = useMemo<MacroPillData[]>(() => [
-    {
-      tone: 'protein',
-      icon: 'barbell-outline',
-      value: recipe.macros.protein,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'carbs',
-      icon: 'leaf-outline',
-      value: recipe.macros.carbs,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'fat',
-      icon: 'water-outline',
-      value: recipe.macros.fat,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'calories',
-      icon: 'flame-outline',
-      value: recipe.macros.calories,
-      unit: t('common.units.kilocalories'),
-    },
-  ], [recipe.macros, t]);
 
   useEffect(() => {
     const animation = Animated.parallel([
@@ -179,9 +94,6 @@ export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
       lineHeight: 24,
     },
     macroRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
       marginTop: spacing.md,
     },
     closeButton: {
@@ -255,13 +167,22 @@ export function ActiveRecipeHeader({ recipe }: ActiveRecipeHeaderProps) {
         <View style={styles.headerContent}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
           <View style={styles.macroRow}>
-            {macroPills.map((macro) => (
-              <MacroPill key={macro.tone} {...macro} />
-            ))}
+            <MacroChips
+              protein={recipe.macros.protein}
+              carbs={recipe.macros.carbs}
+              fat={recipe.macros.fat}
+              calories={recipe.macros.calories}
+              alcoholGrams={recipe.alcoholGrams}
+            />
           </View>
         </View>
 
-        <Pressable accessibilityRole="button" onPress={resetToFree} style={styles.closeButton}>
+        <Pressable
+          accessibilityLabel={t('common.actions.close')}
+          accessibilityRole="button"
+          onPress={resetToFree}
+          style={styles.closeButton}
+        >
           <Ionicons color={colors.text.primary} name="close" size={18} />
         </Pressable>
       </View>

@@ -117,6 +117,12 @@ const LIQUID_OPTIONS = [
 
 // Overlay da câmera ao vivo — fica sempre com visual escuro fixo, não reage
 // ao tema claro/escuro do app (ver exceção documentada no plano de dark mode).
+// Teste no build EAS (25-26/11): ícones e textos usavam colors.text.primary
+// do tema claro (Deep Plum, escuro) e sumiam sobre a faixa preta. Agora são
+// branco fixo (text.inverse, igual nos dois temas). Pior caso, cena branca:
+// ícones sobre a faixa de 45% ≈ 3.4:1 (mínimo de 3:1 para ícones); texto das
+// pílulas (pílula 55% sobre a faixa) ≈ 10:1; o texto solto "Renova em…"
+// ganha sombra escura para não depender da cena.
 const TOP_BAR_BG = colors.overlay.black[45];
 const BOTTOM_BAR_BG = colors.overlay.black[55];
 const CAPTURE_BUTTON_BG = colors.overlay.white[20];
@@ -124,9 +130,9 @@ const CAPTURE_BUTTON_BORDER = colors.overlay.white[40];
 const GALLERY_BUTTON_BG = colors.overlay.black[45];
 const SCANS_PILL_BG = colors.overlay.black[55];
 const SCANS_PILL_BORDER = colors.overlay.white[15];
-const RENEWS_COLOR = colors.overlay.white[55];
-const CAMERA_ICON_COLOR = colors.text.primary;
-const CAMERA_PILL_TEXT_COLOR = colors.text.primary;
+const RENEWS_COLOR = colors.overlay.white[80];
+const CAMERA_ICON_COLOR = colors.text.inverse;
+const CAMERA_PILL_TEXT_COLOR = colors.text.inverse;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -952,6 +958,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       fontSize: fontSizes.xs,
       textAlign: 'right',
       paddingHorizontal: spacing.sm,
+      textShadowColor: colors.overlay.black[82],
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
     },
     cameraCenter: {
       flex: 1,
@@ -1400,6 +1409,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             {/* Gallery */}
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={t('pantryScanner.galleryA11yLabel')}
               onPress={() => {
                 void handleGallery();
               }}
@@ -1411,6 +1421,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             {/* Capture */}
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={t('pantryScanner.captureA11yLabel')}
               onPress={() => {
                 void handleCapture();
               }}
@@ -1420,7 +1431,11 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             </Pressable>
 
             {/* Mirror of gallery button to keep capture centered */}
-            <View style={styles.galleryButton} />
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={styles.galleryButton}
+            />
           </View>
         </SafeAreaView>
       </View>

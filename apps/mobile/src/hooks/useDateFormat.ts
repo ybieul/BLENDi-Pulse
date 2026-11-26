@@ -22,22 +22,13 @@ import { useMemo } from 'react';
 import { useAppTranslation } from './useAppTranslation';
 import type { SupportedLocale } from '../locales/i18n';
 import { useAuthStore } from '../store/auth.store';
+import { toIntlLocale } from '../utils/intlLocale';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Mapeia o locale interno do app (SupportedLocale) para a BCP 47 tag completa
- * esperada pelo Intl.
- *
- *   'en'    → 'en-US'  (garante formatação americana: Apr 22, 2026 / 11:00 PM)
- *   'pt-BR' → 'pt-BR'  (já é uma tag BCP 47 válida)
- *
- * Exportada para reuso por qualquer utilitário que precise de uma tag Intl
- * válida a partir do locale do i18n (ex: utils/formatNumbers.ts).
- */
-export function toIntlLocale(locale: SupportedLocale): string {
-  return locale === 'en' ? 'en-US' : 'pt-BR';
-}
+// toIntlLocale mora em utils/intlLocale.ts (pura, sem store) e é
+// reexportada daqui para quem já a importava deste hook.
+export { toIntlLocale };
 
 const LOCAL_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 

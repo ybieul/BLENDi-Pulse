@@ -9,7 +9,13 @@ import {
   TextInput as RNTextInput,
   View,
 } from 'react-native';
-import { registerSchema } from '@blendi/shared';
+import {
+  FIRST_NAME_MAX_LENGTH,
+  firstNameSchema,
+  LAST_NAME_MAX_LENGTH,
+  lastNameSchema,
+  registerSchema,
+} from '@blendi/shared';
 import {
   colors,
   fonts,
@@ -46,7 +52,9 @@ const SEGMENT_ACTIVE_COLORS = [
 ] as const;
 
 type ValidationIssue = { message: string; code?: string; minimum?: number | bigint; maximum?: number | bigint };
-type FieldName = 'name' | 'email' | 'password' | 'confirmPassword';
+// Nome e sobrenome separados (teste no build EAS 25-26/11): o backend monta
+// o nome completo. Sobrenome é opcional.
+type FieldName = 'firstName' | 'lastName' | 'email' | 'password' | 'confirmPassword';
 
 type FieldErrors = Record<FieldName, string | null>;
 type FieldTouched = Record<FieldName, boolean>;
@@ -188,23 +196,27 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     clearError: clearAppleError,
   } = useAppleAuth();
 
+  const lastNameInputRef = useRef<RNTextInput | null>(null);
   const emailInputRef = useRef<RNTextInput | null>(null);
   const passwordInputRef = useRef<RNTextInput | null>(null);
   const confirmPasswordInputRef = useRef<RNTextInput | null>(null);
 
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({
-    name: null,
+    firstName: null,
+    lastName: null,
     email: null,
     password: null,
     confirmPassword: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<FieldTouched>({
-    name: false,
+    firstName: false,
+    lastName: false,
     email: false,
     password: false,
     confirmPassword: false,
@@ -235,17 +247,26 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     return t(raw as TranslationKey);
   };
 
-  const validateName = (value: string): string | null => {
+  const validateFirstName = (value: string): string | null => {
     if (value.trim().length === 0) {
       return translateKey('errors.validation.required');
     }
 
-    const parsed = registerSchema.shape.name.safeParse(value);
+    const parsed = firstNameSchema.safeParse(value);
     if (parsed.success) {
       return null;
     }
 
     return translateKey(parsed.error.issues[0] ?? 'errors.validation.required');
+  };
+
+  const validateLastName = (value: string): string | null => {
+    const parsed = lastNameSchema.safeParse(value);
+    if (parsed.success) {
+      return null;
+    }
+
+    return translateKey(parsed.error.issues[0] ?? 'errors.validation.invalid_option');
   };
 
   const validateEmail = (value: string): string | null => {
@@ -291,7 +312,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     nextValues?: Partial<Record<FieldName, string>>
   ): string | null => {
     const values = {
-      name,
+      firstName,
+      lastName,
       email,
       password,
       confirmPassword,
@@ -299,8 +321,10 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     };
 
     switch (fieldName) {
-      case 'name':
-        return validateName(values.name);
+      case 'firstName':
+        return validateFirstName(values.firstName);
+      case 'lastName':
+        return validateLastName(values.lastName);
       case 'email':
         return validateEmail(values.email);
       case 'password':
@@ -323,14 +347,25 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     return nextError;
   };
 
-  const handleNameChange = (nextValue: string) => {
-    setName(nextValue);
+  const handleFirstNameChange = (nextValue: string) => {
+    setFirstName(nextValue);
     setFormError(null);
     clearGoogleError();
     clearAppleError();
 
-    if (touchedFields.name) {
-      updateFieldError('name', { name: nextValue });
+    if (touchedFields.firstName) {
+      updateFieldError('firstName', { firstName: nextValue });
+    }
+  };
+
+  const handleLastNameChange = (nextValue: string) => {
+    setLastName(nextValue);
+    setFormError(null);
+    clearGoogleError();
+    clearAppleError();
+
+    if (touchedFields.lastName) {
+      updateFieldError('lastName', { lastName: nextValue });
     }
   };
 
@@ -378,14 +413,16 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
     setFormError(null);
 
     const nextTouchedFields: FieldTouched = {
-      name: true,
+      firstName: true,
+      lastName: true,
       email: true,
       password: true,
       confirmPassword: true,
     };
 
     const nextErrors: FieldErrors = {
-      name: getFieldError('name'),
+      firstName: getFieldError('firstName'),
+      lastName: getFieldError('lastName'),
       email: getFieldError('email'),
       password: getFieldError('password'),
       confirmPassword: getFieldError('confirmPassword'),
@@ -401,7 +438,8 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
     try {
       await register({
-        name: name.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: email.trim(),
         password,
         blendiModel: 'Lite',
@@ -440,7 +478,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
   const clearManualFormErrors = () => {
     setFormError(null);
-    setFieldErrors({ name: null, email: null, password: null, confirmPassword: null });
+    setFieldErrors({ firstName: null, lastName: null, email: null, password: null, confirmPassword: null });
   };
 
   const handleGoogleSignIn = async () => {
@@ -558,20 +596,42 @@ export function RegisterScreen({ navigation }: AuthScreenProps<'Register'>) {
 
       <View style={styles.formBlock}>
         <AuthInput
-          value={name}
-          onChangeText={handleNameChange}
+          value={firstName}
+          onChangeText={handleFirstNameChange}
           onBlur={() => {
-            setFieldTouched('name');
-            updateFieldError('name');
+            setFieldTouched('firstName');
+            updateFieldError('firstName');
           }}
-          error={fieldErrors.name ?? undefined}
-          placeholder={t('auth.fullNameLabel')}
+          error={fieldErrors.firstName ?? undefined}
+          placeholder={t('auth.firstNameLabel')}
+          maxLength={FIRST_NAME_MAX_LENGTH}
           autoCapitalize="words"
           autoCorrect={false}
-          textContentType="name"
-          autoComplete="name"
+          textContentType="givenName"
+          autoComplete="name-given"
+          returnKeyType="next"
+          onSubmitEditing={() => lastNameInputRef.current?.focus()}
+          testID="register-first-name"
+        />
+
+        <AuthInput
+          ref={lastNameInputRef}
+          value={lastName}
+          onChangeText={handleLastNameChange}
+          onBlur={() => {
+            setFieldTouched('lastName');
+            updateFieldError('lastName');
+          }}
+          error={fieldErrors.lastName ?? undefined}
+          placeholder={t('auth.lastNameLabel')}
+          maxLength={LAST_NAME_MAX_LENGTH}
+          autoCapitalize="words"
+          autoCorrect={false}
+          textContentType="familyName"
+          autoComplete="name-family"
           returnKeyType="next"
           onSubmitEditing={() => emailInputRef.current?.focus()}
+          testID="register-last-name"
         />
 
         <AuthInput

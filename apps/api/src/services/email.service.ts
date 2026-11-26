@@ -152,7 +152,7 @@ export class EmailService implements IEmailService {
       const transporter = getSmtpTransporter();
       if (!transporter) {
         console.warn(
-          `[EmailService] Email provider not configured — welcome email NOT sent to ${email}`
+          `[EmailService] Email provider not configured — welcome email NOT sent (recipient omitted from logs)`
         );
         return;
       }
@@ -195,7 +195,7 @@ export class EmailService implements IEmailService {
       // const resend = new Resend(env.RESEND_API_KEY);
       // await resend.emails.send({ from: 'noreply@blendipulse.com', to: email, ... });
       console.warn(
-        `[EmailService] Email provider not configured — verification email NOT sent to ${email}`
+        `[EmailService] Email provider not configured — verification email NOT sent (recipient omitted from logs)`
       );
     } catch (err) {
       console.error('[EmailService] Failed to send verification email:', err);
@@ -246,7 +246,7 @@ export class EmailService implements IEmailService {
       const transporter = getSmtpTransporter();
       if (!transporter) {
         console.warn(
-          `[EmailService] Email provider not configured — password reset email NOT sent to ${email}`
+          `[EmailService] Email provider not configured — password reset email NOT sent (recipient omitted from logs)`
         );
         return;
       }

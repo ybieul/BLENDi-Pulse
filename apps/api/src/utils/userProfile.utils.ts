@@ -7,6 +7,7 @@
 import { calculateLevel, normalizeUserAllergies } from '@blendi/shared';
 import type { IUser } from '../models/User';
 import { calculateFatTargetFromCalories } from './macroCalculation.utils';
+import { serializeUserName } from './userName.utils';
 
 export const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 
@@ -68,7 +69,8 @@ export function serializeUserProfile(user: SerializableUser) {
 
   return {
     id: String(user._id),
-    name: user.name,
+    // name + firstName/lastName (leitura tolerante) + nameNeedsConfirmation.
+    ...serializeUserName(user),
     email: user.email,
     profilePhoto: user.profilePhoto,
     hasProfilePhoto: user.hasProfilePhoto ?? false,

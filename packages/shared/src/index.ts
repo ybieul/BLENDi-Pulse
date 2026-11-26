@@ -22,6 +22,7 @@ export * from './schemas/weeklyReport';
 export * from './utils/level.utils';
 export * from './utils/homeRecipeCompatibility';
 export * from './utils/textMatching';
+export * from './utils/personName';
 export type { HistoryQuery, SupplementItem, UpdateSupplementStackInput } from './schemas/supplementStack';
 export type {
   CalculateMacrosInput,

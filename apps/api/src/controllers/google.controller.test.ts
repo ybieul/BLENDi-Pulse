@@ -107,17 +107,31 @@ mock.module('../models/User', {
 
 // ─── Serviços externos ────────────────────────────────────────────────────────
 
+interface FakeGoogleUserInfo {
+  googleId: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  givenName?: string;
+  familyName?: string;
+}
+
+const DEFAULT_GOOGLE_USER_INFO: FakeGoogleUserInfo = {
+  googleId: 'google-sub-1',
+  email: 'google-user@example.com',
+  emailVerified: true,
+  name: 'Google User',
+};
+
+// Perfil devolvido pelo token — trocado por teste (nome/sobrenome).
+let googleUserInfo: FakeGoogleUserInfo = DEFAULT_GOOGLE_USER_INFO;
+
 mock.module('../services/google.service', {
   namedExports: {
     getAuthorizationUrl: (state: string) =>
       `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`,
     exchangeCodeForTokens: async () => 'google-id-token',
-    getUserInfoFromToken: async () => ({
-      googleId: 'google-sub-1',
-      email: 'google-user@example.com',
-      emailVerified: true,
-      name: 'Google User',
-    }),
+    getUserInfoFromToken: async () => googleUserInfo,
   },
 });
 
@@ -234,6 +248,7 @@ beforeEach(() => {
   generateAccessTokenMock.mock.resetCalls();
   generateRefreshTokenMock.mock.resetCalls();
   userCreateMock.mock.resetCalls();
+  googleUserInfo = DEFAULT_GOOGLE_USER_INFO;
 });
 
 // ─── GET /auth/google/url ─────────────────────────────────────────────────────
@@ -439,5 +454,91 @@ describe('POST /auth/google/exchange', () => {
 
     const serialized = responses.map(r => JSON.stringify({ s: r.statusCode, b: r.body }));
     assert.equal(new Set(serialized).size, 1);
+  });
+});
+
+// ─── Teste no build EAS (25-26/11): idioma do aparelho e nome/sobrenome ──────
+
+async function stateWithLanguage(codeChallenge: string, preferredLanguage?: unknown): Promise<string> {
+  const res = await call(getGoogleUrl, {
+    query: { codeChallenge, ...(preferredLanguage !== undefined && { preferredLanguage }) } as never,
+  });
+  assert.equal(res.statusCode, 200);
+  const url = new URL((res.body?.data as { url: string }).url);
+  return url.searchParams.get('state') ?? '';
+}
+
+async function createdAccountWith(preferredLanguage?: unknown): Promise<Record<string, unknown>> {
+  existingUserDoc = null;
+  const state = await stateWithLanguage(challengeOf(newVerifier()), preferredLanguage);
+  await call(handleGoogleCallback, { query: { code: 'google-auth-code', state } });
+  assert.equal(userCreateMock.mock.callCount(), 1);
+  return userCreateMock.mock.calls[0]?.arguments[0] as Record<string, unknown>;
+}
+
+describe('Google — idioma do aparelho na criação da conta', () => {
+  it('state leva o preferredLanguage enviado (assinado, sem passar pelo app de novo)', async () => {
+    const state = await stateWithLanguage(challengeOf(newVerifier()), 'pt-BR');
+    const payload = JSON.parse(Buffer.from(state.split('.')[1] ?? '', 'base64url').toString());
+    assert.equal(payload.preferredLanguage, 'pt-BR');
+  });
+
+  it('conta nova com pt-BR → locale pt-BR', async () => {
+    const created = await createdAccountWith('pt-BR');
+    assert.equal(created.locale, 'pt-BR');
+  });
+
+  it('conta nova com en → locale en', async () => {
+    const created = await createdAccountWith('en');
+    assert.equal(created.locale, 'en');
+  });
+
+  it('app antigo sem preferredLanguage → en (como antes)', async () => {
+    const created = await createdAccountWith();
+    assert.equal(created.locale, 'en');
+  });
+
+  it('idioma fora da lista → 400 na URL, sem state', async () => {
+    const res = await call(getGoogleUrl, {
+      query: { codeChallenge: challengeOf(newVerifier()), preferredLanguage: 'es' } as never,
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body?.data, undefined);
+  });
+
+  it('conta existente (googleId) mantém o idioma: nada é gravado de idioma no login', async () => {
+    existingUserDoc = { ...buildFakeUserDoc(), locale: 'en' };
+    existingUserDoc.save = async () => existingUserDoc;
+    const state = await stateWithLanguage(challengeOf(newVerifier()), 'pt-BR');
+    await call(handleGoogleCallback, { query: { code: 'google-auth-code', state } });
+
+    assert.equal(userCreateMock.mock.callCount(), 0);
+    assert.equal(existingUserDoc.locale, 'en');
+  });
+});
+
+describe('Google — nome e sobrenome na criação da conta', () => {
+  it('given_name/family_name → firstName/lastName e name composto', async () => {
+    googleUserInfo = { ...DEFAULT_GOOGLE_USER_INFO, name: 'Gabriel B. Silva', givenName: 'Gabriel', familyName: 'Silva' };
+    const created = await createdAccountWith('pt-BR');
+    assert.equal(created.firstName, 'Gabriel');
+    assert.equal(created.lastName, 'Silva');
+    assert.equal(created.name, 'Gabriel Silva');
+    assert.equal(created.nameNeedsConfirmation, false);
+  });
+
+  it('só `name` → dividido em nome + sobrenome', async () => {
+    googleUserInfo = { ...DEFAULT_GOOGLE_USER_INFO, name: 'Ana Maria Souza' };
+    const created = await createdAccountWith();
+    assert.equal(created.firstName, 'Ana');
+    assert.equal(created.lastName, 'Maria Souza');
+  });
+
+  it('perfil Google sem nome nenhum → login continua, começo do e-mail e "nome a confirmar"', async () => {
+    googleUserInfo = { googleId: 'google-sub-1', email: 'google-user@example.com', emailVerified: true };
+    const created = await createdAccountWith();
+    assert.equal(created.firstName, 'google-user');
+    assert.equal(created.name, 'google-user');
+    assert.equal(created.nameNeedsConfirmation, true);
   });
 });

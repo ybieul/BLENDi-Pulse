@@ -5,7 +5,7 @@
 // exibir um número ao usuário — toda formatação numérica passa por aqui.
 // Ver hooks/useFormatNumbers.ts para a versão com locale já injetado.
 
-import { toIntlLocale } from '../hooks/useDateFormat';
+import { toIntlLocale } from './intlLocale';
 import type { SupportedLocale } from '../locales/i18n';
 
 /**

@@ -31,6 +31,20 @@
       "carbs": "Carbs",
       "fat": "Fat",
       "calories": "Calories"
+    },
+    "macroChips": {
+      "protein": "Protein",
+      "carbs": "Carbs",
+      "fat": "Fat",
+      "calories": "kcal",
+      "alcohol": "Alcohol",
+      "a11y": {
+        "protein": "{{value}} grams of protein",
+        "carbs": "{{value}} grams of carbs",
+        "fat": "{{value}} grams of fat",
+        "calories": "{{value}} kilocalories",
+        "alcohol": "{{value}} grams of alcohol"
+      }
     }
   },
 
@@ -43,6 +57,12 @@
   },
 
   "onboarding": {
+    "nameStep": {
+      "title": "What should we call you?",
+      "subtitle": "We couldn't get your name from your sign-in. Last name is optional.",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name (optional)"
+    },
     "model": {
       "lite": {
         "name": "BLENDi Lite"
@@ -178,7 +198,6 @@
     "goalEnergyRecipe": "Fast Fuel Mango Oats",
     "goalRecoveryRecipe": "Golden Recovery Smoothie",
     "goalWeightLossRecipe": "Raspberry Whey Shake",
-    "recipeMacros": "{{protein}}g protein • {{carbs}}g carbs • {{calories}} kcal",
     "blendTime": "{{minutes}} min blend time",
     "dailyRecipeBlendInstruction": "Blend all ingredients until smooth, about 30-45 seconds.",
     "dailyRecipeTip": "Drink within 30 minutes of blending for the best texture and nutrition.",
@@ -1549,7 +1568,6 @@
       "avocadoOrChia": "avocado or chia",
       "oatsOrPeanutButter": "oats or peanut butter"
     },
-    "alcoholUnit": "g alcohol",
     "howToUse": {
       "button": "How to use",
       "a11yLabel": "How to use Pulse AI",
@@ -1662,6 +1680,8 @@
   },
 
   "pantryScanner": {
+    "galleryA11yLabel": "Choose a photo from the gallery",
+    "captureA11yLabel": "Take photo",
     "permissionTitle": "Scan Your Pantry",
     "permissionDescription": "Allow camera access to identify ingredients and get personalized blend recipes",
     "grantPermission": "Enable Camera",
@@ -1765,6 +1785,8 @@
     "resendCode": "Resend code",
     "emailLabel": "Email",
     "fullNameLabel": "Full name",
+    "firstNameLabel": "First name",
+    "lastNameLabel": "Last name (optional)",
     "passwordLabel": "Password",
     "confirmPasswordLabel": "Confirm password",
     "forgotPassword": "Forgot password?",
@@ -1925,6 +1947,21 @@
   },
 
   "me": {
+    "name": {
+      "rowLabel": "Name",
+      "screenTitle": "Your name",
+      "subtitle": "This is how we greet you in the app and in emails.",
+      "firstNameLabel": "First name",
+      "lastNameLabel": "Last name (optional)",
+      "confirmHint": "Confirm your name: we only had the start of your email.",
+      "confirmShort": "Confirm",
+      "save": "Save",
+      "saved": "Name updated",
+      "unsavedTitle": "Discard changes?",
+      "unsavedMessage": "Your name changes haven't been saved.",
+      "unsavedKeep": "Keep editing",
+      "unsavedDiscard": "Discard"
+    },
     "blenderOwnership": {
       "other": "Other model",
       "otherWithName": "Other model · {{name}}",

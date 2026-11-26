@@ -35,6 +35,9 @@ import {
   googleCallbackSchema,
   googleExchangeSchema,
   GOOGLE_CODE_CHALLENGE_PATTERN,
+  PREFERRED_LANGUAGE_VALUES,
+  splitFullName,
+  type PreferredLanguage,
 } from '@blendi/shared';
 import { UserModel, type UserDocument } from '../models/User';
 import {
@@ -60,6 +63,7 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 import { serializeUserProfile } from '../utils/userProfile.utils';
+import { buildAccountNameFields } from '../utils/userName.utils';
 
 // Instância única compartilhada pelos handlers
 const emailService = new EmailService();
@@ -78,6 +82,40 @@ function getCodeChallengeFromState(payload: unknown): string | null {
   return typeof codeChallenge === 'string' && GOOGLE_CODE_CHALLENGE_PATTERN.test(codeChallenge)
     ? codeChallenge
     : null;
+}
+
+/**
+ * Idioma do aparelho guardado no state já verificado (assinado por nós, então
+ * só pode ter um valor que o GET /auth/google/url aceitou). Ausente ou
+ * inesperado (state de uma versão anterior do app) = 'en', como antes.
+ */
+function getPreferredLanguageFromState(payload: unknown): PreferredLanguage {
+  if (typeof payload !== 'object' || payload === null || !('preferredLanguage' in payload)) {
+    return 'en';
+  }
+
+  const { preferredLanguage } = payload as { preferredLanguage?: unknown };
+  return PREFERRED_LANGUAGE_VALUES.find(value => value === preferredLanguage) ?? 'en';
+}
+
+/**
+ * Nome real do perfil Google: given_name/family_name; sem eles, o `name`
+ * dividido em nome + sobrenome. Nada = sem nome real ("nome a confirmar").
+ */
+function resolveGoogleRealName(userInfo: {
+  name?: string;
+  givenName?: string;
+  familyName?: string;
+}): { firstName?: string; lastName?: string } {
+  if (userInfo.givenName) {
+    return { firstName: userInfo.givenName, lastName: userInfo.familyName };
+  }
+
+  if (userInfo.name) {
+    return splitFullName(userInfo.name);
+  }
+
+  return { lastName: userInfo.familyName };
 }
 
 // ─── Handler 1: GET /auth/google/url ─────────────────────────────────────────
@@ -103,14 +141,16 @@ export async function getGoogleUrl(
   try {
     const parsed = googleAuthUrlQuerySchema.safeParse({
       codeChallenge: req.query.codeChallenge,
+      preferredLanguage: req.query.preferredLanguage,
     });
 
     if (!parsed.success) {
+      const field = parsed.error.issues[0]?.path.join('.') || 'codeChallenge';
       sendErrorResponse(res, {
         statusCode: 400,
         code: VALIDATION_ERROR_CODE,
         message: VALIDATION_ERROR_MESSAGE,
-        errors: [{ field: 'codeChallenge', message: 'errors.validation.invalid_option' }],
+        errors: [{ field, message: 'errors.validation.invalid_option' }],
       });
       return;
     }
@@ -118,8 +158,14 @@ export async function getGoogleUrl(
     // State JWT: payload mínimo, expiração curta, assina com o secret existente.
     // Leva a flag de origem e o desafio PKCE (hash público, não é segredo:
     // sem o verificador, que nunca sai do app até a troca, ele não serve).
+    // preferredLanguage: idioma do aparelho, usado só se o callback CRIAR a
+    // conta (o callback é um GET do browser, sem corpo do app).
     const state = jwt.sign(
-      { csrf: true, codeChallenge: parsed.data.codeChallenge },
+      {
+        csrf: true,
+        codeChallenge: parsed.data.codeChallenge,
+        ...(parsed.data.preferredLanguage && { preferredLanguage: parsed.data.preferredLanguage }),
+      },
       env.JWT_ACCESS_SECRET,
       { expiresIn: '10m' }
     );
@@ -183,9 +229,11 @@ export async function handleGoogleCallback(
     }
 
     let codeChallenge: string | null;
+    let preferredLanguage: PreferredLanguage;
     try {
       const statePayload = jwt.verify(state, env.JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
       codeChallenge = getCodeChallengeFromState(statePayload);
+      preferredLanguage = getPreferredLanguageFromState(statePayload);
     } catch {
       res.redirect('blendipulse://auth/callback?error=errors.auth.invalid_state');
       return;
@@ -274,12 +322,21 @@ export async function handleGoogleCallback(
         // fornece nenhum deles — sem isso, esta chamada sempre falhava com
         // ValidationError (causa raiz do cadastro via Google quebrado).
         try {
+          // given_name/family_name do token; sem nome no perfil Google,
+          // começo do e-mail + "nome a confirmar" (o app pede no onboarding).
+          const nameFields = buildAccountNameFields({
+            ...resolveGoogleRealName(userInfo),
+            email: userInfo.email,
+          });
+
           user = await UserModel.create({
             email: userInfo.email,
-            name: userInfo.name,
+            ...nameFields,
             googleId: userInfo.googleId,
             profilePhoto: userInfo.picture,
-            locale: 'en',
+            // Idioma do aparelho (do state). Só na criação: login de conta
+            // existente (Casos 1 e 2) nunca muda o idioma escolhido.
+            locale: preferredLanguage,
             timezone: 'America/New_York', // sobrescrito pelo PATCH /auth/timezone no boot do app
             blendiModel: 'Lite',
             goal: 'Wellness',

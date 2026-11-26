@@ -3,7 +3,6 @@ import {
   Animated,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -41,17 +40,12 @@ import {
 import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
+import { MacroChips } from '../ui/MacroChips';
 import type { TranslationKey } from '../../locales/i18n';
 import { countAllergens, formatAllergenList } from '../../utils/allergies.utils';
 
 const BADGE_BACKGROUND = colors.overlay.pulse[20];
 const BADGE_BORDER = colors.overlay.pulse[35];
-const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
-const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
-const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
-const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
-// CP-B5: álcool junto dos macros só quando > 0 (cor neutra, sem destaque).
-const ALCOHOL_PILL_BACKGROUND = colors.overlay.neutralGray[25];
 const SUBSTITUTES_BACKGROUND = colors.overlay.warning[8];
 const SUBSTITUTES_BORDER = colors.overlay.warning[15];
 // CP-B2: alerta de pedido ajustado ao copo (capacityNotice) — mesmo âmbar de
@@ -66,18 +60,8 @@ const TIP_BACKGROUND = colors.overlay.info[8];
 const TIP_BORDER = colors.overlay.info[15];
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
 const CART_BUTTON_BORDER = colors.overlay.pulse[20];
-const UNIT_OPACITY = 0.7;
 const HEART_SCALE_DEFAULT = 1;
 const HEART_SCALE_ACTIVE = 1.3;
-
-type MacroTone = 'protein' | 'carbs' | 'fat' | 'calories' | 'alcohol';
-
-interface MacroPillData {
-  tone: MacroTone;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  value: number;
-  unit: string;
-}
 
 // CP-B7: sugestão do Pantry (código do backend) → chave de tradução.
 const UNMET_TARGET_SUGGESTION_KEYS: Record<RecipeTargetSuggestion, TranslationKey> = {
@@ -127,92 +111,6 @@ export interface RecipeCardProps {
    * na confirmação). Ausente: a sugestão aparece sem o botão.
    */
   onAllergySuggestionPress?: (recipe: PulseAiRecipe) => void;
-}
-
-function useMacroPills(macros: PulseAiRecipe['macros'], alcoholGrams?: number): MacroPillData[] {
-  const { t } = useAppTranslation();
-
-  return useMemo<MacroPillData[]>(() => [
-    {
-      tone: 'protein',
-      icon: 'barbell-outline',
-      value: macros.protein,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'carbs',
-      icon: 'leaf-outline',
-      value: macros.carbs,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'fat',
-      icon: 'water-outline',
-      value: macros.fat,
-      unit: t('common.units.grams'),
-    },
-    {
-      tone: 'calories',
-      icon: 'flame-outline',
-      value: macros.calories,
-      unit: t('common.units.kilocalories'),
-    },
-    ...(typeof alcoholGrams === 'number' && alcoholGrams > 0
-      ? [{
-          tone: 'alcohol' as const,
-          icon: 'beaker-outline' as const,
-          value: alcoholGrams,
-          unit: t('pulseAi.alcoholUnit'),
-        }]
-      : []),
-  ], [alcoholGrams, macros, t]);
-}
-
-function MacroPill({ icon, value, unit, tone }: MacroPillData) {
-  const colors = useColors();
-  const { formatDecimal } = useFormatNumbers();
-  const backgroundColor =
-    tone === 'protein'
-      ? PROTEIN_PILL_BACKGROUND
-      : tone === 'carbs'
-        ? CARBS_PILL_BACKGROUND
-        : tone === 'fat'
-          ? FAT_PILL_BACKGROUND
-          : tone === 'alcohol'
-            ? ALCOHOL_PILL_BACKGROUND
-            : CALORIES_PILL_BACKGROUND;
-
-  const pillStyles = StyleSheet.create({
-    macroPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    macroValue: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: 12,
-      fontWeight: fontWeights.medium,
-    },
-    macroUnit: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: 10,
-      fontWeight: fontWeights.regular,
-      opacity: UNIT_OPACITY,
-    },
-  });
-
-  return (
-    <View style={[pillStyles.macroPill, { backgroundColor }]} testID={`macro-pill-${tone}`}>
-      <Ionicons name={icon} size={10} color={colors.text.primary} />
-      <Text style={pillStyles.macroValue}>{formatDecimal(value)}</Text>
-      <Text style={pillStyles.macroUnit}>{unit}</Text>
-    </View>
-  );
 }
 
 /**
@@ -495,7 +393,6 @@ export function RecipeCard({
     };
   }, [pendingShareFormat]);
 
-  const macroPills = useMacroPills(recipe.macros, recipe.alcoholGrams);
 
   const substitutesText = recipe.tip?.trim();
   const capacityNotice = recipe.capacityNotice?.trim();
@@ -648,10 +545,6 @@ export function RecipeCard({
       fontWeight: fontWeights.bold,
       letterSpacing: -0.5,
       lineHeight: 26,
-    },
-    macroScrollContent: {
-      gap: spacing.sm,
-      paddingRight: spacing.xs,
     },
     separator: {
       height: 0.5,
@@ -861,15 +754,14 @@ export function RecipeCard({
 
       <Text style={styles.title}>{recipe.title}</Text>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.macroScrollContent}
-      >
-        {macroPills.map((macro) => (
-          <MacroPill key={macro.tone} {...macro} />
-        ))}
-      </ScrollView>
+      {/* Número + nome visível (Proteína, Carbo, Gordura, kcal; álcool > 0). */}
+      <MacroChips
+        protein={recipe.macros.protein}
+        carbs={recipe.macros.carbs}
+        fat={recipe.macros.fat}
+        calories={recipe.macros.calories}
+        alcoholGrams={recipe.alcoholGrams}
+      />
 
       <View style={styles.separator} />
 
@@ -1040,7 +932,6 @@ export function LockedRecipeCard({
   const colors = useColors();
   const themeMode = useThemeStore((state) => state.mode);
   const { t } = useAppTranslation();
-  const macroPills = useMacroPills(preview.macros);
   const textKeys = LOCKED_RECIPE_TEXT_KEYS[source];
 
   const styles = StyleSheet.create({
@@ -1080,11 +971,6 @@ export function LockedRecipeCard({
       fontWeight: fontWeights.bold,
       letterSpacing: -0.5,
       lineHeight: 26,
-    },
-    macroRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
     },
     separator: {
       height: 0.5,
@@ -1160,11 +1046,12 @@ export function LockedRecipeCard({
 
       <Text style={styles.title}>{t(textKeys.genericTitle)}</Text>
 
-      <View style={styles.macroRow}>
-        {macroPills.map((macro) => (
-          <MacroPill key={macro.tone} {...macro} />
-        ))}
-      </View>
+      <MacroChips
+        protein={preview.macros.protein}
+        carbs={preview.macros.carbs}
+        fat={preview.macros.fat}
+        calories={preview.macros.calories}
+      />
 
       <View style={styles.separator} />
 

@@ -16,7 +16,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   fonts,
@@ -31,7 +30,17 @@ import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
 import type { AppTabNavigationProp, RootStackParamList } from '../../navigation/types';
 
-const BASE_TAB_BAR_HEIGHT = 88;
+// ── Posição do campo (teste no build EAS 25-26/11) ─────────────────────────
+// Antes: o campo era absoluto e somava BASE_TAB_BAR_HEIGHT (88) +
+// insets.bottom ao padding — mas a tela da Pulse AI já termina ACIMA da barra
+// de abas (a barra não é absoluta), então esse espaço era contado duas vezes
+// e o campo ficava "flutuando" longe da barra. Agora o campo fica no fluxo do
+// layout, no fim da tela (logo acima da barra de abas), com um respiro fixo.
+// Com o teclado aberto, o padding é a SOBREPOSIÇÃO real entre o teclado e o
+// fim da tela, medida na janela: cobre a barra de abas que some com o
+// teclado (tabBarHideOnKeyboard), o iOS (teclado por cima) e o Android que
+// já encolhe a janela (sobreposição zero) — sem constantes de altura.
+const RESTING_BOTTOM_PADDING = spacing.md;
 const CHAT_FIELD_HEIGHT = 56;
 const CHAT_FIELD_RADIUS = 24;
 const CONTAINER_FADE_HEIGHT = 16;
@@ -45,6 +54,36 @@ const OFFLINE_INPUT_OPACITY = 0.5;
 const RECONNECT_OPACITY_DURATION = 300;
 
 type PulseAiGoalKey = 'muscle' | 'wellness' | 'energy' | 'recovery' | 'weightLoss';
+
+export interface ChatInputBottomPaddingInput {
+  /** Topo do teclado na tela (endCoordinates.screenY); null = teclado fechado. */
+  keyboardScreenY: number | null;
+  /** Altura do teclado (endCoordinates.height), usada só sem a medida da tela. */
+  keyboardHeight: number;
+  /** Fim da tela da Pulse AI na janela (y + altura do campo); null = ainda não medido. */
+  screenBottomY: number | null;
+}
+
+/**
+ * Padding inferior do campo. Teclado fechado: respiro fixo (a tela já
+ * termina acima da barra de abas). Teclado aberto: o quanto o teclado cobre
+ * a tela + o respiro — nunca a barra de abas somada de novo.
+ */
+export function getChatInputBottomPadding({
+  keyboardScreenY,
+  keyboardHeight,
+  screenBottomY,
+}: ChatInputBottomPaddingInput): number {
+  if (keyboardScreenY === null) {
+    return RESTING_BOTTOM_PADDING;
+  }
+
+  const overlap = screenBottomY === null
+    ? keyboardHeight
+    : Math.max(0, screenBottomY - keyboardScreenY);
+
+  return Math.max(RESTING_BOTTOM_PADDING, overlap + KEYBOARD_CLEARANCE);
+}
 
 export interface ChatInputHandle {
   setText: (text: string) => void;
@@ -79,7 +118,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   const MICROPHONE_COLOR = colors.overlay.plum[30];
   const OFFLINE_ICON_COLOR = colors.overlay.plum[30];
 
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<AppTabNavigationProp<'PulseAI'>>();
   const { t } = useAppTranslation();
   const userGoal = useAuthStore((state) => state.user?.goal ?? 'Wellness');
@@ -89,6 +127,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   const [message, setMessage] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [keyboardScreenY, setKeyboardScreenY] = useState<number | null>(null);
+  const [screenBottomY, setScreenBottomY] = useState<number | null>(null);
+  const containerRef = useRef<View>(null);
   const sendScale = useRef(new Animated.Value(SEND_ICON_SCALE_END)).current;
   const fieldOpacity = useRef(new Animated.Value(isConnected ? 1 : OFFLINE_INPUT_OPACITY)).current;
   const previousIsConnected = useRef(isConnected);
@@ -108,10 +149,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   const isOffline = !isConnected;
   const isFieldDisabled = isLoading || isLimitReached || isOffline;
   const canSend = trimmedMessage.length > 0 && !isFieldDisabled;
-  const restingBottomPadding = BASE_TAB_BAR_HEIGHT + insets.bottom + spacing.md;
-  const bottomPadding = keyboardHeight > 0
-    ? Math.max(restingBottomPadding, keyboardHeight + KEYBOARD_CLEARANCE)
-    : restingBottomPadding;
+  const bottomPadding = getChatInputBottomPadding({ keyboardScreenY, keyboardHeight, screenBottomY });
+
+  // Fim da tela na janela = y + altura deste container (o último item da
+  // tela). Medido a cada mudança de layout: a barra de abas some/volta com o
+  // teclado e a tela muda de altura junto.
+  const measureScreenBottom = () => {
+    containerRef.current?.measureInWindow((_x, y, _width, height) => {
+      if (Number.isFinite(y) && Number.isFinite(height) && height > 0) {
+        setScreenBottomY(y + height);
+      }
+    });
+  };
 
   useEffect(() => {
     setPlaceholderIndex(0);
@@ -165,10 +214,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   useEffect(() => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
       setKeyboardHeight(event.endCoordinates.height);
+      setKeyboardScreenY(event.endCoordinates.screenY);
+      measureScreenBottom();
     };
 
     const handleKeyboardHide = () => {
       setKeyboardHeight(0);
+      setKeyboardScreenY(null);
     };
 
     if (Platform.OS === 'ios') {
@@ -221,10 +273,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
   const styles = StyleSheet.create({
     container: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
       paddingTop: CONTAINER_FADE_HEIGHT,
       paddingHorizontal: spacing.xl,
       backgroundColor: colors.background.primary,
@@ -303,7 +351,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   });
 
   return (
-    <View style={[styles.container, { paddingBottom: bottomPadding }]}> 
+    <View
+      ref={containerRef}
+      onLayout={measureScreenBottom}
+      style={[styles.container, { paddingBottom: bottomPadding }]}
+      testID="chat-input-container"
+    >
       <LinearGradient
         colors={['transparent', colors.background.primary]}
         style={styles.fadeGradient}

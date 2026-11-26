@@ -15,6 +15,7 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
+import { serializeUserName } from '../utils/userName.utils';
 
 const DEFAULT_DAILY_HYDRATION_TARGET = 2500;
 
@@ -63,7 +64,9 @@ function buildPurchaseProfileResponse(user: PurchaseProfileUser) {
   return {
     id: String(user._id),
     email: user.email,
-    name: user.name,
+    // name + firstName/lastName + nameNeedsConfirmation: o app substitui o
+    // usuário local por esta resposta (usePulseProPurchase → setUser).
+    ...serializeUserName(user),
     profilePhoto: user.profilePhoto,
     blendiModel: user.blendiModel,
     blendiOwnership: user.blendiOwnership ?? 'blendi',

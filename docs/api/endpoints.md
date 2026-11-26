@@ -51,10 +51,12 @@ Creates a new user account and returns the initial session tokens.
 |---|---|---|---|
 | `email` | string | Yes | Valid email address, normalized to lowercase |
 | `password` | string | Yes | Minimum 8 characters, maximum 72, must include uppercase, lowercase, and a digit |
-| `name` | string | Yes | 2 to 60 characters |
+| `firstName` | string | Yes* | First name (EAS preview test, 25-26/11). Cleaned like other single-line free text (control/bidi characters and markup `<…>`/`<`/`>` become a space, spaces collapse, trimmed); 1 to 50 characters (`FIRST_NAME_MAX_LENGTH`) |
+| `lastName` | string | No | Last name, same cleaning; 0 to 50 characters (`LAST_NAME_MAX_LENGTH`) |
+| `name` | string | Yes* | **Legacy** (app versions before first/last name): 2 to 60 characters. Used only when `firstName` is absent — split into first word = `firstName`, rest = `lastName`. *One of `firstName` or `name` is required; neither → `400` with field `firstName` |
 | `blendiModel` | string | Yes | One of `Lite`, `ProPlus`, `Steel` |
 | `goal` | string | Yes | One of `Muscle`, `Wellness`, `Energy`, `Recovery`, `WeightLoss` |
-| `preferredLanguage` | string | No | One of `en`, `pt-BR`; defaults to `en` when omitted |
+| `preferredLanguage` | string | No | One of `en`, `pt-BR`; defaults to `en` when omitted. The app sends its active language (device language on first use: `pt-*` → `pt-BR`, anything else → `en`) |
 | `dailyProteinTarget` | number | Yes | Integer between 10 and 800 |
 | `dailyCalorieTarget` | number | Yes | Integer between 300 and 15000 |
 | `timezone` | string | Yes | IANA timezone string such as `America/Sao_Paulo` |
@@ -70,7 +72,10 @@ Creates a new user account and returns the initial session tokens.
     "user": {
       "id": "string",
       "email": "string",
-      "name": "string",
+      "name": "Gabriel Silva",
+      "firstName": "Gabriel",
+      "lastName": "Silva",
+      "nameNeedsConfirmation": false,
       "blendiModel": "Lite | ProPlus | Steel",
       "blendiOwnership": "blendi | other | none",
       "otherBlenderModel": null,
@@ -91,6 +96,8 @@ Creates a new user account and returns the initial session tokens.
   }
 }
 ```
+
+`name` is always built by the backend as `"firstName lastName"` (or just `firstName`) — see *First and last name* under `GET /users/me`. An email registration is never `nameNeedsConfirmation: true`.
 
 `blendiOwnership`, `otherBlenderModel` and `dietaryPreferences` are **not** accepted at registration (the Zod schema strips them) — a new account always starts as `blendiOwnership: "blendi"`, `otherBlenderModel: null`, `dietaryPreferences: []`, and the real values are collected by the onboarding and saved through `PATCH /users/me`. They are returned here (and in every other endpoint that returns the full user, see `GET /users/me`) so the client never has to guess their defaults.
 
@@ -219,6 +226,7 @@ Returns the Google OAuth authorization URL that the mobile app must open using `
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `codeChallenge` | string | Yes | `base64url(SHA-256(codeVerifier))`, exactly 43 chars `[A-Za-z0-9_-]`. Stored inside the signed `state` JWT (`{ csrf: true, codeChallenge }`, 10 min) |
+| `preferredLanguage` | string | No | EAS preview test (25-26/11). One of `en`, `pt-BR` — the app's active language. Stored in the signed `state` (`{ …, preferredLanguage }`) and used **only if the callback creates the account** (`locale`). Absent (older app) → `en`, as before. Any other value → `400` (`field: preferredLanguage`) |
 
 **Success response**
 
@@ -238,7 +246,7 @@ Returns the Google OAuth authorization URL that the mobile app must open using `
 | Status | Meaning |
 |---|---|
 | `200` | Authorization URL generated successfully |
-| `400` | `codeChallenge` missing or not in the expected format (`validation/invalid-input`) |
+| `400` | `codeChallenge` missing or not in the expected format, or `preferredLanguage` outside `en`/`pt-BR` (`validation/invalid-input`) |
 | `500` | Unexpected server error |
 
 ### GET /auth/google/callback
@@ -268,6 +276,8 @@ blendipulse://auth/callback?code=<one-time code>
 ```
 
 No access token, refresh token or user data is ever placed in this URL. The app exchanges the code with `POST /auth/google/exchange`.
+
+**Account creation (case 3).** `locale` comes from the `preferredLanguage` signed in `state` (`en` when absent). Name: `given_name`/`family_name` from the ID token → `firstName`/`lastName`; without them, the `name` claim is split; a Google profile with no name at all no longer fails the login (it used to throw "missing name") — the account is created with the start of the email as `firstName` and `nameNeedsConfirmation: true`. Logging into an existing account (cases 1 and 2) never changes its `locale` nor its name.
 
 **Error behavior**
 
@@ -338,6 +348,35 @@ Every failure — malformed body, unknown code, code already used, expired code,
 | `200` | Code and verifier accepted; session issued |
 | `401` | Generic failure (`auth/google-exchange-failed`) |
 | `429` | Too many failed attempts (`auth/too-many-requests`) |
+| `500` | Unexpected server error |
+
+### POST /auth/apple
+
+Sign in with Apple (native flow, no redirect): logs in, links an existing account by verified email, or creates a new account. Full flow and security notes: [apple-signin-backend.md](../fixes/apple-signin-backend.md).
+
+**JWT required:** No
+
+**Request body**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `identityToken` | string | Yes | From `expo-apple-authentication` |
+| `authorizationCode` | string | Yes | From `expo-apple-authentication` |
+| `givenName` | string | No | EAS preview test (25-26/11). Apple's `credential.fullName.givenName` — Apple only sends the name on the first authorization (sometimes not even then). Cleaned and **cut** at 50 characters, never rejected (a long Apple name must not block the login) |
+| `familyName` | string | No | Same, for the last name |
+| `fullName` | string | No | Legacy (older app versions): at most 60 characters; split into first/last name. `givenName`/`familyName` take priority |
+| `preferredLanguage` | string | No | One of `en`, `pt-BR` — the app's active language. Used **only when the account is created** (`locale`); absent → `en`. Any other value → `400` before any call to Apple |
+
+**Name rules.** New account with a real first name → `firstName`/`lastName`, `name` composed, `nameNeedsConfirmation: false`. Without it → start of the email as `firstName` (the real `familyName`, if sent, is kept) and `nameNeedsConfirmation: true`; the app asks for the name in the first onboarding step. Login (case 1) of an account that still needs confirmation (flag, or a legacy account whose `name` is the start of the email or `Apple User`) **and** Apple sends the name now → the real name is saved. A confirmed name is never overwritten by Apple's. Linking (case 2) changes nothing in the account. `locale` is never changed on login or linking.
+
+**Success response** — `200 OK`, same shape as `POST /auth/login` plus `isNewUser`; `user` includes `firstName`, `lastName` and `nameNeedsConfirmation`.
+
+| Status | Meaning |
+|---|---|
+| `200` | Logged in, linked or created |
+| `400` | Body failed validation |
+| `401` | `auth/apple-auth-failed` (identity token / authorization code rejected, or token without `email` on creation) |
+| `409` | `auth/apple-account-conflict` (email already linked to another Apple ID) |
 | `500` | Unexpected server error |
 
 ### POST /auth/forgot-password
@@ -472,7 +511,10 @@ None.
   "data": {
     "user": {
       "id": "string",
-      "name": "string",
+      "name": "Gabriel Silva",
+      "firstName": "Gabriel",
+      "lastName": "Silva",
+      "nameNeedsConfirmation": false,
       "email": "string",
       "profilePhoto": "https://cdn.example.com/avatar.png",
       "hasProfilePhoto": true,
@@ -536,6 +578,8 @@ None.
 
 `allergies` and `allergyInviteDismissed` were added by CP-B6 (see `PATCH /users/me` and [cp-b6-alergias.md](../fixes/cp-b6-alergias.md)). Accounts saved before it have no `allergies` stored; the API reads them as `{ "common": [], "custom": [] }` and `allergyInviteDismissed: false` — no migration. Both are also returned by `PATCH /users/me` and by `POST /auth/google/exchange` (same serializer). `allergies` is health data: it never goes to logs or analytics, and it is deleted with the account (it lives in the `users` document).
 
+**First and last name** (EAS preview test, 25-26/11). `firstName` and `lastName` are stored on the user; `name` is always `"firstName lastName"` (or just `firstName`) and is built by the backend on every write. `nameNeedsConfirmation: true` means the stored name is only the start of the email (Apple/Google sign-up without a real name). Accounts created before these fields are read tolerantly, without migration: `firstName` = first word of `name`, `lastName` = the rest, and `nameNeedsConfirmation` is deduced (`true` only if `name` equals the start of the email or `Apple User`). The same four fields are returned by `POST /auth/register`, `POST /auth/login`, `POST /auth/apple`, `POST /auth/google/exchange`, `PATCH /users/me` and `POST /purchases/verify`. Names never go to logs or analytics, nor to the AI prompts.
+
 The current implementation also returns compatibility aliases `streakDays` and `totalBlends` with the same numeric values as `currentStreak` and `blendCount`.
 
 `hasProfilePhoto`/`profilePhotoUpdatedAt`, `weightGoal`/`weight`/`height`/`targetWeight`/`activityLevel`/`birthDate`/`biologicalSex` (onboarding body profile), `hasRealBodyProfile` (set once the onboarding body step has really been completed via `PATCH /users/me` with `completingBodyOnboarding: true`, see below), `pushToken`, `notificationPreferences`, `dailyPulseTime`, `dailyFatTarget`, the four `subscription*` fields plus `revenueCatCustomerId` (all `null` for a non-subscriber), `totalXP`, `lastLevelUp`, `currentLevel`, and `levelProgress` (a fraction between 0 and 1 toward the next level) are all real fields of this response that were missing from this document before — confirmed directly against `getMe` (`apps/api/src/controllers/user.controller.ts`).
@@ -561,6 +605,8 @@ All fields are optional. The endpoint only updates fields that are present in th
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
+| `firstName` | string | No | EAS preview test (25-26/11). Cleaned like other single-line free text (control/bidi characters and markup become a space, spaces collapse, trimmed); 1 to 50 characters after cleaning (empty → `errors.validation.required`, longer → `errors.validation.too_long`); non-string → `400`. Clears `nameNeedsConfirmation` |
+| `lastName` | string | No | Same cleaning, 0 to 50 characters; `""` = no last name. Sent alone, it keeps the current first name (legacy accounts: derived from `name`) and does **not** clear `nameNeedsConfirmation` |
 | `blendiModel` | string | No | One of `Lite`, `ProPlus`, `Steel`. Sent **without** `blendiOwnership` it means "I have a real BLENDi" — see *Blender ownership rules* below |
 | `blendiOwnership` | string | No | One of `blendi`, `other` (older model or another brand), `none` (no BLENDi yet) — see *Blender ownership rules* below |
 | `otherBlenderModel` | string | No | Free text with brand/model for `blendiOwnership: "other"`. Control characters (including line breaks and bidi overrides) are replaced by a space, then the text is trimmed; at most 60 characters after trimming (`errors.validation.too_long`); an empty/blank string clears the field. Never sent to the AI, to analytics or to logs |

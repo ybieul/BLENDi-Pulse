@@ -31,6 +31,20 @@
       "carbs": "Carboidratos",
       "fat": "Gordura",
       "calories": "Calorias"
+    },
+    "macroChips": {
+      "protein": "Proteína",
+      "carbs": "Carbo",
+      "fat": "Gordura",
+      "calories": "kcal",
+      "alcohol": "Álcool",
+      "a11y": {
+        "protein": "{{value}} gramas de proteína",
+        "carbs": "{{value}} gramas de carboidrato",
+        "fat": "{{value}} gramas de gordura",
+        "calories": "{{value}} quilocalorias",
+        "alcohol": "{{value}} gramas de álcool"
+      }
     }
   },
 
@@ -43,6 +57,12 @@
   },
 
   "onboarding": {
+    "nameStep": {
+      "title": "Como podemos te chamar?",
+      "subtitle": "Não recebemos seu nome no login. O sobrenome é opcional.",
+      "firstNameLabel": "Nome",
+      "lastNameLabel": "Sobrenome (opcional)"
+    },
     "model": {
       "lite": {
         "name": "BLENDi Lite"
@@ -178,7 +198,6 @@
     "goalEnergyRecipe": "Manga com Aveia Turbo",
     "goalRecoveryRecipe": "Smoothie Dourado Recovery",
     "goalWeightLossRecipe": "Shake de Whey com Framboesa",
-    "recipeMacros": "{{protein}}g proteína • {{carbs}}g carboidratos • {{calories}} kcal",
     "blendTime": "{{minutes}} min de blend",
     "dailyRecipeBlendInstruction": "Bata todos os ingredientes até ficar homogêneo, cerca de 30-45 segundos.",
     "dailyRecipeTip": "Beba em até 30 minutos após bater para melhor textura e aproveitamento nutricional.",
@@ -1549,7 +1568,6 @@
       "avocadoOrChia": "abacate ou chia",
       "oatsOrPeanutButter": "aveia ou pasta de amendoim"
     },
-    "alcoholUnit": "g de álcool",
     "howToUse": {
       "button": "Como usar",
       "a11yLabel": "Como usar o Pulse AI",
@@ -1662,6 +1680,8 @@
   },
 
   "pantryScanner": {
+    "galleryA11yLabel": "Escolher uma foto da galeria",
+    "captureA11yLabel": "Tirar foto",
     "permissionTitle": "Escaneie Sua Despensa",
     "permissionDescription": "Permita acesso à câmera para identificar ingredientes e receber receitas personalizadas",
     "grantPermission": "Ativar Câmera",
@@ -1765,6 +1785,8 @@
     "resendCode": "Reenviar código",
     "emailLabel": "E-mail",
     "fullNameLabel": "Nome completo",
+    "firstNameLabel": "Nome",
+    "lastNameLabel": "Sobrenome (opcional)",
     "passwordLabel": "Senha",
     "confirmPasswordLabel": "Confirmar senha",
     "forgotPassword": "Esqueceu a senha?",
@@ -1925,6 +1947,21 @@
   },
 
   "me": {
+    "name": {
+      "rowLabel": "Nome",
+      "screenTitle": "Seu nome",
+      "subtitle": "É assim que te chamamos no app e nos e-mails.",
+      "firstNameLabel": "Nome",
+      "lastNameLabel": "Sobrenome (opcional)",
+      "confirmHint": "Confirme seu nome: só tínhamos o começo do seu e-mail.",
+      "confirmShort": "Confirmar",
+      "save": "Salvar",
+      "saved": "Nome atualizado",
+      "unsavedTitle": "Descartar alterações?",
+      "unsavedMessage": "As alterações no seu nome não foram salvas.",
+      "unsavedKeep": "Continuar editando",
+      "unsavedDiscard": "Descartar"
+    },
     "blenderOwnership": {
       "other": "Outro modelo",
       "otherWithName": "Outro modelo · {{name}}",

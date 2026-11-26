@@ -4,8 +4,8 @@
 //      os scopes FULL_NAME e EMAIL
 //   2. O SDK já devolve identityToken e authorizationCode diretamente
 //      (sem browser/redirect, diferente do Google)
-//   3. Monta o fullName (quando disponível) e envia ao backend via
-//      signInWithApple (services/auth.service.ts)
+//   3. Manda nome e sobrenome (quando a Apple os entrega) e o idioma do
+//      aparelho ao backend via signInWithApple (services/auth.service.ts)
 //   4. Salva a sessão no store Zustand
 //
 // O componente de UI só precisa de: { signInWithApple, isLoading, error }
@@ -14,6 +14,7 @@ import { useState, useCallback } from 'react';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { signInWithApple as signInWithAppleRequest } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
+import { getAppPreferredLanguage } from '../utils/preferredLanguage.utils';
 
 // ─── Tipo de retorno do hook ──────────────────────────────────────────────────
 
@@ -78,21 +79,26 @@ export function useAppleAuth(): UseAppleAuthReturn {
         return;
       }
 
-      // ── Passo 3: montar fullName (só vem preenchido no primeiro signInAsync) ─
-      let fullName: string | undefined;
-      if (credentialFullName) {
-        const parts = [credentialFullName.givenName, credentialFullName.familyName].filter(
-          (part): part is string => !!part
-        );
-        if (parts.length > 0) {
-          fullName = parts.join(' ');
-        }
-      }
+      // ── Passo 3: nome (só vem preenchido no primeiro signInAsync — às vezes
+      // nem nele). givenName/familyName vão separados (o backend grava nome e
+      // sobrenome); fullName continua indo para um backend anterior a eles.
+      const givenName = credentialFullName?.givenName?.trim() || undefined;
+      const familyName = credentialFullName?.familyName?.trim() || undefined;
+      const fullName = [givenName, familyName].filter(Boolean).join(' ') || undefined;
 
       // ── Passo 4: enviar ao backend ──────────────────────────────────────────
+      // preferredLanguage: idioma do aparelho, usado só se a conta for criada
+      // agora (login de conta existente não muda o idioma escolhido).
       let data: Awaited<ReturnType<typeof signInWithAppleRequest>>;
       try {
-        data = await signInWithAppleRequest({ identityToken, authorizationCode, fullName });
+        data = await signInWithAppleRequest({
+          identityToken,
+          authorizationCode,
+          ...(fullName && { fullName }),
+          ...(givenName && { givenName }),
+          ...(familyName && { familyName }),
+          preferredLanguage: getAppPreferredLanguage(),
+        });
       } catch (err) {
         // Nunca logar `err` diretamente: se for um AxiosError, `err.config.data`
         // é o body serializado da requisição — inclui o identityToken e o
@@ -105,7 +111,7 @@ export function useAppleAuth(): UseAppleAuthReturn {
       }
 
       // ── Passo 5: salvar sessão no store (SecureStore + Zustand) ────────────
-      await _setSession(data);
+      await _setSession(data, 'apple');
       setIsNewUser(data.isNewUser);
     } catch (err) {
       // Captura erros não tratados nos passos anteriores

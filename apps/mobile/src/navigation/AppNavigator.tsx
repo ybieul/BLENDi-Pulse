@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlendScreen } from '../screens/BlendScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -14,11 +15,17 @@ import {
   fontSizes,
   fonts,
   fontWeights,
-  spacing,
 } from '@blendi/shared';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 import type { AppTabParamList } from './types';
+import {
+  BLEND_ICON_SIZE,
+  BLEND_SHELL_SIZE,
+  getTabBarMetrics,
+  TAB_BAR_PADDING_TOP,
+  TAB_ITEM_PADDING_VERTICAL,
+} from './tabBarMetrics';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 
@@ -43,33 +50,35 @@ const TAB_LABELS = {
 export function AppNavigator() {
   const colors = useColors();
   const { t } = useAppTranslation();
+  const insets = useSafeAreaInsets();
+  const metrics = getTabBarMetrics(insets.bottom);
 
   const styles = StyleSheet.create({
     tabBar: {
-      height: 88,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.lg,
+      height: metrics.height,
+      paddingTop: TAB_BAR_PADDING_TOP,
+      paddingBottom: metrics.paddingBottom,
       borderTopWidth: 1,
       borderTopColor: colors.background.secondary,
       backgroundColor: colors.background.primary,
     },
     tabItem: {
-      paddingVertical: spacing.sm,
+      paddingVertical: TAB_ITEM_PADDING_VERTICAL,
     },
     tabBarLabel: {
       fontFamily: fonts.body,
       fontSize: fontSizes.xs,
       fontWeight: fontWeights.medium,
     },
+    blendIconBox: metrics.blendIconBox,
     blendIconShell: {
-      minWidth: 56,
-      minHeight: 56,
+      width: BLEND_SHELL_SIZE,
+      height: BLEND_SHELL_SIZE,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: borderRadius.full,
       borderWidth: 1,
       backgroundColor: colors.background.secondary,
-      marginTop: -6,
     },
   });
 
@@ -89,13 +98,20 @@ export function AppNavigator() {
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarHideOnKeyboard: true,
           tabBarLabel: t(TAB_LABELS[route.name]),
+          // O item inteiro (coluna ícone + rótulo, ≥ 44 pt) continua sendo a
+          // área de toque; o leitor de tela lê o rótulo da aba ("Blend").
+          tabBarAccessibilityLabel: t(TAB_LABELS[route.name]),
+          ...(isBlendTab && { tabBarIconStyle: styles.blendIconBox }),
           tabBarIcon: ({ color, focused, size }) => {
             const iconName = focused ? iconNames.active : iconNames.inactive;
 
             if (isBlendTab) {
               return (
-                <View style={[styles.blendIconShell, { borderColor: color }]}>
-                  <Ionicons name={iconName} size={size + 10} color={color} />
+                <View
+                  style={[styles.blendIconShell, { borderColor: color }]}
+                  testID={focused ? 'tab-blend-shell-active' : 'tab-blend-shell'}
+                >
+                  <Ionicons name={iconName} size={BLEND_ICON_SIZE} color={color} />
                 </View>
               );
             }

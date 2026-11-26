@@ -229,6 +229,9 @@ type BlendiModel = "Lite" | "ProPlus" | "Steel";
 interface UserProfileData {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  nameNeedsConfirmation?: boolean;
   email: string;
   blendiModel: BlendiModel;
   blendiOwnership?: BlendiOwnership;
@@ -576,6 +579,8 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
   const profilePhotoActionCopy = useMemo(() => getProfilePhotoActionCopy(t), [t]);
   const displayUserId = authUser?.id ?? profile?.id ?? null;
   const displayName = profile?.name ?? authUser?.name ?? "";
+  const nameNeedsConfirmation =
+    profile?.nameNeedsConfirmation ?? authUser?.nameNeedsConfirmation ?? false;
   const displayEmail = profile?.email ?? authUser?.email ?? "";
   const displayModel: BlendiModel =
     (profile?.blendiModel ?? authUser?.blendiModel) ?? "Lite";
@@ -1799,7 +1804,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             </View>
           </View>
 
-          <Text style={styles.displayName}>{displayName}</Text>
+          <Text numberOfLines={2} style={styles.displayName}>{displayName}</Text>
           <Text style={styles.displayEmail}>{displayEmail}</Text>
           {memberSinceStr ? (
             <Text style={styles.memberSince}>
@@ -1959,6 +1964,17 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             <Text style={styles.settingsTitle}>
               {t("me.settings")}
             </Text>
+
+            {/* Nome e sobrenome (teste no build EAS 25-26/11). Conta "a
+                confirmar" (nome do e-mail): a linha avisa e abre a edição. */}
+            <SettingRow
+              label={t("me.name.rowLabel")}
+              value={nameNeedsConfirmation ? t("me.name.confirmShort") : displayName}
+              onPress={() => {
+                navigation.getParent<RootNavigationProp<"ProfileName">>()?.navigate("ProfileName");
+              }}
+            />
+            <View style={styles.divider} />
 
             <SettingRow
               label={t(resolveBlenderTextKey("profile.fields.model", displayOwnership))}

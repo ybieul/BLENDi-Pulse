@@ -98,13 +98,15 @@ describe('auth.service — login Google', () => {
     mockGet.mockReset();
   });
 
-  it('getGoogleAuthUrl manda o desafio como query param', async () => {
+  it('getGoogleAuthUrl manda o desafio e o idioma do aparelho como query params', async () => {
     mockGet.mockResolvedValue({ data: { success: true, data: { url: 'https://accounts.google.com/x' } } });
 
-    const url = await getGoogleAuthUrl('C'.repeat(43));
+    const url = await getGoogleAuthUrl('C'.repeat(43), 'pt-BR');
 
     expect(url).toBe('https://accounts.google.com/x');
-    expect(mockGet).toHaveBeenCalledWith('/auth/google/url', { params: { codeChallenge: 'C'.repeat(43) } });
+    expect(mockGet).toHaveBeenCalledWith('/auth/google/url', {
+      params: { codeChallenge: 'C'.repeat(43), preferredLanguage: 'pt-BR' },
+    });
   });
 
   it('exchangeGoogleCode: POST com código + verificador e usuário convertido do formato do getMe', async () => {

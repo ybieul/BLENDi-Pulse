@@ -14,9 +14,9 @@ import {
 import { useDateFormat } from '../../hooks/useDateFormat';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { MacroChips } from '../ui/MacroChips';
 import type { BlendLogEntry as BlendLog } from '../../services/blendLog.service';
 
-const CARBS_COLOR = colors.feedback.warning;
 const STAR_FILLED_COLOR = colors.rating.starFilled;
 const STAR_COUNT = 5;
 
@@ -29,20 +29,17 @@ export function BlendLogItem({ item }: BlendLogItemProps) {
   const CARD_BACKGROUND = colors.overlay.plum[7];
   const CARD_BORDER = colors.overlay.plum[10];
   const META_COLOR = colors.overlay.plum[55];
-  const CALORIES_COLOR = colors.overlay.plum[70];
   const STAR_IDLE_COLOR = colors.overlay.plum[24];
 
   const { t } = useAppTranslation();
   const { formatDate, formatTime } = useDateFormat();
 
   const recipeName = item.recipeName?.trim() || t('history.freeBlend');
-  const gramsUnit = t('common.units.grams');
-  const kilocaloriesUnit = t('common.units.kilocalories');
   const rating = typeof item.rating === 'number' ? Math.max(0, Math.min(item.rating, STAR_COUNT)) : 0;
 
   const styles = StyleSheet.create({
     card: {
-      height: 82,
+      minHeight: 82,
       padding: 14,
       borderRadius: 12,
       borderWidth: 1,
@@ -75,25 +72,6 @@ export function BlendLogItem({ item }: BlendLogItemProps) {
       fontSize: 12,
       fontWeight: fontWeights.regular,
     },
-    macrosRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    macroText: {
-      fontFamily: fonts.body,
-      fontSize: 12,
-      fontWeight: fontWeights.medium,
-    },
-    protein: {
-      color: colors.brand.pulse,
-    },
-    carbs: {
-      color: CARBS_COLOR,
-    },
-    calories: {
-      color: CALORIES_COLOR,
-    },
     ratingRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -113,11 +91,14 @@ export function BlendLogItem({ item }: BlendLogItemProps) {
       </View>
 
       <View style={styles.rightColumn}>
-        <View style={styles.macrosRow}>
-          <Text style={[styles.macroText, styles.protein]}>{`${Math.round(item.protein)}${gramsUnit}`}</Text>
-          <Text style={[styles.macroText, styles.carbs]}>{`${Math.round(item.carbs)}${gramsUnit}`}</Text>
-          <Text style={[styles.macroText, styles.calories]}>{`${Math.round(item.calories)} ${kilocaloriesUnit}`}</Text>
-        </View>
+        {/* Número + nome visível (antes só a cor diferenciava os macros). */}
+        <MacroChips
+          variant="compact"
+          integer
+          protein={item.protein}
+          carbs={item.carbs}
+          calories={item.calories}
+        />
 
         {rating > 0 ? (
           <View style={styles.ratingRow}>

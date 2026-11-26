@@ -28,7 +28,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { ZodError } from 'zod';
 import { addMonths } from 'date-fns';
-import { appleSignInSchema } from '@blendi/shared';
+import { appleSignInSchema, splitFullName } from '@blendi/shared';
 import { UserModel, type UserDocument } from '../models/User';
 import {
   verifyAppleIdentityToken,
@@ -38,6 +38,11 @@ import { generateAccessToken, generateRefreshToken } from '../services/auth.serv
 import { EmailService } from '../services/email.service';
 import { getAccountCreationBodyProfileDefaults } from '../utils/accountDefaults.utils';
 import { calculateFatTargetFromCalories } from '../utils/macroCalculation.utils';
+import {
+  buildAccountNameFields,
+  resolveNameNeedsConfirmation,
+  serializeUserName,
+} from '../utils/userName.utils';
 import {
   sendErrorResponse,
   VALIDATION_ERROR_CODE,
@@ -70,24 +75,25 @@ function isDuplicateKeyError(err: unknown): err is { code: number } {
 }
 
 /**
- * Deriva um nome de exibição razoável quando o app não envia `fullName` —
- * isso é esperado em todo login além do primeiro (a Apple só entrega o nome
- * uma vez). Usa a parte local do email quando disponível; caso contrário,
- * cai num literal fixo — o modelo exige `name` não vazio.
+ * Nome real que o app recebeu da Apple neste login. A Apple só entrega o
+ * nome no primeiro login (às vezes nem nele): givenName/familyName (app
+ * atual) têm prioridade; `fullName` (app antigo) é dividido em nome +
+ * sobrenome. Nada recebido = sem nome real (a conta fica "a confirmar").
  */
-function resolveDisplayName(fullName: string | undefined, email: string | undefined): string {
-  if (fullName && fullName.trim().length > 0) {
-    return fullName.trim();
+function resolveAppleRealName(input: {
+  givenName?: string;
+  familyName?: string;
+  fullName?: string;
+}): { firstName?: string; lastName?: string } {
+  if (input.givenName || input.familyName) {
+    return { firstName: input.givenName, lastName: input.familyName };
   }
 
-  if (email) {
-    const [localPart] = email.split('@');
-    if (localPart && localPart.length > 0) {
-      return localPart;
-    }
+  if (input.fullName) {
+    return splitFullName(input.fullName);
   }
 
-  return 'Apple User';
+  return {};
 }
 
 // ─── Handler: POST /auth/apple ────────────────────────────────────────────────
@@ -95,7 +101,8 @@ function resolveDisplayName(fullName: string | undefined, email: string | undefi
 /**
  * Processa o login/registro via Sign in with Apple.
  *
- * Body: { identityToken, authorizationCode, fullName? } — ver appleSignInSchema.
+ * Body: { identityToken, authorizationCode, givenName?, familyName?, fullName?,
+ * preferredLanguage? } — ver appleSignInSchema.
  *
  * Resposta de sucesso (200): { success: true, data: { user, accessToken, refreshToken, isNewUser } }
  * — mesmo formato de POST /auth/register e POST /auth/login.
@@ -113,7 +120,9 @@ export async function handleAppleSignIn(
       return;
     }
 
-    const { identityToken, authorizationCode, fullName } = parsed.data;
+    const { identityToken, authorizationCode, fullName, givenName, familyName, preferredLanguage } =
+      parsed.data;
+    const realName = resolveAppleRealName({ givenName, familyName, fullName });
 
     // 2. Verificar o identityToken — assinatura, iss, aud e expiração
     // (ver apple.service.ts). Qualquer falha aqui é um identityToken
@@ -158,6 +167,19 @@ export async function handleAppleSignIn(
     if (user) {
       // Caso 1: login — o refresh token da Apple pode mudar entre logins
       user.appleRefreshToken = appleRefreshToken;
+
+      // Conta com "nome a confirmar" (criada sem o nome real) e a Apple
+      // mandou o nome agora (ex.: a pessoa tirou o app do "Iniciar sessão
+      // com a Apple" e entrou de novo): grava o nome real. Nome já
+      // confirmado nunca é trocado pelo da Apple. O idioma nunca muda aqui.
+      if (realName.firstName && resolveNameNeedsConfirmation(user)) {
+        const nameFields = buildAccountNameFields({ ...realName, email: user.email });
+        user.name = nameFields.name;
+        user.firstName = nameFields.firstName;
+        user.lastName = nameFields.lastName;
+        user.nameNeedsConfirmation = nameFields.nameNeedsConfirmation;
+      }
+
       await user.save();
     } else if (claims.emailVerified && claims.email) {
       // Caso 2 (só tentado com email_verified=true — ver AppleIdentityTokenClaims.emailVerified):
@@ -216,13 +238,19 @@ export async function handleAppleSignIn(
       // Mesmos defaults de onboarding do Google/register (o app mobile pedirá
       // os dados reais na tela de onboarding logo após o primeiro login).
       try {
+        // Sem nome real: começo do e-mail + "nome a confirmar" (o app pede o
+        // nome na primeira etapa do onboarding).
+        const nameFields = buildAccountNameFields({ ...realName, email: claims.email });
+
         user = await UserModel.create({
           email: claims.email,
           emailVerified: claims.emailVerified,
-          name: resolveDisplayName(fullName, claims.email),
+          ...nameFields,
           appleUserId: claims.sub,
           appleRefreshToken,
-          locale: 'en',
+          // Idioma do aparelho mandado pelo app (só na criação). App antigo
+          // sem o campo: 'en', como antes.
+          locale: preferredLanguage ?? 'en',
           timezone: 'America/New_York', // sobrescrito pelo PATCH /auth/timezone no boot do app
           blendiModel: 'Lite',
           goal: 'Wellness',
@@ -274,7 +302,7 @@ export async function handleAppleSignIn(
         user: {
           id: user.id,
           email: user.email,
-          name: user.name,
+          ...serializeUserName(user),
           blendiModel: user.blendiModel,
           blendiOwnership: user.blendiOwnership ?? 'blendi',
           otherBlenderModel: user.otherBlenderModel ?? null,

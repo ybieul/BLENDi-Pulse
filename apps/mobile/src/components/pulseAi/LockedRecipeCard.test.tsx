@@ -59,8 +59,13 @@ describe('LockedRecipeCard', () => {
     );
 
     expect(getByText('pulseAi.lockedPreview.genericTitle')).toBeTruthy();
-    for (const value of ['12', '30', '6', '222']) {
+    // Teste no build EAS (25-26/11): cada número vem com o nome visível
+    // embaixo (MacroChips) — o número dos gramas agora inclui a unidade.
+    for (const value of [/^12 /, /^30 /, /^6 /, /^222$/]) {
       expect(getByText(value)).toBeTruthy();
+    }
+    for (const label of ['protein', 'carbs', 'fat', 'calories']) {
+      expect(getByText(`common.macroChips.${label}`)).toBeTruthy();
     }
     expect(getByText('pulseAi.lockedPreview.unlockCta')).toBeTruthy();
 

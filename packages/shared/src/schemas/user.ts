@@ -15,6 +15,7 @@
 
 import { z } from 'zod';
 
+import { firstNameSchema, lastNameSchema } from '../utils/personName';
 import { UNSAFE_TEXT_CHARS_PATTERN } from '../utils/textMatching';
 import { isValidIanaTimezone } from '../utils/timezone.utils';
 import { rangeErrorMessage } from '../utils/validationRange.utils';
@@ -231,6 +232,14 @@ export const dailyPulseTimeSchema = z.object({
 
 export const updateUserSchema = z
   .object({
+    // Nome e sobrenome (teste no build EAS 25-26/11). Limpos (sem controle,
+    // sem marcação, espaços colapsados) e com teto; tipo errado é recusado.
+    // O backend monta `name` ("firstName lastName") e tira a marca de
+    // "nome a confirmar" quando firstName vem. lastName '' = sem sobrenome.
+    firstName: firstNameSchema,
+
+    lastName: lastNameSchema,
+
     blendiModel: z.enum(['Lite', 'ProPlus', 'Steel'], {
       required_error: 'errors.validation.required',
       message: 'errors.validation.invalid_option',

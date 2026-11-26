@@ -5,7 +5,7 @@
 //   - Histórico de mensagens em useState (sem persistência na Fase 1)
 //   - Limite de 20 itens no array (10 trocas = 10 user + 10 assistant)
 //   - FlatList inverted=false com auto-scroll via flatListRef
-//   - ChatInput absolutamente posicionado (gerencia seu próprio bottom)
+//   - ChatInput no fim da tela, no fluxo do layout (gerencia o espaço do teclado)
 //   - UsageIndicator acima do ChatInput quando usuário free
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,6 +13,7 @@ import {
   Animated,
   FlatList,
   Image,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -83,9 +84,10 @@ const DAILY_FREE_LIMIT = 3;
 const MAX_MESSAGES = 20;
 const LOGO_PLACEHOLDER_SIZE = 64;
 
-// Altura estimada do ChatInput acima da tab bar (fade + campo + padding).
-// Usado para garantir que o conteúdo não fique atrás do input fixado.
-const ESTIMATED_CHAT_INPUT_HEIGHT = 172;
+// Teste no build EAS (25-26/11): a lista reservava ESTIMATED_CHAT_INPUT_HEIGHT
+// (172, que incluía a barra de abas de novo) porque o ChatInput era absoluto.
+// Agora o ChatInput fica no fluxo do layout, abaixo da lista: a lista termina
+// onde o campo começa e a última mensagem nunca fica escondida atrás dele.
 
 const BADGE_SIZE = 16;
 const BADGE_FONT_SIZE_NORMAL = 10;
@@ -382,6 +384,20 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
   useEffect(() => {
     if (messages.length === 0) return;
     flatListRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length]);
+
+  // Teclado aberto: a lista encolhe (o campo sobe junto) — rola até a última
+  // mensagem para ela continuar visível logo acima do campo.
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      if (messages.length > 0) {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [messages.length]);
 
   // ── Cronômetro de espera — mostra aviso após 8s sem resposta ─────────────
@@ -982,6 +998,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       flexGrow: 1,
       paddingTop: spacing.md,
       paddingHorizontal: spacing.md,
+      paddingBottom: spacing.lg,
       gap: spacing.xl,
     },
     takingLongerText: {
@@ -1175,10 +1192,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
         renderItem={renderItem}
         ListEmptyComponent={ListEmptyComponent}
         ListFooterComponent={ListFooterComponent}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: ESTIMATED_CHAT_INPUT_HEIGHT + spacing.xl },
-        ]}
+        contentContainerStyle={styles.listContent}
         initialNumToRender={5}
         maxToRenderPerBatch={3}
         windowSize={5}

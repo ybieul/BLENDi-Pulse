@@ -114,3 +114,47 @@ describe('POST /auth/register — goal WeightLoss', () => {
     assert.equal(createMock.mock.callCount(), 0);
   });
 });
+
+// ─── Teste no build EAS (25-26/11): nome e sobrenome no cadastro por e-mail ──
+
+describe('POST /auth/register — nome e sobrenome', () => {
+  const { name: _legacyName, ...BASE_WITHOUT_NAME } = BASE;
+
+  it('app atual: firstName + lastName → gravados e name composto, nunca "a confirmar"', async () => {
+    const result = await callRegister({
+      ...BASE_WITHOUT_NAME,
+      goal: 'Wellness',
+      firstName: ' Gabriel ',
+      lastName: 'Silva',
+    });
+    assert.equal(result.status, 201);
+    assert.equal(createdDocs[0]?.firstName, 'Gabriel');
+    assert.equal(createdDocs[0]?.lastName, 'Silva');
+    assert.equal(createdDocs[0]?.name, 'Gabriel Silva');
+    assert.equal(createdDocs[0]?.nameNeedsConfirmation, false);
+  });
+
+  it('só firstName (sobrenome opcional) → name = firstName', async () => {
+    await callRegister({ ...BASE_WITHOUT_NAME, goal: 'Wellness', firstName: 'Ana' });
+    assert.equal(createdDocs[0]?.name, 'Ana');
+    assert.equal(createdDocs[0]?.lastName, '');
+  });
+
+  it('app antigo: só `name` → dividido em nome + sobrenome', async () => {
+    await callRegister({ ...BASE, goal: 'Wellness', name: 'Maria Clara Souza' });
+    assert.equal(createdDocs[0]?.firstName, 'Maria');
+    assert.equal(createdDocs[0]?.lastName, 'Clara Souza');
+    assert.equal(createdDocs[0]?.name, 'Maria Clara Souza');
+  });
+
+  it('sem firstName nem name → 400 com o campo firstName, nada criado', async () => {
+    const result = await callRegister({ ...BASE_WITHOUT_NAME, goal: 'Wellness' });
+    assert.equal(result.status, 400);
+    assert.equal(createMock.mock.callCount(), 0);
+  });
+
+  it('idioma escolhido continua indo para o locale (pt-BR)', async () => {
+    await callRegister({ ...BASE_WITHOUT_NAME, goal: 'Wellness', firstName: 'Ana', preferredLanguage: 'pt-BR' });
+    assert.equal(createdDocs[0]?.locale, 'pt-BR');
+  });
+});

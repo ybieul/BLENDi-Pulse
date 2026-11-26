@@ -15,6 +15,7 @@ import type {
   GoogleExchangeInput,
   RegisterInput,
   LoginInput,
+  PreferredLanguage,
   UserAllergies,
   UserGoal,
   ResetPasswordInput,
@@ -29,7 +30,17 @@ import { api } from '../config/api';
 export interface AuthUser {
   id: string;
   email: string;
+  /** Nome completo ("firstName lastName"), montado pelo backend. */
   name: string;
+  /**
+   * Nome e sobrenome. Opcionais: usuário salvo antes destes campos (ou uma
+   * resposta antiga) não os tem — ler sempre por resolvePersonNameParts /
+   * getDisplayFirstName (@blendi/shared), que derivam do `name`.
+   */
+  firstName?: string;
+  lastName?: string;
+  /** true = o nome é só o começo do e-mail (Apple/Google sem nome real). */
+  nameNeedsConfirmation?: boolean;
   profilePhoto?: string;
   hasProfilePhoto?: boolean;
   profilePhotoUpdatedAt?: string | null;
@@ -93,6 +104,9 @@ export type CurrentUserProfile = {
   id: string;
   email: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  nameNeedsConfirmation?: boolean;
   profilePhoto?: string;
   hasProfilePhoto?: boolean;
   profilePhotoUpdatedAt?: string | null;
@@ -149,6 +163,9 @@ export function mapCurrentUserProfile(user: CurrentUserProfile): AuthUser {
     id: user.id,
     email: user.email,
     name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    nameNeedsConfirmation: user.nameNeedsConfirmation ?? false,
     profilePhoto: user.profilePhoto,
     hasProfilePhoto: user.hasProfilePhoto ?? false,
     profilePhotoUpdatedAt: user.profilePhotoUpdatedAt ?? null,
@@ -335,10 +352,16 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
  * `codeChallenge` é o SHA-256 (base64url) do verificador que o hook guarda
  * em memória. A URL inclui o state JWT (CSRF + desafio) gerado pelo backend.
  * O app abre essa URL no browser via expo-web-browser.
+ *
+ * `preferredLanguage`: idioma do aparelho (o mesmo do cadastro por e-mail).
+ * O backend o guarda no state e só usa se o login CRIAR a conta.
  */
-export async function getGoogleAuthUrl(codeChallenge: string): Promise<string> {
+export async function getGoogleAuthUrl(
+  codeChallenge: string,
+  preferredLanguage: PreferredLanguage,
+): Promise<string> {
   const response = await api.get<{ success: true; data: { url: string } }>('/auth/google/url', {
-    params: { codeChallenge },
+    params: { codeChallenge, preferredLanguage },
   });
   return response.data.data.url;
 }

@@ -17,6 +17,7 @@ import {
   spacing,
 } from '@blendi/shared';
 import { AuthButton } from '../ui/AuthButton';
+import { MacroChips } from '../ui/MacroChips';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { DAILY_RECIPE_BLEND_INSTRUCTION_KEY, DAILY_RECIPES, type DailyRecipe } from './dailyRecipes.data';
@@ -191,6 +192,9 @@ export function DailyRecipeCard({
       lineHeight: 18,
       marginBottom: spacing.sm,
     },
+    macroChips: {
+      marginBottom: spacing.sm,
+    },
     timeEstimate: {
       color: colors.text.primary,
       fontFamily: fonts.body,
@@ -242,13 +246,11 @@ export function DailyRecipeCard({
 
       <Text style={styles.recipeName}>{t(recipe.nameKey)}</Text>
 
-      <Text style={styles.macrosRow}>
-        {t('home.recipeMacros', {
-          protein: recipe.protein,
-          carbs: recipe.carbs,
-          calories: recipe.calories,
-        })}
-      </Text>
+      {/* Mesmos números de antes (proteína, carboidrato, kcal), agora no
+          componente único com o nome visível embaixo de cada um. */}
+      <View style={styles.macroChips}>
+        <MacroChips protein={recipe.protein} carbs={recipe.carbs} calories={recipe.calories} />
+      </View>
 
       <Text style={styles.timeEstimate}>
         {t('home.blendTime', { minutes: recipe.durationMinutes })}

@@ -71,7 +71,7 @@ describe('receita do dia — nenhuma compatível: atalho para a Pulse AI', () =>
   it('o card da receita some e aparece o atalho, que pede a receita à Pulse AI', () => {
     const onAskPulseAi = jest.fn();
     const onStartBlend = jest.fn();
-    const { getByText, queryByText, getByRole } = render(
+    const { getByText, queryByText, queryByTestId, getByRole } = render(
       <DailyRecipeCard
         goal="Muscle"
         dietaryPreferences={[...emptyingDiets]}
@@ -83,7 +83,8 @@ describe('receita do dia — nenhuma compatível: atalho para a Pulse AI', () =>
 
     expect(getByText('home.dailyRecipeUnavailable')).toBeTruthy();
     expect(queryByText('home.startBlend')).toBeNull();
-    expect(queryByText('home.recipeMacros')).toBeNull();
+    // Os macros agora são o componente MacroChips (sem a frase home.recipeMacros).
+    expect(queryByTestId('macro-pill-protein')).toBeNull();
 
     fireEvent.press(getByRole('button'));
 

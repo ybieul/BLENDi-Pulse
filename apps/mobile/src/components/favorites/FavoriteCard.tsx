@@ -11,7 +11,7 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
-import { useFormatNumbers } from '../../hooks/useFormatNumbers';
+import { MacroChips } from '../ui/MacroChips';
 import { useAuthStore } from '../../store/auth.store';
 import { generateAndShare } from '../../utils/shareCard.utils';
 import {
@@ -23,10 +23,6 @@ import { ShareFormatSheet } from '../shareCards/ShareFormatSheet';
 import { AddToListSheet } from '../shoppingList/AddToListSheet';
 import { AuthButton } from '../ui/AuthButton';
 
-const PROTEIN_PILL_BACKGROUND = colors.overlay.pulse[25];
-const CARBS_PILL_BACKGROUND = colors.overlay.warning[25];
-const FAT_PILL_BACKGROUND = colors.overlay.neutralGray[25];
-const CALORIES_PILL_BACKGROUND = colors.overlay.success[25];
 const INGREDIENTS_OPACITY = 0.65;
 const REMOVE_BUTTON_BACKGROUND = colors.overlay.error[12];
 const REMOVE_BUTTON_BORDER = colors.overlay.error[25];
@@ -34,43 +30,10 @@ const REMOVE_ICON_COLOR = colors.feedback.error;
 const CART_BUTTON_BACKGROUND = colors.overlay.pulse[10];
 const CART_BUTTON_BORDER = colors.overlay.pulse[20];
 
-interface MacroPillProps {
-  value: number;
-  unit: string;
-  backgroundColor: string;
-}
-
 export interface FavoriteCardProps {
   item: FavoriteItem;
   onStartBlend: () => void;
   onRemove: () => void;
-}
-
-function MacroPill({ value, unit, backgroundColor }: MacroPillProps) {
-  const colors = useColors();
-  const { formatDecimal } = useFormatNumbers();
-
-  const pillStyles = StyleSheet.create({
-    macroPill: {
-      height: 22,
-      borderRadius: 999,
-      justifyContent: 'center',
-      paddingHorizontal: 8,
-    },
-    macroPillText: {
-      color: colors.text.primary,
-      fontFamily: fonts.body,
-      fontSize: 11,
-      fontWeight: fontWeights.medium,
-      lineHeight: 14,
-    },
-  });
-
-  return (
-    <View style={[pillStyles.macroPill, { backgroundColor }]}>
-      <Text style={pillStyles.macroPillText}>{`${formatDecimal(value)} ${unit}`}</Text>
-    </View>
-  );
 }
 
 function favoriteItemToRecipe(item: FavoriteItem): PulseAiRecipe {
@@ -231,10 +194,7 @@ export function FavoriteCard({ item, onStartBlend, onRemove }: FavoriteCardProps
           <Text style={styles.title}>{item.recipeName}</Text>
 
           <View style={styles.macroRow}>
-            <MacroPill value={item.protein} unit={t('common.units.grams')} backgroundColor={PROTEIN_PILL_BACKGROUND} />
-            <MacroPill value={item.carbs} unit={t('common.units.grams')} backgroundColor={CARBS_PILL_BACKGROUND} />
-            <MacroPill value={item.fat} unit={t('common.units.grams')} backgroundColor={FAT_PILL_BACKGROUND} />
-            <MacroPill value={item.calories} unit={t('common.units.kilocalories')} backgroundColor={CALORIES_PILL_BACKGROUND} />
+            <MacroChips protein={item.protein} carbs={item.carbs} fat={item.fat} calories={item.calories} />
           </View>
         </View>
 

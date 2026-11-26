@@ -66,6 +66,9 @@ type AuthSessionData = AuthResponse['data'] & {
   isNewUser?: boolean;
 };
 
+/** Origem do cadastro no evento sign_up (antes, o Apple saía como 'google'). */
+type SignUpMethod = 'google' | 'apple';
+
 
 async function fetchCurrentUserProfile(): Promise<AuthUser> {
   const response = await api.get<CurrentUserProfileResponse>('/users/me');
@@ -224,7 +227,7 @@ interface AuthActions {
    * Usado pelo useGoogleAuth após OAuth bem-sucedido.
    * Não chamar diretamente em componentes.
    */
-    _setSession: (data: AuthSessionData) => Promise<void>;
+    _setSession: (data: AuthSessionData, signUpMethod?: SignUpMethod) => Promise<void>;
   /**
    * Atualiza o campo timezone no perfil do usuário no store após uma
    * sincronização bem-sucedida com o backend (PATCH /auth/timezone).
@@ -420,14 +423,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
   // ── _setSession ───────────────────────────────────────────────────────────
 
-  _setSession: async (data) => {
+  _setSession: async (data, signUpMethod = 'google') => {
     const shouldShowOnboarding = data.isNewUser === true || hasPendingOnboarding();
 
     await setRefreshToken(data.refreshToken);
 
     if (data.isNewUser === true) {
       persistOnboardingCompletion(false);
-      trackEvent('sign_up', { method: 'google' });
+      trackEvent('sign_up', { method: signUpMethod });
     }
 
     set({

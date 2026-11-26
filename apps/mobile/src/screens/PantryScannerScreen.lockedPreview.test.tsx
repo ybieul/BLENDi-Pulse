@@ -289,9 +289,12 @@ describe('PantryScannerScreen — prévia bloqueada', () => {
 
     expect(utils.getAllByText('pantryScanner.lockedPreview.genericTitle')).toHaveLength(2);
     expect(utils.getAllByText('pantryScanner.lockedPreview.badge')).toHaveLength(2);
-    for (const value of ['12', '30', '6', '222', '10', '25', '5', '185']) {
+    // Teste no build EAS (25-26/11): os gramas vêm com a unidade ("12 g") e o
+    // nome visível embaixo (MacroChips); kcal continua só o número.
+    for (const value of [/^12 /, /^30 /, /^6 /, /^222$/, /^10 /, /^25 /, /^5 /, /^185$/]) {
       expect(utils.getAllByText(value).length).toBeGreaterThan(0);
     }
+    expect(utils.getAllByText('common.macroChips.protein')).toHaveLength(2);
     expect(utils.queryByTestId('recipe-card')).toBeNull();
     expect(utils.queryByTestId('pantry-no-recipes')).toBeNull();
 

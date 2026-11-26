@@ -10,6 +10,7 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import { CompleteProfileScreen } from '../screens/CompleteProfileScreen';
 import { NutritionGoalsScreen } from '../screens/NutritionGoalsScreen';
 import { AllergiesScreen } from '../screens/AllergiesScreen';
+import { ProfileNameScreen } from '../screens/ProfileNameScreen';
 import { UpgradeScreen } from '../screens/UpgradeScreen';
 import { WeeklyReportScreen } from '../screens/WeeklyReportScreen';
 import type { RootStackParamList } from './types';
@@ -77,6 +78,7 @@ export function RootNavigator() {
           <RootStack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
           <RootStack.Screen name="NutritionGoals" component={NutritionGoalsScreen} />
           <RootStack.Screen name="Allergies" component={AllergiesScreen} />
+          <RootStack.Screen name="ProfileName" component={ProfileNameScreen} />
         </>
       ) : (
         <RootStack.Screen name="AuthFlow" component={AuthNavigator} />
