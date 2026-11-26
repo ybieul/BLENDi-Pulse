@@ -42,6 +42,49 @@ describe('selectBackCameraDevice', () => {
   });
 });
 
+// CP-C3a: no Android a multi-lente só quando é segura; senão a lente principal sozinha.
+describe('selectBackCameraDevice — Android', () => {
+  const main = () => fakeDevice({ id: 'main', physicalDevices: ['wide-angle-camera'] });
+  const ultra = () => fakeDevice({ id: 'ultra', physicalDevices: ['ultra-wide-angle-camera'], minZoom: 1 });
+  const logical = (options: Parameters<typeof fakeDevice>[0] = {}) =>
+    fakeDevice({
+      id: 'logical',
+      physicalDevices: ['ultra-wide-angle-camera', 'wide-angle-camera'],
+      minZoom: 0.6,
+      neutralZoom: 1,
+      ...options,
+    });
+
+  it('câmera lógica segura (principal + multi-câmera + zoom abaixo de 1x): usa a multi-lente', () => {
+    expect(selectBackCameraDevice([main(), ultra(), logical()], 'android')?.id).toBe('logical');
+  });
+
+  it('câmera lógica sem zoom abaixo de 1x: usa a lente principal sozinha', () => {
+    expect(selectBackCameraDevice([logical({ minZoom: 1 }), main()], 'android')?.id).toBe('main');
+  });
+
+  it('câmera lógica que não se diz multi-câmera: usa a lente principal sozinha', () => {
+    expect(selectBackCameraDevice([logical({ isMultiCam: false }), main()], 'android')?.id).toBe('main');
+  });
+
+  it('câmera lógica sem a lente principal: usa a lente principal sozinha', () => {
+    const noMain = logical({ physicalDevices: ['ultra-wide-angle-camera', 'telephoto-camera'] });
+    expect(selectBackCameraDevice([noMain, main()], 'android')?.id).toBe('main');
+  });
+
+  it('zoom mínimo inválido não conta como seguro', () => {
+    expect(selectBackCameraDevice([logical({ minZoom: Number.NaN }), main()], 'android')?.id).toBe('main');
+  });
+
+  it('nem segura nem lente principal sozinha: a traseira de hoje (com a principal), nunca a ultra-wide', () => {
+    expect(selectBackCameraDevice([ultra(), logical({ minZoom: 1 })], 'android')?.id).toBe('logical');
+  });
+
+  it('iOS não muda: o virtual multi-lente mesmo sem passar pela regra do Android', () => {
+    expect(selectBackCameraDevice(iPhoneTripleDevices(), 'ios')?.id).toBe('triple');
+  });
+});
+
 describe('getZoomBounds', () => {
   it('abre no neutro e corta o máximo em 10x do 1x', () => {
     const triple = pick(iPhoneTripleDevices());

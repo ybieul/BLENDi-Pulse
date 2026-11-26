@@ -76,6 +76,13 @@
           "enableFrameProcessors": false,
           "enableCodeScanner": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
+          "microphonePermission": false
+        }
       ]
     ],
     "extra": {

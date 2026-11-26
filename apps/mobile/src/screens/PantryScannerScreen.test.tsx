@@ -172,13 +172,12 @@ async function renderAndRead() {
   };
   const utils = render(<PantryScannerScreen {...({ navigation } as unknown as ScreenProps)} />);
 
-  // Etapa de captura (permissão já concedida): botões fechar, galeria, capturar.
+  // Etapa de captura (permissão já concedida).
   await waitFor(() => {
     expect(utils.getByLabelText('common.actions.close')).toBeTruthy();
   });
-  const galleryButton = utils.getAllByRole('button')[1];
-  if (!galleryButton) throw new Error('botão da galeria não encontrado');
-  fireEvent.press(galleryButton);
+  // CP-C3a: a galeria pelo rótulo (não pela posição entre os botões).
+  fireEvent.press(utils.getByLabelText('pantryScanner.galleryA11yLabel'));
   return utils;
 }
 

@@ -14,6 +14,7 @@ import {
   AppState,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -27,6 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import { deleteAsync } from 'expo-file-system/legacy';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
   borderRadius,
@@ -142,13 +144,31 @@ type Step = 'permission' | 'capture' | 'reading' | 'ingredients' | 'generating' 
 
 // CP-C3: sem módulo nativo da câmera (Expo Go) vai direto à captura, que
 // mostra o aviso com a galeria; com permissão concedida, também.
-function getInitialStep(): Step {
+// CP-C3a: "acesso à câmera" = permissão concedida, ou sem módulo nativo (aí a
+// captura só mostra o aviso e nunca abre a câmera).
+function readCameraAccess(): boolean {
   const visionCamera = getVisionCamera();
-  if (!visionCamera) return 'capture';
+  if (!visionCamera) return true;
   try {
-    return visionCamera.Camera.getCameraPermissionStatus() === 'granted' ? 'capture' : 'permission';
+    return visionCamera.Camera.getCameraPermissionStatus() === 'granted';
   } catch {
-    return 'permission';
+    return false;
+  }
+}
+
+function getInitialStep(): Step {
+  return readCameraAccess() ? 'capture' : 'permission';
+}
+
+// CP-C3a: a foto da câmera é um arquivo temporário do app (3-5 MB). Depois da
+// compressão ela não serve mais: apaga sem esperar, sem erro se já não existir
+// e sem log (nada de caminho de arquivo nos logs). Nunca é chamada para a
+// foto da galeria.
+function discardCameraPhoto(uri: string): void {
+  try {
+    deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+  } catch {
+    // Sem módulo nativo: nada a apagar.
   }
 }
 
@@ -243,6 +263,10 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [scansLimit, setScansLimit] = useState(0);
   const [resetDate, setResetDate] = useState<string | undefined>(undefined);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  // CP-C3a: a galeria funciona sem a câmera. Se o usuário veio pela galeria e
+  // a leitura volta para a captura, sem permissão a tela de permissão aparece
+  // no lugar da câmera.
+  const [hasCameraAccess, setHasCameraAccess] = useState(readCameraAccess);
   const [newIngredientText, setNewIngredientText] = useState('');
   // CP-B7: leitura confirmada na tela.
   const [readId, setReadId] = useState<string | null>(null);
@@ -295,6 +319,21 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     });
     return () => subscription.remove();
   }, []);
+
+  // CP-C3a: de volta dos Ajustes (ou de qualquer saída do app) sem a câmera
+  // liberada, relê a permissão. Concedida: vai para a câmera sem sair da tela.
+  // (No iOS, mudar a permissão nos Ajustes costuma reiniciar o app; aí vale a
+  // etapa inicial. No Android o app continua vivo e cai aqui.)
+  useEffect(() => {
+    if (hasCameraAccess) return undefined;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !readCameraAccess()) return;
+      setHasCameraAccess(true);
+      setPermissionDenied(false);
+      setStep((current) => (current === 'permission' ? 'capture' : current));
+    });
+    return () => subscription.remove();
+  }, [hasCameraAccess]);
 
   const isCameraActive = isScreenFocused && !isAppInBackground;
 
@@ -567,6 +606,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     }
     const status = await visionCamera.Camera.requestCameraPermission().catch(() => 'denied' as const);
     if (status === 'granted') {
+      setHasCameraAccess(true);
       setPermissionDenied(false);
       setStep('capture');
     } else {
@@ -600,7 +640,12 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     try {
       const photoUri = await camera.takePhoto();
       if (photoUri) {
-        await handleAnalyze(photoUri);
+        try {
+          await handleAnalyze(photoUri);
+        } finally {
+          // CP-C3a: a compressão terminou (com sucesso ou erro).
+          discardCameraPhoto(photoUri);
+        }
       }
     } catch {
       showToast(t('errors.network_internal_server_error'));
@@ -619,6 +664,11 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       await handleAnalyze(result.assets[0].uri);
     }
   }, [handleAnalyze]);
+
+  // CP-C3a: permissão negada → Ajustes do app (no iOS o pedido não volta).
+  const handleOpenSettings = useCallback(() => {
+    Linking.openSettings().catch(() => undefined);
+  }, []);
 
   const checkIngredient = useCallback((index: number, checked: boolean) => {
     setIngredients((prev) => prev.map((item, i) => (i === index ? { ...item, checked } : item)));
@@ -953,6 +1003,27 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     },
     permissionButton: {
       marginTop: spacing.md,
+    },
+    permissionDeniedActions: {
+      alignSelf: 'stretch',
+      gap: spacing.md,
+    },
+    permissionGalleryButton: {
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.brand.pulse,
+    },
+    permissionGalleryText: {
+      color: themeColors.text.primary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.md,
+      fontWeight: fontWeights.semibold,
     },
 
     // ── Capture (overlay sempre escuro, não reage ao tema) ────────────────────
@@ -1337,7 +1408,9 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   });
 
   // ─── Step: permission ──────────────────────────────────────────────────────
-  if (step === 'permission') {
+  // CP-C3a: também no lugar da captura enquanto a câmera não estiver liberada
+  // (ex.: voltou da leitura de uma foto da galeria).
+  if (step === 'permission' || (step === 'capture' && !hasCameraAccess)) {
     return (
       <View style={styles.screen}>
         <AuroraBackground intensity="reduced" />
@@ -1349,9 +1422,32 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
               {t('pantryScanner.permissionDescription')}
             </Text>
             {permissionDenied ? (
-              <Text style={styles.permissionDeniedText}>
-                {t('pantryScanner.permissionDenied')}
-              </Text>
+              <>
+                <Text style={styles.permissionDeniedText}>
+                  {t('pantryScanner.permissionDenied')}
+                </Text>
+                <View style={styles.permissionDeniedActions}>
+                  <AuthButton
+                    accessibilityLabel={t('pantryScanner.openSettingsA11yLabel')}
+                    onPress={handleOpenSettings}
+                  >
+                    {t('pantryScanner.openSettings')}
+                  </AuthButton>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('pantryScanner.galleryA11yLabel')}
+                    onPress={() => {
+                      void handleGallery();
+                    }}
+                    style={styles.permissionGalleryButton}
+                  >
+                    <Ionicons name="images-outline" size={20} color={themeColors.text.primary} />
+                    <Text style={styles.permissionGalleryText}>
+                      {t('pantryScanner.chooseFromGallery')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
             ) : (
               <AuthButton
                 onPress={() => {

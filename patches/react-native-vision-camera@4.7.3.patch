@@ -1,0 +1,48 @@
+diff --git a/ios/Core/CameraSession+Configuration.swift b/ios/Core/CameraSession+Configuration.swift
+index ecd2a94dafe6c12f6550c4756a3a9cb4fca0a978..e60ab57fc92970ea2634ea3d803e2a1e5265a488 100644
+--- a/ios/Core/CameraSession+Configuration.swift
++++ b/ios/Core/CameraSession+Configuration.swift
+@@ -322,6 +322,28 @@ extension CameraSession {
+     device.videoZoomFactor = clamped
+   }
+ 
++  // pragma MARK: Lens switching [BLENDi patch]
++
++  /**
++   [BLENDi patch] On virtual multi-lens devices (e.g. Triple Camera), lets the active lens change
++   ONLY when the zoom factor requires it (crossing virtualDeviceSwitchOverVideoZoomFactors).
++   `.restricted` with no conditions disables fallback switching (minimum focus distance / macro,
++   focus, exposure, low light), so above 1x the image never comes from the cropped ultra-wide.
++   The default (`.auto`) may keep the ultra-wide when the subject is close.
++   Must run inside lockForConfiguration (called from the device configuration block).
++   */
++  func configureLensSwitching(device: AVCaptureDevice) {
++    guard #available(iOS 15.0, *) else {
++      return
++    }
++    guard device.isVirtualDevice,
++          device.constituentDevices.count > 1,
++          device.activePrimaryConstituentDeviceSwitchingBehavior != .unsupported else {
++      return
++    }
++    device.setPrimaryConstituentDeviceSwitchingBehavior(.restricted, restrictedSwitchingBehaviorConditions: [])
++  }
++
+   // pragma MARK: Exposure
+ 
+   /**
+diff --git a/ios/Core/CameraSession.swift b/ios/Core/CameraSession.swift
+index 10b0f3399c220fd1ab6de286bba6a5b641d5bf30..453671cab023cd80335909d929fa77b1c03399c9 100644
+--- a/ios/Core/CameraSession.swift
++++ b/ios/Core/CameraSession.swift
+@@ -169,6 +169,10 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
+           if difference.formatChanged {
+             try self.configureFormat(configuration: config, device: device)
+           }
++          // 5b. [BLENDi patch] Lens switching only by zoom (see configureLensSwitching).
++          if difference.inputChanged || difference.formatChanged {
++            self.configureLensSwitching(device: device)
++          }
+           // 6. After step 2. and 4., we also need to configure some output properties that depend on format.
+           //    This needs to be done AFTER we updated the `format`, as this controls the supported properties.
+           if difference.outputsChanged || difference.formatChanged {

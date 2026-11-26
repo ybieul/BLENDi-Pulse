@@ -2,7 +2,7 @@
 // galeria (handleAnalyze → compressão → leitura), pausa sem foco/no fundo e
 // Expo Go sem módulo nativo (aviso + galeria).
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Linking, type AppStateStatus } from 'react-native';
 
 jest.mock('../hooks/useColors', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment -- factory do jest.mock não pode usar import do topo
@@ -51,6 +51,12 @@ const mockLaunchImageLibrary = jest.fn();
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: () => mockLaunchImageLibrary() as unknown,
   MediaTypeOptions: { Images: 'Images' },
+}));
+
+// CP-C3a: apagar a foto temporária da câmera.
+const mockDeleteAsync = jest.fn<Promise<void>, [string, unknown]>();
+jest.mock('expo-file-system/legacy', () => ({
+  deleteAsync: (uri: string, options: unknown) => mockDeleteAsync(uri, options),
 }));
 
 const mockReadPantryPhoto = jest.fn<Promise<unknown>, unknown[]>();
@@ -124,6 +130,8 @@ beforeEach(() => {
   mockCompress.mockReset();
   mockCompress.mockResolvedValue({ ok: true, imageBase64: 'base64' });
   mockShowToast.mockReset();
+  mockDeleteAsync.mockReset();
+  mockDeleteAsync.mockResolvedValue(undefined);
   mockLaunchImageLibrary.mockReset();
   mockLaunchImageLibrary.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://gallery.jpg' }] });
 });
@@ -228,5 +236,121 @@ describe('PantryScannerScreen — câmera (CP-C3)', () => {
     await waitFor(() => expect(mockReadPantryPhoto).toHaveBeenCalledTimes(1));
     expect(mockCompress).toHaveBeenCalledWith('file://gallery.jpg');
     spy.mockRestore();
+  });
+});
+
+// CP-C3a: permissão negada com saída (Ajustes e galeria) e foto temporária apagada.
+describe('PantryScannerScreen — permissão negada e foto temporária (CP-C3a)', () => {
+  // O AppState do preset do RN já é um jest.fn: mockRestore apagaria a
+  // implementação dele para os testes seguintes. Guarda e devolve a original.
+  function captureAppStateListeners() {
+    const listeners: ((state: AppStateStatus) => void)[] = [];
+    const spy = jest.spyOn(AppState, 'addEventListener');
+    const original = spy.getMockImplementation();
+    spy.mockImplementation((_type, listener) => {
+      listeners.push(listener);
+      return { remove: () => undefined };
+    });
+    const restore = () => {
+      if (original) spy.mockImplementation(original);
+      else spy.mockRestore();
+    };
+    return { listeners, restore };
+  }
+
+  async function renderDenied() {
+    visionCameraState.permission = 'denied';
+    visionCameraState.requestResult = 'denied';
+    const utils = renderScreen();
+    fireEvent.press(utils.getByText('pantryScanner.grantPermission'));
+    await waitFor(() => expect(utils.getByText('pantryScanner.permissionDenied')).toBeTruthy());
+    return utils;
+  }
+
+  it('negada: mostra Abrir Ajustes e a galeria, com rótulos de acessibilidade', async () => {
+    const { getByLabelText, getByText } = await renderDenied();
+    expect(getByText('pantryScanner.openSettings')).toBeTruthy();
+    expect(getByLabelText('pantryScanner.openSettingsA11yLabel')).toBeTruthy();
+    expect(getByText('pantryScanner.chooseFromGallery')).toBeTruthy();
+    expect(getByLabelText('pantryScanner.galleryA11yLabel')).toBeTruthy();
+  });
+
+  it('Abrir Ajustes chama Linking.openSettings', async () => {
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    const { getByLabelText } = await renderDenied();
+    fireEvent.press(getByLabelText('pantryScanner.openSettingsA11yLabel'));
+    expect(openSettings).toHaveBeenCalledTimes(1);
+    openSettings.mockRestore();
+  });
+
+  it('galeria funciona sem a câmera; se a leitura volta para a captura, a tela de permissão continua', async () => {
+    mockReadPantryPhoto.mockResolvedValueOnce({ ...readResult(), noFoodDetected: true });
+    const { getByLabelText, getByText, queryByTestId } = await renderDenied();
+
+    fireEvent.press(getByLabelText('pantryScanner.galleryA11yLabel'));
+    await waitFor(() => expect(mockReadPantryPhoto).toHaveBeenCalledTimes(1));
+    expect(mockCompress).toHaveBeenCalledWith('file://gallery.jpg');
+
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('pantryScanner.noFoodDetected'));
+    expect(getByText('pantryScanner.permissionDenied')).toBeTruthy();
+    expect(queryByTestId('vision-camera')).toBeNull();
+    // A foto da galeria é do usuário: nunca apagada.
+    expect(mockDeleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('volta dos Ajustes com a permissão dada: abre a câmera sem sair da tela', async () => {
+    const { listeners, restore } = captureAppStateListeners();
+    const { getByLabelText, queryByTestId } = await renderDenied();
+    expect(queryByTestId('vision-camera')).toBeNull();
+
+    // Voltou sem dar a permissão: continua na tela de permissão.
+    act(() => listeners.forEach((listener) => listener('active')));
+    expect(queryByTestId('vision-camera')).toBeNull();
+
+    visionCameraState.permission = 'granted';
+    act(() => listeners.forEach((listener) => listener('active')));
+    await waitFor(() => expect(getByLabelText('pantryScanner.captureA11yLabel')).toBeTruthy());
+    expect(queryByTestId('vision-camera')).toBeTruthy();
+    expect(visionCameraState.lastProps?.isActive).toBe(true);
+    restore();
+  });
+
+  it('foto da câmera apagada depois da compressão com sucesso', async () => {
+    const { getByLabelText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.captureA11yLabel'));
+    await waitFor(() => expect(mockDeleteAsync).toHaveBeenCalledTimes(1));
+    expect(mockDeleteAsync).toHaveBeenCalledWith('file:///tmp/photo.jpg', { idempotent: true });
+    expect(mockCompress.mock.invocationCallOrder[0]).toBeLessThan(mockDeleteAsync.mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it('foto da câmera apagada também quando a compressão falha, e o fluxo segue com o toast de hoje', async () => {
+    mockCompress.mockResolvedValueOnce({ ok: false, error: { translationKey: 'errors.scanner_image_processing_failed' } });
+    const { getByLabelText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.captureA11yLabel'));
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('errors.scanner_image_processing_failed'));
+    expect(mockDeleteAsync).toHaveBeenCalledWith('file:///tmp/photo.jpg', { idempotent: true });
+    expect(mockReadPantryPhoto).not.toHaveBeenCalled();
+  });
+
+  it('apagar falhando (arquivo já não existe) não quebra o fluxo', async () => {
+    mockDeleteAsync.mockRejectedValueOnce(new Error('not found'));
+    mockReadPantryPhoto.mockResolvedValueOnce({
+      ...readResult(),
+      alcoholAge: 'unknown',
+      nextGenerationIsPreview: false,
+      ingredients: [{ name: 'banana', confidence: 'high', isAlcoholic: false }],
+    });
+    const { getByLabelText, findByText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.captureA11yLabel'));
+    expect(await findByText('pantryScanner.ingredientsFound')).toBeTruthy();
+    expect(mockDeleteAsync).toHaveBeenCalledTimes(1);
+    expect(mockShowToast).not.toHaveBeenCalled();
+  });
+
+  it('foto da galeria nunca é apagada', async () => {
+    const { getByLabelText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.galleryA11yLabel'));
+    await waitFor(() => expect(mockReadPantryPhoto).toHaveBeenCalledTimes(1));
+    expect(mockDeleteAsync).not.toHaveBeenCalled();
   });
 });

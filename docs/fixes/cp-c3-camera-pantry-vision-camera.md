@@ -151,3 +151,14 @@ Os avisos de `act()` que aparecem nos testes do Pantry já existiam (8/3/42 hoje
 9. **Android:** tirar foto em pé e conferir que a leitura não sai deitada nem achatada (item 3 dos pendentes).
 
 **Permissão:** num aparelho sem a permissão dada, o pedido aparece; negar mostra o texto de hoje.
+
+**CP-C3a: lente 1x garantida (iPhone e Android):**
+10. Com zoom em **1.3x**, tampe só a lente ultra-wide com o dedo: a imagem continua normal. Com zoom em **0.7x**, tampe a lente 1x: a imagem continua normal.
+11. Mesmo teste aproximando o celular de um objeto (~10 cm) em **1.3x**: tampar a ultra-wide não muda a imagem. No iPhone, nessa distância a imagem pode ficar desfocada. Isso é esperado (a troca automática para a macro da ultra-wide está desligada); afaste até focar.
+12. **Android:** se no passo 10 tampar a ultra-wide escurecer a imagem em 1.3x, anote o modelo. É o risco residual do Android (ver `cp-c3a-camera-lente-1x-permissao-ajustes.md`, seção 2).
+
+**CP-C3a: permissão negada → Abrir Ajustes → voltar:**
+13. Negar a câmera: aparecem o texto de hoje, **Abrir Ajustes** e **Escolher da galeria**.
+14. **Escolher da galeria** lê a foto normalmente. Se a leitura voltar (ex.: "nenhum alimento"), volta a tela de permissão, não uma câmera preta.
+15. **Abrir Ajustes** abre os ajustes do app. Dar a permissão e voltar ao app: a câmera abre sem sair da tela. No iPhone o sistema costuma reiniciar o app quando a permissão muda: nesse caso, abrir o Pantry de novo já mostra a câmera, sem a tela de permissão.
+16. Voltar dos Ajustes **sem** dar a permissão: continua na tela de permissão negada.

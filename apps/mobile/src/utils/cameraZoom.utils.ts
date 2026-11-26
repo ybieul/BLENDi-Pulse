@@ -12,6 +12,7 @@
 //
 // As funções com 'worklet' rodam na thread de UI durante a pinça.
 
+import { Platform } from 'react-native';
 import type { CameraDevice } from 'react-native-vision-camera';
 
 /** Maior fator visível (relativo ao 1x) para foto de despensa. */
@@ -41,12 +42,53 @@ function isPositiveFinite(value: number): boolean {
  * Dispositivo traseiro com zoom contínuo entre as lentes: o que inclui a lente
  * principal e tem mais lentes físicas (virtual multi-lente quando existir);
  * empate: hardware 'full'. Sem lente principal listada, o primeiro traseiro.
+ *
+ * CP-C3a, Android: a troca de lente física numa câmera lógica depende do
+ * fabricante (o Camera2/CameraX não expõe nenhum sinal estático que garanta a
+ * troca pelo zoom). A multi-lente só é usada quando é "segura" (ver
+ * isSafeAndroidMultiCam); senão vale a câmera só com a lente principal, para
+ * nunca recortar a ultra-wide acima de 1x. iOS: a troca só pelo zoom é
+ * garantida pelo patch nativo (patches/react-native-vision-camera@4.7.3.patch).
  */
-export function selectBackCameraDevice(devices: readonly CameraDevice[]): CameraDevice | undefined {
+export function selectBackCameraDevice(
+  devices: readonly CameraDevice[],
+  platform: string = Platform.OS
+): CameraDevice | undefined {
   const back = devices.filter(device => device.position === 'back');
-  const withWide = back.filter(device => device.physicalDevices.includes('wide-angle-camera'));
-  const candidates = withWide.length > 0 ? withWide : back;
 
+  if (platform === 'android') {
+    const safeMultiCam = pickMostLenses(back.filter(isSafeAndroidMultiCam));
+    if (safeMultiCam) return safeMultiCam;
+    const mainOnly = pickMostLenses(back.filter(isMainLensOnly));
+    if (mainOnly) return mainOnly;
+  }
+
+  const withWide = back.filter(device => device.physicalDevices.includes('wide-angle-camera'));
+  return pickMostLenses(withWide.length > 0 ? withWide : back);
+}
+
+/**
+ * Câmera lógica do Android que pode ser usada com zoom contínuo: inclui a lente
+ * principal, o próprio dispositivo diz que é multi-câmera e o zoom vai abaixo
+ * do neutro (a ultra-wide faz parte dela, então a troca de lente em 1x é do
+ * próprio HAL).
+ */
+export function isSafeAndroidMultiCam(device: CameraDevice): boolean {
+  return (
+    device.isMultiCam &&
+    device.physicalDevices.includes('wide-angle-camera') &&
+    isPositiveFinite(device.minZoom) &&
+    isPositiveFinite(device.neutralZoom) &&
+    device.minZoom < device.neutralZoom - ZOOM_EPSILON
+  );
+}
+
+function isMainLensOnly(device: CameraDevice): boolean {
+  return device.physicalDevices.length === 1 && device.physicalDevices[0] === 'wide-angle-camera';
+}
+
+/** O de mais lentes físicas; empate: hardware 'full'; depois, o primeiro. */
+function pickMostLenses(candidates: readonly CameraDevice[]): CameraDevice | undefined {
   let best: CameraDevice | undefined;
   for (const device of candidates) {
     if (!best) {

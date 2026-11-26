@@ -238,14 +238,10 @@ async function waitForCapture(utils: Screen) {
   });
 }
 
-// Galeria = penúltimo botão da captura (o aviso da última prévia, quando há,
-// fica entre o fechar e a galeria).
+// CP-C3a: a galeria pelo rótulo (não pela posição entre os botões).
 async function scanFromGallery(utils: Screen) {
   await waitForCapture(utils);
-  const buttons = utils.getAllByRole('button');
-  const gallery = buttons[buttons.length - 2];
-  if (!gallery) throw new Error('botão da galeria não encontrado');
-  fireEvent.press(gallery);
+  fireEvent.press(utils.getByLabelText('pantryScanner.galleryA11yLabel'));
 }
 
 async function openRecipesStep(utils: Screen) {

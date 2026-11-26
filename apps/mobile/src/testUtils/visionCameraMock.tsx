@@ -47,6 +47,8 @@ interface FakeDeviceOptions {
   neutralZoom?: number;
   supportsFocus?: boolean;
   fieldOfView?: number;
+  /** CP-C3a: padrão = mais de uma lente física. */
+  isMultiCam?: boolean;
 }
 
 /** Dispositivo traseiro falso; padrão: uma lente (wide), sem botões de lente. */
@@ -61,7 +63,7 @@ export function fakeDevice(options: FakeDeviceOptions = {}): CameraDevice {
     neutralZoom: options.neutralZoom ?? 1,
     supportsFocus: options.supportsFocus ?? true,
     hardwareLevel: 'full',
-    isMultiCam: physicalDevices.length > 1,
+    isMultiCam: options.isMultiCam ?? physicalDevices.length > 1,
     formats: [{ fieldOfView: options.fieldOfView ?? 70 }],
   } as unknown as CameraDevice;
 }
