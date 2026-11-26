@@ -93,7 +93,6 @@ jest.mock('react-native-vision-camera', () =>
 
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: () => Promise.resolve({ canceled: false, assets: [{ uri: 'file://pantry.jpg' }] }),
-  MediaTypeOptions: { Images: 'Images' },
 }));
 
 // CP-B7: o antigo analyzePantry virou leitura (readPantryPhoto) + geração.

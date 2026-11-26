@@ -2,7 +2,7 @@
 // galeria (handleAnalyze → compressão → leitura), pausa sem foco/no fundo e
 // Expo Go sem módulo nativo (aviso + galeria).
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { AppState, Linking, type AppStateStatus } from 'react-native';
+import { AppState, Linking, Platform, type AppStateStatus } from 'react-native';
 
 jest.mock('../hooks/useColors', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment -- factory do jest.mock não pode usar import do topo
@@ -47,10 +47,9 @@ jest.mock('react-native-vision-camera', () =>
   require('../testUtils/visionCameraMock').createVisionCameraMock(),
 );
 
-const mockLaunchImageLibrary = jest.fn();
+const mockLaunchImageLibrary = jest.fn<Promise<unknown>, [unknown]>();
 jest.mock('expo-image-picker', () => ({
-  launchImageLibraryAsync: () => mockLaunchImageLibrary() as unknown,
-  MediaTypeOptions: { Images: 'Images' },
+  launchImageLibraryAsync: (options: unknown) => mockLaunchImageLibrary(options),
 }));
 
 // CP-C3a: apagar a foto temporária da câmera.
@@ -182,7 +181,7 @@ describe('PantryScannerScreen — câmera (CP-C3)', () => {
     expect(queryByLabelText('pantryScanner.captureA11yLabel')).toBeNull();
 
     fireEvent.press(getByText('pantryScanner.grantPermission'));
-    await waitFor(() => expect(getByText('pantryScanner.permissionDenied')).toBeTruthy());
+    await waitFor(() => expect(getByText('pantryScanner.permissionDenied.ios')).toBeTruthy());
     expect(queryByText('pantryScanner.grantPermission')).toBeNull();
   });
 
@@ -263,14 +262,14 @@ describe('PantryScannerScreen — permissão negada e foto temporária (CP-C3a)'
     visionCameraState.requestResult = 'denied';
     const utils = renderScreen();
     fireEvent.press(utils.getByText('pantryScanner.grantPermission'));
-    await waitFor(() => expect(utils.getByText('pantryScanner.permissionDenied')).toBeTruthy());
+    await waitFor(() => expect(utils.getByText('pantryScanner.permissionDenied.ios')).toBeTruthy());
     return utils;
   }
 
   it('negada: mostra Abrir Ajustes e a galeria, com rótulos de acessibilidade', async () => {
     const { getByLabelText, getByText } = await renderDenied();
-    expect(getByText('pantryScanner.openSettings')).toBeTruthy();
-    expect(getByLabelText('pantryScanner.openSettingsA11yLabel')).toBeTruthy();
+    expect(getByText('pantryScanner.openSettings.ios')).toBeTruthy();
+    expect(getByLabelText('pantryScanner.openSettingsA11yLabel.ios')).toBeTruthy();
     expect(getByText('pantryScanner.chooseFromGallery')).toBeTruthy();
     expect(getByLabelText('pantryScanner.galleryA11yLabel')).toBeTruthy();
   });
@@ -278,7 +277,7 @@ describe('PantryScannerScreen — permissão negada e foto temporária (CP-C3a)'
   it('Abrir Ajustes chama Linking.openSettings', async () => {
     const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
     const { getByLabelText } = await renderDenied();
-    fireEvent.press(getByLabelText('pantryScanner.openSettingsA11yLabel'));
+    fireEvent.press(getByLabelText('pantryScanner.openSettingsA11yLabel.ios'));
     expect(openSettings).toHaveBeenCalledTimes(1);
     openSettings.mockRestore();
   });
@@ -292,7 +291,7 @@ describe('PantryScannerScreen — permissão negada e foto temporária (CP-C3a)'
     expect(mockCompress).toHaveBeenCalledWith('file://gallery.jpg');
 
     await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('pantryScanner.noFoodDetected'));
-    expect(getByText('pantryScanner.permissionDenied')).toBeTruthy();
+    expect(getByText('pantryScanner.permissionDenied.ios')).toBeTruthy();
     expect(queryByTestId('vision-camera')).toBeNull();
     // A foto da galeria é do usuário: nunca apagada.
     expect(mockDeleteAsync).not.toHaveBeenCalled();
@@ -352,5 +351,73 @@ describe('PantryScannerScreen — permissão negada e foto temporária (CP-C3a)'
     fireEvent.press(getByLabelText('pantryScanner.galleryA11yLabel'));
     await waitFor(() => expect(mockReadPantryPhoto).toHaveBeenCalledTimes(1));
     expect(mockDeleteAsync).not.toHaveBeenCalled();
+  });
+});
+
+// CP-C3b: rótulo de Ajustes/Configurações por plataforma, saída da tela de
+// permissão e seletor do sistema com a API nova de mediaTypes.
+describe('PantryScannerScreen — permissão: plataforma, fechar e galeria (CP-C3b)', () => {
+  async function renderDenied() {
+    visionCameraState.permission = 'denied';
+    visionCameraState.requestResult = 'denied';
+    const utils = renderScreen();
+    fireEvent.press(utils.getByText('pantryScanner.grantPermission'));
+    await waitFor(() => expect(utils.getByLabelText('pantryScanner.galleryA11yLabel')).toBeTruthy());
+    return utils;
+  }
+
+  it('iOS: "Abrir Ajustes" e o texto de Ajustes, com o rótulo de acessibilidade do iOS', async () => {
+    const { getByText, getByLabelText, queryByText } = await renderDenied();
+    expect(getByText('pantryScanner.permissionDenied.ios')).toBeTruthy();
+    expect(getByText('pantryScanner.openSettings.ios')).toBeTruthy();
+    expect(getByLabelText('pantryScanner.openSettingsA11yLabel.ios')).toBeTruthy();
+    expect(queryByText('pantryScanner.openSettings.android')).toBeNull();
+  });
+
+  it('Android: "Abrir Configurações" e o texto de Configurações, com o rótulo do Android', async () => {
+    const platformOS = jest.replaceProperty(Platform, 'OS', 'android');
+    try {
+      const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+      const { getByText, getByLabelText, queryByText } = await renderDenied();
+      expect(getByText('pantryScanner.permissionDenied.android')).toBeTruthy();
+      expect(getByText('pantryScanner.openSettings.android')).toBeTruthy();
+      expect(queryByText('pantryScanner.openSettings.ios')).toBeNull();
+      fireEvent.press(getByLabelText('pantryScanner.openSettingsA11yLabel.android'));
+      expect(openSettings).toHaveBeenCalledTimes(1);
+      openSettings.mockRestore();
+    } finally {
+      platformOS.restore();
+    }
+  });
+
+  it('permissão negada: botão de fechar (44 pt, rótulo) faz a mesma ação do fechar da captura', async () => {
+    const { getByLabelText, navigation } = await renderDenied();
+    const close = getByLabelText('common.actions.close');
+    expect(close).toHaveStyle({ width: 44, height: 44 });
+    fireEvent.press(close);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('antes de pedir a permissão a tela também tem o fechar', () => {
+    visionCameraState.permission = 'not-determined';
+    const { getByText, getByLabelText, navigation } = renderScreen();
+    expect(getByText('pantryScanner.grantPermission')).toBeTruthy();
+    fireEvent.press(getByLabelText('common.actions.close'));
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('galeria abre o seletor do sistema com mediaTypes ["images"] e as opções de antes', async () => {
+    const { getByLabelText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.galleryA11yLabel'));
+    await waitFor(() => expect(mockLaunchImageLibrary).toHaveBeenCalledTimes(1));
+    expect(mockLaunchImageLibrary).toHaveBeenCalledWith({ mediaTypes: ['images'], quality: 1, allowsEditing: false });
+  });
+
+  it('seletor que falha ao abrir mostra o toast de erro e não segue', async () => {
+    mockLaunchImageLibrary.mockRejectedValueOnce(new Error('picker/unavailable'));
+    const { getByLabelText } = renderScreen();
+    fireEvent.press(getByLabelText('pantryScanner.galleryA11yLabel'));
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('errors.network_internal_server_error'));
+    expect(mockCompress).not.toHaveBeenCalled();
   });
 });

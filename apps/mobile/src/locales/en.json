@@ -1691,9 +1691,18 @@
     "permissionTitle": "Scan Your Pantry",
     "permissionDescription": "Allow camera access to identify ingredients and get personalized blend recipes",
     "grantPermission": "Enable Camera",
-    "permissionDenied": "Camera access was denied. Enable it in your device Settings to use this feature.",
-    "openSettings": "Open Settings",
-    "openSettingsA11yLabel": "Open the app settings to allow the camera",
+    "permissionDenied": {
+      "ios": "Camera access was denied. Enable it in your device Settings to use this feature.",
+      "android": "Camera access was denied. Enable it in your device Settings to use this feature."
+    },
+    "openSettings": {
+      "ios": "Open Settings",
+      "android": "Open Settings"
+    },
+    "openSettingsA11yLabel": {
+      "ios": "Open the app settings to allow the camera",
+      "android": "Open the app settings to allow the camera"
+    },
     "chooseFromGallery": "Choose from gallery",
     "scansRemaining": "{{count}} scans remaining this month",
     "renewsIn": "Renews in {{days}} days",
@@ -1989,7 +1998,6 @@
     "photoTooLarge": "Photo too large. Try a smaller image.",
     "photoError": "Error saving photo. Please try again.",
     "cameraPermissionDenied": "Allow camera access to take a photo.",
-    "galleryPermissionDenied": "Allow photo library access to choose a photo.",
     "weeklyShare": {
       "averageDailyProtein": "Avg protein/day",
       "supplementAdherence": "Supplement adherence",

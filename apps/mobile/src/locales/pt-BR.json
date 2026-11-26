@@ -1691,9 +1691,18 @@
     "permissionTitle": "Escaneie Sua Despensa",
     "permissionDescription": "Permita acesso à câmera para identificar ingredientes e receber receitas personalizadas",
     "grantPermission": "Ativar Câmera",
-    "permissionDenied": "Acesso à câmera foi negado. Ative-o nas Configurações do dispositivo para usar esse recurso.",
-    "openSettings": "Abrir Ajustes",
-    "openSettingsA11yLabel": "Abrir os ajustes do app para permitir a câmera",
+    "permissionDenied": {
+      "ios": "Acesso à câmera foi negado. Ative-o nos Ajustes do dispositivo para usar esse recurso.",
+      "android": "Acesso à câmera foi negado. Ative-o nas Configurações do dispositivo para usar esse recurso."
+    },
+    "openSettings": {
+      "ios": "Abrir Ajustes",
+      "android": "Abrir Configurações"
+    },
+    "openSettingsA11yLabel": {
+      "ios": "Abrir os ajustes do app para permitir a câmera",
+      "android": "Abrir as configurações do app para permitir a câmera"
+    },
     "chooseFromGallery": "Escolher da galeria",
     "scansRemaining": "{{count}} scans restantes este mês",
     "renewsIn": "Renova em {{days}} dias",
@@ -1989,7 +1998,6 @@
     "photoTooLarge": "Foto muito grande. Tente uma imagem menor.",
     "photoError": "Erro ao salvar a foto. Tente novamente.",
     "cameraPermissionDenied": "Permita o acesso à câmera para tirar uma foto.",
-    "galleryPermissionDenied": "Permita o acesso à galeria para escolher uma foto.",
     "weeklyShare": {
       "averageDailyProtein": "Prot. média/dia",
       "supplementAdherence": "Adesão aos suplementos",

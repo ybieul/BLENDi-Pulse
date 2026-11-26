@@ -87,7 +87,6 @@ jest.mock('react-native-vision-camera', () =>
 
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: () => Promise.resolve({ canceled: false, assets: [{ uri: 'file://pantry.jpg' }] }),
-  MediaTypeOptions: { Images: 'Images' },
 }));
 
 const mockReadPantryPhoto = jest.fn<Promise<unknown>, unknown[]>();

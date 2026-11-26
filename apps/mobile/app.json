@@ -40,9 +40,16 @@
       },
       "useNextNotificationsApi": true,
       "permissions": [
-        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_IMAGES"
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO",
+        "com.google.android.gms.permission.AD_ID"
       ]
     },
     "web": {
@@ -66,7 +73,12 @@
           "sounds": []
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "react-native-vision-camera",
         {
@@ -83,7 +95,8 @@
           "cameraPermission": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
           "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/withLegacyWriteExternalStorage"
     ],
     "extra": {
       "eas": {

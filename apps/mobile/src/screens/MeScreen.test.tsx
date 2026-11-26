@@ -7,6 +7,7 @@
 // configurações (SettingRow), o React Query e a tradução em inglês de verdade
 // (en.json) — o resto é mockado.
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { ActionSheetIOS, Alert, Platform, type AlertButton } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
 
@@ -54,11 +55,23 @@ jest.mock('../components/profile/ProfilePhoto', () => ({
 }));
 jest.mock('../components/shareCards/WeeklyShareCard', () => ({ WeeklyShareCard: () => null }));
 jest.mock('../utils/shareCard.utils', () => ({ generateAndShare: jest.fn() }));
-jest.mock('../utils/toast.utils', () => ({ showToast: jest.fn() }));
+const mockShowToast = jest.fn<void, unknown[]>();
+jest.mock('../utils/toast.utils', () => ({ showToast: (...args: unknown[]) => mockShowToast(...args) }));
 jest.mock('../config/storage', () => ({
   createAppStorage: () => ({ delete: jest.fn(), getString: jest.fn(), set: jest.fn() }),
 }));
-jest.mock('expo-image-picker', () => ({}));
+// CP-C3b: foto de perfil — câmera pede permissão de câmera; galeria usa o
+// seletor do sistema, sem pedir permissão de galeria.
+const mockRequestCameraPermissions = jest.fn<Promise<{ granted: boolean }>, []>();
+const mockRequestMediaLibraryPermissions = jest.fn<Promise<{ granted: boolean }>, []>();
+const mockLaunchCamera = jest.fn<Promise<unknown>, [unknown]>();
+const mockLaunchImageLibrary = jest.fn<Promise<unknown>, [unknown]>();
+jest.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: () => mockRequestCameraPermissions(),
+  requestMediaLibraryPermissionsAsync: () => mockRequestMediaLibraryPermissions(),
+  launchCameraAsync: (options: unknown) => mockLaunchCamera(options),
+  launchImageLibraryAsync: (options: unknown) => mockLaunchImageLibrary(options),
+}));
 jest.mock('expo-image-manipulator', () => ({ SaveFormat: { JPEG: 'jpeg' }, manipulateAsync: jest.fn() }));
 jest.mock('expo-file-system/legacy', () => ({ EncodingType: { Base64: 'base64' } }));
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: { version: '1.0.0' } } }));
@@ -373,3 +386,83 @@ describe('MeScreen — troca de objetivo (CP-1.1.9)', () => {
   });
 });
 
+describe('MeScreen — foto de perfil sem permissão de galeria (CP-C3b)', () => {
+  const PICKER_OPTIONS = { mediaTypes: ['images'], quality: 1, allowsEditing: false };
+
+  beforeEach(() => {
+    mockShowToast.mockReset();
+    mockRequestCameraPermissions.mockReset().mockResolvedValue({ granted: true });
+    mockRequestMediaLibraryPermissions.mockReset().mockResolvedValue({ granted: true });
+    // Cancelado: o teste para antes do upload (que tem seus próprios mocks).
+    mockLaunchCamera.mockReset().mockResolvedValue({ canceled: true, assets: null });
+    mockLaunchImageLibrary.mockReset().mockResolvedValue({ canceled: true, assets: null });
+  });
+
+  // jest-expo roda como iOS: a folha de ações é o ActionSheetIOS.
+  function chooseOnIos(buttonIndex: number) {
+    let callback: ((index: number) => void) | undefined;
+    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_options, cb) => {
+      callback = cb;
+    });
+    const { getByLabelText } = renderMe();
+    fireEvent.press(getByLabelText(en.me.profilePhotoTitle));
+    spy.mockRestore();
+    expect(callback).toBeDefined();
+    callback?.(buttonIndex);
+  }
+
+  it('galeria: abre o seletor do sistema direto, sem pedir permissão de galeria', async () => {
+    chooseOnIos(1);
+    await waitFor(() => expect(mockLaunchImageLibrary).toHaveBeenCalledTimes(1));
+    expect(mockLaunchImageLibrary).toHaveBeenCalledWith(PICKER_OPTIONS);
+    expect(mockRequestMediaLibraryPermissions).not.toHaveBeenCalled();
+    expect(mockShowToast).not.toHaveBeenCalled();
+  });
+
+  it('câmera: continua pedindo a permissão de câmera antes de abrir', async () => {
+    chooseOnIos(0);
+    await waitFor(() => expect(mockLaunchCamera).toHaveBeenCalledTimes(1));
+    expect(mockRequestCameraPermissions).toHaveBeenCalledTimes(1);
+    expect(mockRequestCameraPermissions.mock.invocationCallOrder[0]).toBeLessThan(
+      mockLaunchCamera.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(mockLaunchCamera).toHaveBeenCalledWith(PICKER_OPTIONS);
+    expect(mockRequestMediaLibraryPermissions).not.toHaveBeenCalled();
+  });
+
+  it('câmera negada: aviso de hoje e a câmera não abre', async () => {
+    mockRequestCameraPermissions.mockResolvedValueOnce({ granted: false });
+    chooseOnIos(0);
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith(en.me.cameraPermissionDenied));
+    expect(mockLaunchCamera).not.toHaveBeenCalled();
+  });
+
+  it('seletor ou câmera que falham ao abrir viram aviso de erro (sem promessa solta)', async () => {
+    mockLaunchImageLibrary.mockRejectedValueOnce(new Error('picker/unavailable'));
+    chooseOnIos(1);
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith(en.me.photoError));
+
+    mockShowToast.mockReset();
+    mockLaunchCamera.mockRejectedValueOnce(new Error('camera/unavailable'));
+    chooseOnIos(0);
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith(en.me.photoError));
+  });
+
+  it('Android (Alert): galeria também sem pedir permissão de galeria', async () => {
+    const platformOS = jest.replaceProperty(Platform, 'OS', 'android');
+    let buttons: AlertButton[] = [];
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, alertButtons) => {
+      buttons = alertButtons ?? [];
+    });
+    try {
+      const { getByLabelText } = renderMe();
+      fireEvent.press(getByLabelText(en.me.profilePhotoTitle));
+      buttons.find((button) => button.text === en.me.chooseFromGallery)?.onPress?.();
+      await waitFor(() => expect(mockLaunchImageLibrary).toHaveBeenCalledWith(PICKER_OPTIONS));
+      expect(mockRequestMediaLibraryPermissions).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      platformOS.restore();
+    }
+  });
+});

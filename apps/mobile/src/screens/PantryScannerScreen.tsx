@@ -655,15 +655,23 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   }, [handleAnalyze, t]);
 
   const handleGallery = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-    });
+    // CP-C3b: falha ao abrir o seletor vira aviso (como no disparo da câmera),
+    // não promessa rejeitada sem tratamento.
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsEditing: false,
+      });
+    } catch {
+      showToast(t('errors.network_internal_server_error'));
+      return;
+    }
     if (!result.canceled && result.assets[0]) {
       await handleAnalyze(result.assets[0].uri);
     }
-  }, [handleAnalyze]);
+  }, [handleAnalyze, t]);
 
   // CP-C3a: permissão negada → Ajustes do app (no iOS o pedido não volta).
   const handleOpenSettings = useCallback(() => {
@@ -972,6 +980,11 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
     },
 
     // ── Permission ────────────────────────────────────────────────────────────
+    permissionTopBar: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+    },
     permissionContainer: {
       flex: 1,
       alignItems: 'center',
@@ -1411,10 +1424,23 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   // CP-C3a: também no lugar da captura enquanto a câmera não estiver liberada
   // (ex.: voltou da leitura de uma foto da galeria).
   if (step === 'permission' || (step === 'capture' && !hasCameraAccess)) {
+    // CP-C3b: o app de sistema é "Ajustes" no iOS e "Configurações" no Android.
+    const isAndroid = Platform.OS === 'android';
     return (
       <View style={styles.screen}>
         <AuroraBackground intensity="reduced" />
         <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+          {/* CP-C3b: saída da tela de permissão, igual ao "fechar" da captura. */}
+          <View style={styles.permissionTopBar}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('common.actions.close')}
+              onPress={() => navigation.goBack()}
+              style={styles.cameraIconButton}
+            >
+              <Ionicons name="close" size={CLOSE_ICON_SIZE} color={themeColors.text.primary} />
+            </Pressable>
+          </View>
           <View style={styles.permissionContainer}>
             <Ionicons name="camera" size={CAMERA_PERMISSION_ICON_SIZE} color={colors.brand.pulse} />
             <Text style={styles.permissionTitle}>{t('pantryScanner.permissionTitle')}</Text>
@@ -1424,14 +1450,22 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
             {permissionDenied ? (
               <>
                 <Text style={styles.permissionDeniedText}>
-                  {t('pantryScanner.permissionDenied')}
+                  {isAndroid
+                    ? t('pantryScanner.permissionDenied.android')
+                    : t('pantryScanner.permissionDenied.ios')}
                 </Text>
                 <View style={styles.permissionDeniedActions}>
                   <AuthButton
-                    accessibilityLabel={t('pantryScanner.openSettingsA11yLabel')}
+                    accessibilityLabel={
+                      isAndroid
+                        ? t('pantryScanner.openSettingsA11yLabel.android')
+                        : t('pantryScanner.openSettingsA11yLabel.ios')
+                    }
                     onPress={handleOpenSettings}
                   >
-                    {t('pantryScanner.openSettings')}
+                    {isAndroid
+                      ? t('pantryScanner.openSettings.android')
+                      : t('pantryScanner.openSettings.ios')}
                   </AuthButton>
                   <Pressable
                     accessibilityRole="button"

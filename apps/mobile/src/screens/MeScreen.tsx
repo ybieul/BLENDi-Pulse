@@ -320,7 +320,6 @@ interface ProfilePhotoActionCopy {
   photoTooLarge: string;
   photoError: string;
   cameraPermissionDenied: string;
-  galleryPermissionDenied: string;
 }
 
 interface UserProfileResponse {
@@ -464,7 +463,6 @@ function getProfilePhotoActionCopy(
     photoTooLarge: t("me.photoTooLarge"),
     photoError: t("me.photoError"),
     cameraPermissionDenied: t("me.cameraPermissionDenied"),
-    galleryPermissionDenied: t("me.galleryPermissionDenied"),
   };
 }
 
@@ -938,35 +936,44 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-    });
-
-    if (!result.canceled && result.assets[0]?.uri) {
-      await handleUploadProcessedProfilePhoto(result.assets[0].uri);
-    }
-  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.cameraPermissionDenied]);
-
-  const handleChooseFromGallery = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      showToast(profilePhotoActionCopy.galleryPermissionDenied);
+    // CP-C3b: falha ao abrir a câmera (ex.: sem app de câmera) vira aviso,
+    // não promessa rejeitada sem tratamento.
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+        allowsEditing: false,
+      });
+    } catch {
+      showToast(profilePhotoActionCopy.photoError);
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-      allowsEditing: false,
-    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      await handleUploadProcessedProfilePhoto(result.assets[0].uri);
+    }
+  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.cameraPermissionDenied, profilePhotoActionCopy.photoError]);
+
+  // CP-C3b: seletor do sistema (PHPicker no iOS, Photo Picker no Android) —
+  // o usuário escolhe uma foto sem o app pedir acesso à galeria inteira.
+  const handleChooseFromGallery = useCallback(async () => {
+    let result: ImagePicker.ImagePickerResult;
+    try {
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+        allowsEditing: false,
+      });
+    } catch {
+      showToast(profilePhotoActionCopy.photoError);
+      return;
+    }
 
     if (!result.canceled && result.assets[0]?.uri) {
       await handleUploadProcessedProfilePhoto(result.assets[0].uri);
     }
-  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.galleryPermissionDenied]);
+  }, [handleUploadProcessedProfilePhoto, profilePhotoActionCopy.photoError]);
 
   const handleRemovePhoto = useCallback(() => {
     Alert.alert(
@@ -1760,6 +1767,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
           <View style={styles.photoWrapper}>
             <TouchableOpacity
+              accessibilityLabel={profilePhotoActionCopy.title}
               accessibilityRole="button"
               activeOpacity={0.9}
               onPress={openProfilePhotoOptions}

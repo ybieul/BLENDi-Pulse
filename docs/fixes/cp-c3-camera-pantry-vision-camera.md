@@ -162,3 +162,13 @@ Os avisos de `act()` que aparecem nos testes do Pantry já existiam (8/3/42 hoje
 14. **Escolher da galeria** lê a foto normalmente. Se a leitura voltar (ex.: "nenhum alimento"), volta a tela de permissão, não uma câmera preta.
 15. **Abrir Ajustes** abre os ajustes do app. Dar a permissão e voltar ao app: a câmera abre sem sair da tela. No iPhone o sistema costuma reiniciar o app quando a permissão muda: nesse caso, abrir o Pantry de novo já mostra a câmera, sem a tela de permissão.
 16. Voltar dos Ajustes **sem** dar a permissão: continua na tela de permissão negada.
+
+**CP-C3b: permissões das lojas (foto de perfil, galeria, Configurações):**
+17. **Perfil → foto → Escolher da galeria** (iPhone e Android): o seletor do sistema abre **de primeira**, sem pedido de acesso às fotos. A foto escolhida vira a foto de perfil. No iPhone, conferir que o seletor abre logo depois da folha de opções fechar (o pedido de permissão que vinha antes atrasava a abertura; agora ela é direta).
+18. **Perfil → foto → Tirar foto**: o pedido de câmera aparece (se ainda não dado), a câmera abre e a foto vira a foto de perfil.
+19. **Android 9 ou anterior (se tiver um aparelho):** repetir o passo 18. Nessas versões o sistema também pede acesso ao armazenamento junto com a câmera, e isso é esperado (ver `cp-c3b-permissoes-lojas.md`, seção 2).
+20. **Pantry → Escolher da galeria** (com e sem a câmera liberada): o seletor do sistema abre sem pedido de acesso às fotos e a leitura acontece normalmente.
+21. **Android, pt-BR:** negar a câmera no Pantry. O texto fala em **Configurações** e o botão é **Abrir Configurações**. No iPhone continuam **Ajustes** e **Abrir Ajustes**.
+22. Na tela de permissão do Pantry (antes de pedir e depois de negar), o **X** no canto superior esquerdo fecha a tela, como o X da câmera.
+23. **Android:** em Configurações → Apps → BLENDi Pulse → Permissões, devem aparecer só **Câmera** e **Notificações**. **Fotos e vídeos**, **Microfone** e **Sobrepor a outros apps** não aparecem.
+24. **iPhone:** em Ajustes → BLENDi Pulse, **não** aparece Face ID. O login continua automático ao reabrir o app.
