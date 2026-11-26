@@ -172,3 +172,8 @@ Os avisos de `act()` que aparecem nos testes do Pantry já existiam (8/3/42 hoje
 22. Na tela de permissão do Pantry (antes de pedir e depois de negar), o **X** no canto superior esquerdo fecha a tela, como o X da câmera.
 23. **Android:** em Configurações → Apps → BLENDi Pulse → Permissões, devem aparecer só **Câmera** e **Notificações**. **Fotos e vídeos**, **Microfone** e **Sobrepor a outros apps** não aparecem.
 24. **iPhone:** em Ajustes → BLENDi Pulse, **não** aparece Face ID. O login continua automático ao reabrir o app.
+
+**CP-C3c: textos de permissão do iOS (português e uso real):**
+25. **iPhone em português:** apagar o app, instalar o build e abrir o **Pantry**. O pedido de câmera diz: *"O BLENDi Pulse usa a câmera para fotografar sua despensa e sugerir receitas, e para tirar sua foto de perfil."*
+26. Apagar o app de novo, instalar e ir direto em **Perfil → foto → Tirar foto**. O pedido de câmera mostra o mesmo texto em português.
+27. **iPhone em inglês:** repetir o passo 25. O texto aparece em inglês: *"BLENDi Pulse uses the camera to scan your pantry for recipe ideas and to take your profile photo."*

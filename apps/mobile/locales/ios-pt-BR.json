@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "O BLENDi Pulse usa a câmera para fotografar sua despensa e sugerir receitas, e para tirar sua foto de perfil.",
+    "NSPhotoLibraryUsageDescription": "O BLENDi Pulse acessa só a foto que você escolher: uma foto da despensa para sugerir receitas ou a sua foto de perfil."
+  }
+}

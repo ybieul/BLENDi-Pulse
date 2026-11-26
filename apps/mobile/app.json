@@ -25,10 +25,14 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
-        "NSPhotoLibraryUsageDescription": "BLENDi Pulse needs photo access to analyze your pantry ingredients",
-        "ITSAppUsesNonExemptEncryption": false
+        "NSCameraUsageDescription": "BLENDi Pulse uses the camera to scan your pantry for recipe ideas and to take your profile photo.",
+        "NSPhotoLibraryUsageDescription": "BLENDi Pulse only accesses the photo you choose: a pantry photo for recipe ideas or your profile photo.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true
       }
+    },
+    "locales": {
+      "pt-BR": "./locales/ios-pt-BR.json"
     },
     "android": {
       "package": "com.blendi.pulse",
@@ -82,7 +86,6 @@
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
           "enableMicrophonePermission": false,
           "enableLocation": false,
           "enableFrameProcessors": false,
@@ -92,7 +95,6 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
           "microphonePermission": false
         }
       ],
