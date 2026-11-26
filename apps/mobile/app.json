@@ -66,7 +66,17 @@
           "sounds": []
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "BLENDi Pulse needs camera access to scan your pantry and suggest recipes",
+          "enableMicrophonePermission": false,
+          "enableLocation": false,
+          "enableFrameProcessors": false,
+          "enableCodeScanner": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

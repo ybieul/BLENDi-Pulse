@@ -1682,6 +1682,12 @@
   "pantryScanner": {
     "galleryA11yLabel": "Escolher uma foto da galeria",
     "captureA11yLabel": "Tirar foto",
+    "camera": {
+      "unavailableInExpoGo": "Câmera disponível no app instalado. Use a galeria.",
+      "unavailable": "Não foi possível abrir a câmera. Use a galeria.",
+      "lensLabel": "{{factor}}x",
+      "lensA11yLabel": "Zoom de {{factor}}x"
+    },
     "permissionTitle": "Escaneie Sua Despensa",
     "permissionDescription": "Permita acesso à câmera para identificar ingredientes e receber receitas personalizadas",
     "grantPermission": "Ativar Câmera",

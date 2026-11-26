@@ -1682,6 +1682,12 @@
   "pantryScanner": {
     "galleryA11yLabel": "Choose a photo from the gallery",
     "captureA11yLabel": "Take photo",
+    "camera": {
+      "unavailableInExpoGo": "Camera available in the installed app. Use the gallery.",
+      "unavailable": "We couldn't open the camera. Use the gallery.",
+      "lensLabel": "{{factor}}x",
+      "lensA11yLabel": "Zoom {{factor}}x"
+    },
     "permissionTitle": "Scan Your Pantry",
     "permissionDescription": "Allow camera access to identify ingredients and get personalized blend recipes",
     "grantPermission": "Enable Camera",

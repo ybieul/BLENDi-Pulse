@@ -8,9 +8,10 @@
 // receitas), líquido quando a foto não mostra, pedido opcional e álcool só
 // para 21+ (mesma folha de idade do Pulse AI).
 
-import { type ElementRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -25,7 +26,6 @@ import type { NavigationProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { Camera, CameraView, PermissionStatus } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import {
@@ -60,6 +60,8 @@ import { LockedRecipeCard, RecipeCard } from '../components/pulseAi/RecipeCard';
 import { AgeConfirmationSheet } from '../components/pulseAi/AgeConfirmationSheet';
 import { AllergyConfirmationSheet } from '../components/allergies/AllergyConfirmationSheet';
 import { PantryHowToUseSheet } from '../components/pantryScanner/PantryHowToUseSheet';
+import { PantryCamera, type PantryCameraHandle } from '../components/pantryScanner/PantryCamera';
+import { getVisionCamera } from '../components/pantryScanner/visionCamera.loader';
 import { addToSelection, EMPTY_ALLERGEN_SELECTION } from '../utils/allergies.utils';
 import { images } from '../assets';
 import {
@@ -137,6 +139,18 @@ const CAMERA_PILL_TEXT_COLOR = colors.text.inverse;
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type Step = 'permission' | 'capture' | 'reading' | 'ingredients' | 'generating' | 'recipes';
+
+// CP-C3: sem módulo nativo da câmera (Expo Go) vai direto à captura, que
+// mostra o aviso com a galeria; com permissão concedida, também.
+function getInitialStep(): Step {
+  const visionCamera = getVisionCamera();
+  if (!visionCamera) return 'capture';
+  try {
+    return visionCamera.Camera.getCameraPermissionStatus() === 'granted' ? 'capture' : 'permission';
+  } catch {
+    return 'permission';
+  }
+}
 
 interface CheckedIngredient extends PantryIngredient {
   checked: boolean;
@@ -217,7 +231,10 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const isFreeTier = !isPro;
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>('permission');
+  // CP-C3: permissão já concedida abre direto na câmera (sem piscar a tela de
+  // permissão). Sem módulo nativo (Expo Go) também: a etapa de captura mostra
+  // o aviso e a galeria.
+  const [step, setStep] = useState<Step>(getInitialStep);
   const [, setCapturedUri] = useState<string | null>(null);
   const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
   const [ingredients, setIngredients] = useState<CheckedIngredient[]>([]);
@@ -254,20 +271,32 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const [isOpeningLastPreview, setIsOpeningLastPreview] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
-  const cameraRef = useRef<ElementRef<typeof CameraView>>(null);
+  const cameraRef = useRef<PantryCameraHandle>(null);
+  const isCapturingRef = useRef(false);
   const unlockingPreviewIdRef = useRef<string | null>(null);
   const shownPreviewIdsRef = useRef(new Set<string>());
 
-  // ── Check permission on mount ──────────────────────────────────────────────
+  // ── CP-C3: câmera pausa sem foco (outra aba/tela por cima) ou no fundo ─────
+  const [isScreenFocused, setIsScreenFocused] = useState(() => navigation.isFocused());
+  const [isAppInBackground, setIsAppInBackground] = useState(() => AppState.currentState === 'background');
+
   useEffect(() => {
-    void Camera.getCameraPermissionsAsync()
-      .then(({ status }) => {
-        if (status === PermissionStatus.GRANTED) {
-          setStep('capture');
-        }
-      })
-      .catch(() => undefined);
+    const unsubscribeFocus = navigation.addListener('focus', () => setIsScreenFocused(true));
+    const unsubscribeBlur = navigation.addListener('blur', () => setIsScreenFocused(false));
+    return () => {
+      unsubscribeFocus();
+      unsubscribeBlur();
+    };
+  }, [navigation]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setIsAppInBackground(state === 'background');
+    });
+    return () => subscription.remove();
   }, []);
+
+  const isCameraActive = isScreenFocused && !isAppInBackground;
 
   const handleUpgradePress = useCallback(() => {
     navigation
@@ -531,8 +560,13 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleRequestPermission = useCallback(async () => {
-    const { status } = await Camera.requestCameraPermissionsAsync();
-    if (status === PermissionStatus.GRANTED) {
+    const visionCamera = getVisionCamera();
+    if (!visionCamera) {
+      setStep('capture');
+      return;
+    }
+    const status = await visionCamera.Camera.requestCameraPermission().catch(() => 'denied' as const);
+    if (status === 'granted') {
       setPermissionDenied(false);
       setStep('capture');
     } else {
@@ -559,14 +593,19 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   );
 
   const handleCapture = useCallback(async () => {
-    if (!cameraRef.current) return;
+    const camera = cameraRef.current;
+    // CP-C3: dois toques rápidos no disparo não tiram duas fotos.
+    if (!camera || isCapturingRef.current) return;
+    isCapturingRef.current = true;
     try {
-      const photo = await cameraRef.current.takePictureAsync();
-      if (photo?.uri) {
-        await handleAnalyze(photo.uri);
+      const photoUri = await camera.takePhoto();
+      if (photoUri) {
+        await handleAnalyze(photoUri);
       }
     } catch {
       showToast(t('errors.network_internal_server_error'));
+    } finally {
+      isCapturingRef.current = false;
     }
   }, [handleAnalyze, t]);
 
@@ -1333,111 +1372,122 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   if (step === 'capture') {
     return (
       <View style={styles.screen}>
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="back" />
-        <SafeAreaView
-          style={[StyleSheet.absoluteFillObject, styles.cameraOverlay]}
-          edges={['top', 'bottom']}
-        >
-          {/* Top bar */}
-          <View style={styles.cameraTopBar}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('common.actions.close')}
-              onPress={() => navigation.goBack()}
-              style={styles.cameraIconButton}
+        <PantryCamera
+          ref={cameraRef}
+          isActive={isCameraActive}
+          renderOverlay={(cameraControls) => (
+            // CP-C3: box-none deixa o toque e a pinça nas áreas vazias chegarem à
+            // prévia; barras e botões continuam recebendo o toque.
+            <SafeAreaView
+              pointerEvents="box-none"
+              style={[StyleSheet.absoluteFillObject, styles.cameraOverlay]}
+              edges={['top', 'bottom']}
             >
-              <Ionicons name="close" size={CLOSE_ICON_SIZE} color={CAMERA_ICON_COLOR} />
-            </Pressable>
-
-            {isFreeTier && scansLimit > 0 ? (
-              <View style={styles.scansPillContainer}>
-                <View style={styles.scansPill}>
-                  <Text style={styles.scansPillText}>
-                    {t('pantryScanner.scansRemaining', {
-                      count: remainingScansCount,
-                    })}
-                  </Text>
-                </View>
-                {daysUntilReset > 0 ? (
-                  <Text style={styles.renewsText}>
-                    {t('pantryScanner.renewsIn', { days: daysUntilReset })}
-                  </Text>
+              {/* Top bar */}
+              <View style={styles.cameraTopBar}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.actions.close')}
+                  onPress={() => navigation.goBack()}
+                  style={styles.cameraIconButton}
+                >
+                  <Ionicons name="close" size={CLOSE_ICON_SIZE} color={CAMERA_ICON_COLOR} />
+                </Pressable>
+    
+                {isFreeTier && scansLimit > 0 ? (
+                  <View style={styles.scansPillContainer}>
+                    <View style={styles.scansPill}>
+                      <Text style={styles.scansPillText}>
+                        {t('pantryScanner.scansRemaining', {
+                          count: remainingScansCount,
+                        })}
+                      </Text>
+                    </View>
+                    {daysUntilReset > 0 ? (
+                      <Text style={styles.renewsText}>
+                        {t('pantryScanner.renewsIn', { days: daysUntilReset })}
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-            ) : null}
-          </View>
-
-          {/* Center spacer — camera viewfinder. CP-1.1.4b: aviso discreto da
-              última prévia, só para Pro dentro da validade. */}
-          <View style={styles.cameraCenter}>
-            {lastPreview ? (
-              <View style={styles.lastPreviewRow} testID="pantry-last-preview">
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('pantryScanner.lockedPreview.lastScanA11yLabel')}
-                  accessibilityState={{ busy: isOpeningLastPreview }}
-                  disabled={isOpeningLastPreview}
-                  onPress={() => {
-                    void handleOpenLastPreview();
-                  }}
-                  style={styles.lastPreviewButton}
-                  testID="pantry-last-preview-open"
-                >
-                  <Ionicons name="restaurant-outline" size={16} color={CAMERA_ICON_COLOR} />
-                  <Text style={styles.lastPreviewText}>
-                    {t('pantryScanner.lockedPreview.lastScanTitle')}
-                  </Text>
-                  {isOpeningLastPreview ? (
-                    <ActivityIndicator color={CAMERA_ICON_COLOR} size="small" />
-                  ) : null}
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('pantryScanner.lockedPreview.lastScanDismiss')}
-                  onPress={handleDismissLastPreview}
-                  style={styles.lastPreviewDismiss}
-                  testID="pantry-last-preview-dismiss"
-                >
-                  <Ionicons name="close" size={16} color={CAMERA_ICON_COLOR} />
-                </Pressable>
+    
+              {/* Center spacer — camera viewfinder. CP-1.1.4b: aviso discreto da
+                  última prévia, só para Pro dentro da validade. */}
+              <View style={styles.cameraCenter} pointerEvents="box-none">
+                {lastPreview ? (
+                  <View style={styles.lastPreviewRow} testID="pantry-last-preview">
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('pantryScanner.lockedPreview.lastScanA11yLabel')}
+                      accessibilityState={{ busy: isOpeningLastPreview }}
+                      disabled={isOpeningLastPreview}
+                      onPress={() => {
+                        void handleOpenLastPreview();
+                      }}
+                      style={styles.lastPreviewButton}
+                      testID="pantry-last-preview-open"
+                    >
+                      <Ionicons name="restaurant-outline" size={16} color={CAMERA_ICON_COLOR} />
+                      <Text style={styles.lastPreviewText}>
+                        {t('pantryScanner.lockedPreview.lastScanTitle')}
+                      </Text>
+                      {isOpeningLastPreview ? (
+                        <ActivityIndicator color={CAMERA_ICON_COLOR} size="small" />
+                      ) : null}
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('pantryScanner.lockedPreview.lastScanDismiss')}
+                      onPress={handleDismissLastPreview}
+                      style={styles.lastPreviewDismiss}
+                      testID="pantry-last-preview-dismiss"
+                    >
+                      <Ionicons name="close" size={16} color={CAMERA_ICON_COLOR} />
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-
-          {/* Bottom bar */}
-          <View style={styles.cameraBottomBar}>
-            {/* Gallery */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('pantryScanner.galleryA11yLabel')}
-              onPress={() => {
-                void handleGallery();
-              }}
-              style={styles.galleryButton}
-            >
-              <Ionicons name="images-outline" size={28} color={CAMERA_ICON_COLOR} />
-            </Pressable>
-
-            {/* Capture */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('pantryScanner.captureA11yLabel')}
-              onPress={() => {
-                void handleCapture();
-              }}
-              style={styles.captureButton}
-            >
-              <Ionicons name="camera" size={32} color={CAMERA_ICON_COLOR} />
-            </Pressable>
-
-            {/* Mirror of gallery button to keep capture centered */}
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={styles.galleryButton}
-            />
-          </View>
-        </SafeAreaView>
+    
+              {/* CP-C3: botões de lente ou aviso de câmera indisponível. */}
+              {cameraControls}
+    
+              {/* Bottom bar */}
+              <View style={styles.cameraBottomBar}>
+                {/* Gallery */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pantryScanner.galleryA11yLabel')}
+                  onPress={() => {
+                    void handleGallery();
+                  }}
+                  style={styles.galleryButton}
+                >
+                  <Ionicons name="images-outline" size={28} color={CAMERA_ICON_COLOR} />
+                </Pressable>
+    
+                {/* Capture */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('pantryScanner.captureA11yLabel')}
+                  onPress={() => {
+                    void handleCapture();
+                  }}
+                  style={styles.captureButton}
+                >
+                  <Ionicons name="camera" size={32} color={CAMERA_ICON_COLOR} />
+                </Pressable>
+    
+                {/* Mirror of gallery button to keep capture centered */}
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={styles.galleryButton}
+                />
+              </View>
+            </SafeAreaView>
+          )}
+        />
       </View>
     );
   }

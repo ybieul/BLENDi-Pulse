@@ -84,19 +84,12 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ setQueryData: jest.fn() }),
 }));
 
-jest.mock('expo-camera', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment -- idem
-  const { View } = require('react-native');
-  return {
-    Camera: {
-      getCameraPermissionsAsync: () => Promise.resolve({ status: 'granted' }),
-      requestCameraPermissionsAsync: () => Promise.resolve({ status: 'granted' }),
-    },
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- idem
-    CameraView: View,
-    PermissionStatus: { GRANTED: 'granted' },
-  };
-});
+// CP-C3: câmera trocada por react-native-vision-camera (aparelho de 1 lente:
+// sem botões de lente, mesma ordem de botões de antes).
+jest.mock('react-native-vision-camera', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call -- idem
+  require('../testUtils/visionCameraMock').createVisionCameraMock(),
+);
 
 jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: () => Promise.resolve({ canceled: false, assets: [{ uri: 'file://pantry.jpg' }] }),
@@ -228,6 +221,8 @@ const mockNavigateUpgrade = jest.fn();
 function renderScreen() {
   const navigation = {
     goBack: jest.fn(),
+    isFocused: () => true,
+    addListener: () => () => undefined,
     getParent: () => ({ navigate: jest.fn(), getParent: () => ({ navigate: mockNavigateUpgrade }) }),
   };
   const props = { navigation } as unknown as ScreenProps;
