@@ -53,6 +53,29 @@ export function parseTutorialLocalState(raw: unknown): TutorialLocalState | null
   };
 }
 
+/**
+ * Contas excluídas nesta sessão do app: nenhuma gravação atrasada do motor
+ * (fila terminando depois da exclusão) recria o estado delas.
+ */
+const erasedUserIds = new Set<string>();
+
+/**
+ * CP-C2a — Apaga o estado local do tutorial (progresso e fila pendente) de
+ * um usuário. Chamado depois do DELETE /users/me com sucesso. O roteiro em
+ * cache não é da conta e fica.
+ */
+export function clearTutorialLocalState(
+  userId: string,
+  backend: AppStorage = createAppStorage(TUTORIAL_STORAGE_NAMESPACE)
+): void {
+  erasedUserIds.add(userId);
+  try {
+    backend.delete(`${LOCAL_STATE_PREFIX}${userId}`);
+  } catch {
+    // Melhor esforço: não bloqueia a exclusão já confirmada pelo servidor.
+  }
+}
+
 export interface TutorialStorage {
   loadState: (userId: string) => TutorialLocalState;
   saveState: (userId: string, state: TutorialLocalState) => void;
@@ -86,6 +109,7 @@ export function createTutorialStorage(backend: AppStorage = createAppStorage(TUT
       }
     },
     saveState: (userId, state) => {
+      if (erasedUserIds.has(userId)) return;
       try {
         backend.set(`${LOCAL_STATE_PREFIX}${userId}`, JSON.stringify(state));
       } catch {

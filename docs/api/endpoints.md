@@ -946,6 +946,79 @@ Updates the authenticated user's stored IANA timezone. This endpoint is still us
 
 ---
 
+### DELETE /users/me
+
+Permanently deletes the authenticated user's account and **all** their data, in one MongoDB transaction (all or nothing).
+
+**JWT required:** Yes
+
+**Request body:** none.
+
+**What is deleted** (18 collections). Every model that stores `userId` is deleted by `userId`; the verification codes are linked by email; the user document goes last. `apps/api/src/controllers/user.deleteAccount.test.ts` fails if a new model with `userId` is left out.
+
+| Collection | Model | Filter |
+|---|---|---|
+| `ai_cache` | `AiCache` | `userId` (via `invalidateUserCache`) |
+| `blend_logs` | `BlendLog` | `userId` |
+| `conversations` | `Conversation` | `userId` |
+| `daily_missions` | `DailyMission` | `userId` |
+| `favorites` | `Favorite` | `userId` |
+| `googleauthcodes` | `GoogleAuthCode` | `userId` (one-time Google sign-in codes not yet exchanged) |
+| `hydration_logs` | `HydrationLog` | `userId` |
+| `locked_previews` | `LockedPreview` | `userId` (Pulse AI and Pantry Scanner locked previews, every `kind`) |
+| `notification_logs` | `NotificationLog` | `userId` |
+| `pantry_reads` | `PantryRead` | `userId` |
+| `shopping_lists` | `ShoppingList` | `userId` |
+| `supplement_logs` | `SupplementLog` | `userId` |
+| `tutorial_progress` | `TutorialProgress` | `userId` (CP-C2) |
+| `user_photos` | `UserPhoto` | `userId` |
+| `weekly_reports` | `WeeklyReport` | `userId` |
+| `xp_logs` | `XPLog` | `userId` |
+| `otps` | `Otp` | `email` of the account |
+| `users` | `User` | `_id` (last) |
+
+**Sign in with Apple:** before the transaction, the stored Apple refresh token (if any) is read and revoked at Apple. Best effort: a failure to read or revoke is only logged and never blocks or delays the deletion.
+
+**Subscription:** the endpoint does **not** cancel an active Pulse Pro subscription (App Store / Google Play own it). The app shows this warning before confirming (`me.deleteAccount.subscriptionWarning`). RevenueCat is not called.
+
+**On the device** (after `200`): the app clears the session like a logout, the last Pantry preview and the local tutorial state (progress and pending queue) of that user.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Account deleted."
+  }
+}
+```
+
+**Error response — user already gone**
+
+**Status:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "code": "resource/not-found",
+  "message": "User not found."
+}
+```
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Account and all data deleted |
+| `401` | Missing, invalid, or expired Bearer token |
+| `404` | `resource/not-found`: the user no longer exists (transaction rolled back, nothing deleted) |
+| `429` | `auth/too-many-requests`: global authenticated rate limit |
+| `500` | Unexpected server error (transaction rolled back, nothing deleted; the app keeps the session) |
+
+
 ## Push Notifications Configuration
 
 ### PATCH /users/push-token
@@ -3533,7 +3606,7 @@ Returns the tour script.
 }
 ```
 
-Step fields: `id` (stable, unique, `area.name` format), `order` (unique), `screen` (app route name), `anchor` (optional; no anchor = centered balloon), `placement` (`above` | `below` | `auto`), `condition` (optional, closed list: `isPro`, `notPro`, `hasBlendi`, `noBlendi`), `addedInVersion`, `text.en` and `text["pt-BR"]` (title up to 48 chars, body up to 300).
+Step fields: `id` (stable, unique, `area.name` format), `order` (unique), `screen` (app route name), `anchor` (optional; no anchor = centered balloon), `placement` (`above` | `below` | `auto`), `condition` (optional, closed list: `isPro`, `notPro`, `hasBlendi`, `noBlendi`), `addedInVersion`, `text.en` and `text["pt-BR"]` (title up to 48 chars, body up to 300, measured with each marker at its largest value). Texts may contain markers from a closed list (`{{waterGlass}}`, `{{freeAiPerDay}}`, `{{freeScansPerMonth}}`, `{{missionsPerDay}}`) that the app fills in for the account (water glass in the account's unit; numbers from `packages/shared/src/planLimits.ts`). An unknown marker makes the whole script invalid; a new marker requires a new `schemaVersion`, so an older app falls back to its embedded copy instead of showing `{{...}}`.
 
 **Status codes**
 

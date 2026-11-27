@@ -41,6 +41,8 @@ import {
   fonts,
   fontWeights,
   spacing,
+  FREE_PULSE_AI_MESSAGES_PER_DAY,
+  FREE_PANTRY_SCANS_PER_MONTH,
 } from '@blendi/shared';
 import { useFavorites } from '../hooks/useFavorites';
 import { useAppTranslation } from '../hooks/useAppTranslation';
@@ -71,7 +73,7 @@ import { formatAllergenList, readProfileAllergies } from '../utils/allergies.uti
 import { trackEvent } from '../services/analytics.service';
 import { showToast } from '../utils/toast.events';
 import { TutorialAnchor } from '../features/tutorial/TutorialAnchor';
-import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
+import { QUERY_KEYS } from '../config/cache.config';
 import type {
   AppTabParamList,
   PulseAIStackScreenProps,
@@ -81,7 +83,6 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
-const DAILY_FREE_LIMIT = 3;
 const MAX_MESSAGES = 20;
 const LOGO_PLACEHOLDER_SIZE = 64;
 
@@ -137,7 +138,7 @@ const GOAL_I18N_KEYS: Record<UserGoal, PulseAiGoalKey> = {
 const GOAL_SUGGESTION_FIELDS = ['suggestion1', 'suggestion2', 'suggestion3'] as const;
 
 function toUsageRemaining(dailyAiUsage: number, isPro: boolean): number | null {
-  return isPro ? null : Math.max(0, DAILY_FREE_LIMIT - dailyAiUsage);
+  return isPro ? null : Math.max(0, FREE_PULSE_AI_MESSAGES_PER_DAY - dailyAiUsage);
 }
 
 function favoriteItemToRecipe(favorite: FavoriteItem): PulseAiRecipe {
@@ -159,7 +160,7 @@ function favoriteItemToRecipe(favorite: FavoriteItem): PulseAiRecipe {
 
 function getRemainingPantryScans(scanStatus: PantryScanStatus | null): number {
   const scansUsed = scanStatus?.scansUsed ?? 0;
-  const scansLimit = scanStatus?.scansLimit ?? PANTRY_SCAN_LIMIT_FREE;
+  const scansLimit = scanStatus?.scansLimit ?? FREE_PANTRY_SCANS_PER_MONTH;
 
   return Math.max(0, scansLimit - scansUsed);
 }

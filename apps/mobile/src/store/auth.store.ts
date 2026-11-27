@@ -46,6 +46,7 @@ import {
 } from '../services/auth.service';
 import { identifyAnalyticsUser, resetAnalyticsUser, trackEvent } from '../services/analytics.service';
 import { identifyPurchasesUser, logoutPurchasesUser } from '../services/purchase.service';
+import { clearTutorialLocalState } from '../features/tutorial/tutorialStorage';
 import type { RegisterInput, LoginInput } from '@blendi/shared';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -356,7 +357,10 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     // estado de "deslogado" que um logout normal.
     await deleteRefreshToken();
 
-    clearUserDeviceData(get().user?.id);
+    const deletedUserId = get().user?.id;
+    clearUserDeviceData(deletedUserId);
+    // CP-C2a: só na exclusão (no logout o progresso fica para retomar).
+    if (deletedUserId) clearTutorialLocalState(deletedUserId);
     get().setUser(null);
 
     set({

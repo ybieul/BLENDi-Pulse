@@ -7,11 +7,11 @@ import {
   fontSizes,
   fontWeights,
   spacing,
+  FREE_PULSE_AI_MESSAGES_PER_DAY,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 
-const DAILY_QUERY_LIMIT = 3;
 const DOT_SIZE = 8;
 const FILLED_DOT_COLOR = colors.overlay.pulse[92];
 const FILLED_DOT_BORDER = colors.brand.pulse;
@@ -31,11 +31,11 @@ export interface UsageIndicatorProps {
 }
 
 function clampUsageRemaining(usageRemaining: number): number {
-  return Math.max(0, Math.min(DAILY_QUERY_LIMIT, usageRemaining));
+  return Math.max(0, Math.min(FREE_PULSE_AI_MESSAGES_PER_DAY, usageRemaining));
 }
 
 function buildDotAnimations(): DotAnimation[] {
-  return Array.from({ length: DAILY_QUERY_LIMIT }, () => ({
+  return Array.from({ length: FREE_PULSE_AI_MESSAGES_PER_DAY }, () => ({
     opacity: new Animated.Value(1),
     scale: new Animated.Value(1),
   }));
@@ -48,8 +48,8 @@ export function UsageIndicator({ usageRemaining }: UsageIndicatorProps) {
   const { t } = useAppTranslation();
   const dotAnimations = useRef(buildDotAnimations()).current;
   const previousUsedCount = useRef<number | null>(null);
-  const clampedRemaining = usageRemaining == null ? DAILY_QUERY_LIMIT : clampUsageRemaining(usageRemaining);
-  const usedCount = DAILY_QUERY_LIMIT - clampedRemaining;
+  const clampedRemaining = usageRemaining == null ? FREE_PULSE_AI_MESSAGES_PER_DAY : clampUsageRemaining(usageRemaining);
+  const usedCount = FREE_PULSE_AI_MESSAGES_PER_DAY - clampedRemaining;
   const shouldRender = usageRemaining != null && clampedRemaining > 0;
 
   useEffect(() => {

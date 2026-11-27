@@ -49,13 +49,40 @@ O tour que passa por Home, Pulse AI, Blend, Track e Me. O **roteiro é dado**: u
    },
    ```
 
-   Regras do texto (o teste `apps/api/src/services/tutorialContent.test.ts` checa): sem travessão, sem exclamação, Title Case no título em inglês, título até 48 caracteres e texto até 300, os dois idiomas obrigatórios, "no ice" nunca (o Lite é "made for powders and fresh fruit"), números de nutrição como estimativa, texto neutro para quem não tem BLENDi (nada de "seu BLENDi" sem `condition: 'hasBlendi'`).
+   Regras do texto (o teste `packages/shared/src/tutorial/tutorialContent.test.ts` checa): sem travessão, sem exclamação, Title Case no título em inglês, título até 48 caracteres e texto até 300 (medidos com cada marcador no maior valor possível), número de limite sempre por marcador (nunca escrito à mão), os dois idiomas obrigatórios, "no ice" nunca (o Lite é "made for powders and fresh fruit"), números de nutrição como estimativa, texto neutro para quem não tem BLENDi (nada de "seu BLENDi" sem `condition: 'hasBlendi'`).
 
-4. **Suba `contentVersion`** no topo do roteiro (1 → 2). Mudou só um texto? Suba também: é o que diz "este roteiro mudou". O ETag da API é calculado do conteúdo, então o app baixa o roteiro novo mesmo se alguém esquecer.
+4. **Número no texto? Use marcador** (seção abaixo).
 
-5. **Rode os testes:** `pnpm --filter @blendi/shared build`, `pnpm --filter @blendi/api test` e `pnpm --filter @blendi/mobile test`.
+5. **Suba `contentVersion`** no topo do roteiro (1 → 2). Mudou só um texto? Suba também: é o que diz "este roteiro mudou". O ETag da API é calculado do conteúdo, então o app baixa o roteiro novo mesmo se alguém esquecer.
+
+6. **Rode os testes:** `pnpm test` na raiz (build do shared + suítes do shared, da API e do mobile), ou cada um: `pnpm --filter @blendi/shared test`, `pnpm --filter @blendi/api test`, `pnpm --filter @blendi/mobile test`.
 
 Condição nova (fora das quatro) ou mudança no formato: suba `TUTORIAL_SCHEMA_VERSION`. App antigo recusa o roteiro do servidor inteiro e fica com a cópia embutida dele (não quebra, só não vê as novidades).
+
+## Marcadores no texto
+
+Número de limite do plano ou quantidade que depende da conta não vai escrito no texto: vai como marcador, e o app preenche na hora de mostrar a etapa.
+
+| Marcador | Vira | Fonte |
+|---|---|---|
+| `{{waterGlass}}` | copo da ação rápida na unidade da conta: "250 ml" (métrico) ou "8.5 fl oz" (imperial) | `QUICK_WATER_GLASS_ML` formatado por `useUnits().displayVolume`, o mesmo formatador do botão |
+| `{{freeAiPerDay}}` | receitas do Pulse AI por dia no plano grátis | `FREE_PULSE_AI_MESSAGES_PER_DAY` |
+| `{{freeScansPerMonth}}` | scans do Pantry por mês no plano grátis | `FREE_PANTRY_SCANS_PER_MONTH` |
+| `{{missionsPerDay}}` | missões diárias | `DAILY_MISSIONS_PER_DAY` |
+
+Os números ficam em `packages/shared/src/planLimits.ts`, a fonte única que a API e o app também usam para aplicar os limites. Mudou um limite lá, o tour acompanha sozinho.
+
+Escreva exatamente `{{nome}}`, sem espaços. Marcador desconhecido, chave solta (`{{` ou `}}` sobrando) ou marcador vazio deixam o roteiro inválido no schema.
+
+### Como criar um marcador novo
+
+1. Ponha o nome em `TUTORIAL_MARKERS` e o tamanho máximo do valor preenchido em `TUTORIAL_MARKER_MAX_LENGTH` (`packages/shared/src/schemas/tutorial.ts`). O limite do balão é medido com esse tamanho.
+2. Se for um número do produto, crie a constante em `planLimits.ts` e use-a também onde a API/app aplicam a regra.
+3. Preencha o valor em `apps/mobile/src/features/tutorial/tutorialMarkers.ts` (`buildTutorialMarkerValues`). Valor que depende da conta (unidade, idioma) vem do `TutorialProvider`.
+4. **Suba `TUTORIAL_SCHEMA_VERSION`.** O app antigo não conhece o marcador: recusa o roteiro do servidor (schemaVersion maior) e usa a cópia embutida dele, que não tem o marcador. Nunca mostra `{{...}}` cru. Como segunda proteção, se sobrar marcador depois de preencher, a etapa é pulada (`invalidText`).
+5. Teste em `packages/shared/src/tutorial/tutorialContent.test.ts` e em `apps/mobile/src/features/tutorial/tutorialMarkers.test.tsx`.
+
+A schemaVersion 1 nunca foi publicada sem marcadores (CP-C2 e CP-C2a saem juntos), então ela já inclui os quatro acima.
 
 ## O que acontece com quem já viu o tour
 
@@ -68,11 +95,11 @@ Condição nova (fora das quatro) ou mudança no formato: suba `TUTORIAL_SCHEMA_
 
 ## Como testar
 
-- **Automático:** `features/tutorial/*.test.ts(x)` usam um roteiro de teste (`testUtils/tutorialTestKit.ts`), não o real. O roteiro real é testado por `tutorialAnchors.test.ts` (âncoras e telas existem) e pela API (`tutorialContent.test.ts`, schema e regras de texto).
+- **Automático:** `features/tutorial/*.test.ts(x)` usam um roteiro de teste (`testUtils/tutorialTestKit.ts`), não o real. O roteiro real é testado por `tutorialAnchors.test.ts` e `tutorialMarkers.test.tsx` no mobile (âncoras, telas, marcadores preenchidos) e no shared por `tutorialContent.test.ts` (schema, marcadores, regras de texto). A API testa o serviço (`tutorial.service.test.ts`) e as rotas.
 - **No aparelho, tour completo:** Me → "Ver tutorial de novo".
 - **Modo novidades no aparelho (dev):** adicione uma etapa com id novo no roteiro, suba `contentVersion`, rode a API local e abra o app numa conta que já concluiu o tour.
 - **Sem rede:** com o modo avião, o app usa o último roteiro baixado ou a cópia embutida; o progresso fica no aparelho e vai para o servidor quando a rede volta.
-- Logs em dev: `[tutorial] etapa pulada: <id> (<motivo>)`. Motivos: `condition`, `route`, `anchorUnknown`, `anchorTimeout`, `duplicate`.
+- Logs em dev: `[tutorial] etapa pulada: <id> (<motivo>)`. Motivos: `condition`, `route`, `anchorUnknown`, `anchorTimeout`, `duplicate`, `invalidText`.
 
 ## Quando o tour abre (e quando não)
 

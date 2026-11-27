@@ -5,7 +5,7 @@
 // arquivo por domínio adotado no resto da camada de serviços.
 
 import axios, { type AxiosError } from 'axios';
-import { calculateLevel } from '@blendi/shared';
+import { calculateLevel, QUICK_WATER_GLASS_ML } from '@blendi/shared';
 
 import { api } from '../config/api';
 import { getApiErrorTranslationKey } from '../utils/error.utils';
@@ -129,9 +129,9 @@ function toHydrationServiceError(error: unknown): HydrationServiceError {
 /**
  * Registra um consumo de água no backend.
  *
- * @param amountMl - Volume em mililitros (padrão: 250 ml por copo)
+ * @param amountMl - Volume em mililitros (padrão: o copo da ação rápida, QUICK_WATER_GLASS_ML)
  */
-export async function logWater(amountMl: number = 250): Promise<LogWaterResponse> {
+export async function logWater(amountMl: number = QUICK_WATER_GLASS_ML): Promise<LogWaterResponse> {
   try {
     const response = await api.post<LogWaterResponse>('/hydration-logs', { amountMl });
     handleXPResponse(response.data.data);

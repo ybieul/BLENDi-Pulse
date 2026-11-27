@@ -2,7 +2,12 @@
 // fallback (servidor → cache → cópia embutida); estado salvo corrompido.
 import { loadTutorialContent } from './tutorialApi';
 import { TutorialProgressSync, applyTutorialOperation, enqueueTutorialOperation } from './tutorialProgressSync';
-import { TUTORIAL_MAX_PENDING_OPERATIONS, createTutorialStorage, parseTutorialLocalState } from './tutorialStorage';
+import {
+  TUTORIAL_MAX_PENDING_OPERATIONS,
+  clearTutorialLocalState,
+  createTutorialStorage,
+  parseTutorialLocalState,
+} from './tutorialStorage';
 import { TEST_CONTENT_INPUT, createFakeServer, createMemoryAppStorage } from './testUtils/tutorialTestKit';
 
 const NOW = '2026-11-27T12:00:00.000Z';
@@ -75,6 +80,30 @@ describe('CP-C2 — fila de progresso', () => {
     server.online = false;
     new TutorialProgressSync('u1', storage, server).apply({ type: 'patch', seenStepIds: ['test.welcome'] });
     expect(new TutorialProgressSync('u2', storage, server).progress.seenStepIds).toEqual([]);
+  });
+
+  it('CP-C2a: limpeza na exclusão apaga progresso e fila do usuário, e gravação atrasada não recria', async () => {
+    const backend = createMemoryAppStorage();
+    const storage = createTutorialStorage(backend);
+    const server = createFakeServer();
+    server.online = false;
+    const sync = new TutorialProgressSync('u-deleted', storage, server);
+    sync.apply({ type: 'patch', seenStepIds: ['test.welcome'], lastStepId: 'test.welcome' });
+    new TutorialProgressSync('u-other', storage, server).apply({ type: 'patch', seenStepIds: ['test.homeA'] });
+    storage.saveCachedContent(TEST_CONTENT_INPUT, '"v1"');
+    expect(backend.getString('state:u-deleted')).toBeDefined();
+
+    clearTutorialLocalState('u-deleted', backend);
+    expect(backend.getString('state:u-deleted')).toBeUndefined();
+    // Fila terminando depois da exclusão (motor ainda vivo) não grava de novo.
+    server.online = true;
+    await sync.flush();
+    sync.apply({ type: 'patch', seenStepIds: ['test.done'] });
+    expect(backend.getString('state:u-deleted')).toBeUndefined();
+    expect(storage.loadState('u-deleted').pending).toEqual([]);
+    // Outra conta e o roteiro em cache ficam.
+    expect(storage.loadState('u-other').progress.seenStepIds).toEqual(['test.homeA']);
+    expect(storage.loadCachedContent()).not.toBeNull();
   });
 
   it('estado salvo corrompido volta ao estado vazio (nunca lança)', () => {

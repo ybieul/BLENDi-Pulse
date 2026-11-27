@@ -7,7 +7,14 @@
 // modo novidades fica só com o que é de fato novo, e nunca repete etapa que
 // não aparece neste aparelho. Fica de fora só o que esta versão não conhece
 // (tela ou âncora nova): isso aparece como novidade depois da atualização.
-import type { TutorialCondition, TutorialContent, TutorialProgress, TutorialStep } from '@blendi/shared';
+import {
+  fillTutorialText,
+  type TutorialCondition,
+  type TutorialContent,
+  type TutorialMarkerValues,
+  type TutorialProgress,
+  type TutorialStep,
+} from '@blendi/shared';
 
 import type {
   PlannedTutorialStep,
@@ -58,15 +65,29 @@ export interface TutorialPlan {
   unavailable: Array<{ id: string; reason: TutorialUnavailableReason }>;
 }
 
-function toPlannedStep(step: TutorialStep, locale: TutorialContentLocale): PlannedTutorialStep {
+function hasLeftoverMarker(text: string): boolean {
+  return text.includes('{{') || text.includes('}}');
+}
+
+/** Texto no idioma da conta com os marcadores preenchidos; null se sobrar marcador. */
+function toPlannedStep(
+  step: TutorialStep,
+  locale: TutorialContentLocale,
+  markers: TutorialMarkerValues
+): PlannedTutorialStep | null {
   const text = step.text[locale];
+  const title = fillTutorialText(text.title, markers);
+  const body = fillTutorialText(text.body, markers);
+  if (hasLeftoverMarker(title) || hasLeftoverMarker(body)) {
+    return null;
+  }
   return {
     id: step.id,
     screen: step.screen,
     ...(step.anchor !== undefined && { anchor: step.anchor }),
     placement: step.placement,
-    title: text.title,
-    body: text.body,
+    title,
+    body,
   };
 }
 
@@ -74,7 +95,8 @@ export function planTutorial(
   content: TutorialContent,
   context: TutorialUserContext,
   locale: TutorialContentLocale,
-  support: TutorialPlanSupport
+  support: TutorialPlanSupport,
+  markers: TutorialMarkerValues
 ): TutorialPlan {
   const ordered = [...content.steps].sort((a, b) => a.order - b.order);
   const seenIds = new Set<string>();
@@ -103,7 +125,12 @@ export function planTutorial(
       continue;
     }
 
-    plan.steps.push(toPlannedStep(step, locale));
+    const planned = toPlannedStep(step, locale, markers);
+    if (!planned) {
+      plan.unavailable.push({ id: step.id, reason: 'invalidText' });
+      continue;
+    }
+    plan.steps.push(planned);
   }
 
   return plan;
@@ -130,7 +157,8 @@ export function decideTutorialStart(
   progress: TutorialProgress,
   content: TutorialContent,
   locale: TutorialContentLocale,
-  activeMode: TutorialMode | null
+  activeMode: TutorialMode | null,
+  markers: TutorialMarkerValues
 ): TutorialStartDecision | null {
   if (plan.steps.length === 0) {
     return null;
@@ -156,12 +184,17 @@ export function decideTutorialStart(
   }
 
   const intro = content.whatsNewIntro[locale];
+  const introTitle = fillTutorialText(intro.title, markers);
+  const introBody = fillTutorialText(intro.body, markers);
+  if (hasLeftoverMarker(introTitle) || hasLeftoverMarker(introBody)) {
+    return { mode: 'whatsNew', steps: fresh, startIndex: 0 };
+  }
   const introStep: PlannedTutorialStep = {
     id: WHATS_NEW_INTRO_STEP_ID,
     screen: 'Home',
     placement: 'auto',
-    title: intro.title,
-    body: intro.body,
+    title: introTitle,
+    body: introBody,
     isSynthetic: true,
   };
 

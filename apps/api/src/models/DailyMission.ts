@@ -1,4 +1,5 @@
 import mongoose, { type Document } from 'mongoose';
+import { DAILY_MISSIONS_PER_DAY } from '@blendi/shared';
 
 const DAILY_MISSION_TTL_SECONDS = 7_776_000;
 const missionDatePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -101,7 +102,7 @@ const dailyMissionSchema = new mongoose.Schema<IDailyMission>(
       type: [dailyMissionItemSchema],
       required: [true, 'errors.validation.required'],
       validate: {
-        validator: (missions: IDailyMissionItem[]) => Array.isArray(missions) && missions.length === 3,
+        validator: (missions: IDailyMissionItem[]) => Array.isArray(missions) && missions.length === DAILY_MISSIONS_PER_DAY,
         message: 'errors.validation.invalid_option',
       },
     },

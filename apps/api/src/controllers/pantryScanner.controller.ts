@@ -27,6 +27,8 @@ import {
   type PantryAllergyCheckResult,
   type RecipeUnmetTarget,
   type UserAllergies,
+  FREE_PANTRY_SCANS_PER_MONTH,
+  FREE_PANTRY_PREVIEWS_PER_CYCLE,
 } from '@blendi/shared';
 import { addMonths } from 'date-fns';
 import mongoose from 'mongoose';
@@ -119,9 +121,7 @@ import {
   type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
 
-const FREE_MONTHLY_SCAN_LIMIT = 3;
 // CP-1.1.4b: prévias bloqueadas por ciclo mensal, depois dos scans grátis.
-const FREE_MONTHLY_SCAN_PREVIEW_LIMIT = 1;
 const LOCKED_PREVIEW_KIND = 'pantry_scanner';
 const PREVIEW_NOT_FOUND_CODE = 'scanner/preview-not-found';
 const PREVIEW_LOCKED_CODE = 'scanner/preview-locked';
@@ -150,7 +150,7 @@ const USABLE_CONFIDENCE_LEVELS = new Set<PantryIngredient['confidence']>(['high'
 // por scan (decisão do Gabriel: fixo, para ninguém ficar preso com scan
 // sobrando), e nenhuma leitura sem scan nem prévia restante.
 const FREE_CYCLE_READ_LIMIT =
-  (FREE_MONTHLY_SCAN_LIMIT + FREE_MONTHLY_SCAN_PREVIEW_LIMIT) * PANTRY_READS_PER_SCAN;
+  (FREE_PANTRY_SCANS_PER_MONTH + FREE_PANTRY_PREVIEWS_PER_CYCLE) * PANTRY_READS_PER_SCAN;
 const READ_LIMIT_REACHED_CODE = 'scanner/read-limit-reached';
 const READ_RATE_LIMITED_CODE = 'scanner/read-rate-limited';
 const READ_DAILY_LIMIT_CODE = 'scanner/read-daily-limit';
@@ -320,8 +320,8 @@ function sendMonthlyLimitReached(res: Response, resetDate: Date): void {
     success: false,
     code: 'scanner/monthly-limit-reached',
     message: 'Monthly Pantry Scanner limit reached.',
-    scansUsed: FREE_MONTHLY_SCAN_LIMIT,
-    scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+    scansUsed: FREE_PANTRY_SCANS_PER_MONTH,
+    scansLimit: FREE_PANTRY_SCANS_PER_MONTH,
     resetDate: resetDate.toISOString(),
   });
 }
@@ -370,7 +370,7 @@ function buildPantryAnalysisResult(params: {
     ...(params.noUsableIngredients ? { noUsableIngredients: true } : {}),
     recipes: params.recipes,
     scansUsed: params.scansUsed,
-    scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+    scansLimit: FREE_PANTRY_SCANS_PER_MONTH,
     resetDate: params.resetDate.toISOString(),
   });
 }
@@ -902,7 +902,7 @@ async function incrementPantryScanCount(
     {
       _id: user.id,
       isPro: false,
-      scanCount: { $lt: FREE_MONTHLY_SCAN_LIMIT },
+      scanCount: { $lt: FREE_PANTRY_SCANS_PER_MONTH },
     },
     {
       $inc: {
@@ -972,9 +972,9 @@ async function reservePantryScanPreview(user: PantryScannerUserProfile): Promise
     {
       _id: user.id,
       isPro: false,
-      scanCount: { $gte: FREE_MONTHLY_SCAN_LIMIT },
+      scanCount: { $gte: FREE_PANTRY_SCANS_PER_MONTH },
       $or: [
-        { monthlyScanPreviewUsage: { $lt: FREE_MONTHLY_SCAN_PREVIEW_LIMIT } },
+        { monthlyScanPreviewUsage: { $lt: FREE_PANTRY_PREVIEWS_PER_CYCLE } },
         { monthlyScanPreviewUsage: { $exists: false } },
       ],
     },
@@ -1044,7 +1044,7 @@ async function deliverPantryLockedPreview(params: {
       })),
       recipes: params.recipes.map(toPulseAiRecipePreview),
       scansUsed: params.scansUsed,
-      scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+      scansLimit: FREE_PANTRY_SCANS_PER_MONTH,
       resetDate: params.resetDate.toISOString(),
     });
   } catch (error) {
@@ -1553,8 +1553,8 @@ async function reserveFreePantryRead(user: PantryScannerUserProfile): Promise<Pa
         { $or: [{ pantryReadCount: { $lt: FREE_CYCLE_READ_LIMIT } }, { pantryReadCount: { $exists: false } }] },
         {
           $or: [
-            { scanCount: { $lt: FREE_MONTHLY_SCAN_LIMIT } },
-            { monthlyScanPreviewUsage: { $lt: FREE_MONTHLY_SCAN_PREVIEW_LIMIT } },
+            { scanCount: { $lt: FREE_PANTRY_SCANS_PER_MONTH } },
+            { monthlyScanPreviewUsage: { $lt: FREE_PANTRY_PREVIEWS_PER_CYCLE } },
             { monthlyScanPreviewUsage: { $exists: false } },
           ],
         },
@@ -1662,7 +1662,7 @@ function sendReadLimit(res: Response, reservation: Extract<PantryReadReservation
 }
 
 function isNextGenerationPreview(user: PantryScannerUserProfile): boolean {
-  return !user.isPro && user.scanCount >= FREE_MONTHLY_SCAN_LIMIT;
+  return !user.isPro && user.scanCount >= FREE_PANTRY_SCANS_PER_MONTH;
 }
 
 function buildPantryReadResult(params: {
@@ -1698,7 +1698,7 @@ function buildPantryReadResult(params: {
     alcoholAge: params.user.alcoholAge,
     nextGenerationIsPreview: isNextGenerationPreview(params.user),
     scansUsed: params.user.scanCount,
-    scansLimit: FREE_MONTHLY_SCAN_LIMIT,
+    scansLimit: FREE_PANTRY_SCANS_PER_MONTH,
     resetDate: params.user.scanResetDate.toISOString(),
   });
 }

@@ -10,6 +10,7 @@ import { join, relative } from 'path';
 import { TUTORIAL_CONTENT, parseTutorialContent } from '@blendi/shared';
 
 import { TUTORIAL_ANCHOR_IDS, isKnownTutorialAnchor } from './tutorialAnchors';
+import { buildTutorialMarkerValues } from './tutorialMarkers';
 import { planTutorial } from './tutorialPlanner';
 import { TUTORIAL_SCREEN_NAMES, isTutorialScreen } from './tutorialScreens';
 
@@ -65,7 +66,7 @@ describe('CP-C2 — âncoras e telas do roteiro inicial', () => {
       const plan = planTutorial(content, { isPro, blendiOwnership: 'blendi' }, 'en', {
         isScreenSupported: isTutorialScreen,
         isAnchorSupported: isKnownTutorialAnchor,
-      });
+      }, buildTutorialMarkerValues('250 ml'));
       expect(plan.unavailable.filter((item) => item.reason !== 'condition')).toEqual([]);
       expect(plan.supportedStepIds).toHaveLength(content.steps.length);
     }

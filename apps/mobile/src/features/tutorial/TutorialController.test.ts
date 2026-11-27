@@ -9,6 +9,7 @@ import { TutorialProgressSync } from './tutorialProgressSync';
 import { createTutorialStorage, type TutorialStorage } from './tutorialStorage';
 import {
   TEST_CONTENT_INPUT,
+  TEST_MARKERS,
   createFakeEnvironment,
   createFakeServer,
   createFakeTelemetry,
@@ -47,6 +48,7 @@ async function setup(options: {
     userId: USER_ID,
     context: { isPro: options.isPro ?? false, blendiOwnership: 'blendi' },
     locale: 'en',
+    markers: TEST_MARKERS,
     env,
     telemetry,
     sync,

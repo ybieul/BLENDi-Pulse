@@ -15,6 +15,7 @@ import {
   fonts,
   fontWeights,
   spacing,
+  QUICK_WATER_GLASS_ML,
 } from '@blendi/shared';
 import { TutorialAnchor } from '../../features/tutorial/TutorialAnchor';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
@@ -29,7 +30,6 @@ const BUTTON_GAP = 12;
 const BUTTON_HEIGHT = 52;
 const BUTTON_RADIUS = 14;
 const WATER_ICON_COLOR = colors.overlay.info[80];
-const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
@@ -142,7 +142,7 @@ export function QuickActionTrigger({
     navigation.navigate('Blend');
   };
 
-  const waterConfirmationText = displayVolume(WATER_CONFIRMATION_AMOUNT_ML);
+  const waterConfirmationText = displayVolume(QUICK_WATER_GLASS_ML);
 
   const styles = StyleSheet.create({
     row: {

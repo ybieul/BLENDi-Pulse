@@ -11,6 +11,8 @@ import {
   type AllergenSelection,
   type PulseAiRecipe,
   type UserAllergies,
+  FREE_PULSE_AI_MESSAGES_PER_DAY,
+  FREE_PULSE_AI_PREVIEWS_PER_DAY,
 } from '@blendi/shared';
 import { ZodError, z } from 'zod';
 
@@ -115,11 +117,9 @@ import {
 // pelo Pantry Scanner); reexportada aqui para quem já importava daqui.
 export { resolveAlcoholAge };
 
-const DAILY_FREE_LIMIT = 3;
 // CP-1.1.4a ("Wow Moment Paywall"): prévias bloqueadas por dia para o usuário
-// grátis, depois das DAILY_FREE_LIMIT mensagens normais. Extra: não gasta nem
+// grátis, depois das FREE_PULSE_AI_MESSAGES_PER_DAY mensagens normais. Extra: não gasta nem
 // devolve nenhuma das mensagens normais.
-const DAILY_FREE_PREVIEW_LIMIT = 1;
 const LOCKED_PREVIEW_KIND = 'pulse_ai';
 const PREVIEW_NOT_FOUND_CODE = 'pulseai/preview-not-found';
 const PREVIEW_LOCKED_CODE = 'pulseai/preview-locked';
@@ -242,7 +242,7 @@ function sha256(value: string): string {
 }
 
 function getUsageRemaining(dailyAiUsage: number, isPro: boolean): number | null {
-  return isPro ? null : Math.max(0, DAILY_FREE_LIMIT - dailyAiUsage);
+  return isPro ? null : Math.max(0, FREE_PULSE_AI_MESSAGES_PER_DAY - dailyAiUsage);
 }
 
 type PulseAiUsageReservationResult =
@@ -268,7 +268,7 @@ async function reservePulseAiUsage(
     {
       _id: user.id,
       isPro: false,
-      dailyAiUsage: { $lt: DAILY_FREE_LIMIT },
+      dailyAiUsage: { $lt: FREE_PULSE_AI_MESSAGES_PER_DAY },
     },
     {
       $inc: {
@@ -290,7 +290,7 @@ async function reservePulseAiUsage(
   return {
     ok: true,
     usageRemaining: getUsageRemaining(
-      updatedUser.dailyAiUsage ?? DAILY_FREE_LIMIT,
+      updatedUser.dailyAiUsage ?? FREE_PULSE_AI_MESSAGES_PER_DAY,
       updatedUser.isPro ?? false,
     ),
   };
@@ -328,7 +328,7 @@ async function reservePulseAiPreview(user: PulseAiUserProfile): Promise<boolean>
       _id: user.id,
       isPro: false,
       $or: [
-        { dailyAiPreviewUsage: { $lt: DAILY_FREE_PREVIEW_LIMIT } },
+        { dailyAiPreviewUsage: { $lt: FREE_PULSE_AI_PREVIEWS_PER_DAY } },
         { dailyAiPreviewUsage: { $exists: false } },
       ],
     },

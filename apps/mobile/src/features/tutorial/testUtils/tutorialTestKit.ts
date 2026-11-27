@@ -49,6 +49,14 @@ export function testContent(overrides: Partial<TutorialContentInput> = {}): Tuto
 export const TEST_KNOWN_ANCHORS = new Set(['test.anchorA', 'test.neverRendered', 'test.anchorMe', 'test.anchorBlend', 'test.anchorNew']);
 export const TEST_KNOWN_SCREENS = new Set(['Home', 'Blend', 'Me', 'PulseAIChat', 'TrackMain']);
 
+/** Valores dos marcadores nos testes (métrico). */
+export const TEST_MARKERS = {
+  waterGlass: '250 ml',
+  freeAiPerDay: '3',
+  freeScansPerMonth: '3',
+  missionsPerDay: '3',
+};
+
 export const testSupport = {
   isScreenSupported: (screen: string) => TEST_KNOWN_SCREENS.has(screen),
   isAnchorSupported: (anchor: string) => TEST_KNOWN_ANCHORS.has(anchor),

@@ -11,7 +11,9 @@ export type TutorialUnavailableReason =
   | 'route'
   | 'anchorUnknown'
   | 'anchorTimeout'
-  | 'duplicate';
+  | 'duplicate'
+  /** Sobrou marcador sem valor depois de preencher (nunca mostra "{{" cru). */
+  | 'invalidText';
 
 export interface TutorialUserContext {
   isPro: boolean;

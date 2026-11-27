@@ -29,6 +29,7 @@ import {
   fonts,
   fontWeights,
   spacing,
+  QUICK_WATER_GLASS_ML,
 } from '@blendi/shared';
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
@@ -257,7 +258,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   // ── Mutation: log water ───────────────────────────────────────────────────
 
   const { mutate: mutateLogWater, isPending: isLogWaterPending } = useMutation({
-    mutationFn: () => logWater(250),
+    mutationFn: () => logWater(QUICK_WATER_GLASS_ML),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationToday });
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.hydrationHistory });

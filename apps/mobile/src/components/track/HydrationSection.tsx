@@ -16,6 +16,7 @@ import {
   fontSizes,
   fontWeights,
   spacing,
+  QUICK_WATER_GLASS_ML,
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
@@ -35,7 +36,6 @@ const BAR_DEFAULT_FILL = colors.overlay.info[60];
 const BAR_GOAL_FILL = colors.overlay.success[70];
 const LABEL_OPACITY = 0.5;
 const WATER_ICON_COLOR = colors.overlay.info[80];
-const WATER_CONFIRMATION_AMOUNT_ML = 250;
 const WATER_CONFIRMATION_DISTANCE = -20;
 const WATER_CONFIRMATION_DURATION = 600;
 const WATER_ICON_SCALE_UP = 1.4;
@@ -136,7 +136,7 @@ export function HydrationSection({
 
   const progress = clampProgress(todayTotal, dailyTarget);
   const progressText = `${displayHydration(todayTotal)} / ${displayHydration(dailyTarget)}`;
-  const quickLogAmount = displayHydration(WATER_CONFIRMATION_AMOUNT_ML);
+  const quickLogAmount = displayHydration(QUICK_WATER_GLASS_ML);
   const chartData = useMemo(
     () => buildTrailingSevenDays(history7Days, historyTimezone),
     [history7Days, historyTimezone]

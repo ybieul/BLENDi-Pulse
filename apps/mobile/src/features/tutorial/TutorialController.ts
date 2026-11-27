@@ -9,7 +9,7 @@
 //     e retoma quando a tela fica livre;
 //   - cada etapa mostrada vai para o progresso (local + servidor), o que dá
 //     a retomada depois de fechar o app.
-import type { TutorialContent } from '@blendi/shared';
+import type { TutorialContent, TutorialMarkerValues } from '@blendi/shared';
 
 import {
   IDLE_TUTORIAL_VIEW_STATE,
@@ -63,6 +63,8 @@ export interface TutorialControllerOptions {
   userId: string;
   context: TutorialUserContext;
   locale: TutorialContentLocale;
+  /** Valores dos marcadores ({{waterGlass}}...) já formatados para a conta. */
+  markers: TutorialMarkerValues;
   env: TutorialEnvironment;
   telemetry: TutorialTelemetry;
   sync: TutorialProgressSync;
@@ -85,12 +87,14 @@ export class TutorialController {
   private autoStartHandled = false;
   private context: TutorialUserContext;
   private locale: TutorialContentLocale;
+  private markers: TutorialMarkerValues;
   private readonly unsubscribeSurface: () => void;
   private surfaceWaiters = new Set<() => void>();
 
   constructor(private readonly options: TutorialControllerOptions) {
     this.context = options.context;
     this.locale = options.locale;
+    this.markers = options.markers;
     this.unsubscribeSurface = options.env.subscribeSurface(() => this.handleSurfaceChange());
   }
 
@@ -145,15 +149,17 @@ export class TutorialController {
     this.listeners.clear();
   }
 
-  /** Plano mudou (Pro, posse do liquidificador) ou idioma mudou. */
-  updateContext(context: TutorialUserContext, locale: TutorialContentLocale): void {
+  /** Plano, posse do liquidificador, idioma ou unidade (marcadores) mudou. */
+  updateContext(context: TutorialUserContext, locale: TutorialContentLocale, markers: TutorialMarkerValues = this.markers): void {
     const changed =
       context.isPro !== this.context.isPro ||
       context.blendiOwnership !== this.context.blendiOwnership ||
-      locale !== this.locale;
+      locale !== this.locale ||
+      JSON.stringify(markers) !== JSON.stringify(this.markers);
     if (!changed) return;
     this.context = context;
     this.locale = locale;
+    this.markers = markers;
     this.replan();
 
     // Durante o tour, só troca o texto (idioma); a lista de etapas fica.
@@ -170,7 +176,7 @@ export class TutorialController {
 
   private replan(): void {
     this.plan = this.content
-      ? planTutorial(this.content, this.context, this.locale, this.options.support)
+      ? planTutorial(this.content, this.context, this.locale, this.options.support, this.markers)
       : null;
   }
 
@@ -191,7 +197,8 @@ export class TutorialController {
       this.options.sync.progress,
       this.content,
       this.locale,
-      this.options.sync.activeMode
+      this.options.sync.activeMode,
+      this.markers
     );
     if (!decision) return false;
 

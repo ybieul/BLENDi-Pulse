@@ -12,7 +12,8 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --project tsconfig.test.json",
+    "test": "node --import tsx --test src/*.test.ts src/*/*.test.ts",
     "lint": "eslint src --ext .ts"
   },
   "devDependencies": {

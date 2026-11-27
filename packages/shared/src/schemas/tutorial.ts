@@ -12,6 +12,12 @@
 //     para tela/âncora que a versão instalada não tem é pulada em silêncio.
 //   - `condition` é uma lista FECHADA: condição desconhecida recusa o roteiro
 //     inteiro (o app cai na cópia embutida). Condição nova = schemaVersion novo.
+//   - Marcadores no texto ({{waterGlass}}...) também são lista FECHADA e
+//     fazem parte da schemaVersion: marcador desconhecido recusa o roteiro
+//     inteiro, então um app antigo nunca mostra "{{...}}" cru. Marcador novo
+//     = subir TUTORIAL_SCHEMA_VERSION (app antigo usa a cópia embutida).
+//     A schemaVersion 1 (CP-C2/CP-C2a, nunca publicada sem marcadores) já
+//     inclui os quatro marcadores abaixo.
 import { z } from 'zod';
 
 /** Versão do formato. O app só aceita roteiro com a versão que conhece. */
@@ -49,22 +55,84 @@ export const TUTORIAL_ANCHOR_ID_PATTERN = TUTORIAL_STEP_ID_PATTERN;
 /** Nome de rota do React Navigation: "Home", "PulseAIChat", "TrackMain". */
 export const TUTORIAL_SCREEN_PATTERN = /^[A-Z][A-Za-z0-9]{1,40}$/;
 
+/**
+ * Marcadores aceitos no título e no texto. O app preenche na hora de mostrar:
+ *   waterGlass        → copo da ação rápida na unidade da conta ("250 ml" / "8.5 fl oz")
+ *   freeAiPerDay      → FREE_PULSE_AI_MESSAGES_PER_DAY
+ *   freeScansPerMonth → FREE_PANTRY_SCANS_PER_MONTH
+ *   missionsPerDay    → DAILY_MISSIONS_PER_DAY
+ */
+export const TUTORIAL_MARKERS = ['waterGlass', 'freeAiPerDay', 'freeScansPerMonth', 'missionsPerDay'] as const;
+export type TutorialMarker = (typeof TUTORIAL_MARKERS)[number];
+export type TutorialMarkerValues = Record<TutorialMarker, string>;
+
+/**
+ * Maior texto que cada marcador pode virar. O limite do balão vale para o
+ * texto preenchido: o schema mede com estes tamanhos no lugar de cada marcador.
+ */
+export const TUTORIAL_MARKER_MAX_LENGTH: Record<TutorialMarker, number> = {
+  waterGlass: 12,
+  freeAiPerDay: 3,
+  freeScansPerMonth: 3,
+  missionsPerDay: 3,
+};
+
+/** Teto do texto cru (com marcadores ainda por preencher). */
+const RAW_TEXT_MAX_LENGTH = 600;
+const MARKER_PATTERN = /\{\{([^{}]*)\}\}/g;
+const KNOWN_MARKERS: ReadonlySet<string> = new Set(TUTORIAL_MARKERS);
+
+/** Marcadores do texto, na ordem em que aparecem (válidos ou não). */
+export function findTutorialMarkers(text: string): string[] {
+  return [...text.matchAll(MARKER_PATTERN)].map(match => match[1] ?? '');
+}
+
+/** true se todo marcador é conhecido e não sobra chave solta ("{{" ou "}}"). */
+export function hasOnlyKnownTutorialMarkers(text: string): boolean {
+  if (!findTutorialMarkers(text).every(name => KNOWN_MARKERS.has(name))) return false;
+  const stripped = text.replace(MARKER_PATTERN, '');
+  return !stripped.includes('{{') && !stripped.includes('}}');
+}
+
+/** Preenche os marcadores. Marcador desconhecido fica como está (quem chama checa). */
+export function fillTutorialText(text: string, values: TutorialMarkerValues): string {
+  return text.replace(MARKER_PATTERN, (whole, name: string) =>
+    KNOWN_MARKERS.has(name) ? values[name as TutorialMarker] : whole
+  );
+}
+
+/** Tamanho do texto com cada marcador no maior valor possível. */
+export function measureFilledTutorialText(text: string): number {
+  return text.replace(MARKER_PATTERN, (whole, name: string) =>
+    KNOWN_MARKERS.has(name) ? 'x'.repeat(TUTORIAL_MARKER_MAX_LENGTH[name as TutorialMarker]) : whole
+  ).length;
+}
+
+function markedTextSchema(maxFilledLength: number) {
+  return z
+    .string({ required_error: 'errors.validation.required' })
+    .trim()
+    .min(1, 'errors.validation.required')
+    .max(RAW_TEXT_MAX_LENGTH, 'errors.validation.too_long')
+    .superRefine((value, ctx) => {
+      if (!hasOnlyKnownTutorialMarkers(value)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'tutorial/unknown-marker' });
+        return;
+      }
+      if (measureFilledTutorialText(value) > maxFilledLength) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'errors.validation.too_long' });
+      }
+    });
+}
+
 const stepIdSchema = z
   .string({ required_error: 'errors.validation.required' })
   .max(TUTORIAL_STEP_ID_MAX_LENGTH, 'errors.validation.too_long')
   .regex(TUTORIAL_STEP_ID_PATTERN, 'errors.validation.invalid_format');
 
 const localizedTextSchema = z.object({
-  title: z
-    .string({ required_error: 'errors.validation.required' })
-    .trim()
-    .min(1, 'errors.validation.required')
-    .max(TUTORIAL_TITLE_MAX_LENGTH, 'errors.validation.too_long'),
-  body: z
-    .string({ required_error: 'errors.validation.required' })
-    .trim()
-    .min(1, 'errors.validation.required')
-    .max(TUTORIAL_BODY_MAX_LENGTH, 'errors.validation.too_long'),
+  title: markedTextSchema(TUTORIAL_TITLE_MAX_LENGTH),
+  body: markedTextSchema(TUTORIAL_BODY_MAX_LENGTH),
 });
 
 /** Texto nos dois idiomas, os dois obrigatórios. */

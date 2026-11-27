@@ -15,7 +15,9 @@ import type { TutorialContentInput } from '../schemas/tutorial';
 
 export const TUTORIAL_CONTENT: TutorialContentInput = {
   schemaVersion: 1,
-  contentVersion: 1,
+  // 2 (CP-C2a): marcadores nos textos, Pulse AI ilimitado no Pro, Passo a
+  // passo explicado no timer.
+  contentVersion: 2,
   whatsNewIntro: {
     en: {
       title: 'What Is New',
@@ -71,11 +73,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Log Water in One Tap',
-          body: 'Each tap logs a 250 ml glass of water toward your daily hydration goal. The water ring fills as you drink, and Track shows your whole day.',
+          body: 'Each tap logs one {{waterGlass}} glass of water toward your daily hydration goal. The water ring fills as you drink, and Track shows your whole day.',
         },
         'pt-BR': {
           title: 'Registre água com um toque',
-          body: 'Cada toque registra um copo de 250 ml na sua meta diária de hidratação. O anel de água enche conforme você bebe, e a aba Acompanhar mostra o seu dia inteiro.',
+          body: 'Cada toque registra um copo de {{waterGlass}} na sua meta diária de hidratação. O anel de água enche conforme você bebe, e a aba Acompanhar mostra o seu dia inteiro.',
         },
       },
     },
@@ -139,11 +141,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Daily Missions',
-          body: 'Three missions every day, picked for your goal. Complete them to earn extra XP. Progress updates on its own as you blend, drink water and use the app.',
+          body: '{{missionsPerDay}} new missions every day, picked for your goal. Complete them to earn extra XP. Progress updates on its own as you blend, drink water and use the app.',
         },
         'pt-BR': {
           title: 'Missões diárias',
-          body: 'Três missões por dia, escolhidas para o seu objetivo. Complete para ganhar XP extra. O progresso atualiza sozinho conforme você faz blends, bebe água e usa o app.',
+          body: '{{missionsPerDay}} missões novas por dia, escolhidas para o seu objetivo. Complete para ganhar XP extra. O progresso atualiza sozinho conforme você faz blends, bebe água e usa o app.',
         },
       },
     },
@@ -231,11 +233,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Your Free Recipes',
-          body: 'The free plan includes 3 Pulse AI recipes per day. The dots show how many you have left today, and they refill the next day. Pulse Pro removes the daily limit.',
+          body: 'The free plan includes {{freeAiPerDay}} Pulse AI recipes per day. The dots show how many you have left today, and they refill the next day. Pulse Pro gives you unlimited Pulse AI.',
         },
         'pt-BR': {
           title: 'Suas receitas grátis',
-          body: 'O plano grátis inclui 3 receitas do Pulse AI por dia. As bolinhas mostram quantas ainda restam hoje, e elas voltam no dia seguinte. O Pulse Pro tira o limite diário.',
+          body: 'O plano grátis inclui {{freeAiPerDay}} receitas do Pulse AI por dia. As bolinhas mostram quantas ainda restam hoje, e elas voltam no dia seguinte. Com o Pulse Pro, o Pulse AI é ilimitado.',
         },
       },
     },
@@ -286,11 +288,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Pantry Scanner',
-          body: 'Take a photo of your fridge or pantry. Pulse AI finds the ingredients, you confirm the list and it creates recipes with what you have. The camera has lenses and zoom. The free plan includes 3 scans per month.',
+          body: 'Take a photo of your fridge or pantry. Pulse AI finds the ingredients, you confirm the list and it creates recipes with what you have. The camera has lenses and zoom. The free plan includes {{freeScansPerMonth}} scans per month.',
         },
         'pt-BR': {
           title: 'Scanner da despensa',
-          body: 'Tire uma foto da geladeira ou da despensa. O Pulse AI encontra os ingredientes, você confirma a lista e ele cria receitas com o que você tem. A câmera tem lentes e zoom. O plano grátis inclui 3 leituras por mês.',
+          body: 'Tire uma foto da geladeira ou da despensa. O Pulse AI encontra os ingredientes, você confirma a lista e ele cria receitas com o que você tem. A câmera tem lentes e zoom. O plano grátis inclui {{freeScansPerMonth}} leituras por mês.',
         },
       },
     },
@@ -317,7 +319,9 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
     // ─── Blend ─────────────────────────────────────────────────────────────
     {
       id: 'blend.modeToggle',
-      order: 200,
+      // Depois do timer: só aparece com receita com etapas e completa o
+      // texto do timer, sem repetir.
+      order: 215,
       screen: 'Blend',
       anchor: 'blend.modeToggle',
       placement: 'below',
@@ -325,11 +329,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Timer or Step by Step',
-          body: 'Recipes with steps can be followed one step at a time. Switch between the timer and the step by step view here.',
+          body: 'This recipe has steps. Tap Steps to follow it one step at a time, and Timer to go back to the countdown.',
         },
         'pt-BR': {
           title: 'Timer ou passo a passo',
-          body: 'Receitas com etapas podem ser seguidas uma etapa por vez. Alterne aqui entre o timer e o passo a passo.',
+          body: 'Esta receita tem etapas. Toque em Passos para seguir uma etapa por vez e em Timer para voltar à contagem.',
         },
       },
     },
@@ -342,11 +346,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Blend Timer',
-          body: 'The timer shows how long to blend. When you open a recipe, the time comes from it. Without a recipe, set the time yourself with the buttons below.',
+          body: 'The timer shows how long to blend. When you open a recipe, the time comes from it; without one, set it with the buttons below. Recipes with steps can also be followed one step at a time: switch between Timer and Steps at the top.',
         },
         'pt-BR': {
           title: 'Timer do blend',
-          body: 'O timer mostra quanto tempo bater. Quando você abre uma receita, o tempo vem dela. Sem receita, ajuste o tempo você mesmo nos botões abaixo.',
+          body: 'O timer mostra quanto tempo bater. Quando você abre uma receita, o tempo vem dela; sem receita, ajuste nos botões abaixo. Receitas com etapas também podem ser seguidas uma etapa por vez: alterne entre Timer e Passos no topo.',
         },
       },
     },
@@ -609,11 +613,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Pulse Pro',
-          body: 'Your Pulse Pro plan is active. You get Pulse AI without the daily limit, more Pantry scans and the full weekly report.',
+          body: 'Your Pulse Pro plan is active. You get unlimited Pulse AI, more Pantry scans and the full weekly report.',
         },
         'pt-BR': {
           title: 'Pulse Pro',
-          body: 'O seu plano Pulse Pro está ativo. Você tem o Pulse AI sem limite diário, mais leituras da despensa e o relatório semanal completo.',
+          body: 'O seu plano Pulse Pro está ativo. Você tem Pulse AI ilimitado, mais leituras da despensa e o relatório semanal completo.',
         },
       },
     },
@@ -627,11 +631,11 @@ export const TUTORIAL_CONTENT: TutorialContentInput = {
       text: {
         en: {
           title: 'Pulse Pro',
-          body: 'Pulse Pro removes the daily Pulse AI limit and adds more Pantry scans and the full weekly report. If you already subscribed, restore your purchase here.',
+          body: 'Pulse Pro gives you unlimited Pulse AI, more Pantry scans and the full weekly report. If you already subscribed, restore your purchase here.',
         },
         'pt-BR': {
           title: 'Pulse Pro',
-          body: 'O Pulse Pro tira o limite diário do Pulse AI e adiciona mais leituras da despensa e o relatório semanal completo. Se você já assinou, restaure a compra aqui.',
+          body: 'O Pulse Pro dá Pulse AI ilimitado, mais leituras da despensa e o relatório semanal completo. Se você já assinou, restaure a compra aqui.',
         },
       },
     },

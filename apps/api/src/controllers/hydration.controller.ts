@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { historyQuerySchema } from '@blendi/shared';
+import { historyQuerySchema, QUICK_WATER_GLASS_ML } from '@blendi/shared';
 import { HydrationLogModel } from '../models/HydrationLog';
 import { UserModel } from '../models/User';
 import { updateMissionProgress } from '../services/missionProgress.service';
@@ -13,7 +13,6 @@ import {
 } from '../utils/error.utils';
 import { getMidnightUTC, toUTC } from '../utils/timezone.utils';
 
-const DEFAULT_HYDRATION_AMOUNT_ML = 250;
 const DEFAULT_HYDRATION_GOAL_ML = 2500;
 // 5 litros — generoso o suficiente para qualquer uso real (inclusive
 // registro manual de um dia inteiro de uma vez), mas fecha a lacuna de
@@ -149,7 +148,7 @@ function getAmountMl(body: Request['body']): number | null {
   const amountMl = body?.amountMl;
 
   if (amountMl == null) {
-    return DEFAULT_HYDRATION_AMOUNT_ML;
+    return QUICK_WATER_GLASS_ML;
   }
 
   if (

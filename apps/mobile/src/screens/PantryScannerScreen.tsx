@@ -48,6 +48,7 @@ import {
   type PantryLiquidChoice,
   type PulseAiRecipe,
   type PulseAiRecipePreview,
+  FREE_PANTRY_SCANS_PER_MONTH,
 } from '@blendi/shared';
 
 import { useAuthStore } from '../store/auth.store';
@@ -92,7 +93,7 @@ import {
   saveLastPantryPreview,
   type PantryLastPreview,
 } from '../utils/pantryLastPreview.utils';
-import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
+import { QUERY_KEYS } from '../config/cache.config';
 import { getRecipeFavoriteKey } from '../services/favorites.service';
 import { showToast } from '../utils/toast.events';
 import type {
@@ -347,7 +348,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
   const updateScanStatus = useCallback(
     (status: { scansUsed?: number; scansLimit?: number; resetDate?: string }) => {
       const nextScansUsed = status.scansUsed ?? 0;
-      const nextScansLimit = status.scansLimit ?? PANTRY_SCAN_LIMIT_FREE;
+      const nextScansLimit = status.scansLimit ?? FREE_PANTRY_SCANS_PER_MONTH;
 
       if (status.resetDate) {
         setResetDate(status.resetDate);
@@ -832,7 +833,7 @@ export function PantryScannerScreen({ navigation }: PulseAIStackScreenProps<'Pan
       // Id novo para editar e gerar de novo sem nova foto.
       setReadId(result.readId ?? null);
       setReadExpiresAt(result.readExpiresAt ?? readExpiresAt);
-      setNextIsPreview(!isPro && (result.scansUsed ?? 0) >= (result.scansLimit ?? PANTRY_SCAN_LIMIT_FREE));
+      setNextIsPreview(!isPro && (result.scansUsed ?? 0) >= (result.scansLimit ?? FREE_PANTRY_SCANS_PER_MONTH));
       setHasGenerated(result.recipes.length > 0);
       setStep('recipes');
     } catch (err) {

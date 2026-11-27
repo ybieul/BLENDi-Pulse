@@ -61,8 +61,6 @@ export const CACHE_CONFIG = {
 
 export type CacheConfig = typeof CACHE_CONFIG;
 
-export const PANTRY_SCAN_LIMIT_FREE = 3;
-
 export const QUERY_KEYS = {
   user: ['user'],
   userProfile: ['userProfile'],

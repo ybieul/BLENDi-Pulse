@@ -2,6 +2,7 @@
 // Registro de consumo de água do usuário.
 
 import mongoose, { type Document } from 'mongoose';
+import { QUICK_WATER_GLASS_ML } from '@blendi/shared';
 
 const HYDRATION_LOG_TTL_SECONDS = 31_536_000;
 
@@ -23,7 +24,7 @@ const hydrationLogSchema = new mongoose.Schema<IHydrationLog>(
     },
     amountMl: {
       type: Number,
-      default: 250,
+      default: QUICK_WATER_GLASS_ML,
       min: [1, 'errors.validation.number_range'],
       validate: {
         validator: Number.isInteger,

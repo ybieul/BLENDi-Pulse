@@ -17,7 +17,10 @@ import {
 } from 'react';
 import { BackHandler, Keyboard, StyleSheet, View, useWindowDimensions } from 'react-native';
 
+import { QUICK_WATER_GLASS_ML } from '@blendi/shared';
+
 import { useAppTranslation } from '../../hooks/useAppTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { useAuthStore } from '../../store/auth.store';
 import { useNetworkStore } from '../../store/network.store';
 import { useReduceMotion } from './useReduceMotion';
@@ -33,6 +36,7 @@ import {
   getCurrentTutorialRouteName,
   tutorialTelemetry,
 } from './tutorialEnvironment';
+import { buildTutorialMarkerValues } from './tutorialMarkers';
 import { resolveTutorialLocale, type TutorialPlanSupport } from './tutorialPlanner';
 import { TutorialProgressSync, type TutorialProgressRemote } from './tutorialProgressSync';
 import { subscribeTutorialAnchorLayout } from './tutorialRegistry';
@@ -85,6 +89,10 @@ export function TutorialProvider({
   const blendiOwnership = useAuthStore((state) => state.user?.blendiOwnership);
   const { locale } = useAppTranslation();
   const contentLocale = resolveTutorialLocale(locale);
+  // Copo de água na unidade da conta, pelo mesmo formatador do botão.
+  const { displayVolume } = useUnits();
+  const waterGlass = displayVolume(QUICK_WATER_GLASS_ML);
+  const markers = useMemo(() => buildTutorialMarkerValues(waterGlass), [waterGlass]);
   const reduceMotion = useReduceMotion();
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
@@ -92,8 +100,8 @@ export function TutorialProvider({
   reduceMotionRef.current = reduceMotion;
   const windowHeightRef = useRef(windowHeight);
   windowHeightRef.current = windowHeight;
-  const contextRef = useRef({ isPro, blendiOwnership, contentLocale });
-  contextRef.current = { isPro, blendiOwnership, contentLocale };
+  const contextRef = useRef({ isPro, blendiOwnership, contentLocale, markers });
+  contextRef.current = { isPro, blendiOwnership, contentLocale, markers };
 
   const env = useMemo(
     () =>
@@ -113,11 +121,17 @@ export function TutorialProvider({
     if (!userId) return undefined;
     const resolvedStorage = storage ?? getDefaultStorage();
     const sync = new TutorialProgressSync(userId, resolvedStorage, remote);
-    const { isPro: currentIsPro, blendiOwnership: currentOwnership, contentLocale: currentLocale } = contextRef.current;
+    const {
+      isPro: currentIsPro,
+      blendiOwnership: currentOwnership,
+      contentLocale: currentLocale,
+      markers: currentMarkers,
+    } = contextRef.current;
     const next = new TutorialController({
       userId,
       context: { isPro: currentIsPro, blendiOwnership: currentOwnership },
       locale: currentLocale,
+      markers: currentMarkers,
       env,
       telemetry,
       sync,
@@ -135,8 +149,8 @@ export function TutorialProvider({
   }, [env, remote, storage, support, telemetry, userId]);
 
   useEffect(() => {
-    controller?.updateContext({ isPro, blendiOwnership }, contentLocale);
-  }, [blendiOwnership, contentLocale, controller, isPro]);
+    controller?.updateContext({ isPro, blendiOwnership }, contentLocale, markers);
+  }, [blendiOwnership, contentLocale, controller, isPro, markers]);
 
   const state: TutorialViewState = useSyncExternalStore(
     controller?.subscribe ?? noopSubscribe,

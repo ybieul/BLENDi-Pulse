@@ -39,6 +39,7 @@ import {
   getDisplayFirstName,
   fonts,
   fontWeights,
+  DAILY_MISSIONS_PER_DAY,
 } from '@blendi/shared';
 import { api } from '../config/api';
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
@@ -484,7 +485,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                 {missionsData ? (
                   <Text style={styles.missionsHeaderBadge}>
                     {missionsData.completedCount > 0
-                      ? `${missionsData.completedCount}/3`
+                      ? `${missionsData.completedCount}/${DAILY_MISSIONS_PER_DAY}`
                       : t('home.xpAvailable', { xp: missionsData.xpAvailable })}
                   </Text>
                 ) : null}

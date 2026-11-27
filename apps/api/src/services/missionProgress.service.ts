@@ -1,4 +1,4 @@
-import { XP_EVENTS } from '@blendi/shared';
+import { XP_EVENTS, DAILY_MISSIONS_PER_DAY, FREE_PANTRY_SCANS_PER_MONTH } from '@blendi/shared';
 import { DailyMissionModel, type IDailyMissionItem, type DailyMissionDocument } from '../models/DailyMission';
 import { UserModel } from '../models/User';
 import { FavoriteModel } from '../models/Favorite';
@@ -7,7 +7,6 @@ import { MISSION_DEFINITIONS, MISSION_POOLS, FALLBACK_MISSION_TYPES } from '../c
 import { toLocalDate } from '../utils/timezone.utils';
 
 const MISSION_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const FREE_TIER_SCAN_LIMIT = 3;
 const DEFAULT_RESULT = {
   missionUpdated: false,
   missionCompleted: false,
@@ -141,7 +140,7 @@ async function generateDailyMissions(
     ? user.supplementStack.filter(item => item?.isActive === true).length
     : 0;
   const favoriteCount = await FavoriteModel.countDocuments({ userId: userIdFromGenerationUser(user) });
-  const shouldRemoveScanPantry = !user.isPro && (user.scanCount ?? 0) >= FREE_TIER_SCAN_LIMIT;
+  const shouldRemoveScanPantry = !user.isPro && (user.scanCount ?? 0) >= FREE_PANTRY_SCANS_PER_MONTH;
 
   const filteredPool = goalPool.filter(entry => {
     if (entry.type === 'completeSuppStack' && activeSupplementCount === 0) {
@@ -163,7 +162,7 @@ async function generateDailyMissions(
   const selectedTypeSet = new Set(normalizedPool.map(entry => entry.type));
 
   for (const fallbackType of FALLBACK_MISSION_TYPES) {
-    if (selectedTypeSet.size >= 3) {
+    if (selectedTypeSet.size >= DAILY_MISSIONS_PER_DAY) {
       break;
     }
 
@@ -173,8 +172,8 @@ async function generateDailyMissions(
     }
   }
 
-  if (selectedTypeSet.size < 3) {
-    throw new Error('Unable to build a mission pool with at least three unique mission types.');
+  if (selectedTypeSet.size < DAILY_MISSIONS_PER_DAY) {
+    throw new Error(`Unable to build a mission pool with at least ${DAILY_MISSIONS_PER_DAY} unique mission types.`);
   }
 
   const expandedPool = normalizedPool.flatMap(entry => Array(entry.weight).fill(entry.type));
@@ -191,13 +190,13 @@ async function generateDailyMissions(
     selectedTypes.push(type);
     seenTypes.add(type);
 
-    if (selectedTypes.length === 3) {
+    if (selectedTypes.length === DAILY_MISSIONS_PER_DAY) {
       break;
     }
   }
 
-  if (selectedTypes.length < 3) {
-    throw new Error('Unable to select three unique daily mission types.');
+  if (selectedTypes.length < DAILY_MISSIONS_PER_DAY) {
+    throw new Error(`Unable to select ${DAILY_MISSIONS_PER_DAY} unique daily mission types.`);
   }
 
   return selectedTypes.map(type => {
