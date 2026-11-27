@@ -32,6 +32,8 @@ import {
 } from '@blendi/shared';
 
 import { CACHE_CONFIG, QUERY_KEYS } from '../config/cache.config';
+import { TutorialAnchor } from '../features/tutorial/TutorialAnchor';
+import { useTutorialScrollRef } from '../features/tutorial/useTutorialScrollRef';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 
@@ -160,6 +162,8 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();
   const queryClient = useQueryClient();
+  // CP-C2: o tutorial rola até as âncoras fora da área visível.
+  const tutorialScrollRef = useTutorialScrollRef('TrackMain');
   const userTimezone = useAuthStore((state) => state.user?.timezone);
   const historyTimezone = userTimezone ?? getDeviceTimezone();
 
@@ -562,6 +566,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
       <AuroraBackground intensity="reduced" />
 
       <ScrollView
+        ref={tutorialScrollRef}
         removeClippedSubviews={true}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -582,7 +587,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
           <Text style={styles.title}>{t('track.title')}</Text>
 
           <View style={styles.headerRightActions}>
-            <View style={styles.headerActionWithBadge}>
+            <TutorialAnchor id="track.shoppingLists" style={styles.headerActionWithBadge}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={String(t('shoppingList.title'))}
@@ -602,7 +607,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                   </Text>
                 </View>
               ) : null}
-            </View>
+            </TutorialAnchor>
 
             <Pressable
               accessibilityRole="button"
@@ -637,7 +642,7 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
         ) : (
           // ── Content ───────────────────────────────────────────────────────
           <>
-            <View style={styles.sectionSpacing}>
+            <TutorialAnchor id="track.hydration" style={styles.sectionSpacing}>
               <HydrationSection
                 todayTotal={hydrationToday}
                 dailyTarget={hydrationTarget}
@@ -646,9 +651,9 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 dataUpdatedAt={hydrationTodayUpdatedAt}
                 isLogWaterPending={isLogWaterPending}
               />
-            </View>
+            </TutorialAnchor>
 
-            <View style={styles.sectionSpacingSmall}>
+            <TutorialAnchor id="track.stack" style={styles.sectionSpacingSmall}>
               <MyStackSection
                 supplements={activeStack}
                 onIncrement={handleIncrementSupplement}
@@ -656,19 +661,21 @@ export function TrackScreen({ navigation }: TrackStackScreenProps<'TrackMain'>) 
                 onManage={handleManage}
                 isCheckPending={isSupplementProgressPending}
               />
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.historyButtonSection}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleViewHistory}
-                style={styles.historyButton}
-              >
-                <View style={styles.historyButtonContent}>
-                  <Ionicons name="bar-chart-outline" size={18} color={colors.brand.pulse} />
-                  <Text style={styles.historyButtonLabel}>{t('track.viewHistory')}</Text>
-                </View>
-              </Pressable>
+              <TutorialAnchor id="track.history">
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleViewHistory}
+                  style={styles.historyButton}
+                >
+                  <View style={styles.historyButtonContent}>
+                    <Ionicons name="bar-chart-outline" size={18} color={colors.brand.pulse} />
+                    <Text style={styles.historyButtonLabel}>{t('track.viewHistory')}</Text>
+                  </View>
+                </Pressable>
+              </TutorialAnchor>
             </View>
           </>
         )}

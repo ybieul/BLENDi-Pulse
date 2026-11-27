@@ -24,6 +24,7 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import type { BadgeStage, UserBadge } from '../../utils/badges.utils';
 import type { TranslationKey } from '../../locales/i18n';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -94,6 +95,8 @@ export function BadgeDetailSheet({ badge, onClose }: BadgeDetailSheetProps) {
   const progressAnimation = useRef(new Animated.Value(0)).current;
 
   const [isMounted, setIsMounted] = useState(badge !== null);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [renderBadge, setRenderBadge] = useState<UserBadge | null>(badge);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
 

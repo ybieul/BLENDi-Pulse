@@ -35,6 +35,7 @@ import { dailyMissionsRouter } from './routes/dailyMissions';
 import { shoppingListRouter } from './routes/shoppingList';
 import { weeklyReportsRouter } from './routes/weeklyReports';
 import { purchasesRouter } from './routes/purchases';
+import { tutorialRouter } from './routes/tutorial';
 import { webhooksRouter } from './routes/webhooks';
 import { sendErrorResponse, type ApiError } from './utils/error.utils';
 import { initializeNotificationJobs } from './jobs/notifications.jobs';
@@ -152,6 +153,7 @@ app.use('/daily-missions', dailyMissionsRouter);
 app.use('/shopping-lists', shoppingListRouter);
 app.use('/weekly-reports', weeklyReportsRouter);
 app.use('/purchases', purchasesRouter);
+app.use('/tutorial', tutorialRouter);
 // Próximas rotas serão registradas aqui conforme os checkpoints avançam:
 // app.use('/api/v1/recipes', recipesRouter);
 

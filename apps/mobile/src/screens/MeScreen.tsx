@@ -115,6 +115,9 @@ import { showToast } from "../utils/toast.utils";
 import { getAxiosErrorTranslationKey } from "../utils/error.utils";
 import { resolveBlenderTextKey } from "../utils/blenderText.utils";
 import axios from "axios";
+import { TutorialAnchor } from "../features/tutorial/TutorialAnchor";
+import { useTutorial } from "../features/tutorial/tutorialContext";
+import { useTutorialScrollRef } from "../features/tutorial/useTutorialScrollRef";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -469,6 +472,9 @@ function getProfilePhotoActionCopy(
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
+  // CP-C2: rolagem para o tutorial e "Ver tutorial de novo".
+  const tutorialScrollRef = useTutorialScrollRef("Me");
+  const { replay: replayTutorial } = useTutorial();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t, locale, changeLocale } = useAppTranslation();
@@ -1703,6 +1709,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
       <AuroraBackground intensity="reduced" />
 
       <ScrollView
+        ref={tutorialScrollRef}
         removeClippedSubviews={true}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -1749,19 +1756,21 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                 </Pressable>
               ) : null}
 
-              <Pressable
-                accessibilityLabel={t("weeklyReport.title")}
-                accessibilityRole="button"
-                onPress={() => {
-                  navigation.getParent<RootNavigationProp<"WeeklyReport">>()?.navigate("WeeklyReport");
-                }}
-                style={({ pressed }) => [
-                  styles.headerActionButton,
-                  pressed ? styles.headerActionButtonPressed : null,
-                ]}
-              >
-                <Ionicons color={HEADER_ACTION_ICON_COLOR} name="bar-chart-outline" size={18} />
-              </Pressable>
+              <TutorialAnchor id="me.weeklyReport">
+                <Pressable
+                  accessibilityLabel={t("weeklyReport.title")}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    navigation.getParent<RootNavigationProp<"WeeklyReport">>()?.navigate("WeeklyReport");
+                  }}
+                  style={({ pressed }) => [
+                    styles.headerActionButton,
+                    pressed ? styles.headerActionButtonPressed : null,
+                  ]}
+                >
+                  <Ionicons color={HEADER_ACTION_ICON_COLOR} name="bar-chart-outline" size={18} />
+                </Pressable>
+              </TutorialAnchor>
             </View>
           </View>
 
@@ -1843,77 +1852,79 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
         ) : null}
 
         {/* ── Stats ───────────────────────────────────────────────────────── */}
-        <View style={styles.statsSection}>
-          <View style={styles.statsGrid}>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon="flash-outline"
-                iconColor={colors.brand.pulse}
-                value={String(profile?.currentStreak ?? 0)}
-                label={t("me.currentStreak")}
-                isLoading={isMeProfileLoading}
-              />
-              <StatCard
-                icon="cafe-outline"
-                iconColor={colors.text.primary}
-                value={String(profile?.blendCount ?? 0)}
-                label={t("me.totalBlends")}
-                isLoading={isMeProfileLoading}
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon="trophy-outline"
-                iconColor={LONGEST_STREAK_COLOR}
-                value={String(profile?.longestStreak ?? 0)}
-                label={t("me.longestStreak")}
-                isLoading={isMeProfileLoading}
-              />
-              <StatCard
-                icon="star"
-                iconColor={LONGEST_STREAK_COLOR}
-                value={String(levelInfo.level)}
-                label={t("me.level")}
-                isLoading={isMeProfileLoading}
-              />
+        <TutorialAnchor id="me.level">
+          <View style={styles.statsSection}>
+            <View style={styles.statsGrid}>
+              <View style={styles.statsRow}>
+                <StatCard
+                  icon="flash-outline"
+                  iconColor={colors.brand.pulse}
+                  value={String(profile?.currentStreak ?? 0)}
+                  label={t("me.currentStreak")}
+                  isLoading={isMeProfileLoading}
+                />
+                <StatCard
+                  icon="cafe-outline"
+                  iconColor={colors.text.primary}
+                  value={String(profile?.blendCount ?? 0)}
+                  label={t("me.totalBlends")}
+                  isLoading={isMeProfileLoading}
+                />
+              </View>
+              <View style={styles.statsRow}>
+                <StatCard
+                  icon="trophy-outline"
+                  iconColor={LONGEST_STREAK_COLOR}
+                  value={String(profile?.longestStreak ?? 0)}
+                  label={t("me.longestStreak")}
+                  isLoading={isMeProfileLoading}
+                />
+                <StatCard
+                  icon="star"
+                  iconColor={LONGEST_STREAK_COLOR}
+                  value={String(levelInfo.level)}
+                  label={t("me.level")}
+                  isLoading={isMeProfileLoading}
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* ── Level progress ──────────────────────────────────────────────── */}
-        <View style={styles.levelSection}>
-          <View style={styles.levelCard}>
-            <Text style={styles.levelCardName}>
-              {t(levelInfo.levelNameKey as TranslationKey, { level: levelInfo.level })}
-            </Text>
+          {/* ── Level progress ──────────────────────────────────────────────── */}
+          <View style={styles.levelSection}>
+            <View style={styles.levelCard}>
+              <Text style={styles.levelCardName}>
+                {t(levelInfo.levelNameKey as TranslationKey, { level: levelInfo.level })}
+              </Text>
 
-            <View style={styles.levelProgressTrack}>
-              <Animated.View
-                style={[
-                  styles.levelProgressFill,
-                  {
-                    width: levelProgressAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%'],
-                    }),
-                  },
-                ]}
-              />
+              <View style={styles.levelProgressTrack}>
+                <Animated.View
+                  style={[
+                    styles.levelProgressFill,
+                    {
+                      width: levelProgressAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%'],
+                      }),
+                    },
+                  ]}
+                />
+              </View>
+
+              <Text style={styles.levelNextCopy}>
+                {t('gamification.xpToNextLevel', {
+                  xp: formatCount(levelInfo.xpToNextLevel),
+                  levelName: t(nextLevelInfo.levelNameKey as TranslationKey, {
+                    level: nextLevelInfo.level,
+                  }),
+                })}
+              </Text>
             </View>
-
-            <Text style={styles.levelNextCopy}>
-              {t('gamification.xpToNextLevel', {
-                xp: formatCount(levelInfo.xpToNextLevel),
-                levelName: t(nextLevelInfo.levelNameKey as TranslationKey, {
-                  level: nextLevelInfo.level,
-                }),
-              })}
-            </Text>
           </View>
-        </View>
+        </TutorialAnchor>
 
         {/* ── Badges ──────────────────────────────────────────────────────── */}
-        <View style={styles.badgesSection}>
+        <TutorialAnchor id="me.badges" style={styles.badgesSection}>
           <Text style={styles.sectionTitle}>
             {t("me.badges.title")}
           </Text>
@@ -1937,7 +1948,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             )}
             style={styles.badgeList}
           />
-        </View>
+        </TutorialAnchor>
 
         {/* ── Settings ────────────────────────────────────────────────────── */}
         <View style={styles.settingsSection}>
@@ -1984,34 +1995,40 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
             />
             <View style={styles.divider} />
 
-            <SettingRow
-              label={t(resolveBlenderTextKey("profile.fields.model", displayOwnership))}
-              value={modelDisplayName}
-              onPress={() => { setEditingType("model"); }}
-            />
+            <TutorialAnchor id="me.modelGoal">
+              <SettingRow
+                label={t(resolveBlenderTextKey("profile.fields.model", displayOwnership))}
+                value={modelDisplayName}
+                onPress={() => { setEditingType("model"); }}
+              />
+              <View style={styles.divider} />
+
+              <SettingRow
+                label={t("profile.fields.goal")}
+                value={t(getGoalKey(displayGoal))}
+                onPress={() => { setEditingType("goal"); }}
+              />
+            </TutorialAnchor>
             <View style={styles.divider} />
 
-            <SettingRow
-              label={t("profile.fields.goal")}
-              value={t(getGoalKey(displayGoal))}
-              onPress={() => { setEditingType("goal"); }}
-            />
+            <TutorialAnchor id="me.nutritionGoals">
+              <SettingRow
+                label={t("nutritionGoals.rowLabel")}
+                value={nutritionGoalsSummary}
+                onPress={() => {
+                  navigation.getParent<RootNavigationProp<"NutritionGoals">>()?.navigate("NutritionGoals");
+                }}
+              />
+            </TutorialAnchor>
             <View style={styles.divider} />
 
-            <SettingRow
-              label={t("nutritionGoals.rowLabel")}
-              value={nutritionGoalsSummary}
-              onPress={() => {
-                navigation.getParent<RootNavigationProp<"NutritionGoals">>()?.navigate("NutritionGoals");
-              }}
-            />
-            <View style={styles.divider} />
-
-            <SettingRow
-              label={t("allergies.profile.rowLabel")}
-              value={allergiesSummary}
-              onPress={openAllergies}
-            />
+            <TutorialAnchor id="me.allergies">
+              <SettingRow
+                label={t("allergies.profile.rowLabel")}
+                value={allergiesSummary}
+                onPress={openAllergies}
+              />
+            </TutorialAnchor>
             <View style={styles.divider} />
 
             {/*
@@ -2032,29 +2049,41 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
               <View style={styles.divider} />
             */}
 
-            <SettingRow
-              label={t("profile.unitSystem")}
-              value={t(
-                displayUnitSystem === "metric"
-                  ? "me.metric"
-                  : "me.imperial",
-              )}
-              onPress={() => { setEditingType("unitSystem"); }}
-            />
+            <TutorialAnchor id="me.preferences">
+              <SettingRow
+                label={t("profile.unitSystem")}
+                value={t(
+                  displayUnitSystem === "metric"
+                    ? "me.metric"
+                    : "me.imperial",
+                )}
+                onPress={() => { setEditingType("unitSystem"); }}
+              />
+              <View style={styles.divider} />
+
+              <SettingRow
+                label={t("profile.language.label")}
+                value={languageDisplayName}
+                onPress={() => { setEditingType("language"); }}
+              />
+              <View style={styles.divider} />
+
+              <SettingRow
+                label={t("me.theme.label")}
+                value={t(themeMode === "dark" ? "me.theme.dark" : "me.theme.light")}
+                onPress={() => { setEditingType("theme"); }}
+              />
+            </TutorialAnchor>
             <View style={styles.divider} />
 
-            <SettingRow
-              label={t("profile.language.label")}
-              value={languageDisplayName}
-              onPress={() => { setEditingType("language"); }}
-            />
-            <View style={styles.divider} />
-
-            <SettingRow
-              label={t("me.theme.label")}
-              value={t(themeMode === "dark" ? "me.theme.dark" : "me.theme.light")}
-              onPress={() => { setEditingType("theme"); }}
-            />
+            {/* CP-C2: apaga o progresso do tutorial e começa da primeira etapa. */}
+            <TutorialAnchor id="me.replay">
+              <SettingRow
+                label={t("tutorial.replayRow")}
+                value=""
+                onPress={replayTutorial}
+              />
+            </TutorialAnchor>
           </View>
         </View>
 
@@ -2118,7 +2147,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
 
         {/* ── Upgrade / Pro ───────────────────────────────────────────────── */}
         {isPro ? (
-          <View style={styles.proSection}>
+          <TutorialAnchor id="me.plan" style={styles.proSection}>
             <View style={styles.proCard}>
               <View style={styles.proRow}>
                 <Ionicons
@@ -2136,9 +2165,9 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                 </View>
               </View>
             </View>
-          </View>
+          </TutorialAnchor>
         ) : (
-          <View style={styles.upgradeSection}>
+          <TutorialAnchor id="me.plan" style={styles.upgradeSection}>
             <View style={styles.upgradeCard}>
               <Text style={styles.upgradeTitle}>
                 {t("me.upgrade.title")}
@@ -2181,7 +2210,7 @@ export function MeScreen({ navigation }: AppTabScreenProps<"Me">) {
                 <Text style={styles.restoreButtonText}>{t("common.actions.restore")}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </TutorialAnchor>
         )}
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}

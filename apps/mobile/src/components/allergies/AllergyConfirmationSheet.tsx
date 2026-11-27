@@ -14,6 +14,7 @@ import { fonts, fontSizes, fontWeights, spacing, type AllergenSelection } from '
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { formatAllergenList } from '../../utils/allergies.utils';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 export interface AllergyConfirmationSheetProps {
   /** Alérgenos citados; null = folha fechada. */
@@ -27,6 +28,8 @@ export interface AllergyConfirmationSheetProps {
 }
 
 export function AllergyConfirmationSheet({ allergens, onConfirm, onDecline, onDismiss }: AllergyConfirmationSheetProps) {
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(allergens !== null);
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();

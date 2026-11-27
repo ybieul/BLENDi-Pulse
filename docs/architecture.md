@@ -30,7 +30,7 @@ No mobile client talks directly to MongoDB or third-party APIs. Every privileged
 
 ### 3. Persistence
 
-MongoDB Atlas stores the system's persistent application data, including users, authentication state, OTP records, and future domain entities. Short-lived collections use TTL indexes, for example `ai_cache` (7 days), the Google sign-in one-time codes (`GoogleAuthCode`, ~2 min), `locked_previews` (24 h, CP-1.1.4a: full content of a locked preview, generic `kind` so the Pantry Scanner can reuse it) and `pantry_reads` (30 min, CP-B7: the result of a Pantry photo read between the read and the generation — never the image).
+MongoDB Atlas stores the system's persistent application data, including users, authentication state, OTP records, and future domain entities. Short-lived collections use TTL indexes, for example `ai_cache` (7 days), the Google sign-in one-time codes (`GoogleAuthCode`, ~2 min), `locked_previews` (24 h, CP-1.1.4a: full content of a locked preview, generic `kind` so the Pantry Scanner can reuse it) and `pantry_reads` (30 min, CP-B7: the result of a Pantry photo read between the read and the generation — never the image). The guided tour progress (CP-C2) lives in `tutorial_progress`, one document per user with step ids and dates only.
 
 Object storage for binary assets is a planned architectural direction for later phases. No object storage provider is integrated today: the one binary asset the app currently stores (user-uploaded profile photos) is persisted as a base64 string directly in MongoDB (`user_photos` collection), not in an object storage provider.
 

@@ -22,6 +22,7 @@ import { colors, fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -194,6 +195,8 @@ export function DailyPulseTimeSheet({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   const [isMounted, setIsMounted] = useState(false);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedHourRef = useRef(initialHour);

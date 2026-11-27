@@ -21,6 +21,7 @@ import {
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useDateFormat } from '../../hooks/useDateFormat';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const GAP = 4;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -101,6 +102,8 @@ export function SupplementHeatmap({ data, period }: SupplementHeatmapProps) {
   const translateY = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = useState(false);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [selectedEntry, setSelectedEntry] = useState<SupplementHeatmapDatum | null>(null);
 
   const circleSize = getCircleSize(period);

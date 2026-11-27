@@ -2277,5 +2277,15 @@
     },
     "pantryLabel": "⚠️ Alergia",
     "pantryA11y": "{{name}}, item que você cadastrou como alergia"
+  },
+  "tutorial": {
+    "next": "Próximo",
+    "back": "Voltar",
+    "skip": "Pular",
+    "done": "Concluir",
+    "stepCounter": "{{current}} de {{total}}",
+    "stepA11y": "Etapa {{current}} de {{total}}",
+    "skipA11yHint": "Encerra o tour. Você pode rever em Perfil.",
+    "replayRow": "Ver tutorial de novo"
   }
 }

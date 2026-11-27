@@ -2277,5 +2277,15 @@
     },
     "pantryLabel": "⚠️ Allergy",
     "pantryA11y": "{{name}}, an item you listed as an allergy"
+  },
+  "tutorial": {
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip",
+    "done": "Done",
+    "stepCounter": "{{current}} of {{total}}",
+    "stepA11y": "Step {{current}} of {{total}}",
+    "skipA11yHint": "Ends the tour. You can replay it from Me.",
+    "replayRow": "Replay tutorial"
   }
 }

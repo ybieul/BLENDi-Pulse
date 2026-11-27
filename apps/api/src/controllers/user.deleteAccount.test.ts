@@ -83,8 +83,8 @@ describe('CP-B8a — DELETE /users/me apaga todos os dados do usuário', () => {
     // Lista explícita, para o relatório e para notar um modelo novo.
     assert.deepEqual([...withUserId].sort(), [
       'AiCache', 'BlendLog', 'Conversation', 'DailyMission', 'Favorite', 'GoogleAuthCode', 'HydrationLog',
-      'LockedPreview', 'NotificationLog', 'PantryRead', 'ShoppingList', 'SupplementLog', 'UserPhoto',
-      'WeeklyReport', 'XPLog',
+      'LockedPreview', 'NotificationLog', 'PantryRead', 'ShoppingList', 'SupplementLog', 'TutorialProgress',
+      'UserPhoto', 'WeeklyReport', 'XPLog',
     ]);
     for (const name of withUserId) {
       const calls = deleteCalls.get(name) ?? [];

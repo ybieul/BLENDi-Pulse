@@ -46,6 +46,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useNetworkStore } from '../store/network.store';
 import { BlendLogServiceError, createBlendLog } from '../services/blendLog.service';
 import { QUERY_KEYS } from '../config/cache.config';
+import { TutorialAnchor } from '../features/tutorial/TutorialAnchor';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 import { addPendingBlend } from '../utils/pendingBlends.utils';
@@ -417,45 +418,47 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
 
       <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
         {hasSteps && (
-          <View style={[styles.viewModeToggle, { backgroundColor: colors.overlay.plum[8], borderColor: colors.overlay.plum[12] }]}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              activeOpacity={0.82}
-              onPress={() => setViewMode('timer')}
-              style={[
-                styles.viewModeSegment,
-                viewMode === 'timer' && { backgroundColor: colors.brand.pulse },
-              ]}
-            >
-              <Text
+          <TutorialAnchor id="blend.modeToggle" style={styles.viewModeToggleAnchor}>
+            <View style={[styles.viewModeToggle, { backgroundColor: colors.overlay.plum[8], borderColor: colors.overlay.plum[12] }]}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.82}
+                onPress={() => setViewMode('timer')}
                 style={[
-                  styles.viewModeLabel,
-                  { color: viewMode === 'timer' ? colors.text.inverse : colors.text.primary },
+                  styles.viewModeSegment,
+                  viewMode === 'timer' && { backgroundColor: colors.brand.pulse },
                 ]}
               >
-                {t('blend.viewModeTimer')}
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.viewModeLabel,
+                    { color: viewMode === 'timer' ? colors.text.inverse : colors.text.primary },
+                  ]}
+                >
+                  {t('blend.viewModeTimer')}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              accessibilityRole="button"
-              activeOpacity={0.82}
-              onPress={() => setViewMode('steps')}
-              style={[
-                styles.viewModeSegment,
-                viewMode === 'steps' && { backgroundColor: colors.brand.pulse },
-              ]}
-            >
-              <Text
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.82}
+                onPress={() => setViewMode('steps')}
                 style={[
-                  styles.viewModeLabel,
-                  { color: viewMode === 'steps' ? colors.text.inverse : colors.text.primary },
+                  styles.viewModeSegment,
+                  viewMode === 'steps' && { backgroundColor: colors.brand.pulse },
                 ]}
               >
-                {t('blend.viewModeSteps')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <Text
+                  style={[
+                    styles.viewModeLabel,
+                    { color: viewMode === 'steps' ? colors.text.inverse : colors.text.primary },
+                  ]}
+                >
+                  {t('blend.viewModeSteps')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TutorialAnchor>
         )}
 
         {activeRecipe !== null && <ActiveRecipeHeader recipe={activeRecipe} />}
@@ -464,23 +467,27 @@ export function BlendScreen({ route }: AppTabScreenProps<'Blend'>) {
           {showStepMode ? (
             <StepModeView steps={recipeSteps} onComplete={handleStepsComplete} />
           ) : (
-            <TimerCircle
-              duration={remainingSeconds}
-              status={timerStatus}
-              onComplete={handleComplete}
-            />
+            <TutorialAnchor id="blend.timer">
+              <TimerCircle
+                duration={remainingSeconds}
+                status={timerStatus}
+                onComplete={handleComplete}
+              />
+            </TutorialAnchor>
           )}
         </View>
 
         {!showStepMode && (
           <View style={styles.controlsArea}>
-            <TimerControls
-              status={timerStatus}
-              duration={timerDuration}
-              onAdjust={handleAdjust}
-              onStart={handleStart}
-              onStop={handleStop}
-            />
+            <TutorialAnchor id="blend.controls">
+              <TimerControls
+                status={timerStatus}
+                duration={timerDuration}
+                onAdjust={handleAdjust}
+                onStart={handleStart}
+                onStop={handleStop}
+              />
+            </TutorialAnchor>
           </View>
         )}
       </View>
@@ -513,6 +520,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // CP-C2: invólucro da âncora centralizado como o próprio seletor.
+  viewModeToggleAnchor: {
+    alignSelf: 'center',
   },
   viewModeToggle: {
     flexDirection: 'row',

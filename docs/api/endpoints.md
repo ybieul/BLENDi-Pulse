@@ -3487,6 +3487,143 @@ Dates are `weekStartDate` values in `YYYY-MM-DD` format, sorted chronologically.
 
 ---
 
+## Tutorial (CP-C2)
+
+Guided tour (coach marks) script and per-account progress. The script is data, defined once in `packages/shared/src/tutorial/tutorial.content.ts` and validated by `tutorialContentSchema` (`packages/shared/src/schemas/tutorial.ts`); the mobile app ships the same file as an embedded fallback. All four routes use the global authenticated rate limit (120 requests/min per user). Logs never include the request body or the user id. How to add a step: `docs/tutorial/README.md`.
+
+### GET /tutorial
+
+Returns the tour script.
+
+**JWT required:** Yes
+
+**Caching:** responds with `ETag` (hash of the validated content) and `Cache-Control: private, max-age=300`. A request with a matching `If-None-Match` gets `304 Not Modified` with no body.
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": {
+      "schemaVersion": 1,
+      "contentVersion": 1,
+      "whatsNewIntro": {
+        "en": { "title": "What Is New", "body": "..." },
+        "pt-BR": { "title": "Novidades", "body": "..." }
+      },
+      "steps": [
+        {
+          "id": "home.rings",
+          "order": 50,
+          "screen": "Home",
+          "anchor": "home.rings",
+          "placement": "auto",
+          "addedInVersion": 1,
+          "text": {
+            "en": { "title": "Your Daily Rings", "body": "..." },
+            "pt-BR": { "title": "Seus anéis do dia", "body": "..." }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Step fields: `id` (stable, unique, `area.name` format), `order` (unique), `screen` (app route name), `anchor` (optional; no anchor = centered balloon), `placement` (`above` | `below` | `auto`), `condition` (optional, closed list: `isPro`, `notPro`, `hasBlendi`, `noBlendi`), `addedInVersion`, `text.en` and `text["pt-BR"]` (title up to 48 chars, body up to 300).
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Script returned |
+| `304` | `If-None-Match` matches the current `ETag` |
+| `401` | Missing, invalid, or expired Bearer token |
+| `503` | `tutorial/unavailable`: the bundled script failed validation (the app falls back to its embedded copy) |
+
+### GET /tutorial/progress
+
+Returns the authenticated user's tour progress. A user who never started gets the empty progress below (no document is created).
+
+**JWT required:** Yes
+
+**Success response**
+
+**Status:** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "progress": {
+      "seenStepIds": [],
+      "lastStepId": null,
+      "completedAt": null,
+      "skippedAt": null,
+      "contentVersion": null
+    }
+  }
+}
+```
+
+`seenStepIds` means "already handled": shown, or covered by a Skip/Done of a tour where the step existed. The app shows the "what is new" mode only for ids not in this list.
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Progress returned |
+| `401` | Missing, invalid, or expired Bearer token |
+| `500` | Unexpected server error |
+
+### PATCH /tutorial/progress
+
+Merges progress into the user's single document (`tutorial_progress` collection, unique index on `userId`, created on first write).
+
+**JWT required:** Yes
+
+**Request body** (all fields optional, unknown fields rejected)
+
+| Field | Type | Notes |
+|---|---|---|
+| `seenStepIds` | string[] | Up to 100 ids (`area.name` format). Merged with `$addToSet`, never removed. Ids not in the current script are ignored |
+| `lastStepId` | string \| null | Step on screen (resume point). Unknown id is ignored; `null` clears |
+| `status` | `"completed"` \| `"skipped"` | Sets `completedAt` / `skippedAt` to now |
+| `contentVersion` | number | Only goes up (`$max`), capped at the server's script version |
+
+**Success response:** `200 OK` with the updated `progress` (same shape as `GET /tutorial/progress`).
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Progress updated |
+| `400` | `tutorial/invalid-data`: body failed validation (over 100 ids, wrong type, unknown field) |
+| `401` | Missing, invalid, or expired Bearer token |
+| `503` | `tutorial/unavailable` (see `GET /tutorial`) |
+| `500` | Unexpected server error |
+
+### POST /tutorial/progress/reset
+
+Deletes the user's progress ("Replay tutorial" in Me). Responds with the empty progress.
+
+**JWT required:** Yes
+
+**Status codes**
+
+| Status | Meaning |
+|---|---|
+| `200` | Progress deleted |
+| `401` | Missing, invalid, or expired Bearer token |
+| `500` | Unexpected server error |
+
+`DELETE /users/me` also deletes the `tutorial_progress` document.
+
+---
+
 ## Health
 
 ### GET /ping

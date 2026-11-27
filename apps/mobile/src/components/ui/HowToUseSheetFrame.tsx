@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fonts, fontWeights, spacing } from '@blendi/shared';
 import { useColors } from '../../hooks/useColors';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 export interface HowToUseSheetFrameProps {
   visible: boolean;
@@ -22,6 +23,8 @@ export interface HowToUseSheetFrameProps {
 }
 
 export function HowToUseSheetFrame({ visible, onClose, title, closeLabel, testIDPrefix, children }: HowToUseSheetFrameProps) {
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(visible);
   const colors = useColors();
   const insets = useSafeAreaInsets();
 

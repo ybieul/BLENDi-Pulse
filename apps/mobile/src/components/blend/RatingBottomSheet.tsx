@@ -19,6 +19,7 @@ import {
 } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -53,6 +54,8 @@ export function RatingBottomSheet({
   const starScales = useRef(Array.from({ length: 5 }, () => new Animated.Value(1))).current;
 
   const [isMounted, setIsMounted] = useState(visible);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [selectedRating, setSelectedRating] = useState(0);
 
   useEffect(() => {

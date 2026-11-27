@@ -19,6 +19,8 @@ export * from './schemas/pulseAi';
 export * from './schemas/supplementStack';
 export * from './schemas/user';
 export * from './schemas/weeklyReport';
+export * from './schemas/tutorial';
+export * from './tutorial/tutorial.content';
 export * from './utils/level.utils';
 export * from './utils/homeRecipeCompatibility';
 export * from './utils/textMatching';

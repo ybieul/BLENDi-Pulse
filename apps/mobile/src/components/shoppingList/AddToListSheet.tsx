@@ -33,6 +33,7 @@ import { getLists, type ShoppingListsResult } from '../../services/shoppingList.
 import { appendIngredientsToShoppingList, type ShoppingListIngredientInput } from '../../utils/shoppingListAddItems.utils';
 import { showToast } from '../../utils/toast.utils';
 import { AuthButton } from '../ui/AuthButton';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[55];
@@ -67,6 +68,8 @@ export function AddToListSheet({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const autoAddTriggeredRef = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const shoppingListsQuery = useQuery<

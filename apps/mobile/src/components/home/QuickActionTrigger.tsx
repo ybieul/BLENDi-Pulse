@@ -16,6 +16,7 @@ import {
   fontWeights,
   spacing,
 } from '@blendi/shared';
+import { TutorialAnchor } from '../../features/tutorial/TutorialAnchor';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useUnits } from '../../hooks/useUnits';
@@ -149,8 +150,11 @@ export function QuickActionTrigger({
       alignItems: 'center',
       gap: BUTTON_GAP,
     },
-    button: {
+    // CP-C2: o flex do botão foi para o invólucro da âncora (mesmo layout).
+    buttonSlot: {
       flex: 1,
+    },
+    button: {
       height: BUTTON_HEIGHT,
       borderRadius: BUTTON_RADIUS,
       borderWidth: 1,
@@ -190,53 +194,57 @@ export function QuickActionTrigger({
 
   return (
     <View style={styles.row}>
-      <Pressable
-        onPress={handleLogWaterPress}
-        accessibilityRole="button"
-        style={styles.button}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.waterConfirmation,
-            {
-              opacity: waterConfirmationOpacity,
-              transform: [{ translateY: waterConfirmationTranslateY }],
-            },
-          ]}
+      <TutorialAnchor id="home.logWater" style={styles.buttonSlot}>
+        <Pressable
+          onPress={handleLogWaterPress}
+          accessibilityRole="button"
+          style={styles.button}
         >
-          <Text style={styles.waterConfirmationText}>
-            {waterConfirmationText === '—' ? waterConfirmationText : `+${waterConfirmationText}`}
-          </Text>
-          {showOfflineIndicator ? (
-            <Ionicons
-              name="cloud-offline-outline"
-              size={WATER_OFFLINE_ICON_SIZE}
-              color={WATER_OFFLINE_ICON_COLOR}
-            />
-          ) : null}
-        </Animated.View>
-
-        <View style={styles.buttonContent}>
-          <Animated.View style={{ transform: [{ scale: waterScale }] }}>
-            <Ionicons name="water-outline" size={18} color={WATER_ICON_COLOR} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.waterConfirmation,
+              {
+                opacity: waterConfirmationOpacity,
+                transform: [{ translateY: waterConfirmationTranslateY }],
+              },
+            ]}
+          >
+            <Text style={styles.waterConfirmationText}>
+              {waterConfirmationText === '—' ? waterConfirmationText : `+${waterConfirmationText}`}
+            </Text>
+            {showOfflineIndicator ? (
+              <Ionicons
+                name="cloud-offline-outline"
+                size={WATER_OFFLINE_ICON_SIZE}
+                color={WATER_OFFLINE_ICON_COLOR}
+              />
+            ) : null}
           </Animated.View>
-          <Text style={styles.buttonLabel}>{t('home.logWater')}</Text>
-        </View>
-      </Pressable>
 
-      <Pressable
-        onPress={handleBlendPress}
-        accessibilityRole="button"
-        style={styles.button}
-      >
-        <View style={styles.buttonContent}>
-          <Ionicons name="flash-outline" size={18} color={colors.brand.pulse} />
-          <Text style={styles.buttonLabel}>
-            {lastBlend !== null ? t('home.lastBlend') : t('home.startBlend')}
-          </Text>
-        </View>
-      </Pressable>
+          <View style={styles.buttonContent}>
+            <Animated.View style={{ transform: [{ scale: waterScale }] }}>
+              <Ionicons name="water-outline" size={18} color={WATER_ICON_COLOR} />
+            </Animated.View>
+            <Text style={styles.buttonLabel}>{t('home.logWater')}</Text>
+          </View>
+        </Pressable>
+      </TutorialAnchor>
+
+      <TutorialAnchor id="home.quickBlend" style={styles.buttonSlot}>
+        <Pressable
+          onPress={handleBlendPress}
+          accessibilityRole="button"
+          style={styles.button}
+        >
+          <View style={styles.buttonContent}>
+            <Ionicons name="flash-outline" size={18} color={colors.brand.pulse} />
+            <Text style={styles.buttonLabel}>
+              {lastBlend !== null ? t('home.lastBlend') : t('home.startBlend')}
+            </Text>
+          </View>
+        </Pressable>
+      </TutorialAnchor>
     </View>
   );
 }

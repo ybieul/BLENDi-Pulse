@@ -26,6 +26,7 @@ import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { AuthButton } from '../ui/AuthButton';
 import { AuthInput } from '../ui/AuthInput';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const SUBTITLE_OPACITY = 0.7;
@@ -37,6 +38,8 @@ interface DeleteAccountSheetProps {
 }
 
 export function DeleteAccountSheet({ onConfirm, onClose }: DeleteAccountSheetProps) {
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(true);
   const { t } = useAppTranslation();
   const colors = useColors();
   const { height } = useWindowDimensions();

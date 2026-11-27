@@ -22,6 +22,7 @@ import { useColors } from '../../hooks/useColors';
 import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useGamificationStore } from '../../store/gamification.store';
 import type { TranslationKey } from '../../locales/i18n';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[30];
@@ -49,6 +50,8 @@ export function LevelDetailSheet({ visible, onClose }: LevelDetailSheetProps) {
   const progressAnimation = useRef(new Animated.Value(0)).current;
 
   const [isMounted, setIsMounted] = useState(visible);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
 
   const levelInfo = useMemo(() => calculateLevel(totalXP), [totalXP]);
   const nextLevelInfo = useMemo(() => calculateLevel(levelInfo.xpForNextLevel), [levelInfo.xpForNextLevel]);

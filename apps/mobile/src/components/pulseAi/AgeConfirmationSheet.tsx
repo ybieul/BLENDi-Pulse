@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fonts, fontSizes, fontWeights, spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 export interface AgeConfirmationSheetProps {
   visible: boolean;
@@ -20,6 +21,8 @@ export interface AgeConfirmationSheetProps {
 }
 
 export function AgeConfirmationSheet({ visible, onAnswer, onDismiss }: AgeConfirmationSheetProps) {
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(visible);
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { t } = useAppTranslation();

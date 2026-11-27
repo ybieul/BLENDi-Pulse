@@ -66,6 +66,8 @@ import { DailyRecipeCard } from '../components/home/DailyRecipeCard';
 import { HomeGreetingHeader, LEVEL_PROGRESS_BAR_WIDTH } from '../components/home/HomeGreetingHeader';
 import { MissionCard } from '../components/missions/MissionCard';
 import { getDailyMissions } from '../services/dailyMission.service';
+import { TutorialAnchor } from '../features/tutorial/TutorialAnchor';
+import { useTutorialScrollRef } from '../features/tutorial/useTutorialScrollRef';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,8 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
   const setGamificationTotalXP = useGamificationStore((state) => state.setTotalXP);
   const totalXP = useGamificationStore((state) => state.totalXP);
   const setPendingProtocol = usePulseAIStore((state) => state.setPendingProtocol);
+  // CP-C2: o tutorial rola até as âncoras fora da área visível.
+  const tutorialScrollRef = useTutorialScrollRef('Home');
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -393,6 +397,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
       <AuroraBackground intensity="reduced" />
 
       <ScrollView
+        ref={tutorialScrollRef}
         removeClippedSubviews={true}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -425,16 +430,18 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
           <Animated.View style={{ opacity: fadeAnim }}>
 
             {/* ── Saudação (primeiro nome) + nível + badge de plano ────────── */}
-            <HomeGreetingHeader
-              greeting={greeting}
-              formattedDate={formattedDate}
-              level={levelInfo.level}
-              levelProgressWidth={levelProgressWidth}
-              isPro={isPro}
-              onLevelPress={() => {
-                setShowLevelDetail(true);
-              }}
-            />
+            <TutorialAnchor id="home.header">
+              <HomeGreetingHeader
+                greeting={greeting}
+                formattedDate={formattedDate}
+                level={levelInfo.level}
+                levelProgressWidth={levelProgressWidth}
+                isPro={isPro}
+                onLevelPress={() => {
+                  setShowLevelDetail(true);
+                }}
+              />
+            </TutorialAnchor>
 
             <View style={styles.spacer20} />
 
@@ -446,7 +453,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
             <View style={styles.spacer24} />
 
             {/* ── Goal Rings ─────────────────────────────────────────────── */}
-            <View style={styles.rowPad}>
+            <TutorialAnchor id="home.rings" style={styles.rowPad}>
               <GoalRingsSection
                 proteinCurrent={logsData?.totalProtein ?? 0}
                 proteinTarget={profile?.dailyProteinTarget ?? 0}
@@ -458,19 +465,19 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                 hydrationTarget={hydrationData?.goalMl ?? HYDRATION_TARGET_ML}
                 dataUpdatedAt={blendLogsUpdatedAt}
               />
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.spacer24} />
 
             {/* ── Streak Badge ───────────────────────────────────────────── */}
-            <View style={styles.rowPad}>
+            <TutorialAnchor id="home.streak" style={styles.rowPad}>
               <StreakBadge streakDays={profile?.streakDays ?? 0} />
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.spacer20} />
 
             {/* ── Daily Missions ──────────────────────────────────────────── */}
-            <View style={styles.rowPad}>
+            <TutorialAnchor id="home.missions" style={styles.rowPad}>
               <View style={styles.missionsHeader}>
                 <Ionicons name="trophy-outline" size={18} color={colors.brand.pulse} />
                 <Text style={styles.missionsHeaderTitle}>{t('home.dailyMissions')}</Text>
@@ -500,7 +507,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                   ))}
                 </View>
               ) : null}
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.spacer20} />
 
@@ -510,14 +517,14 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
             <View style={styles.spacer12} />
 
             {/* ── Protocol Cards (padding esquerdo, sangra à direita) ──────── */}
-            <View style={styles.protocolsWrapper}>
+            <TutorialAnchor id="home.protocols" style={styles.protocolsWrapper}>
               <QuickProtocolCards onProtocolSelect={handleProtocolSelect} />
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.spacer24} />
 
             {/* ── Daily Recipe Card ──────────────────────────────────────── */}
-            <View style={styles.rowPad}>
+            <TutorialAnchor id="home.dailyRecipe" style={styles.rowPad}>
               <DailyRecipeCard
                 goal={profile?.goal ?? 'Wellness'}
                 dietaryPreferences={dietaryPreferences}
@@ -526,7 +533,7 @@ export function HomeScreen({ navigation }: AppTabScreenProps<'Home'>) {
                 onStartBlend={handleStartBlend}
                 onAskPulseAi={handleAskPulseAiForRecipe}
               />
-            </View>
+            </TutorialAnchor>
 
             <View style={styles.spacer8} />
 

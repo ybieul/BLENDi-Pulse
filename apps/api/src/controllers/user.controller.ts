@@ -26,6 +26,7 @@ import { GoogleAuthCodeModel } from '../models/GoogleAuthCode';
 import { LockedPreviewModel } from '../models/LockedPreview';
 import { OtpModel } from '../models/Otp';
 import { PantryReadModel } from '../models/PantryRead';
+import { TutorialProgressModel } from '../models/TutorialProgress';
 import { invalidateUserCache } from '../services/cache.service';
 import { revokeAppleRefreshToken } from '../services/apple.service';
 import {
@@ -533,6 +534,8 @@ export async function deleteAccount(
           // CP-B8a: leituras da foto do Pantry Scanner (antes sumiam só pelo
           // TTL de 30 min) e códigos de verificação pendentes do e-mail.
           PantryReadModel.deleteMany({ userId }, { session }),
+          // CP-C2: progresso do tutorial guiado (1 documento por usuário).
+          TutorialProgressModel.deleteMany({ userId }, { session }),
           ...(owner?.email ? [OtpModel.deleteMany({ email: owner.email }, { session })] : []),
           invalidateUserCache(userId, session),
         ]);

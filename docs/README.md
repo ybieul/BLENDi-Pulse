@@ -203,6 +203,13 @@ Follow-up of the 2026-11-16 AI recipe audit (`Claude-outputs/auditoria-receitas-
 |---|---|
 | [fixes/teste-eas-preview-25-26-11.md](fixes/teste-eas-preview-25-26-11.md) | Fixes from the first EAS preview build test (25-26/11). First and last name on the user (`firstName`/`lastName`, ≤ 50 chars, cleaned like single-line free text; `name` always rebuilt by the backend; legacy accounts read tolerantly from `name`, no migration) and `nameNeedsConfirmation` for Apple/Google sign-ups without a real name (asked in the first onboarding step; editable in a new profile "Name" screen; email sign-up split into First/Last name). Home greets by first name in a single ellipsized line beside level and plan badge. Apple/Google accounts are created in the device language (`preferredLanguage` in `POST /auth/apple` and in the signed Google `state`; login never changes it). White Pantry camera icons. Single `MacroChips` component with visible macro names and full screen-reader labels in every macro card. Pulse AI input in the layout flow with the measured keyboard overlap (no double-counted tab bar). Blend tab circle no longer covers its label; tab bar adds the bottom safe area. Camera zoom/lenses pending a decision (expo-camera 17 does not expose zoom factors or lens types) |
 
+### Fixes — CP-C2 (Guided tutorial / coach marks)
+
+| Document | Description |
+|---|---|
+| [fixes/cp-c2-tutorial-guiado.md](fixes/cp-c2-tutorial-guiado.md) | Data-driven guided tour through Home, Pulse AI, Blend, Track and Me. Script defined once in `packages/shared/src/tutorial/tutorial.content.ts` (Zod schema in `schemas/tutorial.ts`, en and pt-BR, closed condition list), served by `GET /tutorial` (ETag by content hash, 304) and embedded in the app as fallback. Per-account progress in `tutorial_progress` (`GET`/`PATCH /tutorial/progress`, `POST /tutorial/progress/reset`, unknown ids ignored, 100-id cap), included in account deletion (18 collections). Mobile engine in `apps/mobile/src/features/tutorial/`: SVG spotlight animated with Reanimated, balloon that never leaves the safe area, automatic navigation and scroll, silent skip of steps that do not apply, pause under sheets/paywall/level-up/system alerts, offline queue, resume, "what is new" mode with only unseen ids, Android back, screen reader focus, reduce motion. "Replay tutorial" row in Me. API 1617 → 1646 tests, mobile 1134 → 1193 |
+| [tutorial/README.md](tutorial/README.md) | How to add a tutorial step (anchor, catalog, script entry, `addedInVersion`, `contentVersion`), how to test it, and what happens to users who already saw the tour |
+
 ---
 
 ## Key Decisions

@@ -13,6 +13,7 @@ import {
 import { colors, fonts, fontWeights, spacing } from '@blendi/shared';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import type { ShareCardFormat } from './RecipeShareCard';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const BACKDROP_COLOR = colors.overlay.black[32];
 const SHEET_BACKGROUND = colors.decorative.shareSheetBackground;
@@ -43,6 +44,8 @@ export function ShareFormatSheet({ visible, onSelect, onClose }: ShareFormatShee
   const translateY = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = useState(visible);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
 
   useEffect(() => {
     translateY.setValue(height);

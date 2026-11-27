@@ -29,6 +29,7 @@ import { useColors } from '../../hooks/useColors';
 import { showToast } from '../../utils/toast.utils';
 import { appendIngredientsToShoppingList } from '../../utils/shoppingListAddItems.utils';
 import { AuthButton } from '../ui/AuthButton';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const BACKDROP_COLOR = colors.overlay.black[55];
@@ -69,6 +70,8 @@ export function ImportFromFavoritesSheet({
   const translateY = useRef(new Animated.Value(height)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = useState(visible);
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(isMounted);
   const [step, setStep] = useState<ImportStep>('selectRecipe');
   const [selectedRecipe, setSelectedRecipe] = useState<FavoriteItem | null>(null);
   const [selectedIngredientIndexes, setSelectedIngredientIndexes] = useState<Set<number>>(new Set());

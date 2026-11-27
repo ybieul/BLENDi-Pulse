@@ -70,6 +70,7 @@ import { AllergyConfirmationSheet } from '../components/allergies/AllergyConfirm
 import { formatAllergenList, readProfileAllergies } from '../utils/allergies.utils';
 import { trackEvent } from '../services/analytics.service';
 import { showToast } from '../utils/toast.events';
+import { TutorialAnchor } from '../features/tutorial/TutorialAnchor';
 import { PANTRY_SCAN_LIMIT_FREE, QUERY_KEYS } from '../config/cache.config';
 import type {
   AppTabParamList,
@@ -1100,33 +1101,37 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
             <Ionicons name="add-circle-outline" size={24} color={colors.text.secondary} />
           </Pressable>
 
-          <Pressable
-            style={styles.headerButton}
-            onPress={handleHistoryPress}
-            accessibilityRole="button"
-            accessibilityLabel={t('pulseAi.historyButton')}
-          >
-            <Ionicons name="time-outline" size={24} color={colors.text.secondary} />
-          </Pressable>
+          <TutorialAnchor id="pulseAi.history">
+            <Pressable
+              style={styles.headerButton}
+              onPress={handleHistoryPress}
+              accessibilityRole="button"
+              accessibilityLabel={t('pulseAi.historyButton')}
+            >
+              <Ionicons name="time-outline" size={24} color={colors.text.secondary} />
+            </Pressable>
+          </TutorialAnchor>
         </View>
 
         <View style={styles.headerTitleRow}>
           <Text style={styles.headerTitle}>{t('navigation.pulseAI')}</Text>
           {/* CP-B5: "Como usar" — discreto, ao lado do título. */}
-          <Pressable
-            style={styles.howToUseButton}
-            onPress={handleHowToUsePress}
-            accessibilityRole="button"
-            accessibilityLabel={t('pulseAi.howToUse.a11yLabel')}
-            hitSlop={6}
-            testID="pulse-ai-how-to-use-button"
-          >
-            <Ionicons name="help-circle-outline" size={18} color={colors.text.secondary} />
-          </Pressable>
+          <TutorialAnchor id="pulseAi.howToUse">
+            <Pressable
+              style={styles.howToUseButton}
+              onPress={handleHowToUsePress}
+              accessibilityRole="button"
+              accessibilityLabel={t('pulseAi.howToUse.a11yLabel')}
+              hitSlop={6}
+              testID="pulse-ai-how-to-use-button"
+            >
+              <Ionicons name="help-circle-outline" size={18} color={colors.text.secondary} />
+            </Pressable>
+          </TutorialAnchor>
         </View>
 
         <View style={[styles.headerSide, styles.headerRightActions]}>
-          <View style={styles.headerActionWithBadge}>
+          <TutorialAnchor id="pulseAi.pantry" style={styles.headerActionWithBadge}>
             <Pressable
               style={styles.headerButton}
               onPress={handlePantryScannerPress}
@@ -1141,9 +1146,9 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
                 <Text style={styles.badgeText}>{String(remainingPantryScans)}</Text>
               </View>
             ) : null}
-          </View>
+          </TutorialAnchor>
 
-          <View style={styles.headerActionWithBadge}>
+          <TutorialAnchor id="pulseAi.favorites" style={styles.headerActionWithBadge}>
             <Pressable
               style={styles.headerButton}
               onPress={handleFavoritesPress}
@@ -1164,7 +1169,7 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
                 </Animated.View>
               )}
             </Pressable>
-          </View>
+          </TutorialAnchor>
         </View>
       </View>
 
@@ -1201,15 +1206,21 @@ export function PulseAIScreen({ navigation, route }: PulseAIStackScreenProps<'Pu
       />
 
       {/* ── Indicador de uso (acima do ChatInput) ── */}
-      {isConnected ? <UsageIndicator usageRemaining={usageRemaining} /> : null}
+      {isConnected ? (
+        <TutorialAnchor id="pulseAi.usage">
+          <UsageIndicator usageRemaining={usageRemaining} />
+        </TutorialAnchor>
+      ) : null}
 
       {/* ── Campo de input fixado no bottom ── */}
-      <ChatInput
-        ref={chatInputRef}
-        onSend={handleSend}
-        isLoading={isLoading}
-        usageRemaining={usageRemaining}
-      />
+      <TutorialAnchor id="pulseAi.input">
+        <ChatInput
+          ref={chatInputRef}
+          onSend={handleSend}
+          isLoading={isLoading}
+          usageRemaining={usageRemaining}
+        />
+      </TutorialAnchor>
 
       <HowToUseSheet
         allergies={readProfileAllergies(authUser)}

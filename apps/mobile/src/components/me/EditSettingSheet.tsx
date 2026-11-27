@@ -33,6 +33,7 @@ import { SelectionCard } from '../ui/SelectionCard';
 import type { TranslationKey } from '../../locales/i18n';
 import { BLENDER_OPTIONS } from '../../utils/blenderOwnership.utils';
 import { resolveBlenderTextKey } from '../../utils/blenderText.utils';
+import { useTutorialBlockingSurface } from '../../features/tutorial/useTutorialBlockingSurface';
 
 const SHEET_RADIUS = 24;
 const SUBTITLE_OPACITY = 0.7;
@@ -191,6 +192,8 @@ export function EditSettingSheet({
   onConfirm,
   onClose,
 }: EditSettingSheetProps) {
+  // CP-C2: com esta folha aberta, o tutorial guiado espera.
+  useTutorialBlockingSurface(true);
   const { t } = useAppTranslation();
   const titleKey = resolveBlenderTextKey(TITLE_KEYS[type], blendiOwnership);
   const colors = useColors();

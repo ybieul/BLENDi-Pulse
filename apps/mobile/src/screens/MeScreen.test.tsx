@@ -143,6 +143,7 @@ import { SettingRow } from '../components/me/SettingRow';
 import { QUERY_KEYS } from '../config/cache.config';
 import { calculateUserBadges } from '../utils/badges.utils';
 import { MeScreen } from './MeScreen';
+import { TutorialContext } from '../features/tutorial/tutorialContext';
 
 type MeProps = ComponentProps<typeof MeScreen>;
 
@@ -214,7 +215,8 @@ describe('MeScreen — card de configurações', () => {
 
   // CP-B6: + "Alergias", logo depois de "Minhas metas" (antes eram 6 linhas).
   // Teste no build EAS (25-26/11): + "Nome" no topo (antes eram 7 linhas).
-  it('o card tem exatamente 8 linhas: nome, modelo, goal, minhas metas, alergias, unidade, idioma e tema', () => {
+  // CP-C2: + "Ver tutorial de novo" no fim (antes eram 8 linhas).
+  it('o card tem exatamente 9 linhas: nome, modelo, goal, minhas metas, alergias, unidade, idioma, tema e ver tutorial de novo', () => {
     const { UNSAFE_getAllByType, getByText } = renderMe();
     const labels = UNSAFE_getAllByType(SettingRow).map((row) => (row.props as { label: string }).label);
 
@@ -227,9 +229,28 @@ describe('MeScreen — card de configurações', () => {
       en.profile.unitSystem,
       en.profile.language.label,
       en.me.theme.label,
+      en.tutorial.replayRow,
     ]);
     // O valor de hidratação (3000 ml) não aparece em lugar nenhum do Me.
     expect(() => getByText(/3[.,]?000/)).toThrow();
+  });
+
+  it('CP-C2: "Ver tutorial de novo" chama o replay do tutorial', () => {
+    const replay = jest.fn();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    queryClient.setQueryData(QUERY_KEYS.userProfile, { success: true, data: { user: PROFILE } });
+    const props = { navigation, route: { key: 'me', name: 'Me' } } as unknown as MeProps;
+    const { getByText } = render(
+      <QueryClientProvider client={queryClient}>
+        <TutorialContext.Provider value={{ replay, isRunning: false }}>
+          <MeScreen {...props} />
+        </TutorialContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.press(getByText(en.tutorial.replayRow));
+    expect(replay).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('modelo, goal, unidade, idioma e tema continuam no card', () => {
