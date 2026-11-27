@@ -3,7 +3,7 @@
 // "Algum pedido?" passa pela mesma conferência do Pulse AI: alimento citado
 // (até 2 novas tentativas) e valor pedido (1 nova tentativa) viram aviso no
 // card, com sugestão que respeita a dieta.
-// Mesma montagem de pantryScanner.cpB54.test.ts (models fakes em memória).
+// Mesma montagem de pantryScanner.twoStep.test.ts (models fakes em memória).
 // Rodar com: pnpm --filter @blendi/api test
 import assert from 'node:assert/strict';
 import { before, beforeEach, describe, it, mock } from 'node:test';

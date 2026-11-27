@@ -36,6 +36,7 @@
 // total abaixo pode esconder itens não medidos — risco aceito para não
 // bloquear receitas corretas por falta de unidade.
 
+import { ML_PER_US_FLUID_OUNCE } from '@blendi/shared';
 import { findTypicalIngredientWeight, findUnitIngredientWeight } from './ingredientWeights.utils';
 
 /** Medidas caseiras que podem usar o peso típico do ingrediente (CP-B3). */
@@ -49,7 +50,7 @@ const UNIT_TO_ML: ReadonlyArray<readonly [RegExp, number, HouseholdMeasure?]> = 
   // CP-B2: o texto já chega sem acento (normalize), então "onça" vira
   // "onca" — antes a regex esperava "ç" e "onça fluida" nunca era lida.
   // CP-A (ajuste 7): "fluid oz" também ("8 fluid oz" contava 0).
-  [/^(fl\.?\s*oz|fluid\s+(?:ounces?|oz)|oncas?\s+fluidas?)\b/, 29.5735],
+  [/^(fl\.?\s*oz|fluid\s+(?:ounces?|oz)|oncas?\s+fluidas?)\b/, ML_PER_US_FLUID_OUNCE],
   [/^(colher(es)?\s+de\s+sopa|tablespoons?|tbsps?|tbs|cs)\b/, 14.787, 'tbsp'],
   [/^(colher(es)?\s+de\s+cha|colher(es)?\s+de\s+cafe|teaspoons?|tsps?|cc)\b/, 4.929, 'tsp'],
   [/^(colher(es)?)\b/, 4.929, 'tsp'],

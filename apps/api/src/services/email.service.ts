@@ -24,6 +24,7 @@ import { PasswordResetEmail } from './email-templates/passwordResetEmail';
 
 import emailEn from '../locales/email-en.json';
 import emailPtBr from '../locales/email-pt-br.json';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 type EmailLocale = typeof emailEn;
 
@@ -169,7 +170,7 @@ export class EmailService implements IEmailService {
       });
     } catch (err) {
       // Falha silenciosa: o usuário já foi criado. Não propagar erro para o controller.
-      console.error('[EmailService] Failed to send welcome email:', err);
+      console.error('[EmailService] Failed to send welcome email:', describeErrorForLog(err));
     }
   }
 
@@ -198,7 +199,7 @@ export class EmailService implements IEmailService {
         `[EmailService] Email provider not configured — verification email NOT sent (recipient omitted from logs)`
       );
     } catch (err) {
-      console.error('[EmailService] Failed to send verification email:', err);
+      console.error('[EmailService] Failed to send verification email:', describeErrorForLog(err));
     }
   }
 
@@ -266,7 +267,7 @@ export class EmailService implements IEmailService {
       });
     } catch (err) {
       // Falha silenciosa: o cliente já recebeu 200. Não vazar detalhes internos.
-      console.error('[EmailService] Failed to send password reset email:', err);
+      console.error('[EmailService] Failed to send password reset email:', describeErrorForLog(err));
     }
   }
 }

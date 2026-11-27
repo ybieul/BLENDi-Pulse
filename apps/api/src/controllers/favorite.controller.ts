@@ -7,6 +7,7 @@ import { UserModel } from '../models/User';
 import { updateMissionProgress } from '../services/missionProgress.service';
 import { awardXP } from '../services/xp.service';
 import { sendErrorResponse, VALIDATION_ERROR_MESSAGE } from '../utils/error.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 type FavoriteRecord = IFavorite & {
   _id: mongoose.Types.ObjectId | string;
@@ -182,7 +183,7 @@ export async function addFavorite(
 
       Promise.resolve()
         .then(() => updateMissionProgress(userId, 'favoriteRecipe', user.timezone))
-        .catch(err => console.error('Mission update failed:', err));
+        .catch(err => console.error('Mission update failed:', describeErrorForLog(err)));
 
       res.status(201).json({
         success: true,

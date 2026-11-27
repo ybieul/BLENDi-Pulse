@@ -30,6 +30,7 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 const emailService = new EmailService();
 
@@ -98,7 +99,7 @@ export async function forgotPassword(
       await emailService.sendPasswordResetEmail(user.name, email, otp, user.locale);
     } catch (err) {
       // Resposta 200 já foi enviada — só logar. Nunca tentar responder de novo.
-      console.error('[forgotPassword] Failed to send password reset email:', err);
+      console.error('[forgotPassword] Failed to send password reset email:', describeErrorForLog(err));
     }
   } catch (err) {
     next(err);

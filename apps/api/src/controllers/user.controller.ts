@@ -54,6 +54,7 @@ import {
   normalizeNotificationPreferences,
   serializeUserProfile,
 } from '../utils/userProfile.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 const MAX_PROFILE_PHOTO_BASE64_LENGTH = 530_000;
 
@@ -491,15 +492,15 @@ export async function deleteAccount(
         .lean();
       appleRefreshToken = userWithAppleToken?.appleRefreshToken;
     } catch (err) {
-      console.error('[user.controller] failed to read appleRefreshToken before deletion', {
-        userId,
-        err,
-      });
+      // CP-L1: sem userId nem objeto bruto (só nome/código do erro).
+      console.error('[user.controller] failed to read appleRefreshToken before deletion', describeErrorForLog(err));
     }
 
     if (appleRefreshToken) {
       void revokeAppleRefreshToken(appleRefreshToken).catch(err => {
-        console.error('[user.controller] Apple token revocation failed', { userId, err });
+        // CP-L1: só o motivo (a mensagem é montada em apple.service com o
+        // código de erro da Apple ou o status HTTP; sem token, e-mail ou corpo).
+        console.error('[user.controller] Apple token revocation failed', describeErrorForLog(err, { includeMessage: true }));
       });
     }
 

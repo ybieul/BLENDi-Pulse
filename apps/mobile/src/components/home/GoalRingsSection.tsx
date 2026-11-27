@@ -11,7 +11,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import {
-  colors,
   fontSizes,
   fonts,
   fontWeights,
@@ -27,7 +26,6 @@ import { useUnits } from '../../hooks/useUnits';
 import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 import { GoalRing } from '../ui/GoalRing';
 
-const HYDRATION_FILL_COLOR = colors.overlay.info[70];
 const HYDRATION_TEXT_OPACITY = 0.6;
 const HYDRATION_BAR_HEIGHT = 6;
 const HYDRATION_BAR_RADIUS = 3;
@@ -68,6 +66,9 @@ export function GoalRingsSection({
 }: GoalRingsSectionProps) {
   const colors = useColors();
   const HYDRATION_TRACK_COLOR = colors.overlay.plum[8];
+  // CP-L1: mesma cor de meta batida da barra do Track (overlay.success[70]).
+  const HYDRATION_FILL_COLOR = colors.overlay.info[70];
+  const HYDRATION_GOAL_FILL_COLOR = colors.overlay.success[70];
 
   const { t } = useAppTranslation();
   const { displayHydration } = useUnits();
@@ -118,15 +119,28 @@ export function GoalRingsSection({
     ));
   };
 
+  const isHydrationGoalReached = hydrationTarget > 0 && hydrationCurrent >= hydrationTarget;
+
+  // A cor acompanha a animação da largura: fica verde quando a barra chega
+  // ao fim (progresso 1 = meta batida), sem animação nova.
+  const hydrationAnimatedColor = hydrationAnimatedProgress.interpolate({
+    inputRange: [0, 0.999, 1],
+    outputRange: [HYDRATION_FILL_COLOR, HYDRATION_FILL_COLOR, HYDRATION_GOAL_FILL_COLOR],
+  });
+
   const hydrationAnimatedWidth = hydrationAnimatedProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, hydrationTrackWidth],
   });
 
-  const hydrationProgressLabel = t('home.hydrationBar', {
+  const hydrationLabelValues = {
     current: displayHydration(hydrationCurrent),
     target: displayHydration(hydrationTarget),
-  });
+  };
+  const hydrationProgressLabel = t('home.hydrationBar', hydrationLabelValues);
+  const hydrationAccessibilityLabel = isHydrationGoalReached
+    ? t('home.hydrationBarGoalReached', hydrationLabelValues)
+    : hydrationProgressLabel;
 
   const styles = StyleSheet.create({
     section: {
@@ -167,7 +181,6 @@ export function GoalRingsSection({
     hydrationFill: {
       height: HYDRATION_BAR_HEIGHT,
       borderRadius: HYDRATION_BAR_RADIUS,
-      backgroundColor: HYDRATION_FILL_COLOR,
     },
     hydrationText: {
       color: colors.text.primary,
@@ -217,8 +230,9 @@ export function GoalRingsSection({
       </View>
 
       <View
-        accessibilityLabel={hydrationProgressLabel}
+        accessibilityLabel={hydrationAccessibilityLabel}
         style={styles.hydrationRow}
+        testID="home-hydration-bar"
       >
         <Ionicons name="water-outline" size={14} color={colors.feedback.info} />
 
@@ -227,7 +241,7 @@ export function GoalRingsSection({
             <Animated.View
               style={[
                 styles.hydrationFill,
-                { width: hydrationAnimatedWidth },
+                { width: hydrationAnimatedWidth, backgroundColor: hydrationAnimatedColor },
               ]}
             />
           </View>

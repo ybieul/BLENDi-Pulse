@@ -149,7 +149,7 @@ async function fetchGoalsProfile(): Promise<GoalsProfileResponse> {
 export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { t } = useAppTranslation();
+  const { t, locale } = useAppTranslation();
   // Mesma fonte da unidade que a Home usa; sem unidade conhecida, métrico (ml).
   const { unitSystem } = useUnits();
   const queryClient = useQueryClient();
@@ -528,15 +528,15 @@ export function NutritionGoalsScreen({ navigation }: NutritionGoalsScreenProps) 
     const { min, max } = getGoalDisplayLimits(field, unitSystem);
     const isFlOz = isGoalFieldInFlOz(field, unitSystem);
     const label = isFlOz ? HYDRATION_LABEL_IMPERIAL : GOAL_FIELD_LABELS[field];
-    const value = draftText ?? formatGoalDisplayValue(field, baseline[field], unitSystem);
+    const value = draftText ?? formatGoalDisplayValue(field, baseline[field], unitSystem, locale);
     // Só depois que a pessoa digitou algo (mesmo critério do onboarding).
     const error =
       draftText !== undefined &&
       draftText.length > 0 &&
       !isGoalTextValid(field, draftText, unitSystem, baseline)
         ? t('errors.validation.number_range', {
-            min: formatGoalLimit(field, min, unitSystem),
-            max: formatGoalLimit(field, max, unitSystem),
+            min: formatGoalLimit(field, min, unitSystem, locale),
+            max: formatGoalLimit(field, max, unitSystem, locale),
           })
         : undefined;
     const fieldWarnings = warnings[field] ?? [];

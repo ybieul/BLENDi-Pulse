@@ -135,7 +135,7 @@ As promessas sobre o Pantry ("more Pantry scans" / "mais leituras da despensa") 
 
 ## Observações (fora do escopo, não mexi)
 
-1. **Imperial com ponto em pt-BR:** o `displayVolume` formata fl oz com `toFixed(1)`, então em pt-BR aparece "8.5 fl oz" (com ponto) no botão e agora no tour. Mantive o mesmo formatador do botão, como pedido. Trocar para vírgula muda o botão também.
+1. **Imperial com ponto em pt-BR** (resolvido no CP-L1: agora "8,5 fl oz"): o `displayVolume` formata fl oz com `toFixed(1)`, então em pt-BR aparece "8.5 fl oz" (com ponto) no botão e agora no tour. Mantive o mesmo formatador do botão, como pedido. Trocar para vírgula muda o botão também.
 2. **`PANTRY_SCANNER_MONTHLY_LIMIT` e `PANTRY_SCANNER_PRO_LIMIT` (999) no `apps/api/src/config/cache.config.ts` não são usados em lugar nenhum.** O primeiro agora aponta para a fonte única; os dois poderiam sair num CP de limpeza.
 3. **Bônus de 20 XP das missões** (`dailyMission.controller.ts`, `xpAvailable`) é outro número escrito à mão, fora da lista deste CP.
 4. **"Last 7 days" (Track)** está escrito no roteiro e no app (`track.last7Days`); é o período do gráfico, não limite do plano. Se mudar, precisa de marcador.

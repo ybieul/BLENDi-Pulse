@@ -19,12 +19,22 @@ interface AiRequestBudgetStore {
 
 const aiRequestBudgetStorage = new AsyncLocalStorage<AiRequestBudgetStore>();
 
+/**
+ * CP-L1: relógio do orçamento, trocável nos testes (o mesmo relógio falso do
+ * aiProvider). Antes o prazo era gravado com Date.now() real e o teste só
+ * alinhava o relógio falso depois: sob carga sobrava 1 ms e o teste na borda
+ * da janela falhava às vezes.
+ */
+export const aiRequestBudgetClock = {
+  now: (): number => Date.now(),
+};
+
 export function runWithAiRequestBudget<T>(budgetMs: number, operation: () => Promise<T>): Promise<T> {
-  return aiRequestBudgetStorage.run({ deadline: Date.now() + budgetMs }, operation);
+  return aiRequestBudgetStorage.run({ deadline: aiRequestBudgetClock.now() + budgetMs }, operation);
 }
 
 /** Tempo restante do orçamento da requisição atual; null fora de um orçamento. */
-export function getAiRequestRemainingMs(now = Date.now()): number | null {
+export function getAiRequestRemainingMs(now = aiRequestBudgetClock.now()): number | null {
   const store = aiRequestBudgetStorage.getStore();
 
   if (!store) {

@@ -26,6 +26,25 @@ export function formatDecimal(value: number, locale: SupportedLocale, decimalDig
 }
 
 /**
+ * CP-L1 — Mesmo que formatDecimal, mas SEMPRE com `decimalDigits` casas
+ * ("80.0" / "80,0"): o formato que o app já mostrava com toFixed, agora com
+ * o separador do idioma. Arredonda antes (meio para cima, como o toFixed dos
+ * valores já arredondados por roundToOneDecimal). Sem separador de milhar,
+ * para o texto continuar aceito pelos campos (parseStrictDecimal).
+ *
+ * @example
+ *   formatFixedDecimal(8.4535, 'pt-BR') // "8,5"
+ *   formatFixedDecimal(80, 'en')        // "80.0"
+ */
+export function formatFixedDecimal(value: number, locale: SupportedLocale, decimalDigits = 1): string {
+  return new Intl.NumberFormat(toIntlLocale(locale), {
+    minimumFractionDigits: decimalDigits,
+    maximumFractionDigits: decimalDigits,
+    useGrouping: false,
+  }).format(value);
+}
+
+/**
  * Formata um número inteiro potencialmente grande com separador de milhar
  * correto para o locale.
  *

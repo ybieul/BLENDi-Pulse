@@ -120,6 +120,7 @@ import {
   validateRecipeRestrictions,
   type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 // CP-1.1.4b: prévias bloqueadas por ciclo mensal, depois dos scans grátis.
 const LOCKED_PREVIEW_KIND = 'pantry_scanner';
@@ -341,7 +342,7 @@ async function triggerPantryScannerXP(userId: string, timezone: string): Promise
 function triggerPantryScannerMissionProgress(userId: string, timezone: string): void {
   Promise.resolve()
     .then(() => updateMissionProgress(userId, 'scanPantry', timezone))
-    .catch(err => console.error('Mission update failed:', err));
+    .catch(err => console.error('Mission update failed:', describeErrorForLog(err)));
 }
 
 function getNextScanResetDate(scanResetDate: Date, now = new Date()): Date {

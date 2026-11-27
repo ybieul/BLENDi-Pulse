@@ -26,6 +26,7 @@ import {
   type PushNotificationPayload,
 } from '../services/pushNotification.service';
 import { getMidnightUTC, getNextOccurrenceUTC, toLocalDate } from '../utils/timezone.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 const DAILY_PULSE_CRON_EXPRESSION = '*/5 * * * *';
 const HALF_HOUR_CRON_EXPRESSION = '*/30 * * * *';
@@ -207,7 +208,7 @@ async function reserveDeliveredNotifications(
         reserveNotificationLog(entry.userId, entry.type, entry.notificationDate).catch(err => {
           console.error(
             `[NotificationJob:${jobName}] Failed to reserve notification log after successful delivery`,
-            { userId: entry.userId, type: entry.type, err }
+            { type: entry.type, ...describeErrorForLog(err) }
           );
         })
       )
@@ -236,7 +237,7 @@ async function runDailyPulseJob(): Promise<void> {
       .lean<DailyPulseUserCandidate[]>()
       .exec();
   } catch (err) {
-    console.error('[NotificationJob:runDailyPulseJob] Failed to load candidate users — aborting this tick', err);
+    console.error('[NotificationJob:runDailyPulseJob] Failed to load candidate users — aborting this tick', describeErrorForLog(err));
     return;
   }
 
@@ -273,7 +274,7 @@ async function runDailyPulseJob(): Promise<void> {
         notificationDate,
       });
     } catch (err) {
-      console.error(`[NotificationJob:runDailyPulseJob] Failed to process user ${String(user._id)}`, err);
+      console.error('[NotificationJob:runDailyPulseJob] Failed to process a user', describeErrorForLog(err));
     }
   }
 
@@ -281,7 +282,7 @@ async function runDailyPulseJob(): Promise<void> {
     const { successfulTokens } = await dispatchNotifications(notifications);
     await reserveDeliveredNotifications('runDailyPulseJob', successfulTokens, pendingReservations);
   } catch (err) {
-    console.error('[NotificationJob:runDailyPulseJob] Failed to dispatch notifications batch', err);
+    console.error('[NotificationJob:runDailyPulseJob] Failed to dispatch notifications batch', describeErrorForLog(err));
   }
 }
 
@@ -307,7 +308,7 @@ async function runStreakReminderJob(): Promise<void> {
       .lean<StreakReminderUserCandidate[]>()
       .exec();
   } catch (err) {
-    console.error('[NotificationJob:runStreakReminderJob] Failed to load candidate users — aborting this tick', err);
+    console.error('[NotificationJob:runStreakReminderJob] Failed to load candidate users — aborting this tick', describeErrorForLog(err));
     return;
   }
 
@@ -349,7 +350,7 @@ async function runStreakReminderJob(): Promise<void> {
         notificationDate,
       });
     } catch (err) {
-      console.error(`[NotificationJob:runStreakReminderJob] Failed to process user ${String(user._id)}`, err);
+      console.error('[NotificationJob:runStreakReminderJob] Failed to process a user', describeErrorForLog(err));
     }
   }
 
@@ -357,7 +358,7 @@ async function runStreakReminderJob(): Promise<void> {
     const { successfulTokens } = await dispatchNotifications(notifications);
     await reserveDeliveredNotifications('runStreakReminderJob', successfulTokens, pendingReservations);
   } catch (err) {
-    console.error('[NotificationJob:runStreakReminderJob] Failed to dispatch notifications batch', err);
+    console.error('[NotificationJob:runStreakReminderJob] Failed to dispatch notifications batch', describeErrorForLog(err));
   }
 }
 
@@ -385,7 +386,7 @@ async function runSupplementReminderJob(): Promise<void> {
   } catch (err) {
     console.error(
       '[NotificationJob:runSupplementReminderJob] Failed to load candidate users — aborting this tick',
-      err
+      describeErrorForLog(err)
     );
     return;
   }
@@ -441,7 +442,7 @@ async function runSupplementReminderJob(): Promise<void> {
         notificationDate,
       });
     } catch (err) {
-      console.error(`[NotificationJob:runSupplementReminderJob] Failed to process user ${String(user._id)}`, err);
+      console.error('[NotificationJob:runSupplementReminderJob] Failed to process a user', describeErrorForLog(err));
     }
   }
 
@@ -449,7 +450,7 @@ async function runSupplementReminderJob(): Promise<void> {
     const { successfulTokens } = await dispatchNotifications(notifications);
     await reserveDeliveredNotifications('runSupplementReminderJob', successfulTokens, pendingReservations);
   } catch (err) {
-    console.error('[NotificationJob:runSupplementReminderJob] Failed to dispatch notifications batch', err);
+    console.error('[NotificationJob:runSupplementReminderJob] Failed to dispatch notifications batch', describeErrorForLog(err));
   }
 }
 
@@ -477,7 +478,7 @@ async function runHydrationReminderJob(): Promise<void> {
   } catch (err) {
     console.error(
       '[NotificationJob:runHydrationReminderJob] Failed to load candidate users — aborting this tick',
-      err
+      describeErrorForLog(err)
     );
     return;
   }
@@ -531,7 +532,7 @@ async function runHydrationReminderJob(): Promise<void> {
         notificationDate,
       });
     } catch (err) {
-      console.error(`[NotificationJob:runHydrationReminderJob] Failed to process user ${String(user._id)}`, err);
+      console.error('[NotificationJob:runHydrationReminderJob] Failed to process a user', describeErrorForLog(err));
     }
   }
 
@@ -539,7 +540,7 @@ async function runHydrationReminderJob(): Promise<void> {
     const { successfulTokens } = await dispatchNotifications(notifications);
     await reserveDeliveredNotifications('runHydrationReminderJob', successfulTokens, pendingReservations);
   } catch (err) {
-    console.error('[NotificationJob:runHydrationReminderJob] Failed to dispatch notifications batch', err);
+    console.error('[NotificationJob:runHydrationReminderJob] Failed to dispatch notifications batch', describeErrorForLog(err));
   }
 }
 
@@ -657,11 +658,7 @@ async function runWeeklyReportJob(): Promise<void> {
         continue;
       }
 
-      console.error(
-        '[notifications.jobs] Weekly Report generation failed for user',
-        String(user._id),
-        err
-      );
+      console.error('[notifications.jobs] Weekly Report generation failed for a user', describeErrorForLog(err));
     }
   }
 
@@ -680,7 +677,7 @@ export function initializeNotificationJobs(): void {
     DAILY_PULSE_CRON_EXPRESSION,
     () => {
       void runDailyPulseJob().catch(err => {
-        console.error('[notifications.jobs] Daily Pulse job failed:', err);
+        console.error('[notifications.jobs] Daily Pulse job failed:', describeErrorForLog(err));
       });
     },
     { noOverlap: true }
@@ -690,7 +687,7 @@ export function initializeNotificationJobs(): void {
     HALF_HOUR_CRON_EXPRESSION,
     () => {
       void runStreakReminderJob().catch(err => {
-        console.error('[notifications.jobs] Streak Reminder job failed:', err);
+        console.error('[notifications.jobs] Streak Reminder job failed:', describeErrorForLog(err));
       });
     },
     { noOverlap: true }
@@ -700,7 +697,7 @@ export function initializeNotificationJobs(): void {
     HALF_HOUR_CRON_EXPRESSION,
     () => {
       void runSupplementReminderJob().catch(err => {
-        console.error('[notifications.jobs] Supplement Reminder job failed:', err);
+        console.error('[notifications.jobs] Supplement Reminder job failed:', describeErrorForLog(err));
       });
     },
     { noOverlap: true }
@@ -710,7 +707,7 @@ export function initializeNotificationJobs(): void {
     HALF_HOUR_CRON_EXPRESSION,
     () => {
       void runHydrationReminderJob().catch(err => {
-        console.error('[notifications.jobs] Hydration Reminder job failed:', err);
+        console.error('[notifications.jobs] Hydration Reminder job failed:', describeErrorForLog(err));
       });
     },
     { noOverlap: true }
@@ -720,7 +717,7 @@ export function initializeNotificationJobs(): void {
     WEEKLY_REPORT_CRON_EXPRESSION,
     () => {
       void runWeeklyReportJob().catch(err => {
-        console.error('[notifications.jobs] Weekly Report job failed:', err);
+        console.error('[notifications.jobs] Weekly Report job failed:', describeErrorForLog(err));
       });
     },
     { noOverlap: true }

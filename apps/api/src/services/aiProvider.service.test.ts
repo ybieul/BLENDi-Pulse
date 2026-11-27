@@ -93,6 +93,8 @@ beforeEach(() => {
   callLatencyMs = 0;
   logLines = [];
   mock.method(provider.aiProviderTiming, 'now', () => fakeNow);
+  // CP-L1: o orçamento da requisição usa o mesmo relógio falso (determinístico).
+  mock.method(budget.aiRequestBudgetClock, 'now', () => fakeNow);
   mock.method(provider.aiProviderTiming, 'random', () => randomValue);
   mock.method(provider.aiProviderTiming, 'delay', async (ms: number) => {
     delays.push(ms);
@@ -256,8 +258,6 @@ describe('aiProvider — orçamento de tempo (CP-B1)', () => {
     // Orçamento da requisição de 8 s: cabe a 1ª espera (1 s + 5 s mínimos),
     // não cabe a 2ª (já gastos ~1 s; 3 s + 5 s > ~7 s restantes).
     await budget.runWithAiRequestBudget(8_000, async () => {
-      // O orçamento usa Date.now; alinha o relógio falso a ele.
-      fakeNow = Date.now();
       await assert.rejects(provider.callAi(REQUEST), provider.AiProviderRequestError);
     });
 
@@ -270,7 +270,6 @@ describe('aiProvider — orçamento de tempo (CP-B1)', () => {
     outcomesByModel = { 'primary-model': ['{"ok":true}'] };
 
     await budget.runWithAiRequestBudget(4_000, async () => {
-      fakeNow = Date.now();
       await assert.rejects(provider.callAi(REQUEST), provider.AiProviderRequestError);
     });
 
@@ -293,7 +292,6 @@ describe('aiProvider — orçamento de tempo (CP-B1)', () => {
     // (1 + 3 + 5 > 8) — mas a reserva cabe (1 + 5 ≤ 8) e roda.
     outcomesByModel = { 'primary-model': [503, 503], 'backup-model': ['{"backup":true}'] };
     await budget.runWithAiRequestBudget(8_000, async () => {
-      fakeNow = Date.now();
       const response = await provider.callAi(REQUEST);
       assert.equal(response.fromFallback, true);
     });
@@ -306,7 +304,6 @@ describe('aiProvider — orçamento de tempo (CP-B1)', () => {
     callLatencyMs = 1_500;
     outcomesByModel = { 'primary-model': [503, 503, 503], 'backup-model': ['{"backup":true}'] };
     await budget.runWithAiRequestBudget(12_000, async () => {
-      fakeNow = Date.now();
       await assert.rejects(provider.callAi(REQUEST), provider.AiProviderRequestError);
     });
     assert.equal(callsByModel['primary-model'], 3);

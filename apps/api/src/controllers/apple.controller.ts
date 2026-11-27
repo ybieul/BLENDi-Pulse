@@ -48,6 +48,7 @@ import {
   VALIDATION_ERROR_CODE,
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 // Instância única compartilhada pelo handler — mesmo padrão de auth.controller.ts/google.controller.ts
 const emailService = new EmailService();
@@ -137,7 +138,9 @@ export async function handleAppleSignIn(
       // visível de um erro de CONFIGURAÇÃO (Key ID/Team ID/bundle id
       // errados), que do contrário afetaria 100% dos logins e passaria
       // despercebido (nenhum outro ponto do fluxo reporta isso).
-      console.error('[apple.controller] identityToken verification failed', { err });
+      // CP-L1: o erro do jose carrega o payload do token (com e-mail); só nome,
+      // código e mensagem (montada pelo jose sem os valores das claims).
+      console.error('[apple.controller] identityToken verification failed', describeErrorForLog(err, { includeMessage: true }));
       sendErrorResponse(res, {
         statusCode: 401,
         code: 'auth/apple-auth-failed',
@@ -151,7 +154,7 @@ export async function handleAppleSignIn(
     try {
       appleRefreshToken = await exchangeAppleAuthorizationCode(authorizationCode);
     } catch (err) {
-      console.error('[apple.controller] authorizationCode exchange failed', { err });
+      console.error('[apple.controller] authorizationCode exchange failed', describeErrorForLog(err, { includeMessage: true }));
       sendErrorResponse(res, {
         statusCode: 401,
         code: 'auth/apple-auth-failed',
@@ -224,9 +227,7 @@ export async function handleAppleSignIn(
         // ValidationError genérico: o errorHandler global não distingue
         // isso de um bug de código e devolveria um 500 "unexpected error"
         // em produção, em vez de um erro claro de autenticação.
-        console.error('[apple.controller] identityToken sem claim "email" — não é possível criar conta', {
-          sub: claims.sub,
-        });
+        console.error('[apple.controller] identityToken sem claim "email" — não é possível criar conta');
         sendErrorResponse(res, {
           statusCode: 401,
           code: 'auth/apple-auth-failed',

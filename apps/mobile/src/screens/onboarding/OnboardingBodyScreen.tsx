@@ -137,7 +137,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
   const CHIP_BORDER_COLOR = `${colors.text.primary}26`;
   const CHIP_BACKGROUND_COLOR = `${colors.text.primary}0d`;
 
-  const { t } = useAppTranslation();
+  const { t, locale } = useAppTranslation();
   const selectedGoal = useOnboardingStore((state) => state.selectedGoal);
   const selectedUnitSystem = useOnboardingStore((state) => state.unitSystem);
   const setBodyData = useOnboardingStore((state) => state.setBodyData);
@@ -186,6 +186,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
     untouchedSavedWeightKg: null,
     weightUnit,
     metricHeightUnit: inputHeightUnit,
+    locale,
   });
   const storageWeight = bodyFields.weightKg;
   const storageHeight = bodyFields.heightCm;

@@ -30,6 +30,8 @@ import {
 import type { TranslationKey } from '../locales/i18n';
 import { parseStrictDecimalParts, parseStrictInteger } from './numericInput.utils';
 import { flOzToMl, mlToFlOz } from './volumeUnits';
+import { formatFixedDecimal } from './formatNumbers';
+import type { SupportedLocale } from '../locales/i18n';
 
 // ─── Campos e limites ─────────────────────────────────────────────────────────
 
@@ -170,9 +172,10 @@ export function formatGoalDisplayValue(
   field: GoalField,
   storedValue: number,
   unitSystem: GoalUnitSystem = 'metric',
+  locale: SupportedLocale = 'en',
 ): string {
   return isGoalFieldInFlOz(field, unitSystem)
-    ? toGoalDisplayValue(field, storedValue, unitSystem).toFixed(1)
+    ? formatFixedDecimal(toGoalDisplayValue(field, storedValue, unitSystem), locale)
     : String(storedValue);
 }
 
@@ -189,8 +192,9 @@ export function formatGoalLimit(
   field: GoalField,
   value: number,
   unitSystem: GoalUnitSystem = 'metric',
+  locale: SupportedLocale = 'en',
 ): string | number {
-  return isGoalFieldInFlOz(field, unitSystem) ? value.toFixed(1) : value;
+  return isGoalFieldInFlOz(field, unitSystem) ? formatFixedDecimal(value, locale) : value;
 }
 
 /** Valor exibido -> valor de armazenamento (fl oz -> ml inteiro, arredondado). */

@@ -109,7 +109,7 @@ Só códigos e contagens: nunca o nome do item, a mensagem, a receita ou dados d
 
 ## Tarefa 4
 
-"CP-B5.4" → "CP-B7" em todos os comentários e nomes de `describe` (API, app, shared). O arquivo `pantryScanner.cpB54.test.ts` manteve o nome.
+"CP-B5.4" → "CP-B7" em todos os comentários e nomes de `describe` (API, app, shared). O arquivo `pantryScanner.cpB54.test.ts` manteve o nome (renomeado no CP-L1 para `pantryScanner.twoStep.test.ts`).
 
 ## Testes
 
@@ -128,7 +128,7 @@ API: 1301 (eram 1242). App: 970 (eram 961). Typecheck nos 3 workspaces e lint li
 - App: `RecipeCard.unmetTargets.test.tsx` (5) e `PantryScannerScreen.test.tsx` (+4: grupo recolhido e acessível, desmarcado e fora do pedido; marcar entra; digitar abre e marca; sem grupo).
 
 **Expectativas alteradas:**
-- `pantryScanner.cpB54.test.ts`: "adicionado = obrigatório em TODAS", "adicionado que persiste ausente" e "sem parênteses e sem o item" agora esperam **2** novas tentativas (eram 1).
+- `pantryScanner.twoStep.test.ts`: "adicionado = obrigatório em TODAS", "adicionado que persiste ausente" e "sem parênteses e sem o item" agora esperam **2** novas tentativas (eram 1).
 - `pulseAi.cpB5.test.ts`: em "drink sem pedido de drink na mensagem" ("um shake de morango"), a receita falsa ganhou morango. Sem ele, a conferência nova faria uma nova tentativa; o que o teste confere (nenhum drink cobrado) não mudou.
 
 ## Lote 14 (ao vivo)

@@ -1,4 +1,5 @@
-// CP-C2a — Fonte única dos limites do plano: valores atuais e um guarda que
+// CP-C2a / CP-L1 — Fonte única dos limites do plano (e do bônus de XP das
+// missões, XP_EVENTS.missionBonus): valores atuais e um guarda que
 // falha se alguém voltar a escrever um destes números numa cópia local na
 // API ou no app (constante própria, padrão de parâmetro, literal no lugar).
 // Rodar com: pnpm --filter @blendi/shared test
@@ -44,6 +45,9 @@ const FORBIDDEN: Array<{ label: string; pattern: RegExp }> = [
   { label: 'missões contadas com número', pattern: /(selectedTypes\.length|selectedTypeSet\.size|missions\.length)\s*[<>=!]+\s*\d/ },
   { label: 'contador de missões com número', pattern: /completedCount\}\/\d/ },
   { label: 'padrão de hidratação com número no modelo', pattern: /amountMl:\s*\{[^}]*default:\s*\d/s },
+  // CP-L1: bônus de completar as missões do dia (XP_EVENTS.missionBonus).
+  { label: 'bônus de XP das missões com número', pattern: /bonusAwarded\s*\?\s*0\s*:\s*\d/ },
+  { label: 'XP das missões somado com número', pattern: /xpAvailable\w*\s*[+=][^;]*\+\s*\d/ },
 ];
 
 describe('CP-C2a — limites do plano', () => {
@@ -92,6 +96,7 @@ describe('CP-C2a — limites do plano', () => {
       'apps/mobile/src/services/hydration.service.ts': ['QUICK_WATER_GLASS_ML'],
       'apps/mobile/src/screens/TrackScreen.tsx': ['QUICK_WATER_GLASS_ML'],
       'apps/mobile/src/screens/HomeScreen.tsx': ['DAILY_MISSIONS_PER_DAY'],
+      'apps/api/src/controllers/dailyMission.controller.ts': ['XP_EVENTS'],
     };
     for (const [path, names] of Object.entries(uses)) {
       const file = files.find(item => item.path === path);

@@ -16,6 +16,7 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 import { getMidnightUTC, toLocalDate } from '../utils/timezone.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 interface SupplementStackContext {
   timezone: string;
@@ -397,7 +398,7 @@ export async function checkSupplement(
 
             Promise.resolve()
               .then(() => updateMissionProgress(userId, 'completeSuppStack', context.timezone))
-              .catch(err => console.error('Mission update failed:', err));
+              .catch(err => console.error('Mission update failed:', describeErrorForLog(err)));
           }
         }
 

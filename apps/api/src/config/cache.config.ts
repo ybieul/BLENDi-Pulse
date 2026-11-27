@@ -3,8 +3,6 @@
 // No MongoDB, índices TTL usam segundos, então os valores abaixo NÃO devem ser
 // copiados do mobile sem conversão.
 
-import { FREE_PANTRY_SCANS_PER_MONTH } from '@blendi/shared';
-
 export const CACHE_CONFIG = {
   /**
    * 7 dias. Aumentar reduz recomputações e chamadas ao provedor de AI,
@@ -41,18 +39,8 @@ export const CACHE_CONFIG = {
    * ainda evita leituras redundantes em fluxos com múltiplas telas.
    */
   USER_PROFILE_TTL: 15 * 60,
-
-  /**
-   * Free tier: número máximo de scans do Pantry Scanner no mês.
-   * Alterar esse valor muda diretamente a política comercial e o rate limiting atômico.
-   */
-  PANTRY_SCANNER_MONTHLY_LIMIT: FREE_PANTRY_SCANS_PER_MONTH,
-
-  /**
-   * Plano Pro: tratado como uso praticamente ilimitado pelo backend.
-   * Se esse valor cair, o fluxo Pro deixa de se comportar como ilimitado.
-   */
-  PANTRY_SCANNER_PRO_LIMIT: 999,
+  // CP-L1: limites do Pantry saíram daqui (não eram usados); a fonte única
+  // dos limites do plano é packages/shared/src/planLimits.ts.
 } as const;
 
 export type CacheConfig = typeof CACHE_CONFIG;

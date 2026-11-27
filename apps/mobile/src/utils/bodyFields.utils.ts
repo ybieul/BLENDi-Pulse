@@ -32,6 +32,8 @@ import {
   poundsToKg,
 } from './bodyUnits';
 import { parseStrictDecimal, parseStrictInteger } from './numericInput.utils';
+import { formatFixedDecimal } from './formatNumbers';
+import type { SupportedLocale } from '../locales/i18n';
 
 export type BodyUnitSystem = 'metric' | 'imperial';
 
@@ -92,6 +94,8 @@ export interface BodyFieldsInput {
   untouchedSavedWeightKg: number | null;
   /** Unidades exibidas (useUnits): 'kg' | 'lbs' e 'cm'. */
   weightUnit: string;
+  /** CP-L1: separador decimal da faixa em lbs na mensagem ("8,5" em pt-BR). Padrão en. */
+  locale?: SupportedLocale;
   metricHeightUnit: string;
 }
 
@@ -122,11 +126,11 @@ function hasText(text: string): boolean {
   return text.trim().length > 0;
 }
 
-function weightRangeError(unitSystem: BodyUnitSystem, weightUnit: string): BodyFieldError {
+function weightRangeError(unitSystem: BodyUnitSystem, weightUnit: string, locale: SupportedLocale): BodyFieldError {
   if (unitSystem === 'imperial') {
     return rangeError(
-      `${BODY_WEIGHT_POUNDS_LIMITS.min.toFixed(1)} ${weightUnit}`,
-      `${BODY_WEIGHT_POUNDS_LIMITS.max.toFixed(1)} ${weightUnit}`,
+      `${formatFixedDecimal(BODY_WEIGHT_POUNDS_LIMITS.min, locale)} ${weightUnit}`,
+      `${formatFixedDecimal(BODY_WEIGHT_POUNDS_LIMITS.max, locale)} ${weightUnit}`,
     );
   }
   return rangeError(`${BODY_WEIGHT_MIN_KG} ${weightUnit}`, `${BODY_WEIGHT_MAX_KG} ${weightUnit}`);
@@ -136,13 +140,14 @@ function evaluateWeight(input: BodyFieldsInput): Pick<BodyFieldsEvaluation, 'wei
   error?: BodyFieldError;
 } {
   const { unitSystem, weightText, weightUnit, untouchedSavedWeightKg } = input;
+  const locale = input.locale ?? 'en';
 
   if (untouchedSavedWeightKg !== null) {
     const savedValid = isBodyWeightInRange(untouchedSavedWeightKg);
     return {
       weightKg: untouchedSavedWeightKg,
       weightValid: savedValid,
-      error: savedValid ? undefined : weightRangeError(unitSystem, weightUnit),
+      error: savedValid ? undefined : weightRangeError(unitSystem, weightUnit, locale),
     };
   }
 
@@ -153,7 +158,7 @@ function evaluateWeight(input: BodyFieldsInput): Pick<BodyFieldsEvaluation, 'wei
 
   const weightKg = unitSystem === 'imperial' ? poundsToKg(parsed) : parsed;
   const weightValid = isBodyWeightInRange(weightKg);
-  return { weightKg, weightValid, error: weightValid ? undefined : weightRangeError(unitSystem, weightUnit) };
+  return { weightKg, weightValid, error: weightValid ? undefined : weightRangeError(unitSystem, weightUnit, locale) };
 }
 
 type HeightEvaluation = Pick<BodyFieldsEvaluation, 'heightCm' | 'heightValid' | 'heightOutOfRange' | 'errors'>;

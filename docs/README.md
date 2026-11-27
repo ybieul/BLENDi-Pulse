@@ -211,6 +211,12 @@ Follow-up of the 2026-11-16 AI recipe audit (`Claude-outputs/auditoria-receitas-
 | [fixes/cp-c2a-tutorial-marcadores-limites.md](fixes/cp-c2a-tutorial-marcadores-limites.md) | Plan limits in one place (`packages/shared/src/planLimits.ts`: free Pulse AI messages and previews per day, free Pantry scans and previews per cycle, daily missions, quick water glass) used by API and app, with a guard test against local copies. Tutorial script markers (`{{waterGlass}}`, `{{freeAiPerDay}}`, `{{freeScansPerMonth}}`, `{{missionsPerDay}}`, closed list, balloon limit on the filled text, new marker = new `schemaVersion`); imperial accounts see fl oz. Step by Step explained in the timer step; Pulse Pro as unlimited Pulse AI; local tutorial state cleared on account deletion; `DELETE /users/me` documented; `packages/shared` test suite (`pnpm --filter @blendi/shared test`, root `pnpm test`). Shared 25, API 1631, mobile 1201 tests |
 | [tutorial/README.md](tutorial/README.md) | How to add a tutorial step (anchor, catalog, script entry, `addedInVersion`, `contentVersion`), how to test it, and what happens to users who already saw the tour |
 
+### Fixes — CP-L1 (Pre-build cleanup)
+
+| Document | Description |
+|---|---|
+| [fixes/cp-l1-limpeza.md](fixes/cp-l1-limpeza.md) | Home water bar turns green (same token as Track) when the daily goal is hit, with a "goal reached" screen-reader label; volume and weight decimals follow the account language ("8,5 fl oz" in pt-BR) in `useUnits`, My Goals, body-field messages and profile prefill; single ml↔fl oz factor (`ML_PER_US_FLUID_OUNCE` = 29.5735) in app and API; unused Pantry constants removed; mission XP bonus from `XP_EVENTS`; API error logs without user id, email, token or raw error objects (`utils/logSafety.utils.ts` + guard test); flaky AI time-budget test made deterministic (injectable budget clock); `pantryScanner.cpB54.test.ts` renamed to `pantryScanner.twoStep.test.ts`. Shared 25, API 1639 (5 runs), mobile 1225 tests |
+
 ---
 
 ## Key Decisions

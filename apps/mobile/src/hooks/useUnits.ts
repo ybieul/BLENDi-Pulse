@@ -6,7 +6,7 @@ import {
   kgToPounds,
   roundToOneDecimal,
 } from '../utils/bodyUnits';
-import { formatDecimal } from '../utils/formatNumbers';
+import { formatDecimal, formatFixedDecimal } from '../utils/formatNumbers';
 import { mlToFlOz } from '../utils/volumeUnits';
 import { useAppTranslation } from './useAppTranslation';
 
@@ -22,9 +22,6 @@ function isNonNegativeNumber(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
 }
 
-function formatOneDecimal(value: number): string {
-  return roundToOneDecimal(value).toFixed(1);
-}
 
 export interface UseUnitsResult {
   unitSystem: UnitSystem;
@@ -57,10 +54,10 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
     }
 
     if (unitSystem === 'imperial') {
-      return `${formatOneDecimal(kgToPounds(valueInKg))} ${weightUnit}`;
+      return `${formatFixedDecimal(roundToOneDecimal(kgToPounds(valueInKg)), locale)} ${weightUnit}`;
     }
 
-    return `${formatOneDecimal(valueInKg)} ${weightUnit}`;
+    return `${formatFixedDecimal(roundToOneDecimal(valueInKg), locale)} ${weightUnit}`;
   };
 
   const displayHeight = (valueInCm: number): string => {
@@ -81,7 +78,7 @@ export function useUnits(unitSystemOverride?: UnitSystem | null): UseUnitsResult
     }
 
     if (unitSystem === 'imperial') {
-      return `${formatOneDecimal(mlToFlOz(valueInMl))} ${volumeUnit}`;
+      return `${formatFixedDecimal(roundToOneDecimal(mlToFlOz(valueInMl)), locale)} ${volumeUnit}`;
     }
 
     return `${formatDecimal(valueInMl, locale)} ${volumeUnit}`;

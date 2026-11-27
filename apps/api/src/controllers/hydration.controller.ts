@@ -12,6 +12,7 @@ import {
   VALIDATION_ERROR_MESSAGE,
 } from '../utils/error.utils';
 import { getMidnightUTC, toUTC } from '../utils/timezone.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 const DEFAULT_HYDRATION_GOAL_ML = 2500;
 // 5 litros — generoso o suficiente para qualquer uso real (inclusive
@@ -251,7 +252,7 @@ export async function logWater(
 
       Promise.resolve()
         .then(() => updateMissionProgress(userId, 'hitHydrationGoal', hydrationContext.timezone))
-        .catch(err => console.error('Mission update failed:', err));
+        .catch(err => console.error('Mission update failed:', describeErrorForLog(err)));
     }
 
     res.status(201).json({

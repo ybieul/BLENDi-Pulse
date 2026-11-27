@@ -3,20 +3,28 @@
 import { renderHook } from '@testing-library/react-native';
 
 let mockUnitSystem: 'metric' | 'imperial' = 'imperial';
+let mockLocale: 'en' | 'pt-BR' = 'en';
 jest.mock('../store/auth.store', () => ({
   useAuthStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ user: { unitSystem: mockUnitSystem } }),
 }));
 jest.mock('../hooks/useAppTranslation', () => ({
-  useAppTranslation: () => ({ t: (key: string) => key, locale: 'en' }),
+  useAppTranslation: () => ({ t: (key: string) => key, locale: mockLocale }),
 }));
 
 import { useUnits } from '../hooks/useUnits';
-import { MILLILITERS_PER_FLUID_OUNCE, flOzToMl, mlToFlOz } from './volumeUnits';
+import { ML_PER_US_FLUID_OUNCE } from '@blendi/shared';
+
+import { flOzToMl, mlToFlOz } from './volumeUnits';
 
 describe('volumeUnits — conversão ml <-> fl oz', () => {
-  it('o fator é o mesmo que o app já usava (29,574 ml por fl oz)', () => {
-    expect(MILLILITERS_PER_FLUID_OUNCE).toBe(29.574);
+  // CP-L1: fator único do shared (fl oz americano), o mesmo da API e dos
+  // limites do liquidificador. Antes o app usava 29,574; nenhum valor desta
+  // tabela mudou com a troca (diferença de 0,0005 ml por fl oz).
+  it('o fator é o do shared (29,5735 ml por fl oz americano)', () => {
+    expect(ML_PER_US_FLUID_OUNCE).toBe(29.5735);
+    expect(mlToFlOz(ML_PER_US_FLUID_OUNCE)).toBe(1);
+    expect(flOzToMl(1)).toBe(ML_PER_US_FLUID_OUNCE);
   });
 
   it.each([
@@ -43,6 +51,10 @@ describe('volumeUnits — conversão ml <-> fl oz', () => {
 });
 
 describe('useUnits.displayVolume — sem mudança de exibição', () => {
+  beforeEach(() => {
+    mockLocale = 'en';
+  });
+
   it.each([
     [2500, '84.5 fl oz'],
     [3000, '101.4 fl oz'],
@@ -59,5 +71,39 @@ describe('useUnits.displayVolume — sem mudança de exibição', () => {
     mockUnitSystem = 'metric';
     const { result } = renderHook(() => useUnits());
     expect(result.current.displayVolume(2500)).toMatch(/^2[,.]?500 ml$/);
+  });
+});
+
+describe('CP-L1 — separador decimal pelo idioma da conta', () => {
+  afterEach(() => {
+    mockLocale = 'en';
+  });
+
+  it.each([
+    ['en', 'imperial', 250, '8.5 fl oz'],
+    ['pt-BR', 'imperial', 250, '8,5 fl oz'],
+    ['en', 'imperial', 2500, '84.5 fl oz'],
+    ['pt-BR', 'imperial', 2500, '84,5 fl oz'],
+    ['pt-BR', 'imperial', 0, '0,0 fl oz'],
+    ['en', 'metric', 250, '250 ml'],
+    ['pt-BR', 'metric', 250, '250 ml'],
+    ['pt-BR', 'metric', 2500, '2.500 ml'],
+  ] as const)('%s, %s: %i ml -> %s', (locale, unitSystem, ml, text) => {
+    mockLocale = locale;
+    mockUnitSystem = unitSystem;
+    const { result } = renderHook(() => useUnits());
+    expect(result.current.displayVolume(ml)).toBe(text);
+  });
+
+  it.each([
+    ['en', 'metric', 70, '70.0 kg'],
+    ['pt-BR', 'metric', 70.25, '70,3 kg'],
+    ['en', 'imperial', 81, '178.6 lbs'],
+    ['pt-BR', 'imperial', 81, '178,6 lbs'],
+  ] as const)('peso %s, %s: %s kg -> %s', (locale, unitSystem, kg, text) => {
+    mockLocale = locale;
+    mockUnitSystem = unitSystem;
+    const { result } = renderHook(() => useUnits());
+    expect(result.current.displayWeight(kg)).toBe(text);
   });
 });

@@ -112,6 +112,7 @@ import {
   type RecipeAlcoholPolicy,
   type RecipeRestrictionOptions,
 } from '../utils/recipeRestrictions.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 // CP-B7: a resolução da idade foi para alcoholAge.utils.ts (também usada
 // pelo Pantry Scanner); reexportada aqui para quem já importava daqui.
@@ -225,7 +226,7 @@ async function triggerPulseAiXP(userId: string, timezone: string): Promise<Award
 function triggerPulseAiMissionProgress(userId: string, timezone: string): void {
   Promise.resolve()
     .then(() => updateMissionProgress(userId, 'usePulseAI', timezone))
-    .catch(err => console.error('Mission update failed:', err));
+    .catch(err => console.error('Mission update failed:', describeErrorForLog(err)));
 }
 
 function normalizeMessageForCache(message: string): string {
@@ -1058,7 +1059,7 @@ async function persistConversationTurn(params: {
   if (result.matchedCount === 0) {
     console.warn(
       '[pulseAi.controller] persistConversationTurn: conversation not found (provavelmente expirada pelo TTL) — a resposta da IA já havia sido enviada ao usuário.',
-      { conversationId: String(params.conversationId), userId: params.userId }
+      { conversationId: String(params.conversationId) }
     );
   }
 }

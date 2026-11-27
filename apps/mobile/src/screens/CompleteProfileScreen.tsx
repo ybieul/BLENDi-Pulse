@@ -37,6 +37,7 @@ import { AuthButton } from '../components/ui/AuthButton';
 import { AuthInput } from '../components/ui/AuthInput';
 import { NumericKeyboardAccessory } from '../components/ui/NumericKeyboardAccessory';
 import { UnitSystemToggle } from '../components/ui/UnitSystemToggle';
+import { formatFixedDecimal } from '../utils/formatNumbers';
 import { useAppTranslation } from '../hooks/useAppTranslation';
 import { useColors } from '../hooks/useColors';
 import { useNumericFieldChain } from '../hooks/useNumericFieldChain';
@@ -162,7 +163,7 @@ async function fetchBodyProfile(): Promise<BodyProfileResponse> {
 export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps) {
   const colorsTheme = useColors();
   const insets = useSafeAreaInsets();
-  const { t } = useAppTranslation();
+  const { t, locale } = useAppTranslation();
   const queryClient = useQueryClient();
 
   const CHIP_BORDER_COLOR = `${colorsTheme.text.primary}26`;
@@ -217,7 +218,7 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
 
     if (typeof profile.weight === 'number') {
       const displayValue = profileUnitSystem === 'imperial' ? kgToPounds(profile.weight) : profile.weight;
-      setWeightText(displayValue.toFixed(1));
+      setWeightText(formatFixedDecimal(displayValue, locale));
       setUntouchedSavedWeightKg(profile.weight);
     }
 
@@ -228,7 +229,7 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
         setInchesText(savedInches);
         setUntouchedSavedHeightCm(profile.height);
       } else {
-        setHeightText(profile.height.toFixed(1));
+        setHeightText(formatFixedDecimal(profile.height, locale));
       }
     }
 
@@ -247,7 +248,7 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     if (profile.activityLevel && ACTIVITY_LEVELS.some(({ key }) => key === profile.activityLevel)) {
       setActivityLevel(profile.activityLevel);
     }
-  }, [profile]);
+  }, [locale, profile]);
 
   // Leitura estrita ("70abc", "1.2.3", "-3" e "1e2" são inválidos), conversão
   // para kg/cm e mensagem de cada campo: bodyFields.utils.ts. Os limites vêm
@@ -262,6 +263,7 @@ export function CompleteProfileScreen({ navigation }: CompleteProfileScreenProps
     untouchedSavedWeightKg,
     weightUnit,
     metricHeightUnit: inputHeightUnit,
+    locale,
   });
   const storageWeight = bodyFields.weightKg;
   const storageHeight = bodyFields.heightCm;

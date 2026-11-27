@@ -2,7 +2,7 @@
 
 **Ponto de partida:** até aqui, `POST /pantry-scanner/analyze` fazia tudo numa chamada só: lia a foto, contava o scan e gerava as receitas. Na tela de confirmação, desmarcar ou adicionar um ingrediente não mudava nada, porque as receitas já tinham vindo.
 
-**Nome nos comentários do código:** o trabalho foi feito com o rótulo provisório "CP-B5.4"; desde o CP-B7b os comentários e os nomes dos testes usam "CP-B7" (só o arquivo `pantryScanner.cpB54.test.ts` manteve o nome). O CP-B7a é a correção feita antes do commit (bebidas na leitura e item adicionado em qualquer idioma).
+**Nome nos comentários do código:** o trabalho foi feito com o rótulo provisório "CP-B5.4"; desde o CP-B7b os comentários e os nomes dos testes usam "CP-B7" (só o arquivo `pantryScanner.cpB54.test.ts` manteve o nome; no CP-L1 ele virou `pantryScanner.twoStep.test.ts`). O CP-B7a é a correção feita antes do commit (bebidas na leitura e item adicionado em qualquer idioma).
 
 **Decisões do Gabriel (23/11):**
 - duas etapas: ler a foto (não conta scan) e gerar (conta);
@@ -108,7 +108,7 @@ O resto do prompt não mudou, e o formato do JSON continua o mesmo: a visão nã
 API: 1242 (eram 1202 antes do CP-B7). Mobile: 961 (eram 958). Typecheck nos 3 workspaces e lint limpos.
 
 **Novos:**
-- `pantryScanner.cpB54.test.ts` (33):
+- `pantryScanner.twoStep.test.ts` (33):
   - leitura: não conta scan, guarda sem imagem, TTL, `isAlcoholic` pela lista, limites free (12, sem scan nem prévia, ciclo novo) e Pro (10/10 min, janela, 100/dia, dia novo, devolução em falha);
   - geração: readId de outro usuário/vencido/consumido, `selected` fora da leitura, scan contado e devolvido, readId novo, prévia do free, desmarcado nunca entra (nova tentativa e descarte), adicionado em todas, adicionado fora da dieta com aviso, pedido com macro, `liquid` none/water/milk, volume com `capacityNotice`;
   - álcool: 21+ com garrafa e `alcoholGrams`, teto de 28 g, menor `403`, "Não" + pedido → sem álcool com aviso, sem idade `428` sem scan nem IA, rede `no_alcohol`;
@@ -190,6 +190,6 @@ Método da auditoria:
   - `models/PantryRead.ts` (novo), `models/User.ts` (contadores de leitura);
   - `services/promptBuilder.service.ts` (Pantry: escolhas, líquido, álcool, parênteses), `services/pantryPromptBuilder.service.ts` (bebidas), `services/aiRequestBudget.service.ts` (comentário);
   - `utils/pantryRequest.utils.ts` (novo), `utils/recipeNotices.utils.ts` (novo), `utils/alcoholAge.utils.ts` (novo), `utils/aiRecipePayload.utils.ts`, `controllers/pulseAi.controller.ts` (só importações);
-  - testes: `controllers/pantryScanner.cpB54.test.ts`, `controllers/pantryScannerTestFakes.ts`, `models/PantryRead.test.ts`, `utils/pantryRequest.utils.test.ts` e os 4 testes do Pantry migrados.
+  - testes: `controllers/pantryScanner.twoStep.test.ts`, `controllers/pantryScannerTestFakes.ts`, `models/PantryRead.test.ts`, `utils/pantryRequest.utils.test.ts` e os 4 testes do Pantry migrados.
 - Mobile: `screens/PantryScannerScreen.tsx`, `services/pantryScanner.service.ts`, `components/pantryScanner/IngredientCheckItem.tsx`, `components/pulseAi/RecipeCard.tsx`, `locales/en.json`, `locales/pt-BR.json` e os testes citados.
 - Docs: `architecture.md`, `gemini-costs.md`, `api/endpoints.md`, `fixes/posthog-analytics.md`, este relatório.

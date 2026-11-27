@@ -21,7 +21,7 @@ import {
   DAILY_PROTEIN_TARGET_VALIDATION_MIN,
 } from '@blendi/shared';
 
-import { MILLILITERS_PER_FLUID_OUNCE } from './volumeUnits';
+import { ML_PER_US_FLUID_OUNCE as MILLILITERS_PER_FLUID_OUNCE } from '@blendi/shared';
 import {
   GOAL_FIELDS,
   HYDRATION_FL_OZ_LIMITS,

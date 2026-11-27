@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { XP_EVENTS } from '@blendi/shared';
 import { UserModel } from '../models/User';
 import { getDailyMissionsForUser } from '../services/missionProgress.service';
 import { sendErrorResponse } from '../utils/error.utils';
@@ -41,7 +42,9 @@ export async function getDailyMissions(
       (total, mission) => total + (mission.completed ? 0 : mission.xpReward),
       0
     );
-    const xpAvailable = xpAvailableFromMissions + (dailyMission.bonusAwarded ? 0 : 20);
+    // CP-L1: o bônus de completar as 3 missões vem de XP_EVENTS (o mesmo que
+    // missionProgress.service concede via awardXP('missionBonus')).
+    const xpAvailable = xpAvailableFromMissions + (dailyMission.bonusAwarded ? 0 : XP_EVENTS.missionBonus);
 
     res.status(200).json({
       success: true,

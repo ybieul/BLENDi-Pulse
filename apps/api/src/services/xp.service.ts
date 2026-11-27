@@ -3,6 +3,7 @@ import { XPLogModel } from '../models/XPLog';
 import { UserModel, type UserLocale } from '../models/User';
 import { cleanInvalidTokens, sendNotificationBatch } from './pushNotification.service';
 import { getMidnightUTC } from '../utils/timezone.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 const MULTI_OCCURRENCE_XP_TYPES = new Set<XPEventType>([
   'blend',
@@ -190,7 +191,7 @@ export async function awardXP(
     ])
       .then(notificationResult => cleanInvalidTokens(notificationResult.invalidTokens))
       .catch(err => {
-        console.error('[xp.service] level-up push notification failed', { userId, err });
+        console.error('[xp.service] level-up push notification failed', describeErrorForLog(err));
       });
   }
 

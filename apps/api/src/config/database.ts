@@ -4,6 +4,7 @@
 
 import mongoose from 'mongoose';
 import { env } from './env';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 export async function connectDatabase(): Promise<void> {
   try {
@@ -15,8 +16,7 @@ export async function connectDatabase(): Promise<void> {
 
     console.log(`✅  MongoDB conectado: ${conn.connection.name} (${conn.connection.host})`);
   } catch (error) {
-    console.error('❌  Falha ao conectar com o MongoDB:');
-    console.error(error);
+    console.error('❌  Falha ao conectar com o MongoDB:', describeErrorForLog(error, { includeMessage: true }));
     process.exit(1);
   }
 
@@ -30,6 +30,6 @@ export async function connectDatabase(): Promise<void> {
   });
 
   mongoose.connection.on('error', err => {
-    console.error('❌  Erro na conexão MongoDB:', err);
+    console.error('❌  Erro na conexão MongoDB:', describeErrorForLog(err, { includeMessage: true }));
   });
 }

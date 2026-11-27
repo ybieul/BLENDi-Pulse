@@ -9,6 +9,7 @@ import {
   DEFAULT_ERROR_MESSAGE,
   type ApiError,
 } from '../utils/error.utils';
+import { redactForLog } from '../utils/logSafety.utils';
 
 /**
  * Mensagem genérica para erros não tratados explicitamente em produção.
@@ -88,8 +89,10 @@ export function errorHandler(
       path: req.path,
       statusCode,
       errorName: err instanceof Error ? err.name : 'UnknownError',
-      errorMessage: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
+      // CP-L1: mensagem e stack com e-mail/token mascarados (ex.: chave
+      // duplicada do Mongo traz o valor da chave na mensagem).
+      errorMessage: redactForLog(err instanceof Error ? err.message : String(err)),
+      stack: err instanceof Error && err.stack ? redactForLog(err.stack) : undefined,
     });
   }
 

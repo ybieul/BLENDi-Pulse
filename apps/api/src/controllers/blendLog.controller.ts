@@ -22,6 +22,7 @@ import {
   isWithinCalorieGoalXpRange,
   type CalorieGoalXpRange,
 } from '../utils/weightLossGoal.utils';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 interface BlendUserContext {
   timezone: string;
@@ -373,9 +374,8 @@ export async function createBlendLog(
       // poderia ser exibido a ninguém.
       await BlendLogModel.deleteOne({ _id: log._id }).catch(err => {
         console.error('[blendLog.controller] failed to remove orphaned blend log', {
-          userId,
           logId: String(log._id),
-          err,
+          ...describeErrorForLog(err),
         });
       });
 
@@ -443,10 +443,7 @@ export async function createBlendLog(
     // requisição esperar por todas as cadeias de findOrCreate+increment+
     // reconcile de bônus só pra cobrir os casos menos comuns.
     await updateMissionProgress(userId, 'makeBlend', user.timezone).catch(err => {
-      console.error('[blendLog.controller] updateMissionProgress failed for makeBlend', {
-        userId,
-        err,
-      });
+      console.error('[blendLog.controller] updateMissionProgress failed for makeBlend', describeErrorForLog(err));
     });
 
     const backgroundMissionTypesToUpdate: string[] = [
@@ -458,9 +455,8 @@ export async function createBlendLog(
     for (const missionType of backgroundMissionTypesToUpdate) {
       void updateMissionProgress(userId, missionType, user.timezone).catch(err => {
         console.error('[blendLog.controller] updateMissionProgress failed in background', {
-          userId,
           missionType,
-          err,
+          ...describeErrorForLog(err),
         });
       });
     }

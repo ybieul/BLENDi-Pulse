@@ -39,6 +39,7 @@ import { tutorialRouter } from './routes/tutorial';
 import { webhooksRouter } from './routes/webhooks';
 import { sendErrorResponse, type ApiError } from './utils/error.utils';
 import { initializeNotificationJobs } from './jobs/notifications.jobs';
+import { describeErrorForLog, redactForLog } from './utils/logSafety.utils';
 
 const app = express();
 const configuredOrigins = new Set(env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean));
@@ -188,9 +189,11 @@ function setupProcessHandlers(server: Server): void {
   // priorizar disponibilidade (o Railway já reinicia o processo se ele
   // efetivamente crashar por outro motivo).
   process.on('unhandledRejection', (reason, _promise) => {
+    // CP-L1: nome/código/mensagem e stack com e-mail e token mascarados,
+    // nunca o objeto bruto (pode carregar dado da conta).
     console.error('[UnhandledRejection]', {
-      reason,
-      stack: reason instanceof Error ? reason.stack : undefined,
+      ...describeErrorForLog(reason, { includeMessage: true }),
+      stack: reason instanceof Error && reason.stack ? redactForLog(reason.stack) : undefined,
       timestamp: new Date().toISOString(),
     });
   });
@@ -200,8 +203,8 @@ function setupProcessHandlers(server: Server): void {
   // conexões novas, fecha a conexão com o Mongo, então sai).
   process.on('uncaughtException', (err, origin) => {
     console.error('[UncaughtException]', {
-      err,
-      stack: err.stack,
+      ...describeErrorForLog(err, { includeMessage: true }),
+      stack: err.stack ? redactForLog(err.stack) : undefined,
       origin,
       timestamp: new Date().toISOString(),
     });

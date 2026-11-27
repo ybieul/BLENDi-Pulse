@@ -106,8 +106,8 @@ export async function handleInitialPurchaseOrRenewal(
     await syncActiveSubscriptionFromRevenueCat(userId);
   } catch (err) {
     // Só nome e status do erro: a mensagem pode trazer texto da API externa.
+    // CP-L1: sem userId (o eventId identifica o evento no painel do RevenueCat).
     const errorInfo = {
-      userId,
       eventId: event.id,
       eventType: event.type,
       errorName: err instanceof Error ? err.name : 'UnknownError',

@@ -55,11 +55,12 @@ function bodyOf(id: string, unitSystem: 'metric' | 'imperial', locale: 'en' | 'p
 }
 
 describe('CP-C2a — marcadores no app', () => {
-  it('copo de água: 250 ml no métrico e fl oz no imperial, em en e pt-BR (mesmo formatador do botão)', () => {
+  it('copo de água: 250 ml no métrico e fl oz no imperial (8.5 em en, 8,5 em pt-BR), mesmo formatador do botão', () => {
     expect(bodyOf('home.logWater', 'metric', 'en')).toContain('one 250 ml glass');
     expect(bodyOf('home.logWater', 'metric', 'pt-BR')).toContain('copo de 250 ml');
     expect(bodyOf('home.logWater', 'imperial', 'en')).toContain('one 8.5 fl oz glass');
-    expect(bodyOf('home.logWater', 'imperial', 'pt-BR')).toContain('copo de 8.5 fl oz');
+    // CP-L1: vírgula decimal em pt-BR, igual ao botão.
+    expect(bodyOf('home.logWater', 'imperial', 'pt-BR')).toContain('copo de 8,5 fl oz');
   });
 
   it('números pela fonte única', () => {

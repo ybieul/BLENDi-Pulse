@@ -1,5 +1,6 @@
 import { PostHog } from 'posthog-node';
 import { env } from '../config/env';
+import { describeErrorForLog } from '../utils/logSafety.utils';
 
 let client: PostHog | null = null;
 
@@ -22,6 +23,6 @@ export function captureServerEvent(
   try {
     posthog.capture({ distinctId, event, properties });
   } catch (err) {
-    console.warn('[analytics.service] failed to capture event', { event, err });
+    console.warn('[analytics.service] failed to capture event', { event, ...describeErrorForLog(err) });
   }
 }

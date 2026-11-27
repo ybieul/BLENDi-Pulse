@@ -65,7 +65,7 @@ Número de limite do plano ou quantidade que depende da conta não vai escrito n
 
 | Marcador | Vira | Fonte |
 |---|---|---|
-| `{{waterGlass}}` | copo da ação rápida na unidade da conta: "250 ml" (métrico) ou "8.5 fl oz" (imperial) | `QUICK_WATER_GLASS_ML` formatado por `useUnits().displayVolume`, o mesmo formatador do botão |
+| `{{waterGlass}}` | copo da ação rápida na unidade da conta: "250 ml" (métrico) ou "8.5 fl oz" (imperial; "8,5 fl oz" em pt-BR, CP-L1) | `QUICK_WATER_GLASS_ML` formatado por `useUnits().displayVolume`, o mesmo formatador do botão |
 | `{{freeAiPerDay}}` | receitas do Pulse AI por dia no plano grátis | `FREE_PULSE_AI_MESSAGES_PER_DAY` |
 | `{{freeScansPerMonth}}` | scans do Pantry por mês no plano grátis | `FREE_PANTRY_SCANS_PER_MONTH` |
 | `{{missionsPerDay}}` | missões diárias | `DAILY_MISSIONS_PER_DAY` |
