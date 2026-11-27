@@ -15,10 +15,12 @@ jest.mock('../../hooks/useColors', () => {
   return { useColors: () => lightColors };
 });
 
+// CP-L1a: idioma variável (IMC em en e pt-BR).
+let mockLocale: 'en' | 'pt-BR' = 'en';
 jest.mock('../../hooks/useAppTranslation', () => ({
   useAppTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => (options ? `${key}:${JSON.stringify(options)}` : key),
-    locale: 'en',
+    locale: mockLocale,
   }),
 }));
 
@@ -558,3 +560,43 @@ describe('OnboardingBodyScreen — goal Weight Loss', () => {
   });
 });
 
+describe('CP-L1a — IMC no formato do idioma', () => {
+  afterEach(() => {
+    mockLocale = 'en';
+  });
+
+  it.each([
+    ['en', 'onboarding.imcLabel 22.5'],
+    ['pt-BR', 'onboarding.imcLabel 22,5'],
+  ] as const)('%s: %s', async (locale, text) => {
+    mockLocale = locale;
+    jest.useFakeTimers();
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        data: { dailyProteinTarget: 120, dailyCalorieTarget: 2000, dailyCarbTarget: 250, imc: 22.5, imcClassification: 'normal' },
+      },
+    });
+
+    try {
+      const utils = renderScreen();
+      fireEvent.changeText(utils.weight, '70');
+      fireEvent.changeText(utils.height, '175');
+      fireEvent.changeText(utils.birthDate, '15061990');
+      fireEvent.press(utils.getByText('onboarding.biologicalSexMale'));
+      fireEvent.press(utils.getByText('onboarding.weightGoalMaintain'));
+
+      await act(async () => {
+        jest.advanceTimersByTime(700);
+        await Promise.resolve();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(utils.getByText(text)).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

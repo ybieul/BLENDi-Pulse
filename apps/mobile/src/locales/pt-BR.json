@@ -192,6 +192,8 @@
     "caloriesRing": "Calorias",
     "hydrationBar": "{{current}} / {{target}}",
     "hydrationBarGoalReached": "{{current}} / {{target}}, meta atingida",
+    "ringA11y": "{{label}}: {{current}} de {{target}} {{unit}}",
+    "ringA11yGoalReached": "{{label}}: {{current}} de {{target}} {{unit}}, meta atingida",
     "freePlan": "Grátis",
     "proPlan": "Pro",
     "goalMuscleRecipe": "Blend Power Protein",

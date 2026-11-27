@@ -40,6 +40,12 @@ export interface GoalRingProps {
    * o arco já no valor final — usado em snapshots estáticos (ex: relatório
    * semanal) onde não há "chegada" do valor para celebrar. Padrão: true. */
   animate?: boolean;
+  /**
+   * CP-L1a: o que o leitor de tela lê (o anel vira um elemento só). Vem de
+   * quem usa, já traduzido: nome, valor, meta, unidade e "meta atingida".
+   * Sem ele, o anel continua como antes (textos lidos um a um).
+   */
+  accessibilityLabel?: string;
 }
 
 function clampProgress(current: number, target: number): number {
@@ -79,6 +85,7 @@ export function GoalRing({
   strokeWidth = 8,
   color = colors.brand.pulse,
   animate = true,
+  accessibilityLabel,
 }: GoalRingProps) {
   const themeColors = useColors();
   const TRACK_STROKE = themeColors.overlay.plum[8];
@@ -199,8 +206,22 @@ export function GoalRing({
     },
   });
 
+  const accessibilityProps = accessibilityLabel
+    ? {
+        accessible: true,
+        accessibilityRole: 'progressbar' as const,
+        accessibilityLabel,
+        // Mínimo/máximo/atual: VoiceOver e TalkBack anunciam o percentual.
+        ...(target > 0 && {
+          accessibilityValue: { min: 0, max: target, now: Math.max(0, Math.min(current, target)) },
+        }),
+      }
+    : {};
+
   return (
     <Animated.View
+      {...accessibilityProps}
+      testID="goal-ring"
       style={[
         styles.container,
         {

@@ -30,6 +30,7 @@ import { AuthButton } from '../../components/ui/AuthButton';
 import { AuthInput } from '../../components/ui/AuthInput';
 import { NumericKeyboardAccessory } from '../../components/ui/NumericKeyboardAccessory';
 import { OnboardingLayout } from '../../components/ui/OnboardingLayout';
+import { formatFixedDecimal } from '../../utils/formatNumbers';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
 import { useNumericFieldChain } from '../../hooks/useNumericFieldChain';
@@ -604,7 +605,7 @@ export function OnboardingBodyScreen({ navigation }: OnboardingBodyScreenProps) 
                 ) : result ? (
                   <View style={styles.imcContent}>
                     <Text style={styles.imcValue}>
-                      {t('onboarding.imcLabel')} {result.imc.toFixed(1)}
+                      {t('onboarding.imcLabel')} {formatFixedDecimal(result.imc, locale)}
                     </Text>
                     <Text style={styles.imcClassification}>
                       {t(IMC_CLASS_KEYS[result.imcClassification])}

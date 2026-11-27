@@ -22,6 +22,7 @@ import {
 } from '../../config/cache.config';
 import { useAppTranslation } from '../../hooks/useAppTranslation';
 import { useColors } from '../../hooks/useColors';
+import { useFormatNumbers } from '../../hooks/useFormatNumbers';
 import { useUnits } from '../../hooks/useUnits';
 import { StaleDataIndicator } from '../ui/StaleDataIndicator';
 import { GoalRing } from '../ui/GoalRing';
@@ -71,6 +72,16 @@ export function GoalRingsSection({
   const HYDRATION_GOAL_FILL_COLOR = colors.overlay.success[70];
 
   const { t } = useAppTranslation();
+  const { formatDecimal } = useFormatNumbers();
+
+  // CP-L1a: rótulo do leitor de tela de cada anel, no formato de número do
+  // idioma e com "meta atingida" como na barra de água.
+  const ringAccessibilityLabel = (label: string, current: number, target: number, unit: string) => {
+    const values = { label, current: formatDecimal(current), target: formatDecimal(target), unit };
+    return target > 0 && current >= target
+      ? t('home.ringA11yGoalReached', values)
+      : t('home.ringA11y', values);
+  };
   const { displayHydration } = useUnits();
   const [hydrationTrackWidth, setHydrationTrackWidth] = useState(0);
   const hydrationProgress = useMemo(
@@ -206,6 +217,7 @@ export function GoalRingsSection({
             current={proteinCurrent}
             target={proteinTarget}
             label={t('home.proteinRing')}
+            accessibilityLabel={ringAccessibilityLabel(t('home.proteinRing'), proteinCurrent, proteinTarget, t('common.units.grams'))}
             size={100}
           />
         </View>
@@ -215,6 +227,7 @@ export function GoalRingsSection({
             current={carbsCurrent}
             target={carbsTarget}
             label={t('home.carbsRing')}
+            accessibilityLabel={ringAccessibilityLabel(t('home.carbsRing'), carbsCurrent, carbsTarget, t('common.units.grams'))}
             size={120}
           />
         </View>
@@ -224,6 +237,7 @@ export function GoalRingsSection({
             current={caloriesCurrent}
             target={calorieTarget}
             label={t('home.caloriesRing')}
+            accessibilityLabel={ringAccessibilityLabel(t('home.caloriesRing'), caloriesCurrent, calorieTarget, t('common.units.kilocalories'))}
             size={100}
           />
         </View>

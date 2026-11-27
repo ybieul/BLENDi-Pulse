@@ -608,6 +608,7 @@ export function WeeklyReportScreen({ navigation }: WeeklyReportScreenProps) {
             current={Math.round(report.data.supplements.adherenceRate * 100)}
             target={100}
             label=""
+            accessibilityLabel={t('weeklyReport.adherenceRate', { percent: Math.round(report.data.supplements.adherenceRate * 100) })}
             size={90}
             color={SUPPLEMENT_ICON_COLOR}
           />

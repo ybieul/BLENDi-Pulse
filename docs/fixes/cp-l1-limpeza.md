@@ -35,7 +35,7 @@
 | Gráfico de macros do Histórico | tem linha de meta, sem cor de "batida" (não é barra de meta diária) |
 | Relatório semanal | não tem barra de meta diária |
 
-Os anéis não dizem "meta atingida" ao leitor de tela (só a barra, pedida aqui). Fica como sugestão.
+Os anéis ganharam rótulo para o leitor de tela no CP-L1a.
 
 ## 2. Vírgula decimal em pt-BR
 
@@ -50,7 +50,7 @@ Os anéis não dizem "meta atingida" ao leitor de tela (só a barra, pedida aqui
 | `utils/nutritionGoals.utils.ts` `formatGoalLimit` | faixa em fl oz na mensagem de erro | corrigido ("17,0") |
 | `utils/bodyFields.utils.ts` `weightRangeError` | faixa de peso em lbs na mensagem de erro (onboarding e Completar perfil) | corrigido |
 | `screens/CompleteProfileScreen.tsx` | peso e altura pré-preenchidos nos campos | corrigido (o campo aceita a vírgula) |
-| `screens/onboarding/OnboardingBodyScreen.tsx` IMC (`result.imc.toFixed(1)`) | índice, não unidade de medida | **não mexi** (fora da regra do prompt). Em pt-BR aparece "22.5". Sugestão: mesma troca |
+| `screens/onboarding/OnboardingBodyScreen.tsx` IMC (`result.imc.toFixed(1)`) | índice, não unidade de medida | corrigido no CP-L1a (`formatFixedDecimal`) |
 | `screens/HistoryScreen.tsx` proteína média e aderência (`toFixed(0)`) | inteiros, sem casa decimal | não mexi |
 
 `locale` entrou como parâmetro opcional (padrão `en`) nas funções utilitárias, para os testes antigos continuarem iguais. As telas passam o idioma da conta.
@@ -138,6 +138,8 @@ Nenhum código de evento ou prefixo de log mudou. Os textos dos logs só perdera
 - [ ] Conta imperial + pt-BR: "Ver tutorial de novo", etapa da água com "copo de 8,5 fl oz".
 - [ ] Conta imperial + pt-BR: Minhas metas mostra a hidratação com vírgula e aceita digitar "84,5".
 - [ ] Conta imperial + en: tudo com ponto, como antes.
+- [ ] (CP-L1a) Onboarding em pt-BR: IMC com vírgula ("IMC 22,5"); em en com ponto.
+- [ ] (CP-L1a) VoiceOver/TalkBack nos anéis da Home: cada anel é um elemento só e lê nome, valor, meta e unidade ("Proteína: 80 de 150 g"), com "meta atingida" quando bate a meta.
 
 ## Arquivos
 
